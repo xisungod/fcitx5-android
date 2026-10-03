@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 53f1eb8..e9937da 100644
+index 53f1eb8..608b983 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -33,6 +33,23 @@ android {
@@ -31,11 +31,11 @@ index 53f1eb8..e9937da 100644
          }
          debug {
 +            // Install alongside the original debug APK: its CI signing key is ephemeral.
-+            applicationIdSuffix = ".xuancai.black.v06"
++            applicationIdSuffix = ".xuancai.black.v07"
              resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
              resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "炫彩·曜黑 V06")
++            resValue("string", "app_name", "炫彩·曜黑 V07")
          }
      }
  
@@ -122,14 +122,14 @@ index bed1cbf..c076662 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
-index 93ba4d4..4853275 100644
+index 93ba4d4..774be0c 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 @@ -24,6 +24,7 @@ object ThemeManager {
      }
  
      val BuiltinThemes = listOf(
-+        ThemePreset.XuancaiBlackV06,
++        ThemePreset.XuancaiBlackV07,
          ThemePreset.MaterialLight,
          ThemePreset.MaterialDark,
          ThemePreset.PixelLight,
@@ -138,7 +138,7 @@ index 93ba4d4..4853275 100644
      )
  
 -    val DefaultTheme = ThemePreset.PixelDark
-+    val DefaultTheme = ThemePreset.XuancaiBlackV06
++    val DefaultTheme = ThemePreset.XuancaiBlackV07
  
      private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
  
@@ -150,7 +150,7 @@ index 93ba4d4..4853275 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..caaa645 100644
+index d3b4948..84eb00b 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -328,7 +328,7 @@ index d3b4948..caaa645 100644
          R.string.light_mode_theme,
          "light_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialLight else ThemePreset.PixelLight,
-+        ThemePreset.XuancaiBlackV06,
++        ThemePreset.XuancaiBlackV07,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
@@ -337,12 +337,12 @@ index d3b4948..caaa645 100644
          R.string.dark_mode_theme,
          "dark_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialDark else ThemePreset.PixelDark,
-+        ThemePreset.XuancaiBlackV06,
++        ThemePreset.XuancaiBlackV07,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..7b6a8ed 100644
+index 239e22c..6622112 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
@@ -350,8 +350,8 @@ index 239e22c..7b6a8ed 100644
  object ThemePreset {
  
 +    /** Quiet at rest; key-press colour is supplied by PressEffect. */
-+    val XuancaiBlackV06 = Theme.Builtin(
-+        name = "炫彩·曜黑 V06",
++    val XuancaiBlackV07 = Theme.Builtin(
++        name = "炫彩·曜黑 V07",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
@@ -380,7 +380,7 @@ index 239e22c..7b6a8ed 100644
          name = "MaterialLight",
          isDark = false,
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
-index fe90eda..6e94dd3 100644
+index fe90eda..53bcf19 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
 @@ -62,6 +62,7 @@ import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
@@ -441,6 +441,28 @@ index fe90eda..6e94dd3 100644
              }
              clipboardUi.suggestionView.apply {
                  setOnClickListener {
+@@ -537,7 +512,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+     }
+ 
+     companion object {
+-        const val HEIGHT = 40
++        const val HEIGHT = 52
+     }
+ 
+     fun onKeyboardLayoutSwitched(isNumber: Boolean) {
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt
+index bb756df..84ba7e5 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt
+@@ -26,7 +26,7 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
+     }
+ 
+     override val root = ctx.constraintLayout {
+-        add(expandButton, lParams(dp(40)) {
++        add(expandButton, lParams(dp(48)) {
+             centerVertically()
+             endOfParent()
+         })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/IdleUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/IdleUi.kt
 index 14c09e6..81e1de7 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/IdleUi.kt
@@ -528,6 +550,442 @@ index 3170536..70b829d 100644
      }
 -
  }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/CandidateItemUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/CandidateItemUi.kt
+index 5dbfb80..303454b 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/CandidateItemUi.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/CandidateItemUi.kt
+@@ -25,7 +25,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
+ 
+     private val text = view(::AutoScaleTextView) {
+         scaleMode = AutoScaleTextView.Mode.Proportional
+-        textSize = 20f // sp
++        textSize = 24f // sp
+         isSingleLine = true
+         gravity = gravityCenter
+         setTextColor(theme.candidateTextColor)
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/CandidatesPagingSource.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/CandidatesPagingSource.kt
+index 426b3d0..50373b6 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/CandidatesPagingSource.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/CandidatesPagingSource.kt
+@@ -23,7 +23,7 @@ class CandidatesPagingSource(val fcitx: FcitxConnection, val total: Int, val off
+         }
+         val prevKey = if (startIndex >= pageSize) startIndex - pageSize else null
+         val nextKey = if (total > 0) {
+-            if (startIndex + pageSize + 1 >= total) null else startIndex + pageSize
++            if (startIndex + candidates.size >= total) null else startIndex + pageSize
+         } else {
+             if (candidates.size < pageSize) null else startIndex + pageSize
+         }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/GridPagingCandidateViewAdapter.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/GridPagingCandidateViewAdapter.kt
+index 1b83efa..3e3c42c 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/GridPagingCandidateViewAdapter.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/GridPagingCandidateViewAdapter.kt
+@@ -40,7 +40,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
+     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
+         return super.onCreateViewHolder(parent, viewType).apply {
+             itemView.apply {
+-                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(40))
++                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(52))
+             }
+         }
+     }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/BaseExpandedCandidateWindow.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/BaseExpandedCandidateWindow.kt
+index 95194b1..9064c5b 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/BaseExpandedCandidateWindow.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/BaseExpandedCandidateWindow.kt
+@@ -161,12 +161,12 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
+         }
+         updateTabs(fcitx.runImmediately { inputPanelCached.tabs })
+         offsetJob = service.lifecycleScope.launch {
+-            horizontalCandidate.expandedCandidateOffset.collect {
+-                if (it <= 0) {
++            horizontalCandidate.expandedCandidateOffset.collect { _ ->
++                if (horizontalCandidate.adapter.candidates.isEmpty()) {
+                     windowManager.attachWindow(KeyboardWindow)
+                 } else {
+                     candidateLayout.resetPosition()
+-                    adapter.refreshWithOffset(it)
++                    adapter.refreshWithOffset(0)
+                 }
+             }
+         }
+@@ -195,7 +195,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
+     override fun onDetached() {
+         bar.expandButtonStateMachine.push(
+             ExpandedCandidatesDetached,
+-            ExpandedCandidatesEmpty to (horizontalCandidate.adapter.total == adapter.offset)
++            ExpandedCandidatesEmpty to horizontalCandidate.adapter.candidates.isEmpty()
+         )
+         candidatesSubmitJob?.cancel()
+         offsetJob?.cancel()
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/FlexboxExpandedCandidateWindow.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/FlexboxExpandedCandidateWindow.kt
+index 180c523..c08d520 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/FlexboxExpandedCandidateWindow.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/FlexboxExpandedCandidateWindow.kt
+@@ -30,7 +30,7 @@ class FlexboxExpandedCandidateWindow :
+                     itemView.apply {
+                         minimumWidth = dp(40)
+                         setPaddingDp(10, 0, 10, 0)
+-                        layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, dp(40))
++                        layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, dp(52))
+                             .apply { flexGrow = 1f }
+                     }
+                 }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/CandidatePageBuffer.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/CandidatePageBuffer.kt
+new file mode 100644
+index 0000000..0d28760
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/CandidatePageBuffer.kt
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.input.candidates.horizontal
++
++import org.fcitx.fcitx5.android.core.CandidateWord
++
++/** Reject late pages after further typing so words and selection indices cannot mix. */
++internal class CandidatePageBuffer {
++    data class Request(val generation: Int, val offset: Int, val limit: Int)
++    var generation = 0
++        private set
++    var words = emptyArray<CandidateWord>()
++        private set
++    var total = -1
++        private set
++    private var pending: Request? = null
++    private var exhausted = true
++
++    fun reset(words: Array<CandidateWord>, total: Int) {
++        generation++
++        this.words = words
++        this.total = total
++        pending = null
++        exhausted = words.isEmpty() || (total >= 0 && words.size >= total)
++    }
++    fun request(): Request? {
++        if (pending != null || exhausted) return null
++        return Request(generation, words.size, 48).also { pending = it }
++    }
++    fun complete(request: Request, page: Array<CandidateWord>): Boolean {
++        if (pending != request || generation != request.generation || words.size != request.offset) return false
++        pending = null
++        words += page
++        exhausted = page.size < request.limit || (total >= 0 && words.size >= total)
++        if (exhausted && total < 0) total = words.size
++        return true
++    }
++    fun failed(request: Request) {
++        if (pending == request) pending = null
++    }
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt
+index 6121a82..5c7fa5f 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt
+@@ -1,19 +1,16 @@
+-/*
+- * SPDX-License-Identifier: LGPL-2.1-or-later
+- * SPDX-FileCopyrightText: Copyright 2021-2025 Fcitx5 for Android Contributors
+- */
+-
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
+ package org.fcitx.fcitx5.android.input.candidates.horizontal
+ 
+ import android.content.res.Configuration
+-import android.graphics.drawable.ShapeDrawable
+-import android.graphics.drawable.shapes.RectShape
+-import androidx.core.view.updateLayoutParams
++import androidx.lifecycle.lifecycleScope
++import androidx.recyclerview.widget.LinearLayoutManager
+ import androidx.recyclerview.widget.RecyclerView
+-import com.google.android.flexbox.FlexboxLayoutManager
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Job
+ import kotlinx.coroutines.channels.BufferOverflow
+ import kotlinx.coroutines.flow.MutableSharedFlow
+ import kotlinx.coroutines.flow.asSharedFlow
++import kotlinx.coroutines.launch
+ import org.fcitx.fcitx5.android.R
+ import org.fcitx.fcitx5.android.core.FcitxEvent
+ import org.fcitx.fcitx5.android.daemon.launchOnReady
+@@ -23,84 +20,62 @@ import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEve
+ import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+ import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+ import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+-import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxVerticalDecoration
+-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AlwaysFillWidth
+-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AutoFillWidth
+-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.NeverFillWidth
+ import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
+ import org.fcitx.fcitx5.android.input.dependency.context
+ import org.fcitx.fcitx5.android.input.dependency.fcitx
++import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+ import org.fcitx.fcitx5.android.input.dependency.inputView
+ import org.fcitx.fcitx5.android.input.dependency.theme
+ import org.mechdancer.dependency.manager.must
+ import splitties.dimensions.dp
+-import kotlin.math.max
++import timber.log.Timber
+ 
+ class HorizontalCandidateComponent :
+     UniqueViewComponent<HorizontalCandidateComponent, RecyclerView>(), InputBroadcastReceiver {
+-
+     private val context by manager.context()
+     private val fcitx by manager.fcitx()
+     private val theme by manager.theme()
+     private val inputView by manager.inputView()
++    private val service by manager.inputMethodService()
+     private val bar: KawaiiBarComponent by manager.must()
+-
++    private val buffer = CandidatePageBuffer()
++    private var pageJob: Job? = null
+     private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
+     private val maxSpanCountPref by lazy {
+         AppPrefs.getInstance().keyboard.run {
+             if (context.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
+-                expandedCandidateGridSpanCount
+-            else
+-                expandedCandidateGridSpanCountLandscape
++                expandedCandidateGridSpanCount else expandedCandidateGridSpanCountLandscape
+         }
+     }
+-
+-    private var layoutMinWidth = 0
+-    private var layoutFlexGrow = 1f
+-
+-    /**
+-     * (for [HorizontalCandidateMode.AutoFillWidth] only)
+-     * Second layout pass is needed when:
+-     * [^1] total candidates count < maxSpanCount && [^2] RecyclerView cannot display all of them
+-     * In that case, displayed candidates should be stretched evenly (by setting flexGrow to 1.0f).
+-     */
+-    private var secondLayoutPassNeeded = false
+-    private var secondLayoutPassDone = false
+-
+-    // Since expanded candidate window is created once the expand button was clicked,
+-    // we need to replay the last offset
+-    private val _expandedCandidateOffset = MutableSharedFlow<Int>(
+-        replay = 1,
+-        onBufferOverflow = BufferOverflow.DROP_OLDEST
+-    )
+-
++    private val _expandedCandidateOffset = MutableSharedFlow<Int>(replay = 1,
++        onBufferOverflow = BufferOverflow.DROP_OLDEST)
+     val expandedCandidateOffset = _expandedCandidateOffset.asSharedFlow()
+ 
+-    private fun refreshExpanded(childCount: Int) {
+-        _expandedCandidateOffset.tryEmit(childCount)
+-        bar.expandButtonStateMachine.push(
+-            ExpandedCandidatesUpdated,
+-            ExpandedCandidatesEmpty to (adapter.total == childCount)
+-        )
+-    }
+-
+-    val adapter: HorizontalCandidateViewAdapter by lazy {
++    val adapter by lazy {
+         object : HorizontalCandidateViewAdapter(theme) {
+             override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
+                 super.onBindViewHolder(holder, position)
+-                holder.itemView.updateLayoutParams<FlexboxLayoutManager.LayoutParams> {
+-                    minWidth = layoutMinWidth
+-                    flexGrow = layoutFlexGrow
++                val slots = when (fillStyle) {
++                    HorizontalCandidateMode.NeverFillWidth -> 0
++                    HorizontalCandidateMode.AutoFillWidth -> maxSpanCountPref.getValue()
++                    HorizontalCandidateMode.AlwaysFillWidth ->
++                        minOf(itemCount, maxSpanCountPref.getValue()).coerceAtLeast(1)
+                 }
++                holder.itemView.minimumWidth = if (slots == 0) context.dp(40)
++                    else maxOf(context.dp(40), view.width / slots)
++                val generation = buffer.generation
+                 holder.itemView.setOnClickListener {
+-                    fcitx.launchOnReady { it.select(holder.idx) }
++                    if (generation == buffer.generation && holder.bindingAdapterPosition != RecyclerView.NO_POSITION) {
++                        val index = holder.idx
++                        fcitx.launchOnReady { it.select(index) }
++                    }
+                 }
+                 holder.itemView.setOnLongClickListener {
+-                    inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)
++                    if (generation == buffer.generation && holder.bindingAdapterPosition != RecyclerView.NO_POSITION)
++                        inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)
+                     true
+                 }
+             }
+-
+             override fun onViewRecycled(holder: CandidateViewHolder) {
+                 holder.itemView.setOnClickListener(null)
+                 holder.itemView.setOnLongClickListener(null)
+@@ -108,91 +83,46 @@ class HorizontalCandidateComponent :
+             }
+         }
+     }
+-
+-    val layoutManager: FlexboxLayoutManager by lazy {
+-        object : FlexboxLayoutManager(context) {
+-            override fun canScrollVertically() = false
+-            override fun canScrollHorizontally() = false
+-            override fun onLayoutCompleted(state: RecyclerView.State) {
+-                super.onLayoutCompleted(state)
+-                val cnt = this.childCount
+-                if (secondLayoutPassNeeded) {
+-                    if (cnt < adapter.candidates.size) {
+-                        // [^2] RecyclerView can't display all candidates
+-                        // update LayoutParams in onLayoutCompleted would trigger another
+-                        // onLayoutCompleted, skip the second one to avoid infinite loop
+-                        if (secondLayoutPassDone) return
+-                        secondLayoutPassDone = true
+-                        for (i in 0 until cnt) {
+-                            getChildAt(i)!!.updateLayoutParams<LayoutParams> {
+-                                flexGrow = 1f
+-                            }
+-                        }
+-                    } else {
+-                        secondLayoutPassNeeded = false
+-                    }
+-                }
+-                refreshExpanded(cnt)
+-            }
+-            // no need to override `generate{,Default}LayoutParams`, because HorizontalCandidateViewAdapter
+-            // guarantees ViewHolder's layoutParams to be `FlexboxLayoutManager.LayoutParams`
+-        }
+-    }
+-
+-    private val dividerDrawable by lazy {
+-        ShapeDrawable(RectShape()).apply {
+-            val intrinsicSize = max(1, context.dp(1))
+-            intrinsicWidth = intrinsicSize
+-            intrinsicHeight = intrinsicSize
+-            paint.color = theme.dividerColor
+-        }
+-    }
+-
++    val layoutManager by lazy { LinearLayoutManager(context, RecyclerView.HORIZONTAL, false) }
+     override val view by lazy {
+-        object : RecyclerView(context) {
+-            override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+-                super.onSizeChanged(w, h, oldw, oldh)
+-                if (fillStyle == AutoFillWidth) {
+-                    val maxSpanCount = maxSpanCountPref.getValue()
+-                    layoutMinWidth = w / maxSpanCount - dividerDrawable.intrinsicWidth
+-                }
+-            }
+-        }.apply {
++        RecyclerView(context).apply {
+             id = R.id.candidate_view
+             itemAnimator = null
++            overScrollMode = RecyclerView.OVER_SCROLL_NEVER
+             adapter = this@HorizontalCandidateComponent.adapter
+             layoutManager = this@HorizontalCandidateComponent.layoutManager
+-            addItemDecoration(FlexboxVerticalDecoration(dividerDrawable))
++            addOnScrollListener(object : RecyclerView.OnScrollListener() {
++                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
++                    loadMoreIfNeeded()
++                }
++            })
+         }
+     }
+-
+-    override fun onCandidateUpdate(data: FcitxEvent.CandidateListEvent.Data) {
+-        val candidates = data.candidates
+-        val total = data.total
+-        val maxSpanCount = maxSpanCountPref.getValue()
+-        when (fillStyle) {
+-            NeverFillWidth -> {
+-                layoutMinWidth = 0
+-                layoutFlexGrow = 0f
+-                secondLayoutPassNeeded = false
+-            }
+-            AutoFillWidth -> {
+-                layoutMinWidth = view.width / maxSpanCount - dividerDrawable.intrinsicWidth
+-                layoutFlexGrow = if (candidates.size < maxSpanCount) 0f else 1f
+-                // [^1] total candidates count < maxSpanCount
+-                secondLayoutPassNeeded = candidates.size < maxSpanCount
+-                secondLayoutPassDone = false
+-            }
+-            AlwaysFillWidth -> {
+-                layoutMinWidth = 0
+-                layoutFlexGrow = 1f
+-                secondLayoutPassNeeded = false
++    private fun loadMoreIfNeeded() {
++        if (layoutManager.findLastVisibleItemPosition() < adapter.itemCount - 5) return
++        val request = buffer.request() ?: return
++        pageJob = service.lifecycleScope.launch {
++            try {
++                val page = fcitx.runOnReady { getCandidates(request.offset, request.limit) }
++                if (buffer.complete(request, page)) adapter.appendCandidates(page, buffer.total)
++            } catch (e: CancellationException) {
++                buffer.failed(request)
++                throw e
++            } catch (e: Exception) {
++                buffer.failed(request)
++                Timber.w(e, "Could not load the next candidate page")
+             }
+         }
+-        adapter.updateCandidates(candidates, total)
+-        // not sure why empty candidates won't trigger `FlexboxLayoutManager#onLayoutCompleted()`
+-        if (candidates.isEmpty()) {
+-            refreshExpanded(0)
+-        }
++    }
++    override fun onCandidateUpdate(data: FcitxEvent.CandidateListEvent.Data) {
++        pageJob?.cancel()
++        buffer.reset(data.candidates, data.total)
++        view.stopScroll()
++        adapter.updateCandidates(data.candidates, data.total)
++        layoutManager.scrollToPositionWithOffset(0, 0)
++        _expandedCandidateOffset.tryEmit(0)
++        bar.expandButtonStateMachine.push(ExpandedCandidatesUpdated,
++            ExpandedCandidatesEmpty to data.candidates.isEmpty())
++        view.post { loadMoreIfNeeded() }
+     }
+ }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateViewAdapter.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateViewAdapter.kt
+index 30691c2..7c0f644 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateViewAdapter.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateViewAdapter.kt
+@@ -9,7 +9,7 @@ import android.annotation.SuppressLint
+ import android.view.ViewGroup
+ import androidx.annotation.CallSuper
+ import androidx.recyclerview.widget.RecyclerView
+-import com.google.android.flexbox.FlexboxLayoutManager
++import androidx.recyclerview.widget.RecyclerView.LayoutParams
+ import org.fcitx.fcitx5.android.core.CandidateWord
+ import org.fcitx.fcitx5.android.data.theme.Theme
+ import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
+@@ -22,9 +22,6 @@ import splitties.views.setPaddingDp
+ open class HorizontalCandidateViewAdapter(val theme: Theme) :
+     RecyclerView.Adapter<CandidateViewHolder>() {
+ 
+-    init {
+-        setHasStableIds(true)
+-    }
+ 
+     var candidates: Array<CandidateWord> = arrayOf()
+         private set
+@@ -41,15 +38,20 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
+ 
+     override fun getItemCount() = candidates.size
+ 
+-    override fun getItemId(position: Int) = candidates.getOrNull(position).hashCode().toLong()
++    fun appendCandidates(data: Array<CandidateWord>, total: Int) {
++        val start = candidates.size
++        candidates += data
++        this.total = total
++        notifyItemRangeInserted(start, data.size)
++    }
+ 
+     @CallSuper
+     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
+         val ui = CandidateItemUi(parent.context, theme)
+         ui.root.apply {
+             minimumWidth = dp(40)
+-            setPaddingDp(10, 0, 10, 0)
+-            layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, matchParent)
++            setPaddingDp(16, 0, 16, 0)
++            layoutParams = LayoutParams(wrapContent, matchParent)
+         }
+         return CandidateViewHolder(ui)
+     }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/editing/TextEditingUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/editing/TextEditingUi.kt
 index 327f929..e37be89 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/editing/TextEditingUi.kt
@@ -796,50 +1254,52 @@ index 0000000..ddf1d14
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleGlowPainter.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleGlowPainter.kt
 new file mode 100644
-index 0000000..8e22d3d
+index 0000000..483fa0d
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleGlowPainter.kt
-@@ -0,0 +1,38 @@
-+/*
-+ * SPDX-License-Identifier: LGPL-2.1-or-later
-+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
-+ */
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
 +package org.fcitx.fcitx5.android.input.keyboard
 +
 +import android.graphics.Canvas
-+import android.graphics.Color
-+import android.graphics.ComposeShader
-+import android.graphics.LinearGradient
 +import android.graphics.Paint
-+import android.graphics.PorterDuff
 +import android.graphics.RadialGradient
 +import android.graphics.Shader
++import kotlin.math.PI
++import kotlin.math.cos
 +
-+/** A cached, full-width feathered colour field; no press-texture attenuation or warm-up. */
++/** Cached feathered fields grow from the side edges towards the centre. */
 +internal class IdleGlowPainter(firstColor: Int, secondColor: Int) {
-+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-+        shader = ComposeShader(
-+            LinearGradient(-1f, 0f, 1f, 0f,
-+                intArrayOf(firstColor, secondColor), null, Shader.TileMode.CLAMP),
-+            RadialGradient(0f, 0f, 1f,
-+                intArrayOf(Color.WHITE, Color.WHITE, Color.TRANSPARENT),
-+                floatArrayOf(0f, 0.22f, 1f), Shader.TileMode.CLAMP),
-+            PorterDuff.Mode.DST_IN
-+        )
++    private fun paint(color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        shader = RadialGradient(0f, 0f, 1f,
++            intArrayOf(color, color, color and 0x00ffffff),
++            floatArrayOf(0f, 0.18f, 1f), Shader.TileMode.CLAMP)
 +    }
++    private val left = paint(firstColor)
++    private val right = paint(secondColor)
 +
-+    fun draw(canvas: Canvas, width: Int, height: Int, alpha: Float) {
++    fun draw(canvas: Canvas, width: Int, height: Int, alpha: Float, phase: Float) {
 +        if (width <= 0 || height <= 0 || alpha <= 0f) return
-+        paint.alpha = (alpha.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
-+        val save = canvas.save()
-+        canvas.translate(width * 0.5f, height * 0.51f)
-+        canvas.scale(width * 0.65f, height * 0.58f)
-+        canvas.drawCircle(0f, 0f, 1f, paint)
-+        canvas.restoreToCount(save)
++        // Expand inwards, then keep the wide field while it fades away.
++        val t = (phase * 2f).coerceIn(0f, 1f)
++        val spread = (0.5 - 0.5 * cos(PI * t)).toFloat()
++        val radiusX = width * (0.10f + 0.78f * spread)
++        val radiusY = height * 0.49f
++        val opacity = (alpha.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
++        fun side(x: Float, paint: Paint) {
++            paint.alpha = opacity
++            val save = canvas.save()
++            canvas.translate(x, height * 0.5f)
++            canvas.scale(radiusX, radiusY)
++            canvas.drawCircle(0f, 0f, 1f, paint)
++            canvas.restoreToCount(save)
++        }
++        side(0f, left)
++        side(width.toFloat(), right)
 +    }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
-index c331341..721ddd8 100644
+index c331341..61da1fe 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
 @@ -48,7 +48,7 @@ class AlphabetKey(
@@ -897,8 +1357,8 @@ index c331341..721ddd8 100644
 -        src = R.drawable.ic_baseline_language_24,
 -        variant = Variant.AltForeground,
 +    Appearance.Text(
-+        displayText = "中/英",
-+        textSize = 14f,
++        displayText = "中",
++        textSize = 20f,
 +        percentWidth = 0.13f,
 +        variant = Variant.Alternative,
          viewId = R.id.button_lang
@@ -940,7 +1400,7 @@ index 9bfc478..fc4f20c 100644
                  ColorStateList.valueOf(theme.keyPressHighlightColor), null,
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..5a535cb
+index 0000000..6772e73
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 @@ -0,0 +1,502 @@
@@ -1153,7 +1613,7 @@ index 0000000..5a535cb
 +    }
 +
 +    private fun drawBreathing(canvas: Canvas, alpha: Float) {
-+        idleGlow.draw(canvas, host.width, host.height, alpha)
++        idleGlow.draw(canvas, host.width, host.height, alpha, breathing.phase(frameTime))
 +    }
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
@@ -1506,18 +1966,23 @@ index 0000000..b4adafd
 +    }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-index 368cf6c..13827e8 100644
+index 368cf6c..a4fa6bc 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
+@@ -6,6 +6,12 @@ package org.fcitx.fcitx5.android.input.keyboard
  
  import android.annotation.SuppressLint
  import android.content.Context
 +import android.content.res.Configuration
++import android.graphics.Canvas
++import android.graphics.Paint
++import android.view.ViewGroup
++import androidx.core.view.children
++import splitties.dimensions.dp
  import android.view.View
  import androidx.annotation.Keep
  import androidx.core.view.allViews
-@@ -16,6 +17,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
+@@ -16,6 +22,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
  import org.fcitx.fcitx5.android.data.prefs.AppPrefs
  import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
  import org.fcitx.fcitx5.android.data.theme.Theme
@@ -1525,7 +1990,7 @@ index 368cf6c..13827e8 100644
  import org.fcitx.fcitx5.android.input.popup.PopupAction
  import splitties.views.imageResource
  
-@@ -23,13 +25,26 @@ import splitties.views.imageResource
+@@ -23,13 +30,26 @@ import splitties.views.imageResource
  class TextKeyboard(
      context: Context,
      theme: Theme
@@ -1553,18 +2018,19 @@ index 368cf6c..13827e8 100644
          val Layout: List<List<KeyDef>> = listOf(
              listOf(
                  AlphabetKey("Q", "1"),
-@@ -66,20 +81,18 @@ class TextKeyboard(
+@@ -66,20 +86,19 @@ class TextKeyboard(
                  BackspaceKey()
              ),
              listOf(
 -                LayoutSwitchKey("?123", ""),
 -                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
 -                LanguageKey(),
-+                LayoutSwitchKey("123", "", 0.15f),
-+                CommaKey(0.10f, KeyDef.Appearance.Variant.Alternative),
++                LayoutSwitchKey("123", "", 0.14f),
++                CommaKey(0.08f, KeyDef.Appearance.Variant.Alternative),
                  SpaceKey(),
 -                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
 -                ReturnKey()
++                SymbolKey(".", 0.08f, KeyDef.Appearance.Variant.Alternative),
 +                LanguageKey(),
 +                ReturnKey(0.17f)
              )
@@ -1579,7 +2045,32 @@ index 368cf6c..13827e8 100644
      val space: TextKeyView by lazy { findViewById(R.id.button_space) }
      val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
  
-@@ -150,6 +163,7 @@ class TextKeyboard(
+@@ -102,6 +121,24 @@ class TextKeyboard(
+     }
+ 
+     private var capsState: CapsState = CapsState.None
++    private var englishMode = false
++    private val separatorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        color = 0xff353535.toInt()
++        strokeWidth = dp(1f)
++        strokeCap = Paint.Cap.ROUND
++    }
++
++    override fun dispatchDraw(canvas: Canvas) {
++        super.dispatchDraw(canvas)
++        val row = getChildAt(childCount - 1) as? ViewGroup ?: return
++        val keys = row.children.filter { it.visibility == View.VISIBLE }.sortedBy { it.left }.toList()
++        val center = row.top + row.height * 0.5f
++        // Visual ticks only: touch targets stay adjacent with no gaps.
++        keys.dropLast(1).forEach { key ->
++            val x = row.left + key.right.toFloat()
++            canvas.drawLine(x, center - dp(4f), x, center + dp(4f), separatorPaint)
++        }
++    }
+ 
+     private fun transformAlphabet(c: String): String {
+         return when (capsState) {
+@@ -150,6 +187,7 @@ class TextKeyboard(
      }
  
      override fun onAttach() {
@@ -1587,7 +2078,7 @@ index 368cf6c..13827e8 100644
          capsState = CapsState.None
          updateCapsButtonIcon()
          updateAlphabetKeys()
-@@ -165,10 +179,7 @@ class TextKeyboard(
+@@ -165,13 +203,15 @@ class TextKeyboard(
      }
  
      override fun onInputMethodUpdate(ime: InputMethodEntry) {
@@ -1595,11 +2086,39 @@ index 368cf6c..13827e8 100644
 -            append(ime.displayName)
 -            ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
 -        }
+-        if (capsState != CapsState.None) {
+-            switchCapsState()
+-        }
 +        space.mainText.text = context.getString(R.string.space_key_label)
-         if (capsState != CapsState.None) {
-             switchCapsState()
++        englishMode = ime.uniqueName.startsWith("keyboard-") ||
++            ime.languageCode.startsWith("en") || ime.subMode.icon.startsWith("fcitx_rime_latin") ||
++            ime.subMode.label.equals("A", ignoreCase = true)
++        lang.mainText.text = if (englishMode) "英" else "中"
++        lang.contentDescription = if (englishMode) "English" else "中文"
++        capsState = CapsState.None
++        updateCapsButtonIcon()
++        updateAlphabetKeys()
+     }
+ 
+     private fun transformPopupPreview(c: String): String {
+@@ -238,7 +278,7 @@ class TextKeyboard(
+             if (it.def !is KeyDef.Appearance.AltText) return
+             it.mainText.text = it.def.displayText.let { str ->
+                 if (str.length != 1 || !str[0].isLetter()) return@forEach
+-                if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
++                if (!englishMode && keepLettersUppercase) str.uppercase() else transformAlphabet(str)
+             }
          }
-@@ -258,4 +269,4 @@ class TextKeyboard(
+     }
+@@ -251,11 +291,11 @@ class TextKeyboard(
+             } else {
+                 it.def as KeyDef.Appearance.Text
+                 it.mainText.text = it.def.displayText.let { str ->
+-                    if (str[0].run { isLetter() || isWhitespace() }) return@forEach
++                    if (it.id == R.id.button_lang || str.isEmpty() || str[0].run { isLetter() || isWhitespace() }) return@forEach
+                     transformPunctuation(str)
+                 }
+             }
          }
      }
  
@@ -1976,6 +2495,28 @@ index 5e0c372..7a05c53 100644
                      }
                  }
              }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt
+index b8c048c..bbc9139 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt
+@@ -84,7 +84,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
+         scaleType = ImageView.ScaleType.CENTER_CROP
+     }
+ 
+-    private val barHeight = ctx.dp(40)
++    private val barHeight = ctx.dp(52)
+     private val fakeKawaiiBar = view(::View)
+ 
+     private var keyboardWidth = -1
+@@ -95,7 +95,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
+         add(bkg, lParams {
+             centerInParent()
+         })
+-        add(fakeKawaiiBar, lParams(height = dp(40)) {
++        add(fakeKawaiiBar, lParams(height = dp(52)) {
+             centerHorizontally()
+         })
+     }
 diff --git a/app/src/main/res/drawable/ic_keyboard_tools_24.xml b/app/src/main/res/drawable/ic_keyboard_tools_24.xml
 new file mode 100644
 index 0000000..28fcdba
@@ -2157,6 +2698,53 @@ index fe1fd3a..ee23a9f 100644
 +    <string name="effects_follow_system_animation">Follow system animation switch for key effects</string>
 +    <string name="effects_follow_system_animation_summary">When enabled, turning off system animations also pauses keyboard light effects. The advanced Disable animations setting always takes priority.</string>
  </resources>
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt
+new file mode 100644
+index 0000000..0ee6abf
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt
+@@ -0,0 +1,41 @@
++package org.fcitx.fcitx5.android
++
++import org.fcitx.fcitx5.android.core.CandidateWord
++import org.fcitx.fcitx5.android.input.candidates.horizontal.CandidatePageBuffer
++import org.junit.Assert.*
++import org.junit.Test
++
++class CandidatePageBufferTest {
++    private fun words(start: Int, count: Int) = Array(count) { CandidateWord("", "word${start + it}", "") }
++    @Test fun laterTypingRejectsOldPageWithoutClearingTheNewRequest() {
++        val buffer = CandidatePageBuffer()
++        buffer.reset(words(0, 16), -1)
++        val old = buffer.request()!!
++        assertNull(buffer.request())
++        buffer.reset(words(100, 16), -1)
++        val fresh = buffer.request()!!
++        assertFalse(buffer.complete(old, words(16, 48)))
++        buffer.failed(old)
++        assertNull(buffer.request())
++        assertTrue(buffer.complete(fresh, words(116, 3)))
++        assertEquals("word100", buffer.words.first().text)
++        assertEquals("word118", buffer.words.last().text)
++        assertEquals(19, buffer.total)
++        assertNull(buffer.request())
++    }
++    @Test fun retainsFinalCandidateAndRetriesFailedPageAtTheSameOffset() {
++        val buffer = CandidatePageBuffer()
++        buffer.reset(words(0, 16), 65)
++        val failed = buffer.request()!!
++        buffer.failed(failed)
++        val request = buffer.request()!!
++        assertEquals(16, request.offset)
++        assertTrue(buffer.complete(request, words(16, 48)))
++        val last = buffer.request()!!
++        assertEquals(64, last.offset)
++        assertTrue(buffer.complete(last, words(64, 1)))
++        assertEquals(65, buffer.words.size)
++        assertEquals("word64", buffer.words.last().text)
++        assertNull(buffer.request())
++    }
++}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt
 new file mode 100644
 index 0000000..928c810
@@ -2256,12 +2844,60 @@ index 0000000..928c810
 +        }
 +    }
 +}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/IdleGlowDirectionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/IdleGlowDirectionTest.kt
+new file mode 100644
+index 0000000..c615b8d
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/IdleGlowDirectionTest.kt
+@@ -0,0 +1,42 @@
++package org.fcitx.fcitx5.android
++
++import android.app.Application
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import org.fcitx.fcitx5.android.input.keyboard.IdleGlowPainter
++import org.junit.Assert.*
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [33], application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class IdleGlowDirectionTest {
++    @Test fun lightStartsAtBothEdgesAndReachesTheCentreBeforeFading() {
++        val painter = IdleGlowPainter(0xff00f0ff.toInt(), 0xffbe38ff.toInt())
++        fun frame(phase: Float): Bitmap {
++            val image = Bitmap.createBitmap(600, 240, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(image)
++            canvas.drawColor(Color.BLACK)
++            painter.draw(canvas, 600, 240, 0.28f, phase)
++            return image
++        }
++        val early = frame(0.05f)
++        val wide = frame(0.5f)
++        assertTrue(Color.blue(early.getPixel(2, 120)) > 40)
++        assertTrue(Color.blue(early.getPixel(598, 120)) > 40)
++        assertEquals(Color.BLACK, early.getPixel(300, 120))
++        assertTrue(Color.blue(wide.getPixel(300, 120)) > 20)
++        assertTrue(Color.blue(wide.getPixel(200, 120)) > Color.blue(early.getPixel(200, 120)))
++        for ((name, image) in listOf("idle-sides-start" to early, "idle-sides-merged" to wide)) {
++            val file = File("build/outputs/effect-checks/$name.png")
++            file.parentFile.mkdirs()
++            file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
++        }
++    }
++}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..2d02867
+index 0000000..5a849c7
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,255 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
@@ -2273,6 +2909,17 @@ index 0000000..2d02867
 +import android.os.Looper
 +import android.view.View
 +import android.view.ViewGroup
++import android.view.MotionEvent
++import androidx.recyclerview.widget.RecyclerView
++import androidx.recyclerview.widget.LinearLayoutManager
++import org.fcitx.fcitx5.android.core.CandidateWord
++import org.fcitx.fcitx5.android.core.InputMethodEntry
++import org.fcitx.fcitx5.android.core.InputMethodSubMode
++import org.fcitx.fcitx5.android.input.AutoScaleTextView
++import org.fcitx.fcitx5.android.input.bar.ui.CandidateUi
++import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateViewAdapter
++import org.fcitx.fcitx5.android.input.keyboard.KeyAction
++import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 +import android.widget.FrameLayout
 +import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 +import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -2346,7 +2993,7 @@ index 0000000..2d02867
 +        val activity = controller.get()
 +        activity.setTheme(R.style.Theme_InputViewTheme)
 +        val root = FrameLayout(activity)
-+        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV06)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV07)
 +        activity.setContentView(root)
 +        root.addView(keyboard, FrameLayout.LayoutParams(600, 300))
 +        controller.visible()
@@ -2381,7 +3028,7 @@ index 0000000..2d02867
 +    @Test
 +    fun oldHighlightReproducesTheRectangleSoThePixelCheckIsSensitive() {
 +        val context = RuntimeEnvironment.getApplication()
-+        val oldTheme = ThemePreset.XuancaiBlackV06.copy(keyPressHighlightColor = 0x18ffffff)
++        val oldTheme = ThemePreset.XuancaiBlackV07.copy(keyPressHighlightColor = 0x18ffffff)
 +        val key = TextKeyView(context, oldTheme, LanguageKey().appearance as KeyDef.Appearance.Text)
 +        layout(key, 90, 64)
 +        val normal = render(key)
@@ -2391,6 +3038,120 @@ index 0000000..2d02867
 +        assertFalse(normal.sameAs(pressed))
 +        assertTrue(Color.red(pressed.getPixel(5, 5)) > Color.red(normal.getPixel(5, 5)))
 +    }
++    private fun ime(english: Boolean, rimeAscii: Boolean = false) = InputMethodEntry(
++        if (english && !rimeAscii) "keyboard-us" else "rime", "", "", "", "",
++        if (english && !rimeAscii) "en" else "zh", if (rimeAscii) "rime" else "", false,
++        if (rimeAscii) InputMethodSubMode("Latin Mode", "abc", "fcitx_rime_latin") else InputMethodSubMode())
++
++    @Test
++    fun languageKeyMatchesEngineEnglishUsesLowercaseAndShiftStillTypesUppercase() {
++        val context = RuntimeEnvironment.getApplication()
++        val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV07)
++        val q = keys(keyboard).filterIsInstance<TextKeyView>().first { it.def.displayText == "Q" }
++        var action: KeyAction? = null
++        keyboard.keyActionListener = KeyActionListener { value, _ -> action = value }
++        keyboard.onInputMethodUpdate(ime(false))
++        assertEquals("中", keyboard.lang.mainText.text.toString())
++        assertEquals("Q", q.mainText.text.toString())
++        keyboard.lang.performClick()
++        assertEquals(KeyAction.LangSwitchAction, action)
++        keyboard.onInputMethodUpdate(ime(true))
++        assertEquals("英", keyboard.lang.mainText.text.toString())
++        assertEquals("q", q.mainText.text.toString())
++        q.performClick()
++        assertEquals("q", (action as KeyAction.FcitxKeyAction).act)
++        keyboard.caps.performClick()
++        assertEquals("Q", q.mainText.text.toString())
++        q.performClick()
++        assertEquals("Q", (action as KeyAction.FcitxKeyAction).act)
++        assertEquals("q", q.mainText.text.toString())
++        keyboard.onInputMethodUpdate(ime(true, rimeAscii = true))
++        assertEquals("英", keyboard.lang.mainText.text.toString())
++        keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
++        assertEquals("英", keyboard.lang.mainText.text.toString())
++        keyboard.onInputMethodUpdate(ime(false))
++        assertEquals("中", keyboard.lang.mainText.text.toString())
++        keyboard.onDetach()
++    }
++
++    @Test
++    fun bottomRowHasSixAdjacentTargetsAndOnlyEightDpDividerTicks() {
++        val context = RuntimeEnvironment.getApplication()
++        for (width in listOf(360, 800)) {
++            val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV07)
++            layout(keyboard, width, 260)
++            val row = keyboard.getChildAt(keyboard.childCount - 1) as ViewGroup
++            val bottom = (0 until row.childCount).map { row.getChildAt(it) }.sortedBy { it.left }
++            assertEquals(6, bottom.size)
++            assertTrue(keyboard.space.width >= width * 0.39f)
++            val image = render(keyboard)
++            for (i in 0 until bottom.lastIndex) {
++                assertEquals(bottom[i].right, bottom[i + 1].left)
++                val x = bottom[i].right
++                val cy = row.top + row.height / 2
++                assertTrue(Color.red(image.getPixel(x, cy)) > 10)
++                assertEquals(Color.BLACK, image.getPixel(x, cy - 10))
++            }
++            keyboard.onDetach()
++        }
++    }
++
++    @Test
++    fun largeCandidatesScrollAndRealUiRendersBothLanguageStates() {
++        val controller = Robolectric.buildActivity(Activity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val root = FrameLayout(activity)
++        activity.setContentView(root)
++        val adapter = HorizontalCandidateViewAdapter(ThemePreset.XuancaiBlackV07)
++        val words = arrayOf("你好", "您好", "你好吗", "你好呀", "你好世界", "泥好", "拟好", "倪好")
++        adapter.updateCandidates(words.map { CandidateWord("", it, "") }.toTypedArray(), words.size)
++        val manager = LinearLayoutManager(activity, RecyclerView.HORIZONTAL, false)
++        val candidates = RecyclerView(activity).apply {
++            layoutManager = manager
++            this.adapter = adapter
++            itemAnimator = null
++        }
++        val bar = CandidateUi(activity, ThemePreset.XuancaiBlackV07, candidates)
++        bar.expandButton.visibility = View.VISIBLE
++        root.addView(bar.root, FrameLayout.LayoutParams(360, 52))
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV07)
++        root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
++        controller.visible()
++        layout(root, 360, 312)
++        keyboard.onInputMethodUpdate(ime(false))
++        keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
++        save(render(root), "layout-chinese")
++        val first = candidates.findViewHolderForAdapterPosition(0)!!
++        val label = (first.itemView as ViewGroup).getChildAt(0) as AutoScaleTextView
++        assertEquals(24f, label.textSize / activity.resources.displayMetrics.scaledDensity, 0.01f)
++        assertTrue(candidates.canScrollHorizontally(1))
++        val startLeft = manager.getChildAt(0)!!.left
++        // Send a drag through RecyclerView to cover touch interception and candidate child cancellation.
++        for ((action, x, time) in listOf(Triple(MotionEvent.ACTION_DOWN, 280f, 0L),
++                Triple(MotionEvent.ACTION_MOVE, 150f, 20L), Triple(MotionEvent.ACTION_MOVE, 30f, 40L),
++                Triple(MotionEvent.ACTION_UP, 30f, 80L))) {
++            val event = MotionEvent.obtain(0L, time, action, x, 26f, 0)
++            candidates.dispatchTouchEvent(event)
++            event.recycle()
++        }
++        assertTrue(manager.findFirstVisibleItemPosition() > 0 || manager.getChildAt(0)!!.left < startLeft)
++        candidates.stopScroll()
++        val visible = candidates.getChildViewHolder(candidates.getChildAt(0)) as org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
++        assertEquals(words[visible.idx], visible.candidate.text)
++        manager.scrollToPositionWithOffset(0, 0)
++        layout(root, 360, 312)
++        keyboard.onInputMethodUpdate(ime(true))
++        keyboard.onPunctuationUpdate(emptyMap())
++        save(render(root), "layout-english")
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(3100))
++        save(render(root), "layout-glow-sides")
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1300))
++        save(render(root), "layout-glow-inward")
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
++    }
++
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
 new file mode 100644
@@ -2680,7 +3441,7 @@ index 6b9129f..afa223b 100644
 \ No newline at end of file
 +}
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-index b99ab3e..807ae31 100644
+index b99ab3e..af51644 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 @@ -47,7 +47,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
@@ -2688,12 +3449,12 @@ index b99ab3e..807ae31 100644
                  }
                  debug {
 -                    applicationIdSuffix = ".debug"
-+                    applicationIdSuffix = ".xuancai.black.v06"
++                    applicationIdSuffix = ".xuancai.black.v07"
                  }
                  all {
                      // remove META-INF/version-control-info.textproto
 diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-index 8a19dd2..ae2f7a7 100644
+index 8a19dd2..25574e1 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 @@ -29,10 +29,10 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
@@ -2701,16 +3462,16 @@ index 8a19dd2..ae2f7a7 100644
                  }
                  debug {
 -                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.debug\"")
-+                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v06\"")
++                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v07\"")
                      addManifestPlaceholders(
                          mapOf(
 -                            "mainApplicationId" to "org.fcitx.fcitx5.android.debug",
-+                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v06",
++                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v07",
                          )
                      )
                  }
 diff --git a/lib/plugin-base/src/debug/AndroidManifest.xml b/lib/plugin-base/src/debug/AndroidManifest.xml
-index d1d4123..9febd99 100644
+index d1d4123..735d800 100644
 --- a/lib/plugin-base/src/debug/AndroidManifest.xml
 +++ b/lib/plugin-base/src/debug/AndroidManifest.xml
 @@ -7,7 +7,7 @@
@@ -2718,7 +3479,7 @@ index d1d4123..9febd99 100644
  
      <queries>
 -        <package android:name="org.fcitx.fcitx5.android.debug" />
-+        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v06" />
++        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v07" />
      </queries>
  
      <application>
@@ -2727,7 +3488,7 @@ index d1d4123..9febd99 100644
              tools:node="remove" />
          <meta-data
 -            android:name="org.fcitx.fcitx5.android.debug.plugin.METADATA"
-+            android:name="org.fcitx.fcitx5.android.xuancai.black.v06.plugin.METADATA"
++            android:name="org.fcitx.fcitx5.android.xuancai.black.v07.plugin.METADATA"
              android:resource="@xml/plugin" />
  
          <activity
@@ -2736,7 +3497,7 @@ index d1d4123..9febd99 100644
              </intent-filter>
              <intent-filter>
 -                <action android:name="org.fcitx.fcitx5.android.debug.plugin.MANIFEST" />
-+                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v06.plugin.MANIFEST" />
++                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v07.plugin.MANIFEST" />
              </intent-filter>
          </activity>
      </application>
@@ -2744,7 +3505,7 @@ index d1d4123..9febd99 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
-index 1733282..89a41ce 100644
+index 1733282..272ad0c 100644
 --- a/plugin/rime/build.gradle.kts
 +++ b/plugin/rime/build.gradle.kts
 @@ -33,7 +33,7 @@ android {
@@ -2752,12 +3513,12 @@ index 1733282..89a41ce 100644
          }
          debug {
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "曜黑 Rime V06")
++            resValue("string", "app_name", "曜黑 Rime V07")
          }
      }
  
 diff --git a/plugin/rime/src/main/cpp/CMakeLists.txt b/plugin/rime/src/main/cpp/CMakeLists.txt
-index 6ee8e78..8ba1542 100644
+index 6ee8e78..f6d3716 100644
 --- a/plugin/rime/src/main/cpp/CMakeLists.txt
 +++ b/plugin/rime/src/main/cpp/CMakeLists.txt
 @@ -57,3 +57,30 @@ install(FILES
@@ -2768,7 +3529,7 @@ index 6ee8e78..8ba1542 100644
 +# Pinned, checksum-verified data prepared by scripts/prepare-xuancai-rime.py.
 +set(XUANCAI_RIME_DATA "${CMAKE_CURRENT_SOURCE_DIR}/xuancai-rime-ice")
 +if(NOT EXISTS "${XUANCAI_RIME_DATA}/SOURCE.json")
-+    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V06 Rime plugin")
++    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V07 Rime plugin")
 +endif()
 +install(FILES
 +        "${XUANCAI_RIME_DATA}/rime_ice.schema.yaml"
