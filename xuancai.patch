@@ -15,8 +15,34 @@ index 53f1eb8..352cb3d 100644
          }
      }
  
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt b/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt
+index cec9078..8da5e41 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt
+@@ -12,7 +12,7 @@ import org.fcitx.fcitx5.android.core.data.PluginDescriptor.Companion.pluginPacka
+  */
+ data class PluginDescriptor(
+     /**
+-     * Must have [pluginPackagePrefix] prefix and end with `.debug` if it's debug variant
++     * Must have [pluginPackagePrefix] prefix and the same variant suffix as the host.
+      */
+     val packageName: String,
+     /**
+@@ -38,7 +38,9 @@ data class PluginDescriptor(
+ 
+     companion object {
+         const val pluginPackagePrefix = "org.fcitx.fcitx5.android.plugin."
+-        const val pluginPackageSuffix = ".${BuildConfig.BUILD_TYPE}"
++        val pluginPackageSuffix = BuildConfig.APPLICATION_ID
++            .removePrefix("org.fcitx.fcitx5.android")
++            .ifEmpty { ".${BuildConfig.BUILD_TYPE}" }
+         const val pluginAPI = "0.1"
+     }
+-}
+\ No newline at end of file
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
-index bed1cbf..29cc761 100644
+index bed1cbf..689ff4d 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 @@ -141,11 +141,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
@@ -42,6 +68,15 @@ index bed1cbf..29cc761 100644
          )
          val spaceSwipeMoveCursor =
              switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
+@@ -182,7 +182,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+         val langSwitchKeyBehavior = enumList(
+             R.string.lang_switch_key_behavior,
+             "lang_switch_key_behavior",
+-            LangSwitchBehavior.Enumerate
++            LangSwitchBehavior.ToggleActivate
+         ) { showLangSwitchKey.getValue() }
+ 
+         val keyboardHeightPercent: ManagedPreference.PInt
 @@ -213,7 +213,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                  R.string.keyboard_side_padding,
                  R.string.portrait,
