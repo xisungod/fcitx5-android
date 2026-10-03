@@ -1,0 +1,111 @@
+{
+  "source_commit": "09b937054958d5247a612d4e813cd243567397d4",
+  "run": "37137367528",
+  "run_url": "https://github.com/xisungod/fcitx5-android/actions/runs/37137367528",
+  "android_tests": {
+    "tests": 41,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "name": "org.fcitx.fcitx5.android.CandidatePageBufferTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.IdleBreathingTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.IdleGlowDirectionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardVisualRegressionTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PressEffectMasksTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PressEffectRenderingTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PressEffectTrailTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.RimeMobileOptionsTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.StringEscapeTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.ThemeSerializationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "renders": "Actual Android View rendering using Robolectric native graphics, not phone screenshots. Motion clock injected at 33 ms intervals, original view dimensions preserved. GIF timing rounded cumulatively to 10 ms precision.",
+  "release_published": false,
+  "build_conclusion": "success",
+  "native_rime_checks": "passed",
+  "artifacts": [
+    {
+      "file": "SHA256SUMS.txt",
+      "bytes": 291,
+      "sha256": "40b658a2b81b623f90aa654be4e2827a6faef2255352b29eb628595a240510f0"
+    },
+    {
+      "file": "fcitx5-rime-black-v09-arm64.apk",
+      "bytes": 95740229,
+      "sha256": "044250ea38d936599fc8c9c88d7251334833e7da5a099cfdcb1425633579e4a7"
+    },
+    {
+      "file": "fcitx5-xuancai-black-v09-arm64.apk",
+      "bytes": 69621680,
+      "sha256": "49f55f0759db84d172205492fa9f159cd2650d865ac3cc111f8e75911bc4a7a6"
+    },
+    {
+      "file": "xuancai-v09-rime-data.zip",
+      "bytes": 51019217,
+      "sha256": "c9424764837c9ed3c90ecb2dfabb11ba23d0901215a63fec9d9249eff3dd850c"
+    }
+  ],
+  "signing_certificate_sha256": "a02ad0d6bb9167e9a0d1d3a99265623caae3cff0dcb29068437f1bdc6325503b",
+  "package_mode": "isolated .xuancai.black.v09; paired main and plugin share the same certificate"
+}
