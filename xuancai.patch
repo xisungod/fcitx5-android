@@ -87,7 +87,7 @@ index cec9078..8da5e41 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
-index bed1cbf..d7e9392 100644
+index bed1cbf..9ce491d 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 @@ -59,6 +59,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
@@ -140,6 +140,15 @@ index bed1cbf..d7e9392 100644
          ) { showLangSwitchKey.getValue() }
  
          val keyboardHeightPercent: ManagedPreference.PInt
+@@ -193,7 +197,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+                 R.string.keyboard_height,
+                 R.string.portrait,
+                 "keyboard_height_percent",
+-                30,
++                26,
+                 R.string.landscape,
+                 "keyboard_height_percent_landscape",
+                 49,
 @@ -442,4 +446,4 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
  
          fun getInstance() = instance!!
@@ -197,7 +206,7 @@ index 93ba4d4..ff2cf92 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..6b889f0 100644
+index d3b4948..dbf58bc 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -332,29 +341,16 @@ index d3b4948..6b889f0 100644
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
-@@ -51,10 +158,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
-             R.string.key_horizontal_margin,
-             R.string.portrait,
-             "key_horizontal_margin",
--            3,
-+            0,
-             R.string.landscape,
-             "key_horizontal_margin_landscape",
--            3,
-+            0,
-             0,
-             24,
-             "dp"
 @@ -71,10 +178,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_vertical_margin,
              R.string.portrait,
              "key_vertical_margin",
 -            7,
-+            0,
++            4,
              R.string.landscape,
              "key_vertical_margin_landscape",
 -            4,
-+            0,
++            3,
              0,
              24,
              "dp"
@@ -363,20 +359,28 @@ index d3b4948..6b889f0 100644
      }
  
 -    val keyRadius = int(R.string.key_radius, "key_radius", 4, 0, 48, "dp")
-+    val keyRadius = int(R.string.key_radius, "key_radius", 0, 0, 48, "dp")
++    val keyRadius = int(R.string.key_radius, "key_radius", 5, 0, 48, "dp")
  
      val textEditingButtonRadius =
          int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
-@@ -100,7 +207,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -93,6 +200,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+ 
+     enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
+         None(R.string.punctuation_pos_none),
++        TopRowDigits(R.string.punctuation_pos_top_row_digits),
+         Bottom(R.string.punctuation_pos_bottom),
+         TopRight(R.string.punctuation_pos_top_right);
+     }
+@@ -100,7 +208,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val punctuationPosition = enumList(
          R.string.punctuation_position,
          "punctuation_position",
 -        PunctuationPosition.Bottom
-+        PunctuationPosition.None
++        PunctuationPosition.TopRowDigits
      )
  
      enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-@@ -136,14 +243,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -136,14 +244,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val followSystemDayNightTheme = switch(
          R.string.follow_system_day_night_theme,
          "follow_system_dark_mode",
@@ -393,7 +397,7 @@ index d3b4948..6b889f0 100644
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
-@@ -151,7 +258,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -151,7 +259,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val darkModeTheme = themePreference(
          R.string.dark_mode_theme,
          "dark_mode_theme",
@@ -403,34 +407,34 @@ index d3b4948..6b889f0 100644
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..afeb468 100644
+index 239e22c..96f1de6 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
  
  object ThemePreset {
  
-+    /** Quiet at rest; key-press colour is supplied by PressEffect. */
++    /** Separate dark keycaps; translucent faces admit the light behind them. */
 +    val XuancaiBlackV08 = Theme.Builtin(
 +        name = "炫彩·曜黑 V08",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
 +        keyboardColor = 0xff000000,
-+        keyBackgroundColor = 0x00000000,
++        keyBackgroundColor = 0x80505660,
 +        keyTextColor = 0xfff5f5f7,
 +        candidateTextColor = 0xfff5f5f7,
 +        candidateLabelColor = 0xffb8b8c0,
 +        candidateCommentColor = 0xffa4a4ae,
-+        altKeyBackgroundColor = 0x00000000,
++        altKeyBackgroundColor = 0x902b2d34,
 +        altKeyTextColor = 0xffdedee4,
-+        accentKeyBackgroundColor = 0x00000000,
-+        accentKeyTextColor = 0xff00e8ff,
++        accentKeyBackgroundColor = 0x902b2d34,
++        accentKeyTextColor = 0xfff5f5f7,
 +        keyPressHighlightColor = 0x00000000,
 +        keyShadowColor = 0x00000000,
 +        popupBackgroundColor = 0xff202026,
 +        popupTextColor = 0xfff5f5f7,
-+        spaceBarColor = 0x00000000,
++        spaceBarColor = 0x80505660,
 +        dividerColor = 0xff202024,
 +        clipboardEntryColor = 0xff242426,
 +        genericActiveBackgroundColor = 0xff3d4c66,
@@ -1154,7 +1158,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..1d84c60 100644
+index 5c2fef9..7936f88 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1273,17 +1277,27 @@ index 5c2fef9..1d84c60 100644
                  swipeRepeatEnabled = true
                  swipeThresholdX = selectionSwipeThreshold
                  swipeThresholdY = disabledSwipeThreshold
-@@ -394,6 +455,28 @@ abstract class BaseKeyboard(
+@@ -394,6 +455,38 @@ abstract class BaseKeyboard(
          target.view.dispatchTouchEvent(e)
      }
  
++    private val effectKeyBounds = Rect()
++    private val effectHostLocation = IntArray(2)
++
 +    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
 +        pressEffectLayer?.let {
 +            val action = ev.actionMasked
 +            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
 +                val i = ev.actionIndex
 +                val target = findTouchTarget(ev, i)
-+                it.onPress(ev.getX(i), ev.getY(i), target?.hitRect,
++                val keyBounds = target?.view?.let { key ->
++                    getLocationInWindow(effectHostLocation)
++                    effectKeyBounds.set(key.bounds)
++                    effectKeyBounds.offset(-effectHostLocation[0], -effectHostLocation[1])
++                    effectKeyBounds.inset(key.hMargin, key.vMargin)
++                    effectKeyBounds
++                }
++                it.onPress(ev.getX(i), ev.getY(i), keyBounds,
 +                    target?.view?.def is KeyDef.Appearance.AltText)
 +            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
 +                it.onRelease()
@@ -1302,7 +1316,7 @@ index 5c2fef9..1d84c60 100644
      override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
          // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
          return if (vivoKeypressWorkaround && ev.actionMasked == MotionEvent.ACTION_DOWN) true
-@@ -484,8 +567,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +577,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1337,15 +1351,16 @@ index 5c2fef9..1d84c60 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +610,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +620,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
 +        pressEffectLayer?.setActive(false)
      }
  
- }
+-}
 \ No newline at end of file
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt
 index 3847b97..27ac230 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt
@@ -1564,7 +1579,7 @@ index 0000000..483fa0d
 +    }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
-index c331341..c7eb66c 100644
+index c331341..54e6561 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
 @@ -48,7 +48,7 @@ class AlphabetKey(
@@ -1572,10 +1587,19 @@ index c331341..c7eb66c 100644
          displayText = character,
          altText = punctuation,
 -        textSize = 23f,
-+        textSize = 24f,
++        textSize = 22f,
          variant = variant
      ),
      setOf(
+@@ -130,7 +130,7 @@ class BackspaceKey(
+     variant: Variant = Variant.Alternative
+ ) : KeyDef(
+     Appearance.Image(
+-        src = R.drawable.ic_baseline_backspace_24,
++        src = R.drawable.ic_keyboard_backspace_outline,
+         percentWidth = percentWidth,
+         variant = variant,
+         viewId = R.id.button_backspace,
 @@ -158,44 +158,27 @@ class CommaKey(
      percentWidth: Float,
      variant: Variant,
@@ -1617,19 +1641,32 @@ index c331341..c7eb66c 100644
      )
  )
  
- class LanguageKey : KeyDef(
+-class LanguageKey : KeyDef(
 -    Appearance.Image(
 -        src = R.drawable.ic_baseline_language_24,
 -        variant = Variant.AltForeground,
++class LanguageKey(percentWidth: Float = 0.125f) : KeyDef(
 +    Appearance.Text(
 +        displayText = "中",
 +        textSize = 20f,
-+        percentWidth = 0.10f,
++        percentWidth = percentWidth,
 +        variant = Variant.Alternative,
          viewId = R.id.button_lang
      ),
      setOf(
-@@ -230,16 +213,7 @@ class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
+@@ -205,9 +188,8 @@ class LanguageKey : KeyDef(
+ )
+ 
+ class SpaceKey : KeyDef(
+-    Appearance.Text(
+-        displayText = " ",
+-        textSize = 13f,
++    Appearance.Image(
++        src = R.drawable.ic_keyboard_space_outline,
+         percentWidth = 0f,
+         border = Border.Special,
+         viewId = R.id.button_space,
+@@ -230,16 +212,7 @@ class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
      ),
      setOf(
          Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return)))
@@ -1648,14 +1685,14 @@ index c331341..c7eb66c 100644
  
  class ImageLayoutSwitchKey(
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
-index 9bfc478..fc4f20c 100644
+index 9bfc478..e0e6e8b 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
 @@ -146,6 +146,11 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
      }
  
      private fun setupPressHighlight(mask: Drawable? = null) {
-+        // Seamless neon themes use the keyboard-wide light, not a rectangular key overlay.
++        // Neon themes use the keyboard-wide light, not an extra pressed rectangle.
 +        if (Color.alpha(theme.keyPressHighlightColor) == 0) {
 +            appearanceView.foreground = null
 +            return
@@ -1663,6 +1700,19 @@ index 9bfc478..fc4f20c 100644
          appearanceView.foreground = if (rippled) {
              RippleDrawable(
                  ColorStateList.valueOf(theme.keyPressHighlightColor), null,
+@@ -358,6 +363,12 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
+ 
+     private fun applyLayout(orientation: Int) {
+         when (ThemeManager.prefs.punctuationPosition.getValue()) {
++            PunctuationPosition.TopRowDigits -> {
++                val digits = (def as KeyDef.Appearance.AltText).altText.all { it.isDigit() }
++                if (digits && (orientation == Configuration.ORIENTATION_LANDSCAPE ||
++                        !ThemeManager.prefs.portraitNumberRow.getValue())) applyTopRightAltTextPosition()
++                else applyNoAltTextPosition()
++            }
+             PunctuationPosition.Bottom -> when (orientation) {
+                 Configuration.ORIENTATION_LANDSCAPE -> applyTopRightAltTextPosition()
+                 else -> applyBottomAltTextPosition()
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt
 index 26dcded..1a33534 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt
@@ -1700,7 +1750,7 @@ index 26dcded..1a33534 100644
              it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..8fd1507
+index 0000000..2f05c44
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 @@ -0,0 +1,565 @@
@@ -1884,8 +1934,8 @@ index 0000000..8fd1507
 +            keyFill = highlightKey && keyBounds != null
 +            x = if (keyFill) keyBounds!!.exactCenterX() else pressX
 +            y = if (keyFill) keyBounds!!.exactCenterY() else pressY
-+            flashWidth = if (keyFill) max(density, keyBounds!!.width() - 3f * density) else flashRadius * 2f
-+            flashHeight = if (keyFill) max(density, keyBounds!!.height() - 6f * density) else flashRadius * 2f
++            flashWidth = if (keyFill) max(density, keyBounds!!.width().toFloat()) else flashRadius * 2f
++            flashHeight = if (keyFill) max(density, keyBounds!!.height().toFloat()) else flashRadius * 2f
 +            colorIndex = index
 +            shape = selectedShape
 +            echoShape = (selectedShape + 1 + random.nextInt(max(1, shapes - 1))) % shapes
@@ -2387,22 +2437,18 @@ index adea1fc..e715a00 100644
      Enumerate(R.string.space_behavior_enumerate),
      ToggleActivate(R.string.space_behavior_activate),
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-index 368cf6c..c9536bb 100644
+index 368cf6c..6d342e6 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-@@ -6,6 +6,11 @@ package org.fcitx.fcitx5.android.input.keyboard
+@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
  
  import android.annotation.SuppressLint
  import android.content.Context
 +import android.content.res.Configuration
-+import android.graphics.Canvas
-+import android.graphics.Paint
-+import android.view.ViewGroup
-+import splitties.dimensions.dp
  import android.view.View
  import androidx.annotation.Keep
  import androidx.core.view.allViews
-@@ -16,20 +21,35 @@ import org.fcitx.fcitx5.android.core.KeyStates
+@@ -16,20 +17,35 @@ import org.fcitx.fcitx5.android.core.KeyStates
  import org.fcitx.fcitx5.android.data.prefs.AppPrefs
  import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
  import org.fcitx.fcitx5.android.data.theme.Theme
@@ -2439,22 +2485,22 @@ index 368cf6c..c9536bb 100644
          val Layout: List<List<KeyDef>> = listOf(
              listOf(
                  AlphabetKey("Q", "1"),
-@@ -66,20 +86,20 @@ class TextKeyboard(
+@@ -66,21 +82,21 @@ class TextKeyboard(
                  BackspaceKey()
              ),
              listOf(
 -                LayoutSwitchKey("?123", ""),
 -                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
 -                LanguageKey(),
-+                TextPickerSwitchKey("!@#", PickerWindow.Key.Symbol, 0.10f),
-+                LayoutSwitchKey("123", NumberKeyboard.Name, 0.10f),
++                TextPickerSwitchKey("!@#", PickerWindow.Key.Symbol, 0.125f),
++                LayoutSwitchKey("123", NumberKeyboard.Name, 0.125f),
 +                CommaKey(0.10f, KeyDef.Appearance.Variant.Alternative),
                  SpaceKey(),
 -                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
 -                ReturnKey()
 +                SymbolKey(".", 0.10f, KeyDef.Appearance.Variant.Alternative),
 +                LanguageKey(),
-+                ReturnKey(0.10f)
++                ReturnKey(0.125f)
              )
          )
      }
@@ -2463,42 +2509,29 @@ index 368cf6c..c9536bb 100644
      val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
 -    val quickphrase: ImageKeyView by lazy { findViewById(R.id.button_quickphrase) }
 -    val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
+-    val space: TextKeyView by lazy { findViewById(R.id.button_space) }
 +    val lang: TextKeyView by lazy { findViewById(R.id.button_lang) }
-     val space: TextKeyView by lazy { findViewById(R.id.button_space) }
++    val space: ImageKeyView by lazy { findViewById(R.id.button_space) }
      val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
  
-@@ -102,6 +122,30 @@ class TextKeyboard(
+     private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
+@@ -93,6 +109,7 @@ class TextKeyboard(
+     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
+ 
+     init {
++        space.contentDescription = context.getString(R.string.space_key_label)
+         updateLangSwitchKey(showLangSwitchKey.getValue())
+         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
+     }
+@@ -102,6 +119,7 @@ class TextKeyboard(
      }
  
      private var capsState: CapsState = CapsState.None
 +    private var englishMode = false
-+    private val separatorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-+        color = 0xff353535.toInt()
-+        strokeWidth = dp(1f)
-+        strokeCap = Paint.Cap.ROUND
-+    }
-+
-+    override fun dispatchDraw(canvas: Canvas) {
-+        super.dispatchDraw(canvas)
-+        val row = getChildAt(childCount - 1) as? ViewGroup ?: return
-+        val center = row.top + row.height * 0.5f
-+        val halfHeight = dp(4f)
-+        // Visual ticks only: touch targets stay adjacent; no per-frame lists or sorting.
-+        var previous: View? = null
-+        for (i in 0 until row.childCount) {
-+            val key = row.getChildAt(i)
-+            if (key.visibility != View.VISIBLE) continue
-+            previous?.let {
-+                val x = row.left + it.right.toFloat()
-+                canvas.drawLine(x, center - halfHeight, x, center + halfHeight, separatorPaint)
-+            }
-+            previous = key
-+        }
-+    }
  
      private fun transformAlphabet(c: String): String {
          return when (capsState) {
-@@ -111,7 +155,7 @@ class TextKeyboard(
+@@ -111,7 +129,7 @@ class TextKeyboard(
      }
  
      private var punctuationMapping: Map<String, String> = mapOf()
@@ -2507,7 +2540,7 @@ index 368cf6c..c9536bb 100644
  
      override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
          var transformed = action
-@@ -150,6 +194,7 @@ class TextKeyboard(
+@@ -150,6 +168,7 @@ class TextKeyboard(
      }
  
      override fun onAttach() {
@@ -2515,7 +2548,7 @@ index 368cf6c..c9536bb 100644
          capsState = CapsState.None
          updateCapsButtonIcon()
          updateAlphabetKeys()
-@@ -165,13 +210,16 @@ class TextKeyboard(
+@@ -165,13 +184,15 @@ class TextKeyboard(
      }
  
      override fun onInputMethodUpdate(ime: InputMethodEntry) {
@@ -2526,7 +2559,6 @@ index 368cf6c..c9536bb 100644
 -        if (capsState != CapsState.None) {
 -            switchCapsState()
 -        }
-+        space.mainText.text = context.getString(R.string.space_key_label)
 +        englishMode = ime.uniqueName.startsWith("keyboard-") ||
 +            ime.languageCode.startsWith("en") || ime.subMode.icon.startsWith("fcitx_rime_latin") ||
 +            ime.subMode.label.equals("A", ignoreCase = true)
@@ -2539,7 +2571,7 @@ index 368cf6c..c9536bb 100644
      }
  
      private fun transformPopupPreview(c: String): String {
-@@ -194,7 +242,11 @@ class TextKeyboard(
+@@ -194,7 +215,11 @@ class TextKeyboard(
                              )
                          else action
                      }
@@ -2552,7 +2584,7 @@ index 368cf6c..c9536bb 100644
                  }
              }
              else -> action
-@@ -238,7 +290,7 @@ class TextKeyboard(
+@@ -238,7 +263,7 @@ class TextKeyboard(
              if (it.def !is KeyDef.Appearance.AltText) return
              it.mainText.text = it.def.displayText.let { str ->
                  if (str.length != 1 || !str[0].isLetter()) return@forEach
@@ -2561,7 +2593,7 @@ index 368cf6c..c9536bb 100644
              }
          }
      }
-@@ -251,11 +303,11 @@ class TextKeyboard(
+@@ -251,11 +276,11 @@ class TextKeyboard(
              } else {
                  it.def as KeyDef.Appearance.Text
                  it.mainText.text = it.def.displayText.let { str ->
@@ -3060,6 +3092,32 @@ index b8c048c..bbc9139 100644
              centerHorizontally()
          })
      }
+diff --git a/app/src/main/res/drawable/ic_keyboard_backspace_outline.xml b/app/src/main/res/drawable/ic_keyboard_backspace_outline.xml
+new file mode 100644
+index 0000000..f1e6c33
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_keyboard_backspace_outline.xml
+@@ -0,0 +1,7 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp" android:height="24dp"
++    android:viewportWidth="24" android:viewportHeight="24">
++    <path android:fillColor="#00000000" android:strokeColor="#ffffff"
++        android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round"
++        android:pathData="M9,5 L20,5 Q21,5 21,6 L21,18 Q21,19 20,19 L9,19 L3,12 Z M12,9 L18,15 M18,9 L12,15" />
++</vector>
+diff --git a/app/src/main/res/drawable/ic_keyboard_space_outline.xml b/app/src/main/res/drawable/ic_keyboard_space_outline.xml
+new file mode 100644
+index 0000000..f2f8a91
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_keyboard_space_outline.xml
+@@ -0,0 +1,7 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="40dp" android:height="24dp"
++    android:viewportWidth="40" android:viewportHeight="24">
++    <path android:fillColor="#00000000" android:strokeColor="#ffffff"
++        android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round"
++        android:pathData="M6,9 L6,14 Q6,16 8,16 L32,16 Q34,16 34,14 L34,9" />
++</vector>
 diff --git a/app/src/main/res/drawable/ic_keyboard_tools_24.xml b/app/src/main/res/drawable/ic_keyboard_tools_24.xml
 new file mode 100644
 index 0000000..28fcdba
@@ -3074,7 +3132,7 @@ index 0000000..28fcdba
 +        android:pathData="M4,4h6v6h-6z M14,4h6v6h-6z M4,14h6v6h-6z M14,14h6v6h-6z" />
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..4a98c5a 100644
+index 40ef2c9..ed30254 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -3095,7 +3153,15 @@ index 40ef2c9..4a98c5a 100644
      <string name="key_border">启用按键边框</string>
      <string name="brightness">亮度</string>
      <string name="key_radius">按键圆角半径</string>
-@@ -321,4 +332,44 @@
+@@ -123,6 +134,7 @@
+     <string name="punctuation_pos_bottom">底部（仅限竖屏）</string>
+     <string name="punctuation_pos_top_right">右上</string>
+     <string name="punctuation_pos_none">无</string>
++    <string name="punctuation_pos_top_row_digits">仅首行数字</string>
+     <string name="expand_toolbar_by_default">默认展开工具栏</string>
+     <string name="popup_on_key_press">按键时弹出显示字符</string>
+     <string name="disable_animation">禁用动画</string>
+@@ -321,4 +333,44 @@
      <string name="keyboard_height_percent_base">键盘高度百分比</string>
      <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
      <string name="real_size">真实尺寸 (Display.getRealSize)</string>
@@ -3141,7 +3207,7 @@ index 40ef2c9..4a98c5a 100644
 +    <string name="press_ignition_time">按键先亮时长</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..d408f40 100644
+index fa9bc4e..858dcc6 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -3162,7 +3228,15 @@ index fa9bc4e..d408f40 100644
      <string name="key_border">啟用按鍵邊框</string>
      <string name="brightness">亮度</string>
      <string name="key_radius">按鍵圓角半徑</string>
-@@ -316,4 +327,44 @@
+@@ -123,6 +134,7 @@
+     <string name="punctuation_pos_bottom">底部（僅限直向）</string>
+     <string name="punctuation_pos_top_right">右上</string>
+     <string name="punctuation_pos_none">無</string>
++    <string name="punctuation_pos_top_row_digits">僅首行數字</string>
+     <string name="expand_toolbar_by_default">預設展開工具列</string>
+     <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
+     <string name="disable_animation">停用動畫</string>
+@@ -316,4 +328,44 @@
      <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
      <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
      <string name="preferred_voice_input">首選語音輸入</string>
@@ -3208,7 +3282,7 @@ index fa9bc4e..d408f40 100644
 +    <string name="press_ignition_time">按鍵先亮時長</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..c791617 100644
+index fe1fd3a..83baf7e 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -3229,7 +3303,15 @@ index fe1fd3a..c791617 100644
      <string name="key_border">Enable key border</string>
      <string name="brightness">Brightness</string>
      <string name="key_radius">Key radius</string>
-@@ -321,4 +332,44 @@
+@@ -123,6 +134,7 @@
+     <string name="punctuation_pos_bottom">Bottom (Portrait only)</string>
+     <string name="punctuation_pos_top_right">Top Right</string>
+     <string name="punctuation_pos_none">None</string>
++    <string name="punctuation_pos_top_row_digits">Top-row numbers only</string>
+     <string name="expand_toolbar_by_default">Expand toolbar by default</string>
+     <string name="popup_on_key_press">Popup on key press</string>
+     <string name="disable_animation">Disable animation</string>
+@@ -321,4 +333,44 @@
      <string name="keyboard_height_percent_base">Keyboard height percent base</string>
      <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
      <string name="real_size">Real size (Display.getRealSize)</string>
@@ -3487,10 +3569,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..e6541ca
+index 0000000..c14de26
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,363 @@
+@@ -0,0 +1,375 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -3652,7 +3734,7 @@ index 0000000..e6541ca
 +        key.jumpDrawablesToCurrentState()
 +        val pressed = render(key)
 +        assertFalse(normal.sameAs(pressed))
-+        assertTrue(Color.red(pressed.getPixel(5, 5)) > Color.red(normal.getPixel(5, 5)))
++        assertTrue(Color.red(pressed.getPixel(10, 10)) > Color.red(normal.getPixel(10, 10)))
 +    }
 +    private fun ime(english: Boolean, rimeAscii: Boolean = false) = InputMethodEntry(
 +        if (english && !rimeAscii) "keyboard-us" else "rime", "", "", "", "",
@@ -3695,7 +3777,7 @@ index 0000000..e6541ca
 +    }
 +
 +    @Test
-+    fun bottomRowHasSevenSamsungStyleTargetsAndOnlyEightDpDividerTicks() {
++    fun samsungKeycapsHaveVisibleGapsButNoDeadTouchZonesAndSpaceUsesAnIcon() {
 +        val context = RuntimeEnvironment.getApplication()
 +        for (width in listOf(360, 800)) {
 +            val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV08)
@@ -3703,8 +3785,11 @@ index 0000000..e6541ca
 +            val row = keyboard.getChildAt(keyboard.childCount - 1) as ViewGroup
 +            val bottom = (0 until row.childCount).map { row.getChildAt(it) }.sortedBy { it.left }
 +            assertEquals(7, bottom.size)
-+            assertTrue(keyboard.space.width >= width * 0.39f)
++            assertEquals(width * 0.30f, keyboard.space.width.toFloat(), 1f)
 +            assertEquals(width / 2f, (keyboard.space.left + keyboard.space.right) / 2f, 1f)
++            assertEquals(R.drawable.ic_keyboard_space_outline,
++                (keyboard.space.def as KeyDef.Appearance.Image).src)
++            assertEquals(context.getString(R.string.space_key_label), keyboard.space.contentDescription)
 +            var lastAction: KeyAction? = null
 +            keyboard.keyActionListener = KeyActionListener { action, _ -> lastAction = action }
 +            bottom[0].performClick()
@@ -3718,9 +3803,18 @@ index 0000000..e6541ca
 +                assertEquals(bottom[i].right, bottom[i + 1].left)
 +                val x = bottom[i].right
 +                val cy = row.top + row.height / 2
-+                assertTrue(Color.red(image.getPixel(x, cy)) > 10)
++                assertEquals(Color.BLACK, image.getPixel(x, cy))
 +                assertEquals(Color.BLACK, image.getPixel(x, cy - 10))
++                val key = bottom[i] as KeyView
++                assertEquals(3, key.hMargin)
++                assertEquals(4, key.vMargin)
++                assertTrue("A separate dark keycap must remain visible at rest",
++                    Color.red(image.getPixel(key.left + key.hMargin + 5, cy - 8)) > 10)
 +            }
++            val q = keys(keyboard).filterIsInstance<org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView>()
++                .first { (it.def as KeyDef.Appearance.AltText).displayText == "Q" }
++            assertEquals(View.VISIBLE, q.altText.visibility)
++            assertEquals("1", q.altText.text.toString())
 +            keyboard.onDetach()
 +        }
 +    }
@@ -3747,26 +3841,26 @@ index 0000000..e6541ca
 +        rippleBar.addView(bar.root, FrameLayout.LayoutParams(360, 52))
 +        root.addView(rippleBar, FrameLayout.LayoutParams(360, 52))
 +        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV08)
-+        root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
++        root.addView(keyboard, FrameLayout.LayoutParams(360, 208).apply { topMargin = 52 })
 +        rippleBar.keyboard = keyboard
 +        controller.visible()
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        keyboard.onInputMethodUpdate(ime(false))
 +        keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        save(render(root), "layout-chinese")
 +        val barBefore = render(rippleBar)
 +        val downAt = SystemClock.uptimeMillis()
 +        MotionEvent.obtain(downAt, downAt, MotionEvent.ACTION_DOWN, 170f, 28f, 0).let {
 +            keyboard.dispatchTouchEvent(it); it.recycle()
 +        }
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        save(render(root), "layout-key-ignite")
 +        MotionEvent.obtain(downAt, downAt + 30, MotionEvent.ACTION_UP, 170f, 28f, 0).let {
 +            keyboard.dispatchTouchEvent(it); it.recycle()
 +        }
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        val barAfter = render(rippleBar)
 +        assertFalse("A real key press must illuminate the candidate bar", barBefore.sameAs(barAfter))
 +        save(render(root), "layout-candidate-ripple")
@@ -3789,10 +3883,10 @@ index 0000000..e6541ca
 +        val visible = candidates.getChildViewHolder(candidates.getChildAt(0)) as org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 +        assertEquals(words[visible.idx], visible.candidate.text)
 +        manager.scrollToPositionWithOffset(0, 0)
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        keyboard.onInputMethodUpdate(ime(true))
 +        keyboard.onPunctuationUpdate(emptyMap())
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        // The idle toolbar is shown for direct English entry: editing, undo, redo, clipboard, emoji.
 +        val toolbar = FrameLayout(activity)
 +        val buttons = ButtonsBarUi(activity, ThemePreset.XuancaiBlackV08)
@@ -3803,13 +3897,13 @@ index 0000000..e6541ca
 +            FrameLayout.LayoutParams(52, 52).apply { gravity = Gravity.RIGHT })
 +        rippleBar.addView(toolbar, FrameLayout.LayoutParams(360, 52))
 +        rippleBar.displayedChild = 1
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        save(render(root), "layout-english")
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1400))
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        save(render(root), "layout-glow-sides")
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1300))
-+        layout(root, 360, 312)
++        layout(root, 360, 260)
 +        save(render(root), "layout-glow-inward")
 +        keyboard.onDetach()
 +        controller.pause().stop().destroy()
