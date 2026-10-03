@@ -1966,10 +1966,10 @@ index 0000000..b4adafd
 +    }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-index 368cf6c..a4fa6bc 100644
+index 368cf6c..5cf0e65 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-@@ -6,6 +6,12 @@ package org.fcitx.fcitx5.android.input.keyboard
+@@ -6,6 +6,11 @@ package org.fcitx.fcitx5.android.input.keyboard
  
  import android.annotation.SuppressLint
  import android.content.Context
@@ -1977,12 +1977,11 @@ index 368cf6c..a4fa6bc 100644
 +import android.graphics.Canvas
 +import android.graphics.Paint
 +import android.view.ViewGroup
-+import androidx.core.view.children
 +import splitties.dimensions.dp
  import android.view.View
  import androidx.annotation.Keep
  import androidx.core.view.allViews
-@@ -16,6 +22,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
+@@ -16,6 +21,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
  import org.fcitx.fcitx5.android.data.prefs.AppPrefs
  import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
  import org.fcitx.fcitx5.android.data.theme.Theme
@@ -1990,7 +1989,7 @@ index 368cf6c..a4fa6bc 100644
  import org.fcitx.fcitx5.android.input.popup.PopupAction
  import splitties.views.imageResource
  
-@@ -23,13 +30,26 @@ import splitties.views.imageResource
+@@ -23,13 +29,26 @@ import splitties.views.imageResource
  class TextKeyboard(
      context: Context,
      theme: Theme
@@ -2018,7 +2017,7 @@ index 368cf6c..a4fa6bc 100644
          val Layout: List<List<KeyDef>> = listOf(
              listOf(
                  AlphabetKey("Q", "1"),
-@@ -66,20 +86,19 @@ class TextKeyboard(
+@@ -66,20 +85,19 @@ class TextKeyboard(
                  BackspaceKey()
              ),
              listOf(
@@ -2045,7 +2044,7 @@ index 368cf6c..a4fa6bc 100644
      val space: TextKeyView by lazy { findViewById(R.id.button_space) }
      val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
  
-@@ -102,6 +121,24 @@ class TextKeyboard(
+@@ -102,6 +120,30 @@ class TextKeyboard(
      }
  
      private var capsState: CapsState = CapsState.None
@@ -2059,18 +2058,24 @@ index 368cf6c..a4fa6bc 100644
 +    override fun dispatchDraw(canvas: Canvas) {
 +        super.dispatchDraw(canvas)
 +        val row = getChildAt(childCount - 1) as? ViewGroup ?: return
-+        val keys = row.children.filter { it.visibility == View.VISIBLE }.sortedBy { it.left }.toList()
 +        val center = row.top + row.height * 0.5f
-+        // Visual ticks only: touch targets stay adjacent with no gaps.
-+        keys.dropLast(1).forEach { key ->
-+            val x = row.left + key.right.toFloat()
-+            canvas.drawLine(x, center - dp(4f), x, center + dp(4f), separatorPaint)
++        val halfHeight = dp(4f)
++        // Visual ticks only: touch targets stay adjacent; no per-frame lists or sorting.
++        var previous: View? = null
++        for (i in 0 until row.childCount) {
++            val key = row.getChildAt(i)
++            if (key.visibility != View.VISIBLE) continue
++            previous?.let {
++                val x = row.left + it.right.toFloat()
++                canvas.drawLine(x, center - halfHeight, x, center + halfHeight, separatorPaint)
++            }
++            previous = key
 +        }
 +    }
  
      private fun transformAlphabet(c: String): String {
          return when (capsState) {
-@@ -150,6 +187,7 @@ class TextKeyboard(
+@@ -150,6 +192,7 @@ class TextKeyboard(
      }
  
      override fun onAttach() {
@@ -2078,7 +2083,7 @@ index 368cf6c..a4fa6bc 100644
          capsState = CapsState.None
          updateCapsButtonIcon()
          updateAlphabetKeys()
-@@ -165,13 +203,15 @@ class TextKeyboard(
+@@ -165,13 +208,15 @@ class TextKeyboard(
      }
  
      override fun onInputMethodUpdate(ime: InputMethodEntry) {
@@ -2101,7 +2106,7 @@ index 368cf6c..a4fa6bc 100644
      }
  
      private fun transformPopupPreview(c: String): String {
-@@ -238,7 +278,7 @@ class TextKeyboard(
+@@ -238,7 +283,7 @@ class TextKeyboard(
              if (it.def !is KeyDef.Appearance.AltText) return
              it.mainText.text = it.def.displayText.let { str ->
                  if (str.length != 1 || !str[0].isLetter()) return@forEach
@@ -2110,7 +2115,7 @@ index 368cf6c..a4fa6bc 100644
              }
          }
      }
-@@ -251,11 +291,11 @@ class TextKeyboard(
+@@ -251,11 +296,11 @@ class TextKeyboard(
              } else {
                  it.def as KeyDef.Appearance.Text
                  it.mainText.text = it.def.displayText.let { str ->
@@ -2531,7 +2536,7 @@ index 0000000..28fcdba
 +        android:pathData="M4,4h6v6h-6z M14,4h6v6h-6z M4,14h6v6h-6z M14,14h6v6h-6z" />
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..d605af9 100644
+index 40ef2c9..5b40393 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -2564,8 +2569,8 @@ index 40ef2c9..d605af9 100644
 +    <string name="idle_breathing_summary">停止输入后显示柔和霓虹呼吸光，开始打字时淡出</string>
 +    <string name="space_key_label">空格</string>
 +    <string name="keyboard_tools">更多工具</string>
-+    <string name="idle_color_primary">呼吸光 · 第一种颜色</string>
-+    <string name="idle_color_secondary">呼吸光 · 第二种颜色</string>
++    <string name="idle_color_primary">呼吸光 · 左侧颜色</string>
++    <string name="idle_color_secondary">呼吸光 · 右侧颜色</string>
 +    <string name="idle_delay">呼吸光 · 闲置等待时间</string>
 +    <string name="idle_cycle">呼吸光 · 明暗循环周期</string>
 +    <string name="idle_fade_in">呼吸光 · 开始时淡入时间</string>
@@ -2587,7 +2592,7 @@ index 40ef2c9..d605af9 100644
 +    <string name="effects_follow_system_animation_summary">开启后，系统关闭动画时也暂停键盘光效。高级设置中的“禁用动画”始终优先。</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..acb6cc5 100644
+index fa9bc4e..3f5f758 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -2620,8 +2625,8 @@ index fa9bc4e..acb6cc5 100644
 +    <string name="idle_breathing_summary">停止輸入後顯示柔和霓虹呼吸光，開始打字時淡出</string>
 +    <string name="space_key_label">空格</string>
 +    <string name="keyboard_tools">更多工具</string>
-+    <string name="idle_color_primary">呼吸光 · 第一種顏色</string>
-+    <string name="idle_color_secondary">呼吸光 · 第二種顏色</string>
++    <string name="idle_color_primary">呼吸光 · 左側顏色</string>
++    <string name="idle_color_secondary">呼吸光 · 右側顏色</string>
 +    <string name="idle_delay">呼吸光 · 閒置等待時間</string>
 +    <string name="idle_cycle">呼吸光 · 明暗循環週期</string>
 +    <string name="idle_fade_in">呼吸光 · 開始時淡入時間</string>
@@ -2643,7 +2648,7 @@ index fa9bc4e..acb6cc5 100644
 +    <string name="effects_follow_system_animation_summary">開啟後，系統關閉動畫時也暫停鍵盤光效。進階設定中的「停用動畫」始終優先。</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..ee23a9f 100644
+index fe1fd3a..b25e3d9 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -2676,8 +2681,8 @@ index fe1fd3a..ee23a9f 100644
 +    <string name="idle_breathing_summary">Soft neon breathing after a pause; fades when typing resumes</string>
 +    <string name="space_key_label">Space</string>
 +    <string name="keyboard_tools">More tools</string>
-+    <string name="idle_color_primary">Breathing glow · first color</string>
-+    <string name="idle_color_secondary">Breathing glow · second color</string>
++    <string name="idle_color_primary">Breathing glow · left color</string>
++    <string name="idle_color_secondary">Breathing glow · right color</string>
 +    <string name="idle_delay">Breathing glow · idle wait</string>
 +    <string name="idle_cycle">Breathing glow · cycle duration</string>
 +    <string name="idle_fade_in">Breathing glow · fade-in duration</string>
@@ -2894,7 +2899,7 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..5a849c7
+index 0000000..bdd5d7c
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 @@ -0,0 +1,255 @@
@@ -3047,7 +3052,7 @@ index 0000000..5a849c7
 +    fun languageKeyMatchesEngineEnglishUsesLowercaseAndShiftStillTypesUppercase() {
 +        val context = RuntimeEnvironment.getApplication()
 +        val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV07)
-+        val q = keys(keyboard).filterIsInstance<TextKeyView>().first { it.def.displayText == "Q" }
++        val q = keys(keyboard).filterIsInstance<TextKeyView>().first { (it.def as? KeyDef.Appearance.Text)?.displayText == "Q" }
 +        var action: KeyAction? = null
 +        keyboard.keyActionListener = KeyActionListener { value, _ -> action = value }
 +        keyboard.onInputMethodUpdate(ime(false))
