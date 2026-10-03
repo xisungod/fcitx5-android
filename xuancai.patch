@@ -2258,7 +2258,7 @@ index 0000000..928c810
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..ba7743f
+index 0000000..2d02867
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 @@ -0,0 +1,130 @@
@@ -2303,7 +2303,7 @@ index 0000000..ba7743f
 +class KeyboardVisualRegressionTest {
 +    @Before
 +    fun prepareUiWithoutStartingTheNativeInputEngine() {
-+        val application = RuntimeEnvironment.getApplication<Application>()
++        val application = RuntimeEnvironment.getApplication()
 +        val uiApplication = FcitxApplication()
 +        ReflectionHelpers.callInstanceMethod<Void>(uiApplication, "attachBaseContext",
 +            ReflectionHelpers.ClassParameter.from(Context::class.java, application))
@@ -2380,7 +2380,7 @@ index 0000000..ba7743f
 +
 +    @Test
 +    fun oldHighlightReproducesTheRectangleSoThePixelCheckIsSensitive() {
-+        val context = RuntimeEnvironment.getApplication<Application>()
++        val context = RuntimeEnvironment.getApplication()
 +        val oldTheme = ThemePreset.XuancaiBlackV06.copy(keyPressHighlightColor = 0x18ffffff)
 +        val key = TextKeyView(context, oldTheme, LanguageKey().appearance as KeyDef.Appearance.Text)
 +        layout(key, 90, 64)
