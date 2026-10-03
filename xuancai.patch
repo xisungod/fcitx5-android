@@ -3818,10 +3818,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..57ba35e
+index 0000000..f11a35c
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,508 @@
+@@ -0,0 +1,519 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4105,6 +4105,13 @@ index 0000000..57ba35e
 +        save(render(root), "layout-chinese")
 +        val barBefore = render(rippleBar)
 +        val downAt = SystemClock.uptimeMillis()
++        // Rendering and Choreographer callbacks advance Robolectric's clock as well.
++        // Inject exact frame times so the review clip shows the production envelope
++        // at its real configured speed, independent of test-runner scheduling.
++        val effect = ReflectionHelpers.getField<Any>(keyboard, "pressEffectLayer")
++        var reviewTime = downAt
++        val reviewClock: () -> Long = { reviewTime }
++        ReflectionHelpers.setField(effect, "clock", reviewClock)
 +        MotionEvent.obtain(downAt, downAt, MotionEvent.ACTION_DOWN, 170f, 80f, 0).let {
 +            keyboard.dispatchTouchEvent(it); it.recycle()
 +        }
@@ -4115,9 +4122,13 @@ index 0000000..57ba35e
 +        }
 +        // Actual Android View frames, suitable for a timing review without a mock animation.
 +        for (frame in 0..54) {
++            reviewTime = downAt + frame * 33L
++            layout(root, 360, 312)
 +            save(render(root), "motion/frame-%03d".format(frame))
 +            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(33))
 +        }
++        val liveClock: () -> Long = SystemClock::uptimeMillis
++        ReflectionHelpers.setField(effect, "clock", liveClock)
 +        // Trigger another press to verify extension into the candidate strip.
 +        val secondAt = SystemClock.uptimeMillis()
 +        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
