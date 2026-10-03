@@ -12,12 +12,12 @@ font=lambda size:ImageFont.truetype(str(a.font),size)
 canvas=Image.new('RGB',(1200,1300),'#0b0c10')
 d=ImageDraw.Draw(canvas)
 d.text((38,25),'曜黑 V08 · 界面确认',font=font(40),fill='#f5f7ff')
-d.text((40,87),'空格居中 · 编辑 / 撤销 / 重做置顶 · 波纹延伸至候选栏',font=font(23),fill='#a5adbf')
+d.text((40,87),'三星式底行 · 空格居中 · 单键先变色，再扩散至候选栏',font=font(23),fill='#a5adbf')
 scenes=[
- ('layout-english.png','01  英文与顶部工具栏','小写键帽；英文逐字上屏；空格长按后滑动',38,155),
- ('layout-candidate-ripple.png','02  中文候选与按键波纹','大字候选可滑动；光效绘制在候选字后方',620,155),
- ('layout-glow-sides.png','03  两侧起光','闲置开始呼吸；每个周期随机霓虹色',38,694),
- ('layout-glow-inward.png','04  向中央扩散','淡入淡出；时间、亮度和闲置停止可设置',620,694),
+ ('layout-english.png','01  英文与顶部工具栏','编辑 / 撤销 / 重做置顶；长按空格滑动光标',38,155),
+ ('layout-key-ignite.png','02  按键先亮起','每键随机一种霓虹色；先亮时长可设置',620,155),
+ ('layout-candidate-ripple.png','03  同色向外扩散','柔雾延伸至候选栏；候选字保持清晰',38,694),
+ ('layout-glow-inward.png','04  闲置呼吸光','两侧向中间扩散；每周期随机换色',620,694),
 ]
 for file,title,caption,x,y in scenes:
  d.text((x,y),title,font=font(25),fill='#f1f4fa')
