@@ -678,7 +678,7 @@ index 0000000..0d28760
 +    }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt
-index 6121a82..5c7fa5f 100644
+index 6121a82..a97d05a 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt
 @@ -1,19 +1,16 @@
@@ -780,8 +780,7 @@ index 6121a82..5c7fa5f 100644
 -        )
 -    }
 -
--    val adapter: HorizontalCandidateViewAdapter by lazy {
-+    val adapter by lazy {
+     val adapter: HorizontalCandidateViewAdapter by lazy {
          object : HorizontalCandidateViewAdapter(theme) {
              override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
                  super.onBindViewHolder(holder, position)
@@ -859,8 +858,7 @@ index 6121a82..5c7fa5f 100644
 -        }
 -    }
 -
-+    val layoutManager by lazy { LinearLayoutManager(context, RecyclerView.HORIZONTAL, false) }
-     override val view by lazy {
+-    override val view by lazy {
 -        object : RecyclerView(context) {
 -            override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
 -                super.onSizeChanged(w, h, oldw, oldh)
@@ -870,6 +868,8 @@ index 6121a82..5c7fa5f 100644
 -                }
 -            }
 -        }.apply {
++    val layoutManager: LinearLayoutManager by lazy { LinearLayoutManager(context, RecyclerView.HORIZONTAL, false) }
++    override val view: RecyclerView by lazy {
 +        RecyclerView(context).apply {
              id = R.id.candidate_view
              itemAnimator = null
