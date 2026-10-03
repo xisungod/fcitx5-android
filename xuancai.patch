@@ -1168,7 +1168,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..a577af3 100644
+index 5c2fef9..200f31a 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1307,7 +1307,7 @@ index 5c2fef9..a577af3 100644
      }
  
      private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-@@ -392,16 +463,65 @@ abstract class BaseKeyboard(
+@@ -392,16 +463,87 @@ abstract class BaseKeyboard(
              event.deviceId, event.edgeFlags
          )
          target.view.dispatchTouchEvent(e)
@@ -1317,13 +1317,35 @@ index 5c2fef9..a577af3 100644
 +    private val effectKeyBounds = Rect()
 +    private val effectHostLocation = IntArray(2)
 +
++    private fun withinSlideTolerance(event: MotionEvent, index: Int, target: TouchTarget): Boolean {
++        val margin = minOf(dp(4f).toFloat(), target.hitRect.width() * 0.15f)
++        val x = event.getX(index)
++        val y = event.getY(index)
++        return x >= target.hitRect.left - margin && x < target.hitRect.right + margin &&
++            y >= target.hitRect.top - margin && y < target.hitRect.bottom + margin
++    }
++
++    private fun switchSlideTarget(event: MotionEvent, index: Int, old: TouchTarget, next: TouchTarget) {
++        old.view.cancelGestures()
++        onPopupAction(PopupAction.DismissAction(old.view.id))
++        touchTargets[event.getPointerId(index)] = next
++        illuminateKey(event, index, next)
++        dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, index, next)
++    }
++
 +    private fun releaseTouch(event: MotionEvent, index: Int, target: TouchTarget) {
-+        // Dropping outside the selected key cancels, including either finger of a
-+        // two-thumb gesture and UP events with no preceding MOVE.
++        // A small lift-off drift must not discard a letter. If Android batches away
++        // the last MOVE, resolve a deliberate slide from the final UP coordinates.
 +        if (slideSelectionEnabled && canSlideSelect(target.view) &&
-+            target.view.id !in popupSelectionKeys && findTouchTarget(event, index)?.view !== target.view) {
-+            target.view.cancelGestures()
-+            onPopupAction(PopupAction.DismissAction(target.view.id))
++            target.view.id !in popupSelectionKeys && !withinSlideTolerance(event, index, target)) {
++            val next = findTouchTarget(event, index)
++            if (next != null && canSlideSelect(next.view)) {
++                switchSlideTarget(event, index, target, next)
++                dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, next)
++            } else {
++                target.view.cancelGestures()
++                onPopupAction(PopupAction.DismissAction(target.view.id))
++            }
 +        } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, target)
 +    }
 +
@@ -1375,27 +1397,26 @@ index 5c2fef9..a577af3 100644
              when (event.actionMasked) {
                  MotionEvent.ACTION_DOWN -> {
                      releaseAllTouchTargets()
-@@ -423,6 +543,19 @@ abstract class BaseKeyboard(
+@@ -423,6 +565,18 @@ abstract class BaseKeyboard(
                      for (i in 0 until event.pointerCount) {
                          val pid = event.getPointerId(i)
                          val target = touchTargets[pid] ?: continue
 +                        if (slideSelectionEnabled && canSlideSelect(target.view) &&
 +                            target.view.id !in popupSelectionKeys) {
 +                            val next = findTouchTarget(event, i)
++                            // Do not send a tiny excursion to the child: its gesture
++                            // detector would permanently mark this tap as cancelled.
++                            if (next?.view !== target.view && withinSlideTolerance(event, i, target)) continue
 +                            if (next != null && next.view !== target.view && canSlideSelect(next.view)) {
 +                                // Cancel without an UP: intermediate letters must never be committed.
-+                                target.view.cancelGestures()
-+                                onPopupAction(PopupAction.DismissAction(target.view.id))
-+                                touchTargets[pid] = next
-+                                illuminateKey(event, i, next)
-+                                dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, i, next)
++                                switchSlideTarget(event, i, target, next)
 +                                continue
 +                            }
 +                        }
                          dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                      }
                      return true
-@@ -431,7 +564,7 @@ abstract class BaseKeyboard(
+@@ -431,7 +585,7 @@ abstract class BaseKeyboard(
                      val i = event.actionIndex
                      val pid = event.getPointerId(i)
                      val target = touchTargets[pid] ?: return true
@@ -1404,7 +1425,7 @@ index 5c2fef9..a577af3 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -442,7 +575,7 @@ abstract class BaseKeyboard(
+@@ -442,7 +596,7 @@ abstract class BaseKeyboard(
                          releaseAllTouchTargets()
                          return true
                      }
@@ -1413,7 +1434,7 @@ index 5c2fef9..a577af3 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -465,6 +598,12 @@ abstract class BaseKeyboard(
+@@ -465,6 +619,12 @@ abstract class BaseKeyboard(
  
      @CallSuper
      protected open fun onPopupAction(action: PopupAction) {
@@ -1426,7 +1447,7 @@ index 5c2fef9..a577af3 100644
          popupActionListener?.onPopupAction(action)
      }
  
-@@ -484,8 +623,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +644,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1461,7 +1482,7 @@ index 5c2fef9..a577af3 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +666,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +687,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -1886,10 +1907,10 @@ index 26dcded..1a33534 100644
              it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..ef8f065
+index 0000000..6951a1a
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,585 @@
+@@ -0,0 +1,586 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -1963,8 +1984,9 @@ index 0000000..ef8f065
 +
 +    private val density = host.resources.displayMetrics.density
 +    private val sizeScale = sizePercent.coerceIn(20, 400) / 100f
-+    // The default wave can reach the candidate strip even from the bottom row.
-+    private val maxRadius: Float get() = max(BASE_RADIUS_DP * density, host.height * 1.65f) * sizeScale
++    // Keep the candidate-strip reach, but soften the oversized wash during fast typing.
++    // Apply this to the radius so existing saved size settings also receive the adjustment.
++    private val maxRadius: Float get() = max(BASE_RADIUS_DP * density, host.height * 1.65f) * sizeScale * 0.85f
 +    private val flashRadius = FLASH_RADIUS_DP * density
 +    private val expansionDuration = expansionTimeMs.coerceIn(100, 2000).toLong()
 +    private val ignitionDuration = ignitionTimeMs.coerceIn(30, 300).toLong()
@@ -3818,10 +3840,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..f11a35c
+index 0000000..968b8b4
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,519 @@
+@@ -0,0 +1,595 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4298,6 +4320,82 @@ index 0000000..f11a35c
 +        symbolKeys.first { it.mainText.text == "@" }.performClick()
 +        assertEquals(KeyAction.CommitAction("@"), last)
 +        save(render(ui.root), "layout-symbols-first-page")
++    }
++
++    @Test
++    fun rapidTapsKeepEveryLetterDespiteSmallLiftOffDrift() {
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++        activity.setContentView(keyboard)
++        controller.visible()
++        layout(keyboard, 360, 260)
++        keyboard.onInputMethodUpdate(ime(true))
++        val typed = StringBuilder()
++        keyboard.keyActionListener = KeyActionListener { action, _ ->
++            if (action is KeyAction.FcitxKeyAction) typed.append(action.act)
++        }
++        val input = "lianggehuangkimigcuiliao"
++        var time = SystemClock.uptimeMillis()
++        for (letter in input) {
++            val key = keys(keyboard).first {
++                (it.def as? KeyDef.Appearance.Text)?.displayText == letter.uppercase()
++            }
++            val bounds = Rect()
++            key.getDrawingRect(bounds)
++            keyboard.offsetDescendantRectToMyCoords(key, bounds)
++            val down = time
++            for ((action, x) in listOf(MotionEvent.ACTION_DOWN to bounds.exactCenterX(),
++                MotionEvent.ACTION_MOVE to bounds.right + 2f, MotionEvent.ACTION_UP to bounds.right + 2f)) {
++                val event = MotionEvent.obtain(down, time, action, x, bounds.exactCenterY(), 0)
++                keyboard.dispatchTouchEvent(event)
++                event.recycle()
++                time += 10
++            }
++        }
++        assertEquals("The UI must pass the exact raw sequence to Rime, without lost or duplicated taps",
++            input, typed.toString())
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
++    }
++
++    @Test
++    fun finalUpCanSelectANewLetterWithoutMoveButCannotTriggerAFunctionKey() {
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++        activity.setContentView(keyboard)
++        controller.visible()
++        layout(keyboard, 360, 260)
++        val actions = mutableListOf<KeyAction>()
++        keyboard.keyActionListener = KeyActionListener { action, _ -> actions.add(action) }
++        fun touch(action: Int, key: KeyView) {
++            val bounds = Rect()
++            key.getDrawingRect(bounds)
++            keyboard.offsetDescendantRectToMyCoords(key, bounds)
++            val event = MotionEvent.obtain(0, SystemClock.uptimeMillis(), action,
++                bounds.exactCenterX(), bounds.exactCenterY(), 0)
++            keyboard.dispatchTouchEvent(event)
++            event.recycle()
++        }
++        fun key(label: String) = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == label }
++        touch(MotionEvent.ACTION_DOWN, key("G"))
++        touch(MotionEvent.ACTION_UP, key("H"))
++        assertEquals(listOf(KeyAction.FcitxKeyAction("h")), actions)
++        actions.clear()
++        touch(MotionEvent.ACTION_DOWN, key("G"))
++        touch(MotionEvent.ACTION_UP, keyboard.lang)
++        assertTrue(actions.isEmpty())
++        touch(MotionEvent.ACTION_DOWN, key("G"))
++        val outside = MotionEvent.obtain(0, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, -30f, -30f, 0)
++        keyboard.dispatchTouchEvent(outside)
++        outside.recycle()
++        assertTrue(actions.isEmpty())
++        assertTrue(keys(keyboard).none { it.isPressed })
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
 +    }
 +
 +    @Test

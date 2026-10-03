@@ -52,7 +52,8 @@ schema = schema.replace('\ntranslator:\n', '\ntranslator:\n  enable_correction: 
 schema = schema.replace('  algebra:\n', '  algebra:\n    # Mobile omission tolerance: shuang -> shuag, zheng -> zheg.\n    - derive/^([a-z]*[aeio])ng$/$1g/\n', 1)
 schema = schema.replace('    - ascii_composer\n', '    - lua_processor@*xuancai_ascii\n    - ascii_composer\n', 1)
 schema = schema.replace('    - script_translator\n', '    - script_translator\n    - lua_translator@*xuancai_correction\n', 1)
-schema += '\nxuancai_correction:\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: true\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n  initial_quality: 0.2\n'
+schema += '\nxuancai_correction:\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: true\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n  spelling_hints: 32\n  always_show_comments: true\n  initial_quality: 0.2\n'
+schema += '\nxuancai_exact:\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: false\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n'
 schema += '\n# Xuancai mobile settings (user copy takes precedence).\n__patch: xuancai_mobile:/patch\ngrammar:\n  language: zh-hans-t-essay-bgw-compact\n'
 schema_path.write_text(schema)
 for script in ['xuancai_correction.lua', 'xuancai_ascii.lua']:

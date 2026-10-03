@@ -7,6 +7,28 @@
 #include <time.h>
 
 static RimeApi *api;
+static void whole_phrase(RimeSessionId session, const char *keys, const char *expected) {
+    api->clear_composition(session);
+    char prefix[128] = {0};
+    assert(strlen(keys) < sizeof(prefix));
+    for (size_t i = 0; keys[i]; ++i) {
+        assert(api->process_key(session, keys[i], 0));
+        prefix[i] = keys[i];
+        assert(strcmp(api->get_input(session), prefix) == 0);
+    }
+    RimeCandidateListIterator it = {0};
+    assert(api->candidate_list_begin(session, &it));
+    assert(api->candidate_list_next(&it));
+    printf("Whole phrase: %s => %s\n", keys, it.candidate.text);
+    assert(strcmp(it.candidate.text, expected) == 0);
+    api->candidate_list_end(&it);
+    assert(api->select_candidate(session, 0));
+    RIME_STRUCT(RimeCommit, commit);
+    assert(api->get_commit(session, &commit));
+    assert(strcmp(commit.text, expected) == 0);
+    api->free_commit(&commit);
+    assert(!api->get_input(session) || !*api->get_input(session));
+}
 static void candidates(RimeSessionId session, const char *keys, const char *expected) {
     api->clear_composition(session);
     assert(api->simulate_key_sequence(session, keys));
@@ -48,6 +70,15 @@ int main(int argc, char **argv) {
     candidates(session, "nihso", "你好");
     candidates(session, "shuangkashuangdai", "双卡双待");
     candidates(session, "shuagkashuangdai", "双卡双待");
+    whole_phrase(session, "lianggehuangkimigcuiliao", "两个黄鹂鸣翠柳");
+    whole_phrase(session, "lianggehuanglimingcuiliao", "两个黄鹂鸣翠柳");
+    whole_phrase(session, "lianggehuangkimingcuiliu", "两个黄鹂鸣翠柳");
+    whole_phrase(session, "lianggehuanglimigcuiliu", "两个黄鹂鸣翠柳");
+    whole_phrase(session, "lianggehuanglimingcuiliu", "两个黄鹂鸣翠柳");
+    whole_phrase(session, "yihangbailushangqingtiam", "一行白鹭上青天");
+    // An intentionally appended word must not be swallowed by a phrase repair.
+    whole_phrase(session, "lianggehuanglimingcuiliule", "两个黄鹂鸣翠柳了");
+    whole_phrase(session, "lianggehuanglimingcuiliudezuozhe", "两个黄鹂鸣翠柳的作者");
     time_t now = time(NULL); char today[32];
     strftime(today, sizeof(today), "%Y-%m-%d", localtime(&now));
     candidates(session, "rq", today);
