@@ -1,0 +1,57 @@
+name: 炫彩版构建
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "xuancai.patch"
+      - ".github/workflows/xuancai.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: 切到已验证的版本并打上炫彩补丁
+        run: |
+          cp xuancai.patch /tmp/xuancai.patch
+          git -c advice.detachedHead=false checkout e6199a2801b0c76e1baeff7a48f6b18e910e9dd7
+          git submodule update --init --recursive
+          git apply --whitespace=nowarn /tmp/xuancai.patch
+          git status --short
+
+      - name: 准备 Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: 准备 Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: 安装 CMake
+        run: sdkmanager --install "cmake;3.31.6"
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt update
+          sudo apt install -y extra-cmake-modules gettext
+
+      - name: 准备 Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: 编译调试版（arm64）
+        env:
+          BUILD_ABI: arm64-v8a
+        run: ./gradlew :app:assembleDebug
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v7
+        with:
+          name: fcitx5-xuancai-debug-arm64
+          path: app/build/outputs/apk/debug/*.apk
