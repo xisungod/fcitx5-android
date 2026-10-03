@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--archive', type=Path)
 parser.add_argument('--root', type=Path, default=Path.cwd())
 parser.add_argument('--zip', type=Path)
+parser.add_argument('--model', type=Path)
 args = parser.parse_args()
 data = args.archive.read_bytes() if args.archive else urllib.request.urlopen(URL, timeout=120).read()
 assert hashlib.sha256(data).hexdigest() == SHA256, 'Rime Ice archive checksum mismatch'
@@ -22,7 +23,7 @@ import io
 stage = args.root / 'plugin/rime/src/main/cpp/xuancai-rime-ice'
 assert not stage.exists(), f'Remove previous staging directory first: {stage}'
 files = {
-    'others/no_lua_schema/rime_ice.schema.yaml': 'rime_ice.schema.yaml',
+    'rime_ice.schema.yaml': 'rime_ice.schema.yaml',
     **{name: name for name in [
         'rime_ice.dict.yaml', 'melt_eng.schema.yaml', 'melt_eng.dict.yaml',
         'radical_pinyin.schema.yaml', 'radical_pinyin.dict.yaml',
@@ -36,13 +37,38 @@ with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as archive:
         name = member.name.removeprefix(prefix)
         if not member.isfile():
             continue
-        if name.startswith(('cn_dicts/', 'en_dicts/', 'opencc/')):
+        if name.startswith(('cn_dicts/', 'en_dicts/', 'opencc/', 'lua/')):
             files[name] = name
     for source, dest in files.items():
         assert '..' not in Path(dest).parts and not Path(dest).is_absolute()
         target = stage / dest
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(archive.extractfile(prefix + source).read())
+
+# V08 mobile additions; keep upstream words and scripts unchanged.
+schema_path = stage / 'rime_ice.schema.yaml'
+schema = schema_path.read_text()
+schema = schema.replace('\ntranslator:\n', '\ntranslator:\n  enable_correction: false\n  contextual_suggestions: true\n  max_homophones: 7\n  max_homographs: 7\n', 1)
+schema = schema.replace('  algebra:\n', '  algebra:\n    # Mobile omission tolerance: shuang -> shuag, zheng -> zheg.\n    - derive/^([a-z]*[aeio])ng$/$1g/\n', 1)
+schema = schema.replace('    - ascii_composer\n', '    - lua_processor@*xuancai_ascii\n    - ascii_composer\n', 1)
+schema = schema.replace('    - script_translator\n', '    - script_translator\n    - lua_translator@*xuancai_correction\n', 1)
+schema += '\nxuancai_correction:\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: true\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n  initial_quality: 0.2\n'
+schema += '\n# Xuancai mobile settings (user copy takes precedence).\n__patch: xuancai_mobile:/patch\ngrammar:\n  language: zh-hans-t-essay-bgw-compact\n'
+schema_path.write_text(schema)
+for script in ['xuancai_correction.lua', 'xuancai_ascii.lua']:
+    (stage / 'lua' / script).write_bytes((Path(__file__).parent / 'rime' / script).read_bytes())
+(stage / 'xuancai_mobile.yaml').write_text('# Managed by Xuancai\npatch: {}\n')
+MODEL_URL = 'https://github.com/lotem/rime-octagram-data/releases/download/20260712/zh-hans-t-essay-bgw-compact.gram'
+MODEL_SHA = 'd3cb2438c1fdcd6a855dd6ca8f5c1060a29273c6b64c2c2c69af67cd71b6aa7e'
+model = args.model.read_bytes() if args.model else urllib.request.urlopen(MODEL_URL, timeout=120).read()
+assert hashlib.sha256(model).hexdigest() == MODEL_SHA, 'Grammar model checksum mismatch'
+(stage / 'zh-hans-t-essay-bgw-compact.gram').write_bytes(model)
+license_dir = stage / 'grammar-license'
+license_dir.mkdir()
+license_data = urllib.request.urlopen('https://raw.githubusercontent.com/lotem/rime-octagram-data/20260712/LICENSE').read()
+assert hashlib.sha256(license_data).hexdigest() == 'da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768'
+(license_dir / 'LICENSE').write_bytes(license_data)
+(license_dir / 'SOURCE.json').write_text(json.dumps({'project': 'https://github.com/lotem/rime-octagram-data', 'tag': '20260712', 'url': MODEL_URL, 'sha256': MODEL_SHA, 'bytes': len(model)}, indent=2) + '\n')
 
 # Counts refer to raw table rows (not unique words or the user's learned vocabulary).
 def count_rows(path):
@@ -61,7 +87,7 @@ counts.update({f'en_dicts/{name}': count_rows(stage / f'en_dicts/{name}.dict.yam
 manifest = {
     'project': 'https://github.com/iDvel/rime-ice', 'revision': REV,
     'archive_url': URL, 'archive_sha256': SHA256,
-    'schema': 'Official others/no_lua_schema/rime_ice.schema.yaml, copied without modification',
+    'schema': 'Full upstream rime_ice.schema.yaml and Lua; mobile additions enable correction, pinned grammar model and optional fuzzy patches',
     'license': 'GPL-3.0; see LICENSE and upstream README.md for individual data sources',
     'raw_dictionary_rows': counts,
     'files_sha256': {str(p.relative_to(stage)): hashlib.sha256(p.read_bytes()).hexdigest()

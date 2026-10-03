@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 53f1eb8..608b983 100644
+index 53f1eb8..145a83f 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -33,6 +33,23 @@ android {
@@ -31,11 +31,11 @@ index 53f1eb8..608b983 100644
          }
          debug {
 +            // Install alongside the original debug APK: its CI signing key is ephemeral.
-+            applicationIdSuffix = ".xuancai.black.v07"
++            applicationIdSuffix = ".xuancai.black.v08"
              resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
              resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "炫彩·曜黑 V07")
++            resValue("string", "app_name", "炫彩·曜黑 V08")
          }
      }
  
@@ -47,6 +47,19 @@ index 53f1eb8..608b983 100644
      androidTestImplementation(libs.androidx.test.runner)
      androidTestImplementation(libs.androidx.test.rules)
      androidTestImplementation(libs.androidx.lifecycle.testing)
+diff --git a/app/src/main/cpp/androidkeyboard/androidkeyboard.h b/app/src/main/cpp/androidkeyboard/androidkeyboard.h
+index b365ac5..43e41fc 100644
+--- a/app/src/main/cpp/androidkeyboard/androidkeyboard.h
++++ b/app/src/main/cpp/androidkeyboard/androidkeyboard.h
+@@ -29,7 +29,7 @@ FCITX_CONFIG_ENUM_NAME_WITH_I18N(
+ FCITX_CONFIGURATION(
+         AndroidKeyboardEngineConfig,
+         Option<bool>
+-            enableWordHint{this, "EnableWordHint", _("Enable word hint"), true};
++            enableWordHint{this, "EnableWordHint", _("Enable word hint"), false};
+         Option<bool>
+             hintOnPhysicalKeyboard{this, "WordHintOnPhysicalKeyboard", _("Enable word hint when using physical keyboard"), false};
+         Option<bool>
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt b/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt
 index cec9078..8da5e41 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt
@@ -74,10 +87,20 @@ index cec9078..8da5e41 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
-index bed1cbf..c076662 100644
+index bed1cbf..25a6ad7 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
-@@ -137,15 +137,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+@@ -59,6 +59,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+     }
+ 
+     inner class Keyboard : ManagedPreferenceCategory(R.string.virtual_keyboard, sharedPreferences) {
++        val rimeFuzzyNl = switch(R.string.rime_fuzzy_nl, "rime_fuzzy_nl", false)
++        val rimeFuzzyZh = switch(R.string.rime_fuzzy_zh, "rime_fuzzy_zh", false)
++        val rimeFuzzyAng = switch(R.string.rime_fuzzy_ang, "rime_fuzzy_ang", false)
+         val hapticOnKeyPress =
+             enumList(
+                 R.string.button_haptic_feedback,
+@@ -137,15 +140,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          val focusChangeResetKeyboard =
              switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true)
          val expandToolbarByDefault =
@@ -96,16 +119,16 @@ index bed1cbf..c076662 100644
          )
  
          val showVoiceInputButton =
-@@ -173,7 +173,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+@@ -173,7 +176,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          val spaceKeyLongPressBehavior = enumList(
              R.string.space_long_press_behavior,
              "space_long_press_behavior",
 -            SpaceLongPressBehavior.None
-+            SpaceLongPressBehavior.ShowPicker
++            SpaceLongPressBehavior.MoveCursor
          )
          val spaceSwipeMoveCursor =
              switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
-@@ -182,7 +182,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+@@ -182,7 +185,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          val langSwitchKeyBehavior = enumList(
              R.string.lang_switch_key_behavior,
              "lang_switch_key_behavior",
@@ -114,22 +137,43 @@ index bed1cbf..c076662 100644
          ) { showLangSwitchKey.getValue() }
  
          val keyboardHeightPercent: ManagedPreference.PInt
-@@ -442,4 +442,4 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+@@ -442,4 +445,4 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
  
          fun getInstance() = instance!!
      }
 -}
 \ No newline at end of file
 +}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/rime/RimeFuzzyConfig.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/rime/RimeFuzzyConfig.kt
+new file mode 100644
+index 0000000..dfdaa52
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/rime/RimeFuzzyConfig.kt
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.data.rime
++
++internal object RimeFuzzyConfig {
++    fun render(nl: Boolean, zh: Boolean, ang: Boolean): String {
++        val rules = mutableListOf<String>()
++        if (nl) rules += listOf("derive/^n/l/", "derive/^l/n/")
++        if (zh) rules += listOf("derive/^([zcs])h/$1/", "derive/^([zcs])([^h])/$1h$2/")
++        if (ang) rules += listOf("derive/ang$/an/", "derive/an$/ang/")
++        return if (rules.isEmpty()) "# Managed by Xuancai\npatch: {}\n" else buildString {
++            append("# Managed by Xuancai\npatch:\n  speller/algebra/+:\n")
++            rules.forEach { append("    - '").append(it).append("'\n") }
++        }
++    }
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
-index 93ba4d4..774be0c 100644
+index 93ba4d4..ff2cf92 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 @@ -24,6 +24,7 @@ object ThemeManager {
      }
  
      val BuiltinThemes = listOf(
-+        ThemePreset.XuancaiBlackV07,
++        ThemePreset.XuancaiBlackV08,
          ThemePreset.MaterialLight,
          ThemePreset.MaterialDark,
          ThemePreset.PixelLight,
@@ -138,7 +182,7 @@ index 93ba4d4..774be0c 100644
      )
  
 -    val DefaultTheme = ThemePreset.PixelDark
-+    val DefaultTheme = ThemePreset.XuancaiBlackV07
++    val DefaultTheme = ThemePreset.XuancaiBlackV08
  
      private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
  
@@ -150,7 +194,7 @@ index 93ba4d4..774be0c 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..84eb00b 100644
+index d3b4948..324bec4 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -174,7 +218,7 @@ index d3b4948..84eb00b 100644
  
      val keyBorderStroke = switch(
          R.string.key_border_stroke, "key_border_stroke", false,
-@@ -43,6 +46,96 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -43,6 +46,105 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
  
@@ -212,13 +256,18 @@ index d3b4948..84eb00b 100644
 +        Mint(R.string.neon_mint, 0xFF00FFC6.toInt());
 +    }
 +
++    val idleRandomColors = switch(
++        R.string.idle_random_colors, "idle_random_colors", true,
++        enableUiOn = { idleBreathing.getValue() }
++    )
++
 +    val idleColorPrimary = enumList(
 +        R.string.idle_color_primary, "idle_color_primary", NeonColor.Cyan,
-+        enableUiOn = { idleBreathing.getValue() }
++        enableUiOn = { idleBreathing.getValue() && !idleRandomColors.getValue() }
 +    )
 +    val idleColorSecondary = enumList(
 +        R.string.idle_color_secondary, "idle_color_secondary", NeonColor.Purple,
-+        enableUiOn = { idleBreathing.getValue() }
++        enableUiOn = { idleBreathing.getValue() && !idleRandomColors.getValue() }
 +    )
 +    val idleDelay = int(
 +        R.string.idle_delay, "idle_delay", 1800, 500, 10000, "ms", 100,
@@ -234,6 +283,10 @@ index d3b4948..84eb00b 100644
 +    )
 +    val idleFadeOut = int(
 +        R.string.idle_fade_out, "idle_fade_out", 180, 50, 1500, "ms", 10,
++        enableUiOn = { idleBreathing.getValue() }
++    )
++    val idleTimeout = int(
++        R.string.idle_timeout, "idle_timeout", 60, 15, 300, "s", 15,
 +        enableUiOn = { idleBreathing.getValue() }
 +    )
 +    val idleBrightness = int(
@@ -271,7 +324,7 @@ index d3b4948..84eb00b 100644
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
-@@ -51,10 +144,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -51,10 +153,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_horizontal_margin,
              R.string.portrait,
              "key_horizontal_margin",
@@ -284,7 +337,7 @@ index d3b4948..84eb00b 100644
              0,
              24,
              "dp"
-@@ -71,10 +164,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -71,10 +173,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_vertical_margin,
              R.string.portrait,
              "key_vertical_margin",
@@ -297,7 +350,7 @@ index d3b4948..84eb00b 100644
              0,
              24,
              "dp"
-@@ -83,7 +176,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -83,7 +185,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
          keyVerticalMarginLandscape = secondary
      }
  
@@ -306,7 +359,7 @@ index d3b4948..84eb00b 100644
  
      val textEditingButtonRadius =
          int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
-@@ -100,7 +193,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -100,7 +202,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val punctuationPosition = enumList(
          R.string.punctuation_position,
          "punctuation_position",
@@ -315,7 +368,7 @@ index d3b4948..84eb00b 100644
      )
  
      enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-@@ -136,14 +229,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -136,14 +238,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val followSystemDayNightTheme = switch(
          R.string.follow_system_day_night_theme,
          "follow_system_dark_mode",
@@ -328,21 +381,21 @@ index d3b4948..84eb00b 100644
          R.string.light_mode_theme,
          "light_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialLight else ThemePreset.PixelLight,
-+        ThemePreset.XuancaiBlackV07,
++        ThemePreset.XuancaiBlackV08,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
-@@ -151,7 +244,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -151,7 +253,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val darkModeTheme = themePreference(
          R.string.dark_mode_theme,
          "dark_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialDark else ThemePreset.PixelDark,
-+        ThemePreset.XuancaiBlackV07,
++        ThemePreset.XuancaiBlackV08,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..6622112 100644
+index 239e22c..afeb468 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
@@ -350,8 +403,8 @@ index 239e22c..6622112 100644
  object ThemePreset {
  
 +    /** Quiet at rest; key-press colour is supplied by PressEffect. */
-+    val XuancaiBlackV07 = Theme.Builtin(
-+        name = "炫彩·曜黑 V07",
++    val XuancaiBlackV08 = Theme.Builtin(
++        name = "炫彩·曜黑 V08",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
@@ -380,10 +433,18 @@ index 239e22c..6622112 100644
          name = "MaterialLight",
          isDark = false,
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
-index fe90eda..53bcf19 100644
+index fe90eda..4e9da5b 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
-@@ -62,6 +62,7 @@ import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
+@@ -5,6 +5,7 @@
+ package org.fcitx.fcitx5.android.input.bar
+ 
+ import android.graphics.Color
++import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+ import android.os.Build
+ import android.util.Size
+ import android.view.KeyEvent
+@@ -62,6 +63,7 @@ import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
  import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
  import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -391,7 +452,7 @@ index fe90eda..53bcf19 100644
  import org.fcitx.fcitx5.android.input.popup.PopupComponent
  import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
  import org.fcitx.fcitx5.android.input.wm.InputWindow
-@@ -264,24 +265,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+@@ -264,24 +266,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
      private val idleUi: IdleUi by lazy {
          IdleUi(context, theme, popup, commonKeyActionListener).apply {
              menuButton.setOnClickListener {
@@ -417,16 +478,19 @@ index fe90eda..53bcf19 100644
              }
              hideKeyboardButton.apply {
                  setOnClickListener(hideKeyboardCallback)
-@@ -291,21 +275,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+@@ -291,21 +276,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                  onGestureListener = swipeHideKeyboardCallback
              }
              buttonsUi.apply {
--                undoButton.setOnClickListener {
--                    service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
--                }
--                redoButton.setOnClickListener {
--                    service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
--                }
++                textEditingButton.setOnClickListener {
++                    windowManager.attachWindow(TextEditingWindow())
++                }
+                 undoButton.setOnClickListener {
+                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
+                 }
+                 redoButton.setOnClickListener {
+                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
+                 }
 -                cursorMoveButton.setOnClickListener {
 -                    windowManager.attachWindow(TextEditingWindow())
 +                emojiButton.setOnClickListener {
@@ -441,7 +505,19 @@ index fe90eda..53bcf19 100644
              }
              clipboardUi.suggestionView.apply {
                  setOnClickListener {
-@@ -537,7 +512,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+@@ -407,8 +392,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+         view.displayedChild = index
+     }
+ 
++    fun setEffectKeyboard(keyboard: BaseKeyboard?) { view.keyboard = keyboard }
++
+     override val view by lazy {
+-        ViewAnimator(context).apply {
++        RippleBarView(context).apply {
+             backgroundColor =
+                 if (ThemeManager.prefs.keyBorder.getValue()) Color.TRANSPARENT
+                 else theme.barColor
+@@ -537,7 +524,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
      }
  
      companion object {
@@ -450,6 +526,46 @@ index fe90eda..53bcf19 100644
      }
  
      fun onKeyboardLayoutSwitched(isNumber: Boolean) {
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/RippleBarView.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/RippleBarView.kt
+new file mode 100644
+index 0000000..de1ebeb
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/RippleBarView.kt
+@@ -0,0 +1,34 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.input.bar
++
++import android.content.Context
++import android.graphics.Canvas
++import android.widget.ViewAnimator
++import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
++
++/** Continues keyboard ripples behind candidate text, without a second animation or touch layer. */
++class RippleBarView(context: Context) : ViewAnimator(context) {
++    private val keyboardPosition = IntArray(2)
++    private val barPosition = IntArray(2)
++    var keyboard: BaseKeyboard? = null
++        set(value) {
++            field?.effectInvalidator = null
++            field = value
++            value?.effectInvalidator = { invalidate() }
++            invalidate()
++        }
++
++    override fun dispatchDraw(canvas: Canvas) {
++        keyboard?.takeIf { it.isShown && it.isAttachedToWindow }?.let { source ->
++            source.getLocationInWindow(keyboardPosition)
++            getLocationInWindow(barPosition)
++            val saved = canvas.save()
++            canvas.clipRect(0, 0, width, height)
++            canvas.translate((keyboardPosition[0] - barPosition[0]).toFloat(),
++                (keyboardPosition[1] - barPosition[1]).toFloat())
++            source.drawPressExtension(canvas)
++            canvas.restoreToCount(saved)
++        }
++        super.dispatchDraw(canvas)
++    }
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt
 index bb756df..84ba7e5 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt
@@ -511,7 +627,7 @@ index 14c09e6..81e1de7 100644
      }
  
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt
-index 3170536..70b829d 100644
+index 3170536..ed87f17 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt
 @@ -20,7 +20,7 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
@@ -523,18 +639,22 @@ index 3170536..70b829d 100644
      }
  
      private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
-@@ -28,24 +28,11 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
+@@ -28,24 +28,22 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
          root.addView(it, FlexboxLayout.LayoutParams(size, size))
      }
  
--    val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
--        contentDescription = ctx.getString(R.string.undo)
--    }
++    val textEditingButton = toolButton(R.drawable.ic_cursor_move).apply {
++        contentDescription = ctx.getString(R.string.text_editing)
++    }
++
+     val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
+         contentDescription = ctx.getString(R.string.undo)
+     }
 -
--    val redoButton = toolButton(R.drawable.ic_baseline_redo_24).apply {
--        contentDescription = ctx.getString(R.string.redo)
--    }
--
+     val redoButton = toolButton(R.drawable.ic_baseline_redo_24).apply {
+         contentDescription = ctx.getString(R.string.redo)
+     }
+ 
 -    val cursorMoveButton = toolButton(R.drawable.ic_cursor_move).apply {
 -        contentDescription = ctx.getString(R.string.text_editing)
 -    }
@@ -1026,7 +1146,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..cc9630a 100644
+index 5c2fef9..c19b292 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1049,7 +1169,16 @@ index 5c2fef9..cc9630a 100644
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
  import org.fcitx.fcitx5.android.input.popup.PopupAction
-@@ -51,6 +55,43 @@ abstract class BaseKeyboard(
+@@ -48,20 +52,75 @@ abstract class BaseKeyboard(
+ ) : ConstraintLayout(context) {
+ 
+     var keyActionListener: KeyActionListener? = null
++    internal var effectInvalidator: (() -> Unit)? = null
++        set(value) {
++            field = value
++            pressEffectLayer?.invalidateExtension = value
++        }
++    internal fun drawPressExtension(canvas: Canvas) { pressEffectLayer?.drawExtension(canvas) }
  
      private val prefs = AppPrefs.getInstance()
  
@@ -1080,9 +1209,12 @@ index 5c2fef9..cc9630a 100644
 +                p.idleCycle.getValue().toLong(),
 +                p.idleFadeIn.getValue().toLong(),
 +                p.idleFadeOut.getValue().toLong(),
-+                p.idleBrightness.getValue() / 100f
++                p.idleBrightness.getValue() / 100f,
++                p.idleTimeout.getValue() * 1000L
 +            ),
-+            intArrayOf(p.idleColorPrimary.getValue().argb, p.idleColorSecondary.getValue().argb)
++            if (p.idleRandomColors.getValue()) ThemePrefs.NeonColor.entries.map { it.argb }.toIntArray()
++            else intArrayOf(p.idleColorPrimary.getValue().argb, p.idleColorSecondary.getValue().argb),
++            randomIdleColors = p.idleRandomColors.getValue()
 +        )
 +    }
 +
@@ -1093,7 +1225,46 @@ index 5c2fef9..cc9630a 100644
      private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
      private val expandKeypressArea by prefs.keyboard.expandKeypressArea
      private val swipeSymbolDirection by prefs.keyboard.swipeSymbolDirection
-@@ -394,6 +435,26 @@ abstract class BaseKeyboard(
+ 
+     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
++    private val spaceLongPressBehavior = prefs.keyboard.spaceKeyLongPressBehavior
+     private val spaceKeys = mutableListOf<KeyView>()
+-    private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
++    private fun updateSpaceGestures() {
++        val trackpad = spaceLongPressBehavior.getValue() == SpaceLongPressBehavior.MoveCursor
+         spaceKeys.forEach {
+-            it.swipeEnabled = v
++            it.swipeRequiresLongPress = trackpad
++            it.swipeEnabled = trackpad || spaceSwipeMoveCursor.getValue()
+         }
+     }
++    private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
++        updateSpaceGestures()
++    }
++    private val spaceLongPressChangeListener = ManagedPreference.OnChangeListener<SpaceLongPressBehavior> { _, _ ->
++        updateSpaceGestures()
++    }
+ 
+     private val vivoKeypressWorkaround by prefs.advanced.vivoKeypressWorkaround
+ 
+@@ -135,6 +194,7 @@ abstract class BaseKeyboard(
+             })
+         }
+         spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
++        spaceLongPressBehavior.registerOnChangeListener(spaceLongPressChangeListener)
+     }
+ 
+     private fun createKeyView(def: KeyDef): KeyView {
+@@ -153,7 +213,7 @@ abstract class BaseKeyboard(
+             }
+             if (def is SpaceKey) {
+                 spaceKeys.add(this)
+-                swipeEnabled = spaceSwipeMoveCursor.getValue()
++                updateSpaceGestures()
+                 swipeRepeatEnabled = true
+                 swipeThresholdX = selectionSwipeThreshold
+                 swipeThresholdY = disabledSwipeThreshold
+@@ -394,6 +454,26 @@ abstract class BaseKeyboard(
          target.view.dispatchTouchEvent(e)
      }
  
@@ -1120,7 +1291,7 @@ index 5c2fef9..cc9630a 100644
      override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
          // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
          return if (vivoKeypressWorkaround && ev.actionMasked == MotionEvent.ACTION_DOWN) true
-@@ -484,8 +545,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +564,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1155,7 +1326,7 @@ index 5c2fef9..cc9630a 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +588,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +607,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -1164,12 +1335,89 @@ index 5c2fef9..cc9630a 100644
  
  }
 \ No newline at end of file
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt
+index 3847b97..27ac230 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt
+@@ -108,25 +108,20 @@ class CommonKeyActionListener :
+                     commitAndReset()
+                     triggerUnicode()
+                 }
+-                is LangSwitchAction -> {
+-                    when (langSwitchKeyBehavior) {
++                is LangSwitchAction -> service.postFcitxJob {
++                    if (inputMethodEntryCached.uniqueName == "rime") {
++                        // Use Rime's native option action without resetting or committing pinyin.
++                        RimeActions.asciiToggle(statusArea())?.let { activateAction(it.id) }
++                    } else when (langSwitchKeyBehavior) {
+                         LangSwitchBehavior.Enumerate -> {
+-                            service.postFcitxJob {
+-                                if (enabledIme().size < 2) {
+-                                    service.lifecycleScope.launch {
+-                                        service.showDialog(AddMoreInputMethodsPrompt.build(context))
+-                                    }
+-                                } else {
+-                                    enumerateIme()
++                            if (enabledIme().size < 2) {
++                                service.lifecycleScope.launch {
++                                    service.showDialog(AddMoreInputMethodsPrompt.build(context))
+                                 }
+-                            }
+-                        }
+-                        LangSwitchBehavior.ToggleActivate -> {
+-                            service.postFcitxJob {
+-                                toggleIme()
+-                            }
++                            } else enumerateIme()
+                         }
+-                        LangSwitchBehavior.NextInputMethodApp -> {
++                        LangSwitchBehavior.ToggleActivate -> toggleIme()
++                        LangSwitchBehavior.NextInputMethodApp -> service.lifecycleScope.launch {
+                             service.switchToNextIME()
+                         }
+                     }
+@@ -172,7 +167,7 @@ class CommonKeyActionListener :
+                 }
+                 is SpaceLongPressAction -> {
+                     when (spaceKeyLongPressBehavior) {
+-                        SpaceLongPressBehavior.None -> {}
++                        SpaceLongPressBehavior.None, SpaceLongPressBehavior.MoveCursor -> {}
+                         SpaceLongPressBehavior.Enumerate -> service.postFcitxJob {
+                             enumerateIme()
+                         }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CustomGestureView.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CustomGestureView.kt
+index e088fbc..fffbd5d 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CustomGestureView.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CustomGestureView.kt
+@@ -66,6 +66,8 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
+     private var repeatJob: Job? = null
+ 
+     var swipeEnabled = false
++    // Space trackpad: hold first, then allow moves even after consuming the long press.
++    var swipeRequiresLongPress = false
+     var swipeRepeatEnabled = false
+     var swipeThresholdX = 24f
+     var swipeThresholdY = 24f
+@@ -231,7 +233,12 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
+                         isPressed = false
+                     }
+                 }
+-                if (!swipeEnabled || longPressTriggered || repeatStarted) return true
++                if (!swipeEnabled || (longPressTriggered && !swipeRequiresLongPress) || repeatStarted) return true
++                if (swipeRequiresLongPress && !longPressTriggered) {
++                    swipeLastX = x
++                    swipeLastY = y
++                    return true
++                }
+                 val countX = consumeSwipe(x, SwipeAxis.X)
+                 val countY = consumeSwipe(y, SwipeAxis.Y)
+                 dispatchGestureEvent(GestureType.Move, x, y, countX, countY)
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleBreathing.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleBreathing.kt
 new file mode 100644
-index 0000000..ddf1d14
+index 0000000..102dfdc
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleBreathing.kt
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,88 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -1186,7 +1434,8 @@ index 0000000..ddf1d14
 +    cycleMs: Long = 5200L,
 +    fadeInMs: Long = 850L,
 +    fadeOutMs: Long = 180L,
-+    brightness: Float = 0.28f
++    brightness: Float = 0.28f,
++    timeoutMs: Long = 60000L
 +) {
 +    private val idleDelay = idleDelayMs.coerceIn(500L, 10000L)
 +    private val cycle = cycleMs.coerceIn(2000L, 15000L)
@@ -1200,11 +1449,14 @@ index 0000000..ddf1d14
 +    private var fadeAt = 0L
 +    private var fadeFrom = 0f
 +    private var fadePhase = 0f
++    private val timeout = timeoutMs.coerceIn(15000L, 300000L)
++    private var stopAt = 0L
 +
 +    fun resume(now: Long) {
 +        running = true
 +        touching = false
 +        idleAt = now + idleDelay
++        stopAt = now + timeout
 +        fadeFrom = 0f
 +    }
 +
@@ -1222,6 +1474,7 @@ index 0000000..ddf1d14
 +        touching = held
 +        // A long exit fade must finish before a newly configured short idle wait restarts it.
 +        idleAt = now + max(idleDelay, if (fadeFrom > 0f) fadeOutDuration else 0L)
++        stopAt = now + timeout
 +    }
 +
 +    fun phase(now: Long): Float =
@@ -1229,7 +1482,7 @@ index 0000000..ddf1d14
 +        else ((now - idleAt).coerceAtLeast(0L) % cycle).toFloat() / cycle
 +
 +    fun alpha(now: Long): Float {
-+        if (!running) return 0f
++        if (!running || now >= stopAt) return 0f
 +        val fadeElapsed = now - fadeAt
 +        if (fadeFrom > 0f && fadeElapsed in 0L until fadeOutDuration) {
 +            return fadeFrom * (1f - fadeElapsed.toFloat() / fadeOutDuration)
@@ -1237,12 +1490,13 @@ index 0000000..ddf1d14
 +        if (touching || now < idleAt) return 0f
 +        val fadeIn = ((now - idleAt).toFloat() / fadeInDuration).coerceIn(0f, 1f)
 +        val pulse = (0.5 - 0.5 * cos(2.0 * PI * phase(now))).toFloat()
-+        return peak * (0.04f + 0.96f * pulse) * fadeIn
++        val exitFade = ((stopAt - now).toFloat() / fadeOutDuration).coerceIn(0f, 1f)
++        return peak * (0.04f + 0.96f * pulse) * fadeIn * exitFade
 +    }
 +
 +    /** No timer while hidden or holding a key; a single timer during the idle delay. */
 +    fun nextFrameDelay(now: Long): Long? {
-+        if (!running) return null
++        if (!running || now >= stopAt) return null
 +        if (fadeFrom > 0f && now - fadeAt in 0L until fadeOutDuration) return 0L
 +        if (touching) return null
 +        return if (now < idleAt) idleAt - now else IDLE_FRAME_MS
@@ -1398,12 +1652,47 @@ index 9bfc478..fc4f20c 100644
          appearanceView.foreground = if (rippled) {
              RippleDrawable(
                  ColorStateList.valueOf(theme.keyPressHighlightColor), null,
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt
+index 26dcded..1a33534 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt
+@@ -97,6 +97,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
+ 
+     private fun detachCurrentLayout() {
+         currentKeyboard?.also {
++            bar.setEffectKeyboard(null)
+             it.onDetach()
+             keyboardView.removeView(it)
+             it.keyActionListener = null
+@@ -111,6 +112,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
+             it.popupActionListener = popupActionListener
+             keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
+             it.onAttach()
++            bar.setEffectKeyboard(it)
+             it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
+             it.onInputMethodUpdate(fcitx.runImmediately { inputMethodEntryCached })
+         }
+@@ -164,12 +166,14 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
+             it.keyActionListener = keyActionListener
+             it.popupActionListener = popupActionListener
+             it.onAttach()
++            bar.setEffectKeyboard(it)
+         }
+         notifyBarLayoutChanged()
+     }
+ 
+     override fun onDetached() {
+         currentKeyboard?.let {
++            bar.setEffectKeyboard(null)
+             it.onDetach()
+             it.keyActionListener = null
+             it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..6772e73
+index 0000000..ec6ddea
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,502 @@
+@@ -0,0 +1,526 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -1459,6 +1748,7 @@ index 0000000..6772e73
 +    private val breathing: IdleBreathing,
 +    idleColors: IntArray,
 +    private val clock: () -> Long = SystemClock::uptimeMillis,
++    randomIdleColors: Boolean = false,
 +    private val animationsAllowed: () -> Boolean = {
 +        !AppPrefs.getInstance().advanced.disableAnimation.getValue() &&
 +            (!org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
@@ -1483,12 +1773,20 @@ index 0000000..6772e73
 +    private var lastColorIndex = -1
 +    private var frameTime = 0L
 +    private var active = false
-+    private val idleGlow = IdleGlowPainter(
-+        idleColors.getOrElse(0) { CYBERPUNK[0] },
-+        idleColors.getOrElse(1) { CYBERPUNK[4] }
-+    )
++    // Cache all shaders once. A new colour pair is chosen near the dim point of each breath.
++    private val idleStyles = if (randomIdleColors && idleColors.size > 1)
++        Array(idleColors.size) { i -> IdleGlowPainter(idleColors[i], idleColors[(i + 3) % idleColors.size]) }
++    else arrayOf(IdleGlowPainter(idleColors.getOrElse(0) { CYBERPUNK[0] },
++        idleColors.getOrElse(1) { CYBERPUNK[4] }))
++    private var idleStyleIndex = random.nextInt(idleStyles.size)
++    private var previousIdlePhase = 1f
++    var invalidateExtension: (() -> Unit)? = null
++    private fun invalidateBoth() {
++        host.invalidate()
++        invalidateExtension?.invoke()
++    }
 +    private val frameCallback = Runnable {
-+        if (canDraw() && animatorsEnabled()) host.invalidate() else clear()
++        if (canDraw() && animatorsEnabled()) invalidateBoth() else clear()
 +    }
 +
 +    private fun canDraw() = active && host.isAttachedToWindow && host.isShown &&
@@ -1507,7 +1805,7 @@ index 0000000..6772e73
 +        } else if (idleEnabled && !breathing.running) {
 +            breathing.resume(clock())
 +        }
-+        host.invalidate()
++        invalidateBoth()
 +    }
 +
 +    fun onRelease() {
@@ -1515,6 +1813,7 @@ index 0000000..6772e73
 +        breathing.activity(clock(), held = false)
 +        host.removeCallbacks(frameCallback)
 +        host.postInvalidateOnAnimation()
++        invalidateExtension?.invoke()
 +    }
 +
 +    private fun scheduleFrame(delay: Long) {
@@ -1552,6 +1851,7 @@ index 0000000..6772e73
 +        breathing.activity(now, held = true)
 +        host.removeCallbacks(frameCallback)
 +        host.postInvalidateOnAnimation()
++        invalidateExtension?.invoke()
 +        if (!pressEnabled) return
 +        if (Textures.ready == null) Textures.ensure()
 +        var index = random.nextInt(colors.size)
@@ -1577,6 +1877,7 @@ index 0000000..6772e73
 +            driftY = (random.nextFloat() - 0.5f) * 16f * density
 +        }
 +        host.postInvalidateOnAnimation()
++        invalidateExtension?.invoke()
 +    }
 +
 +    /** Both light layers stay under the key legends. */
@@ -1613,7 +1914,19 @@ index 0000000..6772e73
 +    }
 +
 +    private fun drawBreathing(canvas: Canvas, alpha: Float) {
-+        idleGlow.draw(canvas, host.width, host.height, alpha, breathing.phase(frameTime))
++        val phase = breathing.phase(frameTime)
++        if (phase < previousIdlePhase && phase < 0.08f && idleStyles.size > 1) {
++            idleStyleIndex = (idleStyleIndex + 1 + random.nextInt(idleStyles.size - 1)) % idleStyles.size
++        }
++        previousIdlePhase = phase
++        idleStyles[idleStyleIndex].draw(canvas, host.width, host.height, alpha, phase)
++    }
++
++    /** Called inside the candidate bar, behind its text, with keyboard-relative coordinates. */
++    fun drawExtension(canvas: Canvas) {
++        if (!canDraw() || !animatorsEnabled()) return
++        frameTime = clock()
++        if (ripples.size > 0) draw(canvas, underStrength + overStrength)
 +    }
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
@@ -1965,8 +2278,63 @@ index 0000000..b4adafd
 +        size = 0
 +    }
 +}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PunctuationMode.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PunctuationMode.kt
+new file mode 100644
+index 0000000..6a7c7e6
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PunctuationMode.kt
+@@ -0,0 +1,13 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.input.keyboard
++
++internal object PunctuationMode {
++    fun forMode(text: String, english: Boolean): String = if (!english) text else when (text) {
++        "，" -> ","
++        "。" -> "."
++        "？" -> "?"
++        "！" -> "!"
++        "…" -> "..."
++        else -> text
++    }
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/RimeActions.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/RimeActions.kt
+new file mode 100644
+index 0000000..a458914
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/RimeActions.kt
+@@ -0,0 +1,18 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.input.keyboard
++
++import org.fcitx.fcitx5.android.core.Action
++
++internal object RimeActions {
++    fun find(actions: Array<Action>, name: String): Action? {
++        for (action in actions) {
++            if (action.name == name) return action
++            action.menu?.let { find(it, name)?.let { found -> return found } }
++        }
++        return null
++    }
++    // In the pinned fcitx5-rime, updateSchemaMenu always puts the native Latin
++    // toggle first. Its numeric ID is dynamic; text is localized, so use neither.
++    fun asciiToggle(actions: Array<Action>): Action? =
++        find(actions, "fcitx-rime-im")?.menu?.firstOrNull()?.takeUnless { it.isSeparator }
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/SpaceLongPressBehavior.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/SpaceLongPressBehavior.kt
+index adea1fc..e715a00 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/SpaceLongPressBehavior.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/SpaceLongPressBehavior.kt
+@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.R
+ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
+ 
+ enum class SpaceLongPressBehavior(override val stringRes: Int) : ManagedPreferenceEnum {
++    MoveCursor(R.string.space_behavior_cursor),
+     None(R.string.space_behavior_none),
+     Enumerate(R.string.space_behavior_enumerate),
+     ToggleActivate(R.string.space_behavior_activate),
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-index 368cf6c..5cf0e65 100644
+index 368cf6c..1118523 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 @@ -6,6 +6,11 @@ package org.fcitx.fcitx5.android.input.keyboard
@@ -2024,12 +2392,12 @@ index 368cf6c..5cf0e65 100644
 -                LayoutSwitchKey("?123", ""),
 -                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
 -                LanguageKey(),
-+                LayoutSwitchKey("123", "", 0.14f),
-+                CommaKey(0.08f, KeyDef.Appearance.Variant.Alternative),
++                LayoutSwitchKey("123", "", 0.10f),
++                CommaKey(0.10f, KeyDef.Appearance.Variant.Alternative),
++                SymbolKey(".", 0.10f, KeyDef.Appearance.Variant.Alternative),
                  SpaceKey(),
 -                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
 -                ReturnKey()
-+                SymbolKey(".", 0.08f, KeyDef.Appearance.Variant.Alternative),
 +                LanguageKey(),
 +                ReturnKey(0.17f)
              )
@@ -2075,6 +2443,15 @@ index 368cf6c..5cf0e65 100644
  
      private fun transformAlphabet(c: String): String {
          return when (capsState) {
+@@ -111,7 +153,7 @@ class TextKeyboard(
+     }
+ 
+     private var punctuationMapping: Map<String, String> = mapOf()
+-    private fun transformPunctuation(p: String) = punctuationMapping.getOrDefault(p, p)
++    private fun transformPunctuation(p: String) = if (englishMode) p else punctuationMapping.getOrDefault(p, p)
+ 
+     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
+         var transformed = action
 @@ -150,6 +192,7 @@ class TextKeyboard(
      }
  
@@ -2083,7 +2460,7 @@ index 368cf6c..5cf0e65 100644
          capsState = CapsState.None
          updateCapsButtonIcon()
          updateAlphabetKeys()
-@@ -165,13 +208,15 @@ class TextKeyboard(
+@@ -165,13 +208,16 @@ class TextKeyboard(
      }
  
      override fun onInputMethodUpdate(ime: InputMethodEntry) {
@@ -2103,10 +2480,24 @@ index 368cf6c..5cf0e65 100644
 +        capsState = CapsState.None
 +        updateCapsButtonIcon()
 +        updateAlphabetKeys()
++        updatePunctuationKeys()
      }
  
      private fun transformPopupPreview(c: String): String {
-@@ -238,7 +283,7 @@ class TextKeyboard(
+@@ -194,7 +240,11 @@ class TextKeyboard(
+                             )
+                         else action
+                     }
+-                    is KeyDef.Popup.Keyboard.Explicit -> action
++                    is KeyDef.Popup.Keyboard.Explicit -> action.copy(
++                        keyboard = KeyDef.Popup.Keyboard.Explicit(
++                            action.keyboard.items.map { PunctuationMode.forMode(it, englishMode) }.toTypedArray()
++                        )
++                    )
+                 }
+             }
+             else -> action
+@@ -238,7 +288,7 @@ class TextKeyboard(
              if (it.def !is KeyDef.Appearance.AltText) return
              it.mainText.text = it.def.displayText.let { str ->
                  if (str.length != 1 || !str[0].isLetter()) return@forEach
@@ -2115,7 +2506,7 @@ index 368cf6c..5cf0e65 100644
              }
          }
      }
-@@ -251,11 +296,11 @@ class TextKeyboard(
+@@ -251,11 +301,11 @@ class TextKeyboard(
              } else {
                  it.def as KeyDef.Appearance.Text
                  it.mainText.text = it.def.displayText.let { str ->
@@ -2500,6 +2891,84 @@ index 5e0c372..7a05c53 100644
                      }
                  }
              }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt
+index f8f2778..9ab8223 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt
+@@ -1,10 +1,68 @@
+-/*
+- * SPDX-License-Identifier: LGPL-2.1-or-later
+- * SPDX-FileCopyrightText: Copyright 2021-2023 Fcitx5 for Android Contributors
+- */
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
+ package org.fcitx.fcitx5.android.ui.main.settings.behavior
+ 
++import android.util.AtomicFile
++import androidx.fragment.app.activityViewModels
++import androidx.lifecycle.lifecycleScope
++import androidx.preference.Preference
++import androidx.preference.PreferenceScreen
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++import org.fcitx.fcitx5.android.R
++import org.fcitx.fcitx5.android.FcitxApplication
+ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
++import org.fcitx.fcitx5.android.data.rime.RimeFuzzyConfig
++import org.fcitx.fcitx5.android.input.keyboard.RimeActions
++import org.fcitx.fcitx5.android.ui.main.MainViewModel
++import org.fcitx.fcitx5.android.utils.toast
++import java.io.File
+ 
+-class KeyboardSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().keyboard)
++class KeyboardSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().keyboard) {
++    private val viewModel: MainViewModel by activityViewModels()
++    override fun onPreferenceUiCreated(screen: PreferenceScreen) {
++        listOf("rime_fuzzy_nl", "rime_fuzzy_zh", "rime_fuzzy_ang").forEachIndexed { index, key ->
++            findPreference<Preference>(key)?.order = index
++        }
++        screen.addPreference(Preference(requireContext()).apply {
++            setTitle(R.string.rime_apply)
++            setSummary(R.string.rime_apply_summary)
++            order = 3
++            setOnPreferenceClickListener {
++                val context = requireContext()
++                lifecycleScope.launch {
++                    try {
++                        val ready = viewModel.fcitx.runOnReady {
++                            inputMethodEntryCached.uniqueName == "rime" &&
++                                RimeActions.find(statusArea(), "fcitx-rime-deploy") != null
++                        }
++                        if (!ready) {
++                            context.toast(context.getString(R.string.rime_select_first))
++                            return@launch
++                        }
++                        val prefs = AppPrefs.getInstance().keyboard
++                        val config = RimeFuzzyConfig.render(prefs.rimeFuzzyNl.getValue(),
++                            prefs.rimeFuzzyZh.getValue(), prefs.rimeFuzzyAng.getValue())
++                        withContext(Dispatchers.IO) {
++                            val engineContext = FcitxApplication.getInstance().directBootAwareContext
++                            val directory = (engineContext.getExternalFilesDir(null) ?: engineContext.filesDir).resolve("data/rime")
++                            check(directory.isDirectory || directory.mkdirs())
++                            val file = AtomicFile(File(directory, "xuancai_mobile.yaml"))
++                            val output = file.startWrite()
++                            try {
++                                output.write(config.toByteArray(Charsets.UTF_8))
++                                file.finishWrite(output)
++                            } catch (e: Exception) { file.failWrite(output); throw e }
++                        }
++                        viewModel.fcitx.runOnReady {
++                            RimeActions.find(statusArea(), "fcitx-rime-deploy")?.let { activateAction(it.id) }
++                        }
++                        context.toast(context.getString(R.string.rime_deploy_started))
++                    } catch (e: Exception) { context.toast(e) }
++                }
++                true
++            }
++        })
++    }
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt
 index b8c048c..bbc9139 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt
@@ -2536,7 +3005,7 @@ index 0000000..28fcdba
 +        android:pathData="M4,4h6v6h-6z M14,4h6v6h-6z M4,14h6v6h-6z M14,14h6v6h-6z" />
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..5b40393 100644
+index 40ef2c9..2f0670a 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -2557,7 +3026,7 @@ index 40ef2c9..5b40393 100644
      <string name="key_border">启用按键边框</string>
      <string name="brightness">亮度</string>
      <string name="key_radius">按键圆角半径</string>
-@@ -321,4 +332,33 @@
+@@ -321,4 +332,43 @@
      <string name="keyboard_height_percent_base">键盘高度百分比</string>
      <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
      <string name="real_size">真实尺寸 (Display.getRealSize)</string>
@@ -2590,9 +3059,19 @@ index 40ef2c9..5b40393 100644
 +    <string name="neon_mint">薄荷青</string>
 +    <string name="effects_follow_system_animation">光效跟随系统动画开关</string>
 +    <string name="effects_follow_system_animation_summary">开启后，系统关闭动画时也暂停键盘光效。高级设置中的“禁用动画”始终优先。</string>
++    <string name="idle_timeout">闲置多久后停止呼吸光</string>
++    <string name="rime_fuzzy_nl">Rime 模糊音：n / l</string>
++    <string name="rime_fuzzy_zh">Rime 模糊音：z / zh、c / ch、s / sh</string>
++    <string name="rime_fuzzy_ang">Rime 模糊音：an / ang</string>
++    <string name="rime_apply">应用 Rime 模糊音设置</string>
++    <string name="rime_apply_summary">默认关闭。选好开关并选择 Rime 后，点击此处重新部署。</string>
++    <string name="rime_select_first">请先启用并选择 Rime，再应用设置。</string>
++    <string name="rime_deploy_started">设置已保存，Rime 已开始重新部署。</string>
++    <string name="space_behavior_cursor">长按后滑动移动光标</string>
++    <string name="idle_random_colors">呼吸光随机颜色</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..3f5f758 100644
+index fa9bc4e..d70fd1d 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -2613,7 +3092,7 @@ index fa9bc4e..3f5f758 100644
      <string name="key_border">啟用按鍵邊框</string>
      <string name="brightness">亮度</string>
      <string name="key_radius">按鍵圓角半徑</string>
-@@ -316,4 +327,33 @@
+@@ -316,4 +327,43 @@
      <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
      <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
      <string name="preferred_voice_input">首選語音輸入</string>
@@ -2646,9 +3125,19 @@ index fa9bc4e..3f5f758 100644
 +    <string name="neon_mint">薄荷青</string>
 +    <string name="effects_follow_system_animation">光效跟隨系統動畫開關</string>
 +    <string name="effects_follow_system_animation_summary">開啟後，系統關閉動畫時也暫停鍵盤光效。進階設定中的「停用動畫」始終優先。</string>
++    <string name="idle_timeout">閒置多久後停止呼吸光</string>
++    <string name="rime_fuzzy_nl">Rime 模糊音：n / l</string>
++    <string name="rime_fuzzy_zh">Rime 模糊音：z / zh、c / ch、s / sh</string>
++    <string name="rime_fuzzy_ang">Rime 模糊音：an / ang</string>
++    <string name="rime_apply">套用 Rime 模糊音設定</string>
++    <string name="rime_apply_summary">預設關閉。選好開關並選擇 Rime 後，點此重新部署。</string>
++    <string name="rime_select_first">請先啟用並選擇 Rime，再套用設定。</string>
++    <string name="rime_deploy_started">設定已儲存，Rime 已開始重新部署。</string>
++    <string name="space_behavior_cursor">長按後滑動移動游標</string>
++    <string name="idle_random_colors">呼吸光隨機顏色</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..b25e3d9 100644
+index fe1fd3a..db56ab8 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -2669,7 +3158,7 @@ index fe1fd3a..b25e3d9 100644
      <string name="key_border">Enable key border</string>
      <string name="brightness">Brightness</string>
      <string name="key_radius">Key radius</string>
-@@ -321,4 +332,33 @@
+@@ -321,4 +332,43 @@
      <string name="keyboard_height_percent_base">Keyboard height percent base</string>
      <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
      <string name="real_size">Real size (Display.getRealSize)</string>
@@ -2702,6 +3191,16 @@ index fe1fd3a..b25e3d9 100644
 +    <string name="neon_mint">Mint</string>
 +    <string name="effects_follow_system_animation">Follow system animation switch for key effects</string>
 +    <string name="effects_follow_system_animation_summary">When enabled, turning off system animations also pauses keyboard light effects. The advanced Disable animations setting always takes priority.</string>
++    <string name="idle_timeout">Stop idle glow after inactivity</string>
++    <string name="rime_fuzzy_nl">Rime fuzzy initials: n / l</string>
++    <string name="rime_fuzzy_zh">Rime fuzzy initials: z / zh, c / ch, s / sh</string>
++    <string name="rime_fuzzy_ang">Rime fuzzy finals: an / ang</string>
++    <string name="rime_apply">Apply Rime fuzzy settings</string>
++    <string name="rime_apply_summary">Default off. Select Rime, then apply to redeploy.</string>
++    <string name="rime_select_first">Enable and select Rime before applying settings.</string>
++    <string name="rime_deploy_started">Settings saved. Rime deployment has started.</string>
++    <string name="space_behavior_cursor">Hold, then slide to move cursor</string>
++    <string name="idle_random_colors">Random breathing colours</string>
  </resources>
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt
 new file mode 100644
@@ -2752,10 +3251,10 @@ index 0000000..0ee6abf
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt
 new file mode 100644
-index 0000000..928c810
+index 0000000..30b5d41
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,110 @@
 +package org.fcitx.fcitx5.android
 +
 +import org.fcitx.fcitx5.android.input.keyboard.IdleBreathing
@@ -2848,6 +3347,23 @@ index 0000000..928c810
 +            assertTrue(alpha.isFinite() && alpha in 0f..0.6f)
 +        }
 +    }
++    @Test
++    fun inactivityDeadlineStopsFramesUntilNewInputOrKeyboardReopens() {
++        val glow = IdleBreathing(timeoutMs = 60000)
++        glow.resume(0)
++        assertTrue(glow.alpha(4400) > 0f)
++        assertEquals(0f, glow.alpha(60000), 0f)
++        assertNull(glow.nextFrameDelay(60000))
++        assertTrue("Expired envelope must stay running to prevent draw auto-resume", glow.running)
++        assertEquals(0f, glow.alpha(300000), 0f)
++        assertNull(glow.nextFrameDelay(300000))
++        glow.activity(300000, held = false)
++        assertTrue(glow.alpha(304400) > 0f)
++        glow.stop()
++        glow.resume(400000)
++        assertTrue(glow.alpha(404400) > 0f)
++    }
++
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/IdleGlowDirectionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/IdleGlowDirectionTest.kt
 new file mode 100644
@@ -2899,12 +3415,19 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..bdd5d7c
+index 0000000..33e5306
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,255 @@
+@@ -0,0 +1,337 @@
 +package org.fcitx.fcitx5.android
 +
++import androidx.activity.ComponentActivity
++import android.os.SystemClock
++import android.view.Gravity
++import org.fcitx.fcitx5.android.input.bar.RippleBarView
++import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
++import org.fcitx.fcitx5.android.input.bar.ui.idle.ButtonsBarUi
++import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 +import android.app.Activity
 +import android.app.Application
 +import android.content.Context
@@ -2998,7 +3521,7 @@ index 0000000..bdd5d7c
 +        val activity = controller.get()
 +        activity.setTheme(R.style.Theme_InputViewTheme)
 +        val root = FrameLayout(activity)
-+        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV07)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV08)
 +        activity.setContentView(root)
 +        root.addView(keyboard, FrameLayout.LayoutParams(600, 300))
 +        controller.visible()
@@ -3033,7 +3556,7 @@ index 0000000..bdd5d7c
 +    @Test
 +    fun oldHighlightReproducesTheRectangleSoThePixelCheckIsSensitive() {
 +        val context = RuntimeEnvironment.getApplication()
-+        val oldTheme = ThemePreset.XuancaiBlackV07.copy(keyPressHighlightColor = 0x18ffffff)
++        val oldTheme = ThemePreset.XuancaiBlackV08.copy(keyPressHighlightColor = 0x18ffffff)
 +        val key = TextKeyView(context, oldTheme, LanguageKey().appearance as KeyDef.Appearance.Text)
 +        layout(key, 90, 64)
 +        val normal = render(key)
@@ -3051,7 +3574,7 @@ index 0000000..bdd5d7c
 +    @Test
 +    fun languageKeyMatchesEngineEnglishUsesLowercaseAndShiftStillTypesUppercase() {
 +        val context = RuntimeEnvironment.getApplication()
-+        val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV07)
++        val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV08)
 +        val q = keys(keyboard).filterIsInstance<TextKeyView>().first { (it.def as? KeyDef.Appearance.Text)?.displayText == "Q" }
 +        var action: KeyAction? = null
 +        keyboard.keyActionListener = KeyActionListener { value, _ -> action = value }
@@ -3074,7 +3597,11 @@ index 0000000..bdd5d7c
 +        assertEquals("英", keyboard.lang.mainText.text.toString())
 +        keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
 +        assertEquals("英", keyboard.lang.mainText.text.toString())
++        val comma = keys(keyboard).filterIsInstance<TextKeyView>()
++            .first { (it.def as? KeyDef.Appearance.Text)?.displayText == "," }
++        assertEquals(",", comma.mainText.text.toString())
 +        keyboard.onInputMethodUpdate(ime(false))
++        assertEquals("，", comma.mainText.text.toString())
 +        assertEquals("中", keyboard.lang.mainText.text.toString())
 +        keyboard.onDetach()
 +    }
@@ -3083,12 +3610,13 @@ index 0000000..bdd5d7c
 +    fun bottomRowHasSixAdjacentTargetsAndOnlyEightDpDividerTicks() {
 +        val context = RuntimeEnvironment.getApplication()
 +        for (width in listOf(360, 800)) {
-+            val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV07)
++            val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV08)
 +            layout(keyboard, width, 260)
 +            val row = keyboard.getChildAt(keyboard.childCount - 1) as ViewGroup
 +            val bottom = (0 until row.childCount).map { row.getChildAt(it) }.sortedBy { it.left }
 +            assertEquals(6, bottom.size)
 +            assertTrue(keyboard.space.width >= width * 0.39f)
++            assertEquals(width / 2f, (keyboard.space.left + keyboard.space.right) / 2f, 1f)
 +            val image = render(keyboard)
 +            for (i in 0 until bottom.lastIndex) {
 +                assertEquals(bottom[i].right, bottom[i + 1].left)
@@ -3103,12 +3631,12 @@ index 0000000..bdd5d7c
 +
 +    @Test
 +    fun largeCandidatesScrollAndRealUiRendersBothLanguageStates() {
-+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
 +        val activity = controller.get()
 +        activity.setTheme(R.style.Theme_InputViewTheme)
 +        val root = FrameLayout(activity)
 +        activity.setContentView(root)
-+        val adapter = HorizontalCandidateViewAdapter(ThemePreset.XuancaiBlackV07)
++        val adapter = HorizontalCandidateViewAdapter(ThemePreset.XuancaiBlackV08)
 +        val words = arrayOf("你好", "您好", "你好吗", "你好呀", "你好世界", "泥好", "拟好", "倪好")
 +        adapter.updateCandidates(words.map { CandidateWord("", it, "") }.toTypedArray(), words.size)
 +        val manager = LinearLayoutManager(activity, RecyclerView.HORIZONTAL, false)
@@ -3117,16 +3645,34 @@ index 0000000..bdd5d7c
 +            this.adapter = adapter
 +            itemAnimator = null
 +        }
-+        val bar = CandidateUi(activity, ThemePreset.XuancaiBlackV07, candidates)
++        val bar = CandidateUi(activity, ThemePreset.XuancaiBlackV08, candidates)
 +        bar.expandButton.visibility = View.VISIBLE
-+        root.addView(bar.root, FrameLayout.LayoutParams(360, 52))
-+        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV07)
++        val rippleBar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
++        rippleBar.addView(bar.root, FrameLayout.LayoutParams(360, 52))
++        root.addView(rippleBar, FrameLayout.LayoutParams(360, 52))
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV08)
 +        root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
++        rippleBar.keyboard = keyboard
 +        controller.visible()
 +        layout(root, 360, 312)
 +        keyboard.onInputMethodUpdate(ime(false))
 +        keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
++        layout(root, 360, 312)
 +        save(render(root), "layout-chinese")
++        val barBefore = render(rippleBar)
++        val downAt = SystemClock.uptimeMillis()
++        MotionEvent.obtain(downAt, downAt, MotionEvent.ACTION_DOWN, 170f, 28f, 0).let {
++            keyboard.dispatchTouchEvent(it); it.recycle()
++        }
++        MotionEvent.obtain(downAt, downAt + 30, MotionEvent.ACTION_UP, 170f, 28f, 0).let {
++            keyboard.dispatchTouchEvent(it); it.recycle()
++        }
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
++        layout(root, 360, 312)
++        val barAfter = render(rippleBar)
++        assertFalse("A real key press must illuminate the candidate bar", barBefore.sameAs(barAfter))
++        save(render(root), "layout-candidate-ripple")
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1400))
 +        val first = candidates.findViewHolderForAdapterPosition(0)!!
 +        val label = (first.itemView as ViewGroup).getChildAt(0) as AutoScaleTextView
 +        assertEquals(24f, label.textSize / activity.resources.displayMetrics.scaledDensity, 0.01f)
@@ -3148,11 +3694,63 @@ index 0000000..bdd5d7c
 +        layout(root, 360, 312)
 +        keyboard.onInputMethodUpdate(ime(true))
 +        keyboard.onPunctuationUpdate(emptyMap())
++        layout(root, 360, 312)
++        // The idle toolbar is shown for direct English entry: editing, undo, redo, clipboard, emoji.
++        val toolbar = FrameLayout(activity)
++        val buttons = ButtonsBarUi(activity, ThemePreset.XuancaiBlackV08)
++        toolbar.addView(buttons.root, FrameLayout.LayoutParams(256, 52).apply { leftMargin = 52 })
++        toolbar.addView(ToolButton(activity, R.drawable.ic_keyboard_tools_24, ThemePreset.XuancaiBlackV08),
++            FrameLayout.LayoutParams(52, 52))
++        toolbar.addView(ToolButton(activity, R.drawable.ic_baseline_keyboard_arrow_down_24, ThemePreset.XuancaiBlackV08),
++            FrameLayout.LayoutParams(52, 52).apply { gravity = Gravity.RIGHT })
++        rippleBar.addView(toolbar, FrameLayout.LayoutParams(360, 52))
++        rippleBar.displayedChild = 1
++        layout(root, 360, 312)
 +        save(render(root), "layout-english")
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(3100))
++        layout(root, 360, 312)
 +        save(render(root), "layout-glow-sides")
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1300))
++        layout(root, 360, 312)
 +        save(render(root), "layout-glow-inward")
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
++    }
++
++    @Test
++    fun holdingSpaceThenDraggingMovesCursorWithoutTypingASpace() {
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV08)
++        activity.setContentView(keyboard)
++        controller.visible()
++        layout(keyboard, 360, 260)
++        val actions = mutableListOf<KeyAction>()
++        keyboard.keyActionListener = KeyActionListener { action, _ -> actions.add(action) }
++        val space = keyboard.space
++        val start = SystemClock.uptimeMillis()
++        fun touch(action: Int, x: Float, time: Long) {
++            val event = MotionEvent.obtain(start, time, action, x, space.height / 2f, 0)
++            space.dispatchTouchEvent(event)
++            event.recycle()
++        }
++        touch(MotionEvent.ACTION_DOWN, 45f, start)
++        touch(MotionEvent.ACTION_MOVE, 47f, start + 50)
++        assertTrue(actions.isEmpty())
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350))
++        touch(MotionEvent.ACTION_MOVE, 79f, start + 380)
++        touch(MotionEvent.ACTION_MOVE, 58f, start + 400)
++        touch(MotionEvent.ACTION_UP, 58f, start + 420)
++        assertTrue(actions.contains(KeyAction.SpaceLongPressAction))
++        val directions = actions.filterIsInstance<KeyAction.SymAction>()
++        assertTrue(directions.any { it.sym == org.fcitx.fcitx5.android.core.KeySym(FcitxKeyMapping.FcitxKey_Right) })
++        assertTrue(directions.any { it.sym == org.fcitx.fcitx5.android.core.KeySym(FcitxKeyMapping.FcitxKey_Left) })
++        assertFalse(directions.any { it.sym == org.fcitx.fcitx5.android.core.KeySym(FcitxKeyMapping.FcitxKey_space) })
++        actions.clear()
++        touch(MotionEvent.ACTION_DOWN, 45f, start + 450)
++        touch(MotionEvent.ACTION_UP, 45f, start + 480)
++        assertEquals(listOf(KeyAction.SymAction(org.fcitx.fcitx5.android.core.KeySym(FcitxKeyMapping.FcitxKey_space))), actions)
 +        keyboard.onDetach()
 +        controller.pause().stop().destroy()
 +    }
@@ -3203,10 +3801,10 @@ index 0000000..a640055
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
 new file mode 100644
-index 0000000..cd7ac14
+index 0000000..3fcbbe3
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,169 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
@@ -3363,6 +3961,18 @@ index 0000000..cd7ac14
 +            assertTrue(peak(h.render(9400)) >= 40)
 +        } finally { h.finish() }
 +    }
++    @Test
++    fun expiredIdleGlowCannotBeRestartedByVisibleDrawing() {
++        val h = Harness()
++        try {
++            h.render(0)
++            assertTrue(peak(h.render(4400)) >= 40)
++            assertEquals(0, peak(h.render(61000)))
++            assertEquals(0, peak(h.render(120000)))
++            assertNull(h.envelope.nextFrameDelay(120000))
++        } finally { h.finish() }
++    }
++
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt
 new file mode 100644
@@ -3415,6 +4025,47 @@ index 0000000..7a580b9
 +        assertEquals(0, trail.size)
 +    }
 +}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/RimeMobileOptionsTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/RimeMobileOptionsTest.kt
+new file mode 100644
+index 0000000..ed5388e
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/RimeMobileOptionsTest.kt
+@@ -0,0 +1,35 @@
++package org.fcitx.fcitx5.android
++
++import org.fcitx.fcitx5.android.core.Action
++import org.fcitx.fcitx5.android.data.rime.RimeFuzzyConfig
++import org.fcitx.fcitx5.android.input.keyboard.PunctuationMode
++import org.fcitx.fcitx5.android.input.keyboard.RimeActions
++import org.junit.Assert.*
++import org.junit.Test
++
++class RimeMobileOptionsTest {
++    private fun action(id: Int, name: String, text: String, children: Array<Action>? = null) =
++        Action(id, false, false, false, name, "", text, text, children)
++    @Test fun nativeRimeToggleIsFoundWithoutDependingOnLocalizedTextOrSchemaId() {
++        val toggle = action(71, "", "拉丁模式")
++        val deploy = action(93, "fcitx-rime-deploy", "部署")
++        val root = action(5, "fcitx-rime-im", "雾凇", arrayOf(toggle, action(72, "", "雾凇拼音"), deploy))
++        assertEquals(toggle, RimeActions.asciiToggle(arrayOf(root)))
++        assertEquals(deploy, RimeActions.find(arrayOf(root), "fcitx-rime-deploy"))
++        assertNull(RimeActions.asciiToggle(arrayOf(action(9, "pinyin", "拼音"))))
++    }
++    @Test fun fuzzyGroupsDefaultOffAndCanBeEnabledIndependently() {
++        assertTrue(RimeFuzzyConfig.render(false, false, false).contains("patch: {}"))
++        val nl = RimeFuzzyConfig.render(true, false, false)
++        assertTrue(nl.contains("derive/^n/l/"))
++        assertFalse(nl.contains("derive/ang$/an/"))
++        val rest = RimeFuzzyConfig.render(false, true, true)
++        assertFalse(rest.contains("derive/^n/l/"))
++        assertTrue(rest.contains("derive/^([zcs])h/$1/"))
++        assertTrue(rest.contains("derive/ang$/an/"))
++    }
++    @Test fun longPressPunctuationUsesEnglishAsciiOrChineseFullWidth() {
++        assertEquals(listOf(",", ".", "?", "!", "..."), listOf("，", "。", "？", "！", "…").map { PunctuationMode.forMode(it, true) })
++        assertEquals("，", PunctuationMode.forMode("，", false))
++    }
++}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt
 index 6b9129f..afa223b 100644
 --- a/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt
@@ -3446,37 +4097,60 @@ index 6b9129f..afa223b 100644
 \ No newline at end of file
 +}
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-index b99ab3e..af51644 100644
+index b99ab3e..64c2246 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-@@ -47,7 +47,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
+@@ -47,7 +47,8 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
                      proguardFile(getDefaultProguardFile("proguard-android-optimize.txt"))
                  }
                  debug {
 -                    applicationIdSuffix = ".debug"
-+                    applicationIdSuffix = ".xuancai.black.v07"
++                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v08"
++                    signingConfigs.fromProjectEnv(target)?.let { signingConfig = it }
                  }
                  all {
                      // remove META-INF/version-control-info.textproto
 diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-index 8a19dd2..25574e1 100644
+index 8a19dd2..15a9ed7 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-@@ -29,10 +29,10 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
+@@ -15,6 +15,8 @@ import org.gradle.kotlin.dsl.configure
+ class AndroidPluginAppConventionPlugin : Plugin<Project> {
+ 
+     override fun apply(target: Project) {
++        val mainApplicationId = "org.fcitx.fcitx5.android" +
++            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v08")
+         target.extensions.configure<ApplicationExtension> {
+             buildFeatures {
+                 buildConfig = true
+@@ -29,10 +31,10 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
                      )
                  }
                  debug {
 -                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.debug\"")
-+                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v07\"")
++                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"$mainApplicationId\"")
                      addManifestPlaceholders(
                          mapOf(
 -                            "mainApplicationId" to "org.fcitx.fcitx5.android.debug",
-+                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v07",
++                            "mainApplicationId" to mainApplicationId,
                          )
                      )
                  }
+diff --git a/build-logic/convention/src/main/kotlin/Versions.kt b/build-logic/convention/src/main/kotlin/Versions.kt
+index 51ae91d..767a86f 100644
+--- a/build-logic/convention/src/main/kotlin/Versions.kt
++++ b/build-logic/convention/src/main/kotlin/Versions.kt
+@@ -17,7 +17,7 @@ object Versions {
+     const val defaultBuildTools = "36.1.0"
+ 
+     // NOTE: increase this value to bump version code
+-    const val baseVersionCode = 11
++    const val baseVersionCode = 80
+     const val baseVersionName = "0.1.3"
+ 
+     val supportedABIs = setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
 diff --git a/lib/plugin-base/src/debug/AndroidManifest.xml b/lib/plugin-base/src/debug/AndroidManifest.xml
-index d1d4123..735d800 100644
+index d1d4123..241bf2a 100644
 --- a/lib/plugin-base/src/debug/AndroidManifest.xml
 +++ b/lib/plugin-base/src/debug/AndroidManifest.xml
 @@ -7,7 +7,7 @@
@@ -3484,7 +4158,7 @@ index d1d4123..735d800 100644
  
      <queries>
 -        <package android:name="org.fcitx.fcitx5.android.debug" />
-+        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v07" />
++        <package android:name="${mainApplicationId}" />
      </queries>
  
      <application>
@@ -3493,7 +4167,7 @@ index d1d4123..735d800 100644
              tools:node="remove" />
          <meta-data
 -            android:name="org.fcitx.fcitx5.android.debug.plugin.METADATA"
-+            android:name="org.fcitx.fcitx5.android.xuancai.black.v07.plugin.METADATA"
++            android:name="${mainApplicationId}.plugin.METADATA"
              android:resource="@xml/plugin" />
  
          <activity
@@ -3502,7 +4176,7 @@ index d1d4123..735d800 100644
              </intent-filter>
              <intent-filter>
 -                <action android:name="org.fcitx.fcitx5.android.debug.plugin.MANIFEST" />
-+                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v07.plugin.MANIFEST" />
++                <action android:name="${mainApplicationId}.plugin.MANIFEST" />
              </intent-filter>
          </activity>
      </application>
@@ -3510,7 +4184,7 @@ index d1d4123..735d800 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
-index 1733282..272ad0c 100644
+index 1733282..d74181c 100644
 --- a/plugin/rime/build.gradle.kts
 +++ b/plugin/rime/build.gradle.kts
 @@ -33,7 +33,7 @@ android {
@@ -3518,15 +4192,15 @@ index 1733282..272ad0c 100644
          }
          debug {
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "曜黑 Rime V07")
++            resValue("string", "app_name", "曜黑 Rime V08")
          }
      }
  
 diff --git a/plugin/rime/src/main/cpp/CMakeLists.txt b/plugin/rime/src/main/cpp/CMakeLists.txt
-index 6ee8e78..f6d3716 100644
+index 6ee8e78..c3f00f6 100644
 --- a/plugin/rime/src/main/cpp/CMakeLists.txt
 +++ b/plugin/rime/src/main/cpp/CMakeLists.txt
-@@ -57,3 +57,30 @@ install(FILES
+@@ -57,3 +57,43 @@ install(FILES
          DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
          COMPONENT prebuilt-assets
          )
@@ -3534,7 +4208,7 @@ index 6ee8e78..f6d3716 100644
 +# Pinned, checksum-verified data prepared by scripts/prepare-xuancai-rime.py.
 +set(XUANCAI_RIME_DATA "${CMAKE_CURRENT_SOURCE_DIR}/xuancai-rime-ice")
 +if(NOT EXISTS "${XUANCAI_RIME_DATA}/SOURCE.json")
-+    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V07 Rime plugin")
++    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V08 Rime plugin")
 +endif()
 +install(FILES
 +        "${XUANCAI_RIME_DATA}/rime_ice.schema.yaml"
@@ -3545,9 +4219,11 @@ index 6ee8e78..f6d3716 100644
 +        "${XUANCAI_RIME_DATA}/radical_pinyin.dict.yaml"
 +        "${XUANCAI_RIME_DATA}/custom_phrase.txt"
 +        "${XUANCAI_RIME_DATA}/symbols_v.yaml"
++        "${XUANCAI_RIME_DATA}/xuancai_mobile.yaml"
++        "${XUANCAI_RIME_DATA}/zh-hans-t-essay-bgw-compact.gram"
 +        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
 +        COMPONENT prebuilt-assets)
-+install(DIRECTORY "${XUANCAI_RIME_DATA}/cn_dicts" "${XUANCAI_RIME_DATA}/en_dicts"
++install(DIRECTORY "${XUANCAI_RIME_DATA}/cn_dicts" "${XUANCAI_RIME_DATA}/en_dicts" "${XUANCAI_RIME_DATA}/lua"
 +        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
 +        COMPONENT prebuilt-assets)
 +install(DIRECTORY "${XUANCAI_RIME_DATA}/opencc/"
@@ -3557,19 +4233,31 @@ index 6ee8e78..f6d3716 100644
 +        "${XUANCAI_RIME_DATA}/SOURCE.json"
 +        DESTINATION "${FCITX_INSTALL_DATADIR}/licenses/rime-ice"
 +        COMPONENT prebuilt-assets)
++
++install(DIRECTORY "${XUANCAI_RIME_DATA}/grammar-license/"
++        DESTINATION "${FCITX_INSTALL_DATADIR}/licenses/rime-grammar"
++        COMPONENT prebuilt-assets)
++# Tables are generated and tested by the same pinned librime 1.12 on the build host.
++if(NOT EXISTS "${XUANCAI_RIME_DATA}/build/rime_ice.table.bin")
++    message(FATAL_ERROR "Precompile and verify Rime data before packaging")
++endif()
++install(DIRECTORY "${XUANCAI_RIME_DATA}/build/"
++        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data/build"
++        COMPONENT prebuilt-assets)
 diff --git a/plugin/rime/src/main/cpp/default.yaml b/plugin/rime/src/main/cpp/default.yaml
-index e497426..c4593d1 100644
+index e497426..3e8ca58 100644
 --- a/plugin/rime/src/main/cpp/default.yaml
 +++ b/plugin/rime/src/main/cpp/default.yaml
-@@ -4,9 +4,10 @@
+@@ -4,11 +4,7 @@
  config_version: '0.40'
  
  schema_list:
-+  - schema: rime_ice
-+  - schema: luna_pinyin_simp
-   - schema: luna_pinyin
-   - schema: luna_pinyin_tw
+-  - schema: luna_pinyin
+-  - schema: luna_pinyin_tw
 -  - schema: luna_pinyin_simp
-   - schema: luna_pinyin_fluency
-   - schema: stroke
+-  - schema: luna_pinyin_fluency
+-  - schema: stroke
++  - schema: rime_ice
  
+ switcher:
+   caption: 〔方案選單〕
