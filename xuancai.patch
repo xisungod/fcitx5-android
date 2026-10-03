@@ -531,18 +531,21 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..6306ec1 100644
+index 5c2fef9..3fa188e 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-@@ -5,6 +5,7 @@
+@@ -5,8 +5,10 @@
  package org.fcitx.fcitx5.android.input.keyboard
  
  import android.content.Context
 +import android.graphics.Canvas
  import android.graphics.Rect
  import android.view.MotionEvent
++import android.view.View
  import androidx.annotation.CallSuper
-@@ -20,6 +21,8 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
+ import androidx.annotation.DrawableRes
+ import androidx.constraintlayout.widget.ConstraintLayout
+@@ -20,6 +22,8 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
  import org.fcitx.fcitx5.android.data.prefs.AppPrefs
  import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
  import org.fcitx.fcitx5.android.data.theme.Theme
@@ -551,7 +554,7 @@ index 5c2fef9..6306ec1 100644
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
  import org.fcitx.fcitx5.android.input.popup.PopupAction
-@@ -51,6 +54,43 @@ abstract class BaseKeyboard(
+@@ -51,6 +55,43 @@ abstract class BaseKeyboard(
  
      private val prefs = AppPrefs.getInstance()
  
@@ -595,7 +598,7 @@ index 5c2fef9..6306ec1 100644
      private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
      private val expandKeypressArea by prefs.keyboard.expandKeypressArea
      private val swipeSymbolDirection by prefs.keyboard.swipeSymbolDirection
-@@ -394,6 +434,26 @@ abstract class BaseKeyboard(
+@@ -394,6 +435,26 @@ abstract class BaseKeyboard(
          target.view.dispatchTouchEvent(e)
      }
  
@@ -622,7 +625,7 @@ index 5c2fef9..6306ec1 100644
      override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
          // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
          return if (vivoKeypressWorkaround && ev.actionMasked == MotionEvent.ACTION_DOWN) true
-@@ -484,8 +544,28 @@ abstract class BaseKeyboard(
+@@ -484,8 +545,28 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -652,7 +655,7 @@ index 5c2fef9..6306ec1 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +582,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +583,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
