@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - name: 拉取源码
         uses: actions/checkout@v7
@@ -55,3 +57,15 @@ jobs:
         with:
           name: fcitx5-xuancai-debug-arm64
           path: app/build/outputs/apk/debug/*.apk
+
+      - name: 发布到 Release（手机可直接下载 apk）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          cp "$APK" /tmp/fcitx5-xuancai-arm64.apk
+          gh release delete xuancai-latest --yes --cleanup-tag || true
+          gh release create xuancai-latest /tmp/fcitx5-xuancai-arm64.apk \
+            --title "小企鹅炫彩版（最新构建）" \
+            --notes "构建自 ${GITHUB_SHA}" --latest
