@@ -984,6 +984,36 @@ index 0000000..a640055
 +        assertEquals(0, dot[n - 1] ushr 24)
 +    }
 +}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt
+index 6b9129f..afa223b 100644
+--- a/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt
++++ b/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt
+@@ -66,7 +66,7 @@ class ThemeSerializationTest {
+ 
+     @Test
+     fun version2() {
+-        // Version 2.0
++        // Version 2.0 predates the candidate colours introduced by version 2.1.
+         val raw = """
+             {
+                "name":"",
+@@ -98,7 +98,12 @@ class ThemeSerializationTest {
+             }
+         """.trimIndent()
+         val (decoded, migrated) = raw.toCustomTheme()
+-        Assert.assertEquals("Migration shouldn't happen", false, migrated)
+-        Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
++        Assert.assertEquals("Version 2.0 must migrate to 2.1", true, migrated)
++        Assert.assertEquals(decoded.keyTextColor, decoded.candidateTextColor)
++        Assert.assertEquals(decoded.keyTextColor, decoded.candidateLabelColor)
++        Assert.assertEquals(decoded.altKeyTextColor, decoded.candidateCommentColor)
++        val (roundTrip, migratedAgain) = decoded.toJson().toCustomTheme()
++        Assert.assertEquals("Round trip", decoded, roundTrip)
++        Assert.assertEquals("Current format must not migrate again", false, migratedAgain)
+     }
+-}
+\ No newline at end of file
++}
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 index b99ab3e..7e32d8a 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
