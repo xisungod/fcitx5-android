@@ -1,12 +1,13 @@
-name: 曜黑 V02 与 Rime 构建
+name: 曜黑 V03 与 Rime 构建
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - "redesign/keyscafe-black-v02"
+      - "redesign/keyscafe-black-v03"
     paths:
       - "xuancai.patch"
+      - "scripts/**"
       - ".github/workflows/xuancai.yml"
 
 jobs:
@@ -24,11 +25,15 @@ jobs:
       - name: 切到已验证的版本并打上炫彩补丁
         run: |
           cp xuancai.patch /tmp/xuancai.patch
-          cp XUANCAI-V02.md /tmp/XUANCAI-V02.md
+          cp XUANCAI-V03.md /tmp/XUANCAI-V03.md
+          cp scripts/prepare-xuancai-rime.py /tmp/prepare-xuancai-rime.py
           git -c advice.detachedHead=false checkout e6199a2801b0c76e1baeff7a48f6b18e910e9dd7
           git submodule update --init --recursive
           git apply --whitespace=nowarn /tmp/xuancai.patch
           git status --short
+
+      - name: 准备固定版本的雾凇词库
+        run: python3 /tmp/prepare-xuancai-rime.py --zip /tmp/xuancai-v03-rime-data.zip
 
       - name: 准备 Java
         uses: actions/setup-java@v5
@@ -53,36 +58,37 @@ jobs:
       - name: 编译曜黑主程序、配套 Rime 并运行测试（arm64）
         env:
           BUILD_ABI: arm64-v8a
-          BUILD_VERSION_NAME: "xuancai-black-v02"
+          BUILD_VERSION_NAME: "xuancai-black-v03"
         run: ./gradlew :app:assembleDebug :plugin:rime:assembleDebug :app:testDebugUnitTest
 
       - name: 整理并校验安装包
         run: |
-          mkdir -p /tmp/xuancai-v02
-          cp app/build/outputs/apk/debug/*.apk /tmp/xuancai-v02/fcitx5-xuancai-black-v02-arm64.apk
-          cp plugin/rime/build/outputs/apk/debug/*.apk /tmp/xuancai-v02/fcitx5-rime-black-v02-arm64.apk
+          mkdir -p /tmp/xuancai-v03
+          cp app/build/outputs/apk/debug/*.apk /tmp/xuancai-v03/fcitx5-xuancai-black-v03-arm64.apk
+          cp plugin/rime/build/outputs/apk/debug/*.apk /tmp/xuancai-v03/fcitx5-rime-black-v03-arm64.apk
+          cp /tmp/xuancai-v03-rime-data.zip /tmp/xuancai-v03/
           SDK_TOOLS="$ANDROID_HOME/build-tools/36.1.0"
-          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v02/fcitx5-xuancai-black-v02-arm64.apk
-          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v02/fcitx5-rime-black-v02-arm64.apk
-          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v02/fcitx5-xuancai-black-v02-arm64.apk > /tmp/main-badging.txt
-          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v02/fcitx5-rime-black-v02-arm64.apk > /tmp/rime-badging.txt
+          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v03/fcitx5-xuancai-black-v03-arm64.apk
+          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v03/fcitx5-rime-black-v03-arm64.apk
+          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v03/fcitx5-xuancai-black-v03-arm64.apk > /tmp/main-badging.txt
+          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v03/fcitx5-rime-black-v03-arm64.apk > /tmp/rime-badging.txt
           sed -n '1,6p' /tmp/main-badging.txt
           sed -n '1,6p' /tmp/rime-badging.txt
-          cd /tmp/xuancai-v02
-          sha256sum *.apk > SHA256SUMS.txt
+          cd /tmp/xuancai-v03
+          sha256sum *.apk *.zip > SHA256SUMS.txt
 
       - name: 上传安装包
         uses: actions/upload-artifact@v7
         with:
-          name: fcitx5-xuancai-black-v02-and-rime-arm64
-          path: /tmp/xuancai-v02/*
+          name: fcitx5-xuancai-black-v03-and-rime-arm64
+          path: /tmp/xuancai-v03/*
 
       - name: 发布到 Release（手机可直接下载 apk）
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create xuancai-black-v02 /tmp/xuancai-v02/* \
+          gh release create xuancai-black-v03 /tmp/xuancai-v03/* \
             --target "$GITHUB_SHA" \
-            --title "炫彩·曜黑 V02 + Rime（arm64）" \
-            --notes-file /tmp/XUANCAI-V02.md --prerelease --latest=false
+            --title "炫彩·曜黑 V03 + Rime（arm64）" \
+            --notes-file /tmp/XUANCAI-V03.md --prerelease --latest=false
