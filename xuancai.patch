@@ -2593,7 +2593,7 @@ index adea1fc..e715a00 100644
      Enumerate(R.string.space_behavior_enumerate),
      ToggleActivate(R.string.space_behavior_activate),
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-index 368cf6c..9a083e7 100644
+index 368cf6c..a36f0b8 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 @@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
@@ -2772,8 +2772,14 @@ index 368cf6c..9a083e7 100644
                  }
              }
              else -> action
-@@ -238,7 +265,7 @@ class TextKeyboard(
-             if (it.def !is KeyDef.Appearance.AltText) return
+@@ -235,10 +262,12 @@ class TextKeyboard(
+ 
+     private fun updateAlphabetKeys() {
+         textKeys.forEach {
+-            if (it.def !is KeyDef.Appearance.AltText) return
++            // The dedicated digit row precedes the letters; skip it without
++            // terminating the entire case update.
++            if (it.def !is KeyDef.Appearance.AltText) return@forEach
              it.mainText.text = it.def.displayText.let { str ->
                  if (str.length != 1 || !str[0].isLetter()) return@forEach
 -                if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
@@ -2781,7 +2787,7 @@ index 368cf6c..9a083e7 100644
              }
          }
      }
-@@ -251,11 +278,11 @@ class TextKeyboard(
+@@ -251,11 +280,11 @@ class TextKeyboard(
              } else {
                  it.def as KeyDef.Appearance.Text
                  it.mainText.text = it.def.displayText.let { str ->
