@@ -1,0 +1,98 @@
+{
+  "commit": "bc70583673c52c0c7bfa2732fcb779f8ae469ad2",
+  "run": "37131862919",
+  "run_url": "https://github.com/xisungod/fcitx5-android/actions/runs/37131862919",
+  "android_tests": {
+    "tests": 36,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "suite": "org.fcitx.fcitx5.android.CandidatePageBufferTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.IdleBreathingTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.IdleGlowDirectionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.KeyboardVisualRegressionTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.PressEffectMasksTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.PressEffectRenderingTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.PressEffectTrailTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.RimeMobileOptionsTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.StringEscapeTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "org.fcitx.fcitx5.android.ThemeSerializationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "fcitx5-rime-black-v08-arm64.apk",
+      "bytes": 95740233,
+      "sha256": "68152e793d55e51ff14e6628557e64a8e1de2e49b420c8ce5bdcffbc2c98d2b3"
+    },
+    {
+      "file": "fcitx5-xuancai-black-v08-arm64.apk",
+      "bytes": 69616144,
+      "sha256": "5daf51850471deb7682644b0e648ef9137da8c659321f60c2d2281c74d4e5efa"
+    }
+  ],
+  "renders": "Actual Android View code, Robolectric native graphics; not phone screenshots",
+  "release_published": false,
+  "fixed_signing": "blocked: Actions Secrets API returned 403; isolated .xuancai.black.v08 package"
+}
