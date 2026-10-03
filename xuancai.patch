@@ -1,8 +1,113 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 53f1eb8..352cb3d 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -46,9 +46,11 @@ android {
+             proguardFile("proguard-rules.pro")
+         }
+         debug {
++            // Install alongside the original debug APK: its CI signing key is ephemeral.
++            applicationIdSuffix = ".xuancai.black.v02"
+             resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
+             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
+-            resValue("string", "app_name", "@string/app_name_debug")
++            resValue("string", "app_name", "炫彩·曜黑 V02")
+         }
+     }
+ 
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
+index bed1cbf..29cc761 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
+@@ -141,11 +141,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+         val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
+         val toolbarNumRowOnPassword =
+             switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true)
+-        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
++        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", false)
+         val keepLettersUppercase = switch(
+             R.string.keep_keyboard_letters_uppercase,
+             "keep_keyboard_letters_uppercase",
+-            false
++            true
+         )
+ 
+         val showVoiceInputButton =
+@@ -173,7 +173,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+         val spaceKeyLongPressBehavior = enumList(
+             R.string.space_long_press_behavior,
+             "space_long_press_behavior",
+-            SpaceLongPressBehavior.None
++            SpaceLongPressBehavior.ShowPicker
+         )
+         val spaceSwipeMoveCursor =
+             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
+@@ -213,7 +213,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+                 R.string.keyboard_side_padding,
+                 R.string.portrait,
+                 "keyboard_side_padding",
+-                0,
++                4,
+                 R.string.landscape,
+                 "keyboard_side_padding_landscape",
+                 0,
+@@ -442,4 +442,4 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+ 
+         fun getInstance() = instance!!
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
+index 93ba4d4..c6a35b5 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
+@@ -24,6 +24,7 @@ object ThemeManager {
+     }
+ 
+     val BuiltinThemes = listOf(
++        ThemePreset.XuancaiBlackV02,
+         ThemePreset.MaterialLight,
+         ThemePreset.MaterialDark,
+         ThemePreset.PixelLight,
+@@ -35,7 +36,7 @@ object ThemeManager {
+         ThemePreset.AMOLEDBlack,
+     )
+ 
+-    val DefaultTheme = ThemePreset.PixelDark
++    val DefaultTheme = ThemePreset.XuancaiBlackV02
+ 
+     private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
+ 
+@@ -156,4 +157,4 @@ object ThemeManager {
+         }
+     }
+ 
+-}
+\ No newline at end of file
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..3ccd35b 100644
+index d3b4948..96e57cf 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-@@ -43,6 +43,40 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -9,7 +9,6 @@ import android.content.SharedPreferences
+ import android.os.Build
+ import androidx.annotation.StringRes
+ import androidx.core.content.edit
+-import org.fcitx.fcitx5.android.BuildConfig
+ import org.fcitx.fcitx5.android.R
+ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
+@@ -34,7 +33,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+         return pref
+     }
+ 
+-    val keyBorder = switch(R.string.key_border, "key_border", false)
++    val keyBorder = switch(R.string.key_border, "key_border", true)
+ 
+     val keyBorderStroke = switch(
+         R.string.key_border_stroke, "key_border_stroke", false,
+@@ -43,6 +42,40 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
  
@@ -21,7 +126,7 @@ index d3b4948..3ccd35b 100644
 +    val pressEffectPalette = enumList(
 +        R.string.press_effect_palette,
 +        "press_effect_palette",
-+        PressEffectPalette.Cyberpunk,
++        PressEffectPalette.Rainbow,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -36,13 +141,104 @@ index d3b4948..3ccd35b 100644
 +    )
 +
 +    val pressEffectOverKeys = int(
-+        R.string.press_effect_over_keys, "press_effect_over_keys", 45, 0, 100, "%", 5,
++        R.string.press_effect_over_keys, "press_effect_over_keys", 25, 0, 100, "%", 5,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
+@@ -71,7 +104,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+             R.string.key_vertical_margin,
+             R.string.portrait,
+             "key_vertical_margin",
+-            7,
++            5,
+             R.string.landscape,
+             "key_vertical_margin_landscape",
+             4,
+@@ -83,7 +116,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+         keyVerticalMarginLandscape = secondary
+     }
+ 
+-    val keyRadius = int(R.string.key_radius, "key_radius", 4, 0, 48, "dp")
++    val keyRadius = int(R.string.key_radius, "key_radius", 8, 0, 48, "dp")
+ 
+     val textEditingButtonRadius =
+         int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
+@@ -100,7 +133,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+     val punctuationPosition = enumList(
+         R.string.punctuation_position,
+         "punctuation_position",
+-        PunctuationPosition.Bottom
++        PunctuationPosition.None
+     )
+ 
+     enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
+@@ -136,14 +169,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+     val followSystemDayNightTheme = switch(
+         R.string.follow_system_day_night_theme,
+         "follow_system_dark_mode",
+-        true,
++        false,
+         summary = R.string.follow_system_day_night_theme_summary
+     )
+ 
+     val lightModeTheme = themePreference(
+         R.string.light_mode_theme,
+         "light_mode_theme",
+-        if (BuildConfig.DEBUG) ThemePreset.MaterialLight else ThemePreset.PixelLight,
++        ThemePreset.XuancaiBlackV02,
+         enableUiOn = {
+             followSystemDayNightTheme.getValue()
+         })
+@@ -151,7 +184,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+     val darkModeTheme = themePreference(
+         R.string.dark_mode_theme,
+         "dark_mode_theme",
+-        if (BuildConfig.DEBUG) ThemePreset.MaterialDark else ThemePreset.PixelDark,
++        ThemePreset.XuancaiBlackV02,
+         enableUiOn = {
+             followSystemDayNightTheme.getValue()
+         })
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
+index 239e22c..a9292eb 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
+@@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
+ 
+ object ThemePreset {
+ 
++    /** Quiet at rest; key-press colour is supplied by PressEffect. */
++    val XuancaiBlackV02 = Theme.Builtin(
++        name = "炫彩·曜黑 V02",
++        isDark = true,
++        backgroundColor = 0xff000000,
++        barColor = 0xff000000,
++        keyboardColor = 0xff000000,
++        keyBackgroundColor = 0xff242426,
++        keyTextColor = 0xfff5f5f7,
++        candidateTextColor = 0xfff5f5f7,
++        candidateLabelColor = 0xffb8b8c0,
++        candidateCommentColor = 0xffa4a4ae,
++        altKeyBackgroundColor = 0xff171719,
++        altKeyTextColor = 0xffdedee4,
++        accentKeyBackgroundColor = 0xff303038,
++        accentKeyTextColor = 0xfff5f5f7,
++        keyPressHighlightColor = 0x18ffffff,
++        keyShadowColor = 0x00000000,
++        popupBackgroundColor = 0xff29292e,
++        popupTextColor = 0xfff5f5f7,
++        spaceBarColor = 0xff242426,
++        dividerColor = 0xff202024,
++        clipboardEntryColor = 0xff242426,
++        genericActiveBackgroundColor = 0xff364f83,
++        genericActiveForegroundColor = 0xfff5f5f7
++    )
++
+     val MaterialLight = Theme.Builtin(
+         name = "MaterialLight",
+         isDark = false,
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 index 5c2fef9..ca25ced 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
@@ -128,12 +324,54 @@ index 5c2fef9..ca25ced 100644
  
  }
 \ No newline at end of file
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
+index c331341..eb54330 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
+@@ -48,7 +48,7 @@ class AlphabetKey(
+     Appearance.AltText(
+         displayText = character,
+         altText = punctuation,
+-        textSize = 23f,
++        textSize = 24f,
+         variant = variant
+     ),
+     setOf(
+@@ -158,12 +158,11 @@ class CommaKey(
+     percentWidth: Float,
+     variant: Variant,
+ ) : KeyDef(
+-    Appearance.ImageText(
++    Appearance.Text(
+         displayText = ",",
+         textSize = 23f,
+         percentWidth = percentWidth,
+-        variant = variant,
+-        src = R.drawable.ic_baseline_tag_faces_24
++        variant = variant
+     ),
+     setOf(
+         Behavior.Press(KeyAction.FcitxKeyAction(","))
+@@ -193,9 +192,10 @@ class CommaKey(
+ )
+ 
+ class LanguageKey : KeyDef(
+-    Appearance.Image(
+-        src = R.drawable.ic_baseline_language_24,
+-        variant = Variant.AltForeground,
++    Appearance.Text(
++        displayText = "中/英",
++        textSize = 13f,
++        variant = Variant.Alternative,
+         viewId = R.id.button_lang
+     ),
+     setOf(
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..64e5830
+index 0000000..29cf421
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,401 @@
+@@ -0,0 +1,435 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -147,6 +385,8 @@ index 0000000..64e5830
 +import android.graphics.Paint
 +import android.graphics.PorterDuff
 +import android.graphics.PorterDuffColorFilter
++import android.graphics.RadialGradient
++import android.graphics.Shader
 +import android.os.Build
 +import android.os.SystemClock
 +import android.view.View
@@ -206,13 +446,25 @@ index 0000000..64e5830
 +        val rotation: Float,
 +        val spin: Float,
 +        val size: Float,
++        val stretchX: Float,
++        val stretchY: Float,
++        val driftX: Float,
++        val driftY: Float,
 +        val start: Long
 +    ) {
 +        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
 +            colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
 +        }
 +        val flashPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-+            colorFilter = PorterDuffColorFilter(mix(color, Color.WHITE, 0.55f), PorterDuff.Mode.SRC_IN)
++            colorFilter = PorterDuffColorFilter(mix(color, Color.WHITE, 0.12f), PorterDuff.Mode.SRC_IN)
++        }
++        // Immediate feedback even while the first set of textures is warming up.
++        val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++            shader = RadialGradient(
++                0f, 0f, 1f,
++                intArrayOf(color, color and 0x00ffffff),
++                null, Shader.TileMode.CLAMP
++            )
 +        }
 +    }
 +
@@ -222,13 +474,13 @@ index 0000000..64e5830
 +
 +    fun onPress(x: Float, y: Float) {
 +        if (!animatorsEnabled()) return
-+        val textures = Textures.ready ?: return Textures.ensure()
++        if (Textures.ready == null) Textures.ensure()
 +        var index = random.nextInt(colors.size)
 +        if (colors.size > 1 && index == lastColorIndex) {
 +            index = (index + 1 + random.nextInt(colors.size - 1)) % colors.size
 +        }
 +        lastColorIndex = index
-+        val shapes = textures.bodies.size
++        val shapes = PressEffectMasks.SHAPES
 +        val shape = random.nextInt(shapes)
 +        ripples.add(
 +            Ripple(
@@ -238,6 +490,10 @@ index 0000000..64e5830
 +                rotation = random.nextFloat() * 360f,
 +                spin = (random.nextFloat() * 2f - 1f) * 24f,
 +                size = 0.88f + random.nextFloat() * 0.24f,
++                stretchX = 0.82f + random.nextFloat() * 0.36f,
++                stretchY = 0.82f + random.nextFloat() * 0.36f,
++                driftX = (random.nextFloat() - 0.5f) * 22f * density,
++                driftY = (random.nextFloat() - 0.5f) * 16f * density,
 +                start = SystemClock.uptimeMillis()
 +            )
 +        )
@@ -248,6 +504,7 @@ index 0000000..64e5830
 +    /** call before the keys are drawn */
 +    fun drawUnder(canvas: Canvas) {
 +        frameTime = SystemClock.uptimeMillis()
++        if (!animatorsEnabled()) ripples.clear()
 +        if (ripples.isEmpty()) return
 +        draw(canvas, underStrength)
 +    }
@@ -262,34 +519,51 @@ index 0000000..64e5830
 +
 +    fun clear() {
 +        ripples.clear()
++        host.invalidate()
 +    }
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
-+        val textures = Textures.ready ?: return
++        val textures = Textures.ready
 +        for (r in ripples) {
 +            val elapsed = (frameTime - r.start).coerceAtLeast(0L)
 +            val t = elapsed.toFloat() / duration
 +            if (t >= 1f) continue
 +            val seconds = elapsed / 1000f
 +            val angle = r.rotation + r.spin * seconds
++            val e = easeOut(t)
++            val x = r.x + r.driftX * e
++            val y = r.y + r.driftY * e
++            if (textures == null) {
++                val save = canvas.save()
++                canvas.translate(x, y)
++                val radius = maxRadius * r.size * (0.16f + 0.84f * e)
++                canvas.scale(radius * r.stretchX, radius * r.stretchY)
++                r.fallbackPaint.alpha = (180f * strength * (1f - t)).toInt()
++                canvas.drawCircle(0f, 0f, 1f, r.fallbackPaint)
++                canvas.restoreToCount(save)
++                continue
++            }
 +            // finger flash: a quick bright bloom right where the key was hit
 +            if (t < FLASH_END) {
 +                val k = t / FLASH_END
-+                val alpha = 0.95f * (1f - k).pow(1.5f)
++                val alpha = 0.72f * (1f - k).pow(1.5f)
 +                drawTexture(canvas, textures.dot, r.x, r.y, flashRadius * (1f + 0.7f * k), 0f, r.flashPaint, alpha * strength)
 +            }
 +            // main mist: spreads fast then slows down (ease-out), lingers, dissolves
-+            val e = easeOut(t)
 +            val radius = maxRadius * r.size * (0.16f + 0.84f * e)
-+            val bodyAlpha = 0.92f * ramp(t, 0f, 0.06f) * (1f - smoothstep(0.38f, 1f, t))
-+            drawTexture(canvas, textures.bodies[r.shape], r.x, r.y, radius, angle, r.paint, bodyAlpha * strength)
++            val bodyAlpha = 0.85f * ramp(t, 0f, 0.045f) * (1f - smoothstep(0.24f, 1f, t))
++            val save = canvas.save()
++            canvas.translate(x, y)
++            canvas.scale(r.stretchX, r.stretchY)
++            drawTexture(canvas, textures.bodies[r.shape], 0f, 0f, radius, angle, r.paint, bodyAlpha * strength)
 +            // trailing echo ring: the second ripple a moment later
 +            val t2 = (t - ECHO_DELAY) / (1f - ECHO_DELAY)
 +            if (t2 > 0f) {
 +                val radius2 = maxRadius * r.size * (0.12f + 0.70f * easeOut(t2))
-+                val echoAlpha = 0.55f * ramp(t2, 0f, 0.1f) * (1f - smoothstep(0.3f, 1f, t2))
-+                drawTexture(canvas, textures.rings[r.echoShape], r.x, r.y, radius2, -angle * 0.6f, r.paint, echoAlpha * strength)
++                val echoAlpha = 0.18f * ramp(t2, 0f, 0.1f) * (1f - smoothstep(0.3f, 1f, t2))
++                drawTexture(canvas, textures.rings[r.echoShape], 0f, 0f, radius2, -angle * 0.6f, r.paint, echoAlpha * strength)
 +            }
++            canvas.restoreToCount(save)
 +        }
 +    }
 +
@@ -336,7 +610,7 @@ index 0000000..64e5830
 +                        val bodies = Array(m.SHAPES) { i -> bitmap(m.mist(noise, m.bodySeed(i), ring = false), size) }
 +                        val rings = Array(m.SHAPES) { i -> bitmap(m.mist(noise, m.ringSeed(i), ring = true), size) }
 +                        ready = Textures(bodies, rings, bitmap(m.dot(), m.DOT_SIZE))
-+                    } catch (e: Throwable) {
++                    } catch (e: Exception) {
 +                        started = false
 +                    }
 +                }, "PressEffectTextures").apply {
@@ -351,12 +625,12 @@ index 0000000..64e5830
 +    }
 +
 +    companion object {
-+        private const val BASE_RADIUS_DP = 150f
-+        private const val FLASH_RADIUS_DP = 22f
-+        private const val BASE_DURATION_MS = 620f
++        private const val BASE_RADIUS_DP = 124f
++        private const val FLASH_RADIUS_DP = 19f
++        private const val BASE_DURATION_MS = 760f
 +        private const val FLASH_END = 0.22f
 +        private const val ECHO_DELAY = 0.16f
-+        private const val MAX_RIPPLES = 12
++        private const val MAX_RIPPLES = 10
 +
 +        /** acid yellow, electric cyan, electric blue, neon violet, hot magenta */
 +        val CYBERPUNK = intArrayOf(
@@ -413,7 +687,7 @@ index 0000000..64e5830
 + * kept free of Android types so it can be checked off-device.
 + */
 +internal object PressEffectMasks {
-+    const val SHAPES = 4
++    const val SHAPES = 8
 +    const val TEXTURE_SIZE = 256
 +    const val DOT_SIZE = 64
 +
@@ -460,13 +734,11 @@ index 0000000..64e5830
 +                    val w = if (d > 0f) 0.10f else 0.24f
 +                    0.95f * exp(-(d / w) * (d / w))
 +                } else {
-+                    val f = 0.64f
-+                    val d = rho - f
-+                    val w = if (d > 0f) 0.16f else 0.42f
-+                    val band = exp(-(d / w) * (d / w))
-+                    val out = max(d, 0f) / 0.16f
-+                    val fill = exp(-out * out) * (0.30f + 0.70f * PressEffect.smoothstep(0f, 1f, rho / f))
-+                    0.82f * band + 0.30f * fill
++                    // A filled cloud with broad feathering; no bright hollow ring.
++                    val core = exp(-(rho / 0.58f).pow(2))
++                    val shoulder = 0.24f * exp(-((rho - 0.42f) / 0.30f).pow(2))
++                    (0.86f * core + shoulder) *
++                        (1f - PressEffect.smoothstep(0.63f, 1.03f, rho))
 +                }
 +                val alpha = (a * cloud * edge).coerceIn(0f, 1f)
 +                pixels[py * size + px] = ((alpha * 255f + 0.5f).toInt() shl 24) or 0xFFFFFF
@@ -535,6 +807,39 @@ index 0000000..64e5830
 +        }
 +    }
 +}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
+index 368cf6c..d361c5b 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
+@@ -67,10 +67,10 @@ class TextKeyboard(
+             ),
+             listOf(
+                 LayoutSwitchKey("?123", ""),
+-                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
+                 LanguageKey(),
++                CommaKey(0.085f, KeyDef.Appearance.Variant.Alternative),
+                 SpaceKey(),
+-                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
++                SymbolKey(".", 0.085f, KeyDef.Appearance.Variant.Alternative),
+                 ReturnKey()
+             )
+         )
+@@ -79,7 +79,7 @@ class TextKeyboard(
+     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
+     val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
+     val quickphrase: ImageKeyView by lazy { findViewById(R.id.button_quickphrase) }
+-    val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
++    val lang: TextKeyView by lazy { findViewById(R.id.button_lang) }
+     val space: TextKeyView by lazy { findViewById(R.id.button_space) }
+     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
+ 
+@@ -258,4 +258,4 @@ class TextKeyboard(
+         }
+     }
+ 
+-}
+\ No newline at end of file
++}
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
 index 40ef2c9..3903811 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
@@ -601,3 +906,138 @@ index fe1fd3a..9e8fe65 100644
      <string name="key_border">Enable key border</string>
      <string name="brightness">Brightness</string>
      <string name="key_radius">Key radius</string>
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
+new file mode 100644
+index 0000000..a640055
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
+@@ -0,0 +1,37 @@
++package org.fcitx.fcitx5.android
++
++import org.fcitx.fcitx5.android.input.keyboard.PressEffectMasks
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class PressEffectMasksTest {
++    @Test
++    fun mistVariantsHaveTransparentEdgesAndFeathering() {
++        val noise = PressEffectMasks.Noise(20261003)
++        val n = PressEffectMasks.TEXTURE_SIZE
++        val hashes = mutableSetOf<Int>()
++        repeat(PressEffectMasks.SHAPES) { i ->
++            val body = PressEffectMasks.mist(noise, PressEffectMasks.bodySeed(i), false)
++            hashes.add(body.contentHashCode())
++            for (x in 0 until n) {
++                assertEquals(0, body[x] ushr 24)
++                assertEquals(0, body[(n - 1) * n + x] ushr 24)
++                assertEquals(0, body[x * n] ushr 24)
++                assertEquals(0, body[x * n + n - 1] ushr 24)
++            }
++            assertTrue(body.count { (it ushr 24) in 1..254 } > n * n / 8)
++            assertTrue(body[(n / 2) * n + n / 2] ushr 24 > 30)
++        }
++        assertEquals(PressEffectMasks.SHAPES, hashes.size)
++    }
++
++    @Test
++    fun flashFallsOffFromCenterToTransparentEdge() {
++        val dot = PressEffectMasks.dot()
++        val n = PressEffectMasks.DOT_SIZE
++        assertTrue(dot[(n / 2) * n + n / 2] ushr 24 > 240)
++        assertEquals(0, dot[0] ushr 24)
++        assertEquals(0, dot[n - 1] ushr 24)
++    }
++}
+diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
+index b99ab3e..7e32d8a 100644
+--- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
++++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
+@@ -47,7 +47,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
+                     proguardFile(getDefaultProguardFile("proguard-android-optimize.txt"))
+                 }
+                 debug {
+-                    applicationIdSuffix = ".debug"
++                    applicationIdSuffix = ".xuancai.black.v02"
+                 }
+                 all {
+                     // remove META-INF/version-control-info.textproto
+diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
+index 8a19dd2..c4759f1 100644
+--- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
++++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
+@@ -29,10 +29,10 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
+                     )
+                 }
+                 debug {
+-                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.debug\"")
++                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v02\"")
+                     addManifestPlaceholders(
+                         mapOf(
+-                            "mainApplicationId" to "org.fcitx.fcitx5.android.debug",
++                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v02",
+                         )
+                     )
+                 }
+diff --git a/lib/plugin-base/src/debug/AndroidManifest.xml b/lib/plugin-base/src/debug/AndroidManifest.xml
+index d1d4123..ddfed55 100644
+--- a/lib/plugin-base/src/debug/AndroidManifest.xml
++++ b/lib/plugin-base/src/debug/AndroidManifest.xml
+@@ -7,7 +7,7 @@
+     </queries>
+ 
+     <queries>
+-        <package android:name="org.fcitx.fcitx5.android.debug" />
++        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v02" />
+     </queries>
+ 
+     <application>
+@@ -15,7 +15,7 @@
+             android:name="org.fcitx.fcitx5.android.plugin.METADATA"
+             tools:node="remove" />
+         <meta-data
+-            android:name="org.fcitx.fcitx5.android.debug.plugin.METADATA"
++            android:name="org.fcitx.fcitx5.android.xuancai.black.v02.plugin.METADATA"
+             android:resource="@xml/plugin" />
+ 
+         <activity
+@@ -28,8 +28,8 @@
+                 <action android:name="org.fcitx.fcitx5.android.plugin.MANIFEST" />
+             </intent-filter>
+             <intent-filter>
+-                <action android:name="org.fcitx.fcitx5.android.debug.plugin.MANIFEST" />
++                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v02.plugin.MANIFEST" />
+             </intent-filter>
+         </activity>
+     </application>
+-</manifest>
+\ No newline at end of file
++</manifest>
+diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
+index 1733282..afe6eb6 100644
+--- a/plugin/rime/build.gradle.kts
++++ b/plugin/rime/build.gradle.kts
+@@ -33,7 +33,7 @@ android {
+             proguardFile("proguard-rules.pro")
+         }
+         debug {
+-            resValue("string", "app_name", "@string/app_name_debug")
++            resValue("string", "app_name", "曜黑 Rime V02")
+         }
+     }
+ 
+diff --git a/plugin/rime/src/main/cpp/default.yaml b/plugin/rime/src/main/cpp/default.yaml
+index e497426..d71bbde 100644
+--- a/plugin/rime/src/main/cpp/default.yaml
++++ b/plugin/rime/src/main/cpp/default.yaml
+@@ -4,9 +4,9 @@
+ config_version: '0.40'
+ 
+ schema_list:
++  - schema: luna_pinyin_simp
+   - schema: luna_pinyin
+   - schema: luna_pinyin_tw
+-  - schema: luna_pinyin_simp
+   - schema: luna_pinyin_fluency
+   - schema: stroke
+ 
