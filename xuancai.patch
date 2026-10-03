@@ -1,0 +1,603 @@
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
+index d3b4948..3ccd35b 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
+@@ -43,6 +43,40 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+ 
+     val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
+ 
++    enum class PressEffectPalette(override val stringRes: Int) : ManagedPreferenceEnum {
++        Cyberpunk(R.string.press_effect_palette_cyberpunk),
++        Cool(R.string.press_effect_palette_cool),
++        Rainbow(R.string.press_effect_palette_rainbow),
++        Berry(R.string.press_effect_palette_berry),
++        Accent(R.string.press_effect_palette_accent);
++    }
++
++    val pressEffect = switch(
++        R.string.press_effect, "press_effect", true, R.string.press_effect_summary
++    )
++
++    val pressEffectPalette = enumList(
++        R.string.press_effect_palette,
++        "press_effect_palette",
++        PressEffectPalette.Cyberpunk,
++        enableUiOn = { pressEffect.getValue() }
++    )
++
++    val pressEffectSize = int(
++        R.string.press_effect_size, "press_effect_size", 100, 40, 200, "%", 10,
++        enableUiOn = { pressEffect.getValue() }
++    )
++
++    val pressEffectSpeed = int(
++        R.string.press_effect_speed, "press_effect_speed", 100, 50, 200, "%", 10,
++        enableUiOn = { pressEffect.getValue() }
++    )
++
++    val pressEffectOverKeys = int(
++        R.string.press_effect_over_keys, "press_effect_over_keys", 45, 0, 100, "%", 5,
++        enableUiOn = { pressEffect.getValue() }
++    )
++
+     val keyHorizontalMargin: ManagedPreference.PInt
+     val keyHorizontalMarginLandscape: ManagedPreference.PInt
+ 
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
+index 5c2fef9..ca25ced 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
+@@ -5,6 +5,7 @@
+ package org.fcitx.fcitx5.android.input.keyboard
+ 
+ import android.content.Context
++import android.graphics.Canvas
+ import android.graphics.Rect
+ import android.view.MotionEvent
+ import androidx.annotation.CallSuper
+@@ -20,6 +21,8 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
+ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+ import org.fcitx.fcitx5.android.data.theme.Theme
++import org.fcitx.fcitx5.android.data.theme.ThemeManager
++import org.fcitx.fcitx5.android.data.theme.ThemePrefs
+ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
+ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
+ import org.fcitx.fcitx5.android.input.popup.PopupAction
+@@ -51,6 +54,29 @@ abstract class BaseKeyboard(
+ 
+     private val prefs = AppPrefs.getInstance()
+ 
++    /** colourful press effect (Keys Cafe style), drawn under and over the keys */
++    private val pressEffectLayer: PressEffect? = ThemeManager.prefs.let { p ->
++        if (!p.pressEffect.getValue()) null
++        else PressEffect(
++            this,
++            when (p.pressEffectPalette.getValue()) {
++                ThemePrefs.PressEffectPalette.Cyberpunk -> PressEffect.CYBERPUNK
++                ThemePrefs.PressEffectPalette.Cool -> PressEffect.COOL
++                ThemePrefs.PressEffectPalette.Rainbow -> PressEffect.RAINBOW
++                ThemePrefs.PressEffectPalette.Berry -> PressEffect.BERRY
++                ThemePrefs.PressEffectPalette.Accent -> intArrayOf(theme.accentKeyBackgroundColor)
++            },
++            theme.isDark,
++            p.pressEffectSize.getValue(),
++            p.pressEffectSpeed.getValue(),
++            p.pressEffectOverKeys.getValue()
++        )
++    }
++
++    init {
++        if (pressEffectLayer != null) setWillNotDraw(false)
++    }
++
+     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
+     private val expandKeypressArea by prefs.keyboard.expandKeypressArea
+     private val swipeSymbolDirection by prefs.keyboard.swipeSymbolDirection
+@@ -394,6 +420,24 @@ abstract class BaseKeyboard(
+         target.view.dispatchTouchEvent(e)
+     }
+ 
++    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
++        pressEffectLayer?.let {
++            val action = ev.actionMasked
++            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
++                val i = ev.actionIndex
++                it.onPress(ev.getX(i), ev.getY(i))
++            }
++        }
++        return super.dispatchTouchEvent(ev)
++    }
++
++    override fun dispatchDraw(canvas: Canvas) {
++        val effect = pressEffectLayer ?: return super.dispatchDraw(canvas)
++        effect.drawUnder(canvas)
++        super.dispatchDraw(canvas)
++        effect.drawOver(canvas)
++    }
++
+     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+         // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
+         return if (vivoKeypressWorkaround && ev.actionMasked == MotionEvent.ACTION_DOWN) true
+@@ -502,6 +546,7 @@ abstract class BaseKeyboard(
+ 
+     open fun onDetach() {
+         releaseAllTouchTargets()
++        pressEffectLayer?.clear()
+     }
+ 
+ }
+\ No newline at end of file
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
+new file mode 100644
+index 0000000..64e5830
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
+@@ -0,0 +1,401 @@
++/*
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
++ */
++package org.fcitx.fcitx5.android.input.keyboard
++
++import android.animation.ValueAnimator
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Paint
++import android.graphics.PorterDuff
++import android.graphics.PorterDuffColorFilter
++import android.os.Build
++import android.os.SystemClock
++import android.view.View
++import kotlin.math.PI
++import kotlin.math.atan2
++import kotlin.math.cos
++import kotlin.math.exp
++import kotlin.math.floor
++import kotlin.math.hypot
++import kotlin.math.max
++import kotlin.math.min
++import kotlin.math.pow
++import kotlin.random.Random
++
++/**
++ * Colourful key press effect in the spirit of Samsung Keys Cafe "keyboard colour effects":
++ * every press releases a soft, feathered water ripple of a random palette colour
++ * with a random irregular shape, which spreads over the neighbouring keys and fades out.
++ *
++ * It is drawn by the keyboard itself: [drawUnder] before the keys (light leaks through the
++ * gaps and translucent keys, labels stay crisp) and [drawOver] after them with reduced
++ * strength so the colour also washes over the key caps.
++ *
++ * Textures are generated procedurally once per process on a background thread, as white
++ * alpha masks, and tinted per ripple, so any number of colours costs no extra memory.
++ */
++class PressEffect(
++    private val host: View,
++    palette: IntArray,
++    isDark: Boolean,
++    sizePercent: Int,
++    speedPercent: Int,
++    overKeysPercent: Int
++) {
++
++    private val colors: IntArray =
++        (if (palette.isEmpty()) CYBERPUNK else palette).map { adapt(it, isDark) }.toIntArray()
++
++    private val density = host.resources.displayMetrics.density
++    private val maxRadius = BASE_RADIUS_DP * density * sizePercent.coerceIn(20, 400) / 100f
++    private val flashRadius = FLASH_RADIUS_DP * density
++    private val duration = (BASE_DURATION_MS * 100f / speedPercent.coerceIn(20, 400)).toLong()
++    private val underStrength = if (isDark) 1f else 0.9f
++    private val overStrength = overKeysPercent.coerceIn(0, 100) / 100f * (if (isDark) 1f else 0.8f)
++
++    private val random = Random(SystemClock.uptimeMillis())
++    private val ripples = ArrayList<Ripple>(MAX_RIPPLES + 1)
++    private var lastColorIndex = -1
++    private var frameTime = 0L
++
++    private class Ripple(
++        val x: Float,
++        val y: Float,
++        color: Int,
++        val shape: Int,
++        val echoShape: Int,
++        val rotation: Float,
++        val spin: Float,
++        val size: Float,
++        val start: Long
++    ) {
++        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
++            colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
++        }
++        val flashPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
++            colorFilter = PorterDuffColorFilter(mix(color, Color.WHITE, 0.55f), PorterDuff.Mode.SRC_IN)
++        }
++    }
++
++    init {
++        Textures.ensure()
++    }
++
++    fun onPress(x: Float, y: Float) {
++        if (!animatorsEnabled()) return
++        val textures = Textures.ready ?: return Textures.ensure()
++        var index = random.nextInt(colors.size)
++        if (colors.size > 1 && index == lastColorIndex) {
++            index = (index + 1 + random.nextInt(colors.size - 1)) % colors.size
++        }
++        lastColorIndex = index
++        val shapes = textures.bodies.size
++        val shape = random.nextInt(shapes)
++        ripples.add(
++            Ripple(
++                x, y, colors[index],
++                shape = shape,
++                echoShape = (shape + 1 + random.nextInt(max(1, shapes - 1))) % shapes,
++                rotation = random.nextFloat() * 360f,
++                spin = (random.nextFloat() * 2f - 1f) * 24f,
++                size = 0.88f + random.nextFloat() * 0.24f,
++                start = SystemClock.uptimeMillis()
++            )
++        )
++        while (ripples.size > MAX_RIPPLES) ripples.removeAt(0)
++        host.postInvalidateOnAnimation()
++    }
++
++    /** call before the keys are drawn */
++    fun drawUnder(canvas: Canvas) {
++        frameTime = SystemClock.uptimeMillis()
++        if (ripples.isEmpty()) return
++        draw(canvas, underStrength)
++    }
++
++    /** call after the keys are drawn; also schedules the next frame */
++    fun drawOver(canvas: Canvas) {
++        if (ripples.isEmpty()) return
++        if (overStrength > 0f) draw(canvas, overStrength)
++        ripples.removeAll { (frameTime - it.start) >= duration }
++        if (ripples.isNotEmpty()) host.postInvalidateOnAnimation()
++    }
++
++    fun clear() {
++        ripples.clear()
++    }
++
++    private fun draw(canvas: Canvas, strength: Float) {
++        val textures = Textures.ready ?: return
++        for (r in ripples) {
++            val elapsed = (frameTime - r.start).coerceAtLeast(0L)
++            val t = elapsed.toFloat() / duration
++            if (t >= 1f) continue
++            val seconds = elapsed / 1000f
++            val angle = r.rotation + r.spin * seconds
++            // finger flash: a quick bright bloom right where the key was hit
++            if (t < FLASH_END) {
++                val k = t / FLASH_END
++                val alpha = 0.95f * (1f - k).pow(1.5f)
++                drawTexture(canvas, textures.dot, r.x, r.y, flashRadius * (1f + 0.7f * k), 0f, r.flashPaint, alpha * strength)
++            }
++            // main mist: spreads fast then slows down (ease-out), lingers, dissolves
++            val e = easeOut(t)
++            val radius = maxRadius * r.size * (0.16f + 0.84f * e)
++            val bodyAlpha = 0.92f * ramp(t, 0f, 0.06f) * (1f - smoothstep(0.38f, 1f, t))
++            drawTexture(canvas, textures.bodies[r.shape], r.x, r.y, radius, angle, r.paint, bodyAlpha * strength)
++            // trailing echo ring: the second ripple a moment later
++            val t2 = (t - ECHO_DELAY) / (1f - ECHO_DELAY)
++            if (t2 > 0f) {
++                val radius2 = maxRadius * r.size * (0.12f + 0.70f * easeOut(t2))
++                val echoAlpha = 0.55f * ramp(t2, 0f, 0.1f) * (1f - smoothstep(0.3f, 1f, t2))
++                drawTexture(canvas, textures.rings[r.echoShape], r.x, r.y, radius2, -angle * 0.6f, r.paint, echoAlpha * strength)
++            }
++        }
++    }
++
++    private fun drawTexture(
++        canvas: Canvas, bitmap: Bitmap, x: Float, y: Float, radius: Float,
++        angle: Float, paint: Paint, alpha: Float
++    ) {
++        if (alpha <= 0.004f || radius <= 0.5f) return
++        paint.alpha = (alpha.coerceIn(0f, 1f) * 255f).toInt()
++        val half = bitmap.width / 2f
++        val scale = radius / half
++        val save = canvas.save()
++        canvas.translate(x, y)
++        canvas.rotate(angle)
++        canvas.scale(scale, scale)
++        canvas.drawBitmap(bitmap, -half, -half, paint)
++        canvas.restoreToCount(save)
++    }
++
++    private fun animatorsEnabled(): Boolean =
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ValueAnimator.areAnimatorsEnabled() else true
++
++    /** white alpha masks: irregular water-ripple bodies, echo rings and a soft dot */
++    private class Textures(val bodies: Array<Bitmap>, val rings: Array<Bitmap>, val dot: Bitmap) {
++        companion object {
++            @Volatile
++            var ready: Textures? = null
++                private set
++
++            @Volatile
++            private var started = false
++
++            fun ensure() {
++                if (ready != null || started) return
++                synchronized(this) {
++                    if (ready != null || started) return
++                    started = true
++                }
++                Thread({
++                    try {
++                        val m = PressEffectMasks
++                        val noise = PressEffectMasks.Noise(20261003)
++                        val size = m.TEXTURE_SIZE
++                        val bodies = Array(m.SHAPES) { i -> bitmap(m.mist(noise, m.bodySeed(i), ring = false), size) }
++                        val rings = Array(m.SHAPES) { i -> bitmap(m.mist(noise, m.ringSeed(i), ring = true), size) }
++                        ready = Textures(bodies, rings, bitmap(m.dot(), m.DOT_SIZE))
++                    } catch (e: Throwable) {
++                        started = false
++                    }
++                }, "PressEffectTextures").apply {
++                    isDaemon = true
++                    priority = Thread.NORM_PRIORITY - 1
++                }.start()
++            }
++
++            private fun bitmap(pixels: IntArray, size: Int): Bitmap =
++                Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
++        }
++    }
++
++    companion object {
++        private const val BASE_RADIUS_DP = 150f
++        private const val FLASH_RADIUS_DP = 22f
++        private const val BASE_DURATION_MS = 620f
++        private const val FLASH_END = 0.22f
++        private const val ECHO_DELAY = 0.16f
++        private const val MAX_RIPPLES = 12
++
++        /** acid yellow, electric cyan, electric blue, neon violet, hot magenta */
++        val CYBERPUNK = intArrayOf(
++            0xFFFCEE0A.toInt(), 0xFF00F0FF.toInt(), 0xFF2D6BFF.toInt(), 0xFFB026FF.toInt(), 0xFFFF2BD6.toInt()
++        )
++
++        /** One UI blue, sky, aqua, light blue, cobalt, ice */
++        val COOL = intArrayOf(
++            0xFF3E91FF.toInt(), 0xFF00C2FF.toInt(), 0xFF2DE2C9.toInt(), 0xFF7FB7FF.toInt(),
++            0xFF5B6CFF.toInt(), 0xFFA8E6FF.toInt()
++        )
++
++        val RAINBOW = intArrayOf(
++            0xFFFF4D4D.toInt(), 0xFFFF9F1C.toInt(), 0xFFFFE14D.toInt(), 0xFF4DFF88.toInt(),
++            0xFF33D6FF.toInt(), 0xFF4D7CFF.toInt(), 0xFFB24DFF.toInt()
++        )
++
++        /** misty berry purple, the original skin's palette */
++        val BERRY = intArrayOf(
++            0xFF9F75FD.toInt(), 0xFFC08CFF.toInt(), 0xFFFF8AD8.toInt(), 0xFF7B6CFF.toInt(), 0xFFE0B3FF.toInt()
++        )
++
++        private fun easeOut(t: Float): Float = 1f - (1f - t.coerceIn(0f, 1f)).pow(3)
++
++        private fun ramp(t: Float, a: Float, b: Float): Float = ((t - a) / (b - a)).coerceIn(0f, 1f)
++
++        internal fun smoothstep(a: Float, b: Float, x: Float): Float {
++            val t = ((x - a) / (b - a)).coerceIn(0f, 1f)
++            return t * t * (3f - 2f * t)
++        }
++
++        private fun mix(a: Int, b: Int, k: Float): Int {
++            val r = Color.red(a) + ((Color.red(b) - Color.red(a)) * k).toInt()
++            val g = Color.green(a) + ((Color.green(b) - Color.green(a)) * k).toInt()
++            val bl = Color.blue(a) + ((Color.blue(b) - Color.blue(a)) * k).toInt()
++            return Color.rgb(r, g, bl)
++        }
++
++        /** on light keyboards neon pastels wash out: deepen them a little */
++        private fun adapt(color: Int, isDark: Boolean): Int {
++            if (isDark) return color or 0xFF000000.toInt()
++            val hsv = FloatArray(3)
++            Color.colorToHSV(color, hsv)
++            hsv[1] = min(1f, hsv[1] * 1.1f)
++            hsv[2] = hsv[2] * 0.86f
++            return Color.HSVToColor(hsv)
++        }
++    }
++}
++
++
++/**
++ * Pure pixel maths for [PressEffect]'s alpha masks (white, ARGB, non-premultiplied),
++ * kept free of Android types so it can be checked off-device.
++ */
++internal object PressEffectMasks {
++    const val SHAPES = 4
++    const val TEXTURE_SIZE = 256
++    const val DOT_SIZE = 64
++
++    fun bodySeed(i: Int) = 11 + i * 26
++    fun ringSeed(i: Int) = 7 + i * 31
++
++    fun mist(noise: Noise, seed: Int, ring: Boolean): IntArray {
++        val g = Random(seed)
++        // random lobes (2..5) make every ripple an irregular, water-like outline
++        val ks = intArrayOf(2, 3, 4, 5)
++        val amps = FloatArray(4) { (0.5f + g.nextFloat() * 0.5f) / ks[it].toFloat().pow(0.9f) }
++        val total = amps.sum()
++        val strength = 0.26f + g.nextFloat() * 0.12f
++        for (i in amps.indices) amps[i] = amps[i] / total * strength
++        val phases = FloatArray(4) { g.nextFloat() * 2f * PI.toFloat() }
++        var maxD = 0f
++        for (i in 0 until 360) {
++            val th = i / 360f * 2f * PI.toFloat()
++            maxD = max(maxD, lobes(th, ks, amps, phases))
++        }
++        val ox = g.nextFloat() * 50f
++        val oy = g.nextFloat() * 50f
++        val size = TEXTURE_SIZE
++        val c = (size - 1) / 2f
++        val pixels = IntArray(size * size)
++        for (py in 0 until size) {
++            for (px in 0 until size) {
++                val nx = (px - c) / (size / 2f)
++                val ny = (py - c) / (size / 2f)
++                val r0 = hypot(nx, ny)
++                if (r0 >= 0.995f) continue
++                // gentle domain warp: wispy, uneven edge
++                val wx = noise.fbm(nx * 1.4f + ox, ny * 1.4f + oy) - 0.5f
++                val wy = noise.fbm(nx * 1.4f + oy + 13f, ny * 1.4f + ox + 7f) - 0.5f
++                val x = nx + 0.10f * wx
++                val y = ny + 0.10f * wy
++                val r = hypot(x, y)
++                val th = atan2(y, x)
++                val rho = r / (lobes(th, ks, amps, phases) / maxD)
++                val cloud = (0.66f + 1.2f * (noise.fbm(x * 1.1f + oy, y * 1.1f + ox) - 0.5f)).coerceIn(0.3f, 1.15f)
++                val edge = 1f - PressEffect.smoothstep(0.84f, 0.99f, r0)
++                val a = if (ring) {
++                    val d = rho - 0.72f
++                    val w = if (d > 0f) 0.10f else 0.24f
++                    0.95f * exp(-(d / w) * (d / w))
++                } else {
++                    val f = 0.64f
++                    val d = rho - f
++                    val w = if (d > 0f) 0.16f else 0.42f
++                    val band = exp(-(d / w) * (d / w))
++                    val out = max(d, 0f) / 0.16f
++                    val fill = exp(-out * out) * (0.30f + 0.70f * PressEffect.smoothstep(0f, 1f, rho / f))
++                    0.82f * band + 0.30f * fill
++                }
++                val alpha = (a * cloud * edge).coerceIn(0f, 1f)
++                pixels[py * size + px] = ((alpha * 255f + 0.5f).toInt() shl 24) or 0xFFFFFF
++            }
++        }
++        return pixels
++    }
++
++    fun dot(): IntArray {
++        val size = DOT_SIZE
++        val c = (size - 1) / 2f
++        val pixels = IntArray(size * size)
++        for (py in 0 until size) {
++            for (px in 0 until size) {
++                val r = hypot(px - c, py - c) / (size / 2f)
++                val a = exp(-(r / 0.48f).pow(2)) * (1f - PressEffect.smoothstep(0.85f, 0.99f, r))
++                pixels[py * size + px] = ((a.coerceIn(0f, 1f) * 255f + 0.5f).toInt() shl 24) or 0xFFFFFF
++            }
++        }
++        return pixels
++    }
++
++    private fun lobes(th: Float, ks: IntArray, amps: FloatArray, phases: FloatArray): Float {
++        var d = 1f
++        for (i in ks.indices) d += amps[i] * cos(ks[i] * th + phases[i])
++        return d
++    }
++
++    /** small tiling 2D value noise with a few octaves */
++    class Noise(seed: Int) {
++        private val grid = Random(seed).let { r -> FloatArray(GRID * GRID) { r.nextFloat() } }
++
++        private fun value(x: Float, y: Float): Float {
++            val xf = floor(x)
++            val yf = floor(y)
++            val ix = xf.toInt()
++            val iy = yf.toInt()
++            val fx = x - xf
++            val fy = y - yf
++            val sx = fx * fx * (3f - 2f * fx)
++            val sy = fy * fy * (3f - 2f * fy)
++            val top = at(ix, iy) + (at(ix + 1, iy) - at(ix, iy)) * sx
++            val bottom = at(ix, iy + 1) + (at(ix + 1, iy + 1) - at(ix, iy + 1)) * sx
++            return top + (bottom - top) * sy
++        }
++
++        private fun at(x: Int, y: Int): Float =
++            grid[Math.floorMod(y, GRID) * GRID + Math.floorMod(x, GRID)]
++
++        fun fbm(x: Float, y: Float): Float {
++            var sum = 0f
++            var amp = 1f
++            var freq = 1.5f
++            var norm = 0f
++            repeat(3) {
++                sum += amp * value(x * freq, y * freq)
++                norm += amp
++                amp *= 0.5f
++                freq *= 2f
++            }
++            return sum / norm
++        }
++
++        companion object {
++            const val GRID = 64
++        }
++    }
++}
+diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
+index 40ef2c9..3903811 100644
+--- a/app/src/main/res/values-zh-rCN/strings.xml
++++ b/app/src/main/res/values-zh-rCN/strings.xml
+@@ -104,6 +104,17 @@
+     <string name="input_method_options">输入法设置</string>
+     <string name="theme">主题</string>
+     <string name="key_ripple_effect">启用按键水波纹特效</string>
++    <string name="press_effect">炫彩按键特效</string>
++    <string name="press_effect_summary">每次按键随机颜色的水波涟漪，在按键下方和上方扩散</string>
++    <string name="press_effect_palette">特效配色</string>
++    <string name="press_effect_palette_cyberpunk">赛博朋克霓虹</string>
++    <string name="press_effect_palette_cool">冷色系</string>
++    <string name="press_effect_palette_rainbow">彩虹</string>
++    <string name="press_effect_palette_berry">雾莓紫</string>
++    <string name="press_effect_palette_accent">主题强调色</string>
++    <string name="press_effect_size">特效大小</string>
++    <string name="press_effect_speed">特效速度</string>
++    <string name="press_effect_over_keys">特效覆盖按键的强度</string>
+     <string name="key_border">启用按键边框</string>
+     <string name="brightness">亮度</string>
+     <string name="key_radius">按键圆角半径</string>
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index fa9bc4e..f68de2f 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -104,6 +104,17 @@
+     <string name="input_method_options">輸入法設定</string>
+     <string name="theme">主題</string>
+     <string name="key_ripple_effect">啟用按鍵水波紋特效</string>
++    <string name="press_effect">炫彩按鍵特效</string>
++    <string name="press_effect_summary">每次按鍵隨機顏色的水波漣漪，在按鍵下方和上方擴散</string>
++    <string name="press_effect_palette">特效配色</string>
++    <string name="press_effect_palette_cyberpunk">賽博朋克霓虹</string>
++    <string name="press_effect_palette_cool">冷色系</string>
++    <string name="press_effect_palette_rainbow">彩虹</string>
++    <string name="press_effect_palette_berry">霧莓紫</string>
++    <string name="press_effect_palette_accent">主題強調色</string>
++    <string name="press_effect_size">特效大小</string>
++    <string name="press_effect_speed">特效速度</string>
++    <string name="press_effect_over_keys">特效覆蓋按鍵的強度</string>
+     <string name="key_border">啟用按鍵邊框</string>
+     <string name="brightness">亮度</string>
+     <string name="key_radius">按鍵圓角半徑</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index fe1fd3a..9e8fe65 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -104,6 +104,17 @@
+     <string name="input_method_options">Input Method Options</string>
+     <string name="theme">Theme</string>
+     <string name="key_ripple_effect">Enable key ripple effect</string>
++    <string name="press_effect">Colourful press effect</string>
++    <string name="press_effect_summary">Random-colour water ripples that spread under and over the keys</string>
++    <string name="press_effect_palette">Press effect colours</string>
++    <string name="press_effect_palette_cyberpunk">Cyberpunk neon</string>
++    <string name="press_effect_palette_cool">Cool blues</string>
++    <string name="press_effect_palette_rainbow">Rainbow</string>
++    <string name="press_effect_palette_berry">Misty berry purple</string>
++    <string name="press_effect_palette_accent">Theme accent colour</string>
++    <string name="press_effect_size">Press effect size</string>
++    <string name="press_effect_speed">Press effect speed</string>
++    <string name="press_effect_over_keys">Press effect strength over keys</string>
+     <string name="key_border">Enable key border</string>
+     <string name="brightness">Brightness</string>
+     <string name="key_radius">Key radius</string>
