@@ -1168,7 +1168,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..5fa08a9 100644
+index 5c2fef9..a577af3 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1307,7 +1307,7 @@ index 5c2fef9..5fa08a9 100644
      }
  
      private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-@@ -392,16 +463,55 @@ abstract class BaseKeyboard(
+@@ -392,16 +463,65 @@ abstract class BaseKeyboard(
              event.deviceId, event.edgeFlags
          )
          target.view.dispatchTouchEvent(e)
@@ -1316,6 +1316,16 @@ index 5c2fef9..5fa08a9 100644
 +
 +    private val effectKeyBounds = Rect()
 +    private val effectHostLocation = IntArray(2)
++
++    private fun releaseTouch(event: MotionEvent, index: Int, target: TouchTarget) {
++        // Dropping outside the selected key cancels, including either finger of a
++        // two-thumb gesture and UP events with no preceding MOVE.
++        if (slideSelectionEnabled && canSlideSelect(target.view) &&
++            target.view.id !in popupSelectionKeys && findTouchTarget(event, index)?.view !== target.view) {
++            target.view.cancelGestures()
++            onPopupAction(PopupAction.DismissAction(target.view.id))
++        } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, target)
++    }
 +
 +    private fun illuminateKey(event: MotionEvent, index: Int, target: TouchTarget?) {
 +        pressEffectLayer?.let { effect ->
@@ -1365,7 +1375,7 @@ index 5c2fef9..5fa08a9 100644
              when (event.actionMasked) {
                  MotionEvent.ACTION_DOWN -> {
                      releaseAllTouchTargets()
-@@ -423,6 +533,19 @@ abstract class BaseKeyboard(
+@@ -423,6 +543,19 @@ abstract class BaseKeyboard(
                      for (i in 0 until event.pointerCount) {
                          val pid = event.getPointerId(i)
                          val target = touchTargets[pid] ?: continue
@@ -1385,22 +1395,25 @@ index 5c2fef9..5fa08a9 100644
                          dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                      }
                      return true
-@@ -442,7 +565,13 @@ abstract class BaseKeyboard(
+@@ -431,7 +564,7 @@ abstract class BaseKeyboard(
+                     val i = event.actionIndex
+                     val pid = event.getPointerId(i)
+                     val target = touchTargets[pid] ?: return true
+-                    dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, i, target)
++                    releaseTouch(event, i, target)
+                     touchTargets.remove(pid)
+                     return true
+                 }
+@@ -442,7 +575,7 @@ abstract class BaseKeyboard(
                          releaseAllTouchTargets()
                          return true
                      }
 -                    dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, 0, target)
-+                    // Dropping outside the keyboard cancels selection, even when Android
-+                    // did not send a final MOVE before UP.
-+                    if (slideSelectionEnabled && canSlideSelect(target.view) &&
-+                        target.view.id !in popupSelectionKeys && findTouchTarget(event, 0)?.view !== target.view) {
-+                        target.view.cancelGestures()
-+                        onPopupAction(PopupAction.DismissAction(target.view.id))
-+                    } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, 0, target)
++                    releaseTouch(event, 0, target)
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -465,6 +594,12 @@ abstract class BaseKeyboard(
+@@ -465,6 +598,12 @@ abstract class BaseKeyboard(
  
      @CallSuper
      protected open fun onPopupAction(action: PopupAction) {
@@ -1413,7 +1426,7 @@ index 5c2fef9..5fa08a9 100644
          popupActionListener?.onPopupAction(action)
      }
  
-@@ -484,8 +619,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +623,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1448,7 +1461,7 @@ index 5c2fef9..5fa08a9 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +662,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +666,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -1803,7 +1816,7 @@ index c331341..454bb61 100644
  
  class ImageLayoutSwitchKey(
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
-index 9bfc478..e0e6e8b 100644
+index 9bfc478..fbb6f25 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
 @@ -146,6 +146,11 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
@@ -1818,9 +1831,14 @@ index 9bfc478..e0e6e8b 100644
          appearanceView.foreground = if (rippled) {
              RippleDrawable(
                  ColorStateList.valueOf(theme.keyPressHighlightColor), null,
-@@ -358,6 +363,12 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
+@@ -357,7 +362,17 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
+     }
  
      private fun applyLayout(orientation: Int) {
++        if ((def as KeyDef.Appearance.AltText).altText.isEmpty()) {
++            applyNoAltTextPosition()
++            return
++        }
          when (ThemeManager.prefs.punctuationPosition.getValue()) {
 +            PunctuationPosition.TopRowDigits -> {
 +                val digits = (def as KeyDef.Appearance.AltText).altText.all { it.isDigit() }
@@ -1868,10 +1886,10 @@ index 26dcded..1a33534 100644
              it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..be0cf0f
+index 0000000..60126fa
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,587 @@
+@@ -0,0 +1,585 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -2290,8 +2308,6 @@ index 0000000..be0cf0f
 +        val BERRY = intArrayOf(
 +            0xFF9F75FD.toInt(), 0xFFC08CFF.toInt(), 0xFFFF8AD8.toInt(), 0xFF7B6CFF.toInt(), 0xFFE0B3FF.toInt()
 +        )
-+
-+        private fun easeOut(t: Float): Float = 1f - (1f - t.coerceIn(0f, 1f)).pow(3)
 +
 +        private fun ramp(t: Float, a: Float, b: Float): Float = ((t - a) / (b - a)).coerceIn(0f, 1f)
 +
@@ -2781,7 +2797,7 @@ index 368cf6c..9a083e7 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerData.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerData.kt
-index 67545fe..a5e9ef5 100644
+index 67545fe..7b89baf 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerData.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerData.kt
 @@ -13,8 +13,8 @@ object PickerData {
@@ -2790,7 +2806,7 @@ index 67545fe..a5e9ef5 100644
      val Symbol: List<Pair<Category, Array<String>>> = listOf(
 -        Category("1?#", R.drawable.symbol_number_punctuation) to arrayOf(
 -            "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-+        Category("!?#", R.drawable.symbol_number_punctuation) to arrayOf(
++        Category("!?#") to arrayOf(
 +            "，", "。", "？", "！", "、", "：", "；", "…", "—", "·",
              "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
              "'", "\"", "=", "_", "`", ":", ";", "?",
@@ -2803,6 +2819,13 @@ index 67545fe..a5e9ef5 100644
              "！", "＠", "＃", "＄", "％", "＾", "＆", "＊", "（", "）",
              "‘", "’", "＝", "＿", "｀", "：", "；", "？",
              "〜", "｜", "＋", "―", "＼", "／", "、", "．", "，", "。",
+@@ -338,4 +337,4 @@ object PickerData {
+             "⁄(⁄ ⁄•⁄ω⁄•⁄ ⁄)⁄", "(╬ﾟдﾟ)▄︻┻┳═一", "･*･:≡(　ε:)", "¯\\_(ツ)_/¯"
+         )
+     )
+-}
+\ No newline at end of file
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerWindow.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerWindow.kt
 index 20ccfba..3d38c05 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerWindow.kt
@@ -3789,10 +3812,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..ae4570e
+index 0000000..57ba35e
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,468 @@
+@@ -0,0 +1,508 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4033,7 +4056,7 @@ index 0000000..ae4570e
 +            }
 +            val q = keys(keyboard).filterIsInstance<org.fcitx.fcitx5.android.input.keyboard.AltTextKeyView>()
 +                .first { (it.def as KeyDef.Appearance.AltText).displayText == "Q" }
-+            assertEquals(View.VISIBLE, q.altText.visibility)
++            assertEquals(View.GONE, q.altText.visibility)
 +            assertEquals("", q.altText.text.toString())
 +            assertEquals(5, keyboard.childCount)
 +            val digitRow = keyboard.getChildAt(0) as ViewGroup
@@ -4258,6 +4281,46 @@ index 0000000..ae4570e
 +        symbolKeys.first { it.mainText.text == "@" }.performClick()
 +        assertEquals(KeyAction.CommitAction("@"), last)
 +        save(render(ui.root), "layout-symbols-first-page")
++    }
++
++    @Test
++    fun twoThumbsKeepIndependentTargetsWhileOneFingerSlides() {
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++        activity.setContentView(keyboard)
++        controller.visible()
++        layout(keyboard, 360, 260)
++        val typed = mutableListOf<String>()
++        keyboard.keyActionListener = KeyActionListener { action, _ ->
++            if (action is KeyAction.FcitxKeyAction) typed.add(action.act)
++        }
++        fun event(action: Int, vararg pointers: Pair<Int, String>) {
++            val properties = pointers.map { (id, _) -> MotionEvent.PointerProperties().apply {
++                this.id = id; toolType = MotionEvent.TOOL_TYPE_FINGER
++            } }.toTypedArray()
++            val coordinates = pointers.map { (_, label) ->
++                val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == label }
++                val bounds = Rect()
++                key.getDrawingRect(bounds)
++                keyboard.offsetDescendantRectToMyCoords(key, bounds)
++                MotionEvent.PointerCoords().apply { x = bounds.exactCenterX(); y = bounds.exactCenterY(); pressure = 1f; size = 1f }
++            }.toTypedArray()
++            val e = MotionEvent.obtain(0, SystemClock.uptimeMillis(), action, pointers.size,
++                properties, coordinates, 0, 0, 1f, 1f, 0, 0, android.view.InputDevice.SOURCE_TOUCHSCREEN, 0)
++            keyboard.dispatchTouchEvent(e)
++            e.recycle()
++        }
++        event(MotionEvent.ACTION_DOWN, 0 to "G")
++        event(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 0 to "G", 1 to "H")
++        event(MotionEvent.ACTION_MOVE, 0 to "T", 1 to "H")
++        assertTrue(typed.isEmpty())
++        event(MotionEvent.ACTION_POINTER_UP, 0 to "T", 1 to "H")
++        event(MotionEvent.ACTION_UP, 1 to "H")
++        assertEquals(listOf("t", "h"), typed)
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
 +    }
 +
 +}
