@@ -2740,7 +2740,7 @@ index ed6a05f..583cde8 100644
      }
  }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt
-index f7ba9c4..4579601 100644
+index f7ba9c4..d8be6a5 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt
 @@ -75,6 +75,7 @@ class PopupKeyboardUi(
@@ -2760,6 +2760,20 @@ index f7ba9c4..4579601 100644
          // add rows in reverse order, because newly added view shows at bottom
          for (i in rowCount - 1 downTo 0) {
              val order = keyOrders[i]
+@@ -219,7 +220,12 @@ class PopupKeyboardUi(
+ 
+     override fun onTrigger(): KeyAction? {
+         val key = keys.getOrNull(focusedIndex) ?: return null
+-        return KeyAction.FcitxKeyAction(key)
++        // Fcitx's string key API parses one keysym, not a text sequence such as "...".
++        return if (key.codePointCount(0, key.length) == 1) {
++            KeyAction.FcitxKeyAction(key)
++        } else {
++            KeyAction.CommitAction(key)
++        }
+     }
+ 
+ }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupMenuUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupMenuUi.kt
 index 86a4107..8690397 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupMenuUi.kt
@@ -3473,10 +3487,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..42ceef3
+index 0000000..e6541ca
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,347 @@
+@@ -0,0 +1,363 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -3492,6 +3506,7 @@ index 0000000..42ceef3
 +import android.graphics.Bitmap
 +import android.graphics.Canvas
 +import android.graphics.Color
++import android.graphics.Rect
 +import android.os.Looper
 +import android.view.View
 +import android.view.ViewGroup
@@ -3514,6 +3529,7 @@ index 0000000..42ceef3
 +import org.fcitx.fcitx5.android.input.keyboard.LanguageKey
 +import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 +import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
++import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
 +import org.junit.Assert.*
 +import org.junit.Before
 +import org.junit.Test
@@ -3571,6 +3587,20 @@ index 0000000..42ceef3
 +        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
 +            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
 +        view.layout(0, 0, width, height)
++    }
++
++    @Test
++    fun popupCommitsEnglishEllipsisAsTextAndKeepsSinglePunctuationAsKeys() {
++        val context = RuntimeEnvironment.getApplication()
++        fun trigger(text: String) = PopupKeyboardUi(
++            context, ThemePreset.XuancaiBlackV08,
++            Rect(0, 0, 600, 400), Rect(120, 300, 180, 360),
++            radius = 12f, keyWidth = 44, keyHeight = 52, popupHeight = 100,
++            keys = arrayOf(text), labels = arrayOf(text)
++        ).onTrigger()
++        assertEquals(KeyAction.CommitAction("..."), trigger("..."))
++        assertEquals(KeyAction.FcitxKeyAction("，"), trigger("，"))
++        assertEquals(KeyAction.FcitxKeyAction(","), trigger(","))
 +    }
 +
 +    @Test
