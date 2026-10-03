@@ -1,0 +1,14 @@
+{
+  "commit": "87c0f6189c048fcf7d9aa8a297bbf1bddf94f22a",
+  "run_url": "https://github.com/xisungod/fcitx5-android/actions/runs/37133242797",
+  "android_tests": {
+    "tests": 36,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "ui_build": "success",
+  "renders": "Actual Android View code in Robolectric native graphics, not phone screenshots",
+  "release_published": false,
+  "full_rime_packaging": "still running when UI review was saved; see workflow for final result"
+}
