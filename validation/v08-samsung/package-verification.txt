@@ -1,0 +1,6 @@
+Packaged full Lua, grammar, all dictionary sources and precompiled tables verified.
+{'file': 'fcitx5-xuancai-black-v08-arm64.apk', 'bytes': 69618374, 'package': 'org.fcitx.fcitx5.android.xuancai.black.v08', 'native_libraries': 24, 'sha256': '678c33e27da47ab19ecf158e08cd838ee4d3574c665f7b47968127b3364ced19', 'checks': 'passed'}
+{'file': 'fcitx5-rime-black-v08-arm64.apk', 'bytes': 95740231, 'package': 'org.fcitx.fcitx5.android.plugin.rime.xuancai.black.v08', 'native_libraries': 1, 'sha256': 'b82620fac3cdd646ceca34a6ef9c82dd91ea7bc6ac1940ffb81b70c0f7673d65', 'checks': 'passed'}
+Both APKs are intact, arm64, correctly paired, and signed by the same certificate.
+Source archive, full Lua, grammar and precompiled tables match the tested package.
+Signing certificate SHA256: 08e85c61fc0d7fe49193a4109bd1885a452a9122d5832cf38872abf43982dad0

@@ -18,6 +18,8 @@
 构建提交：`87c0f6189c048fcf7d9aa8a297bbf1bddf94f22a`。
 构建记录：https://github.com/xisungod/fcitx5-android/actions/runs/37133242797
 
-本记录保存时，配套 Rime 插件的全量构建仍在运行，最终结果以构建记录为准。此次未改变 Rime 词库和引擎逻辑，此前通过的实际候选记录见 `../v08/native-candidates.txt`。
+配套 Rime 插件的全量构建已经成功；真实引擎的长句、纠错、中英切换与英文直接上屏验证均通过，详见本目录 `native-candidates.txt`。主程序与插件使用同一签名，包名配套，APK 内置词库、Lua、语法模型和预编译表的完整性均已核验，详见 `package-verification.txt`。
 
-尚未发布安装包，等待用户确认界面。
+用户已确认并授权发布。V08 三星键帽版已发布：https://github.com/xisungod/fcitx5-android/releases/tag/xuancai-black-v08
+
+上传后 GitHub 返回的 SHA-256 与本地已验证文件一致。安装主程序与 V08 配套 Rime 两个 APK；旧版可以保留，但设置和学习记录不自动迁移。
