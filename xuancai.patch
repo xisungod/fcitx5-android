@@ -1,20 +1,52 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 53f1eb8..00ac005 100644
+index 53f1eb8..e9937da 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
-@@ -46,9 +46,11 @@ android {
+@@ -33,6 +33,23 @@ android {
+         }
+     }
+ 
++    testOptions {
++        unitTests.isIncludeAndroidResources = true
++        unitTests.all {
++            it.jvmArgs(
++                "--add-opens=java.base/java.lang=ALL-UNNAMED",
++                "--add-opens=java.base/java.util=ALL-UNNAMED",
++                "--add-opens=java.base/java.io=ALL-UNNAMED",
++                "--add-opens=java.base/java.net=ALL-UNNAMED",
++                "--add-opens=java.base/java.security=ALL-UNNAMED",
++                "--add-opens=java.base/java.text=ALL-UNNAMED",
++                "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
++                "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
++                "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"
++            )
++        }
++    }
++
+     buildFeatures {
+         viewBinding = true
+         resValues = true
+@@ -46,9 +63,11 @@ android {
              proguardFile("proguard-rules.pro")
          }
          debug {
 +            // Install alongside the original debug APK: its CI signing key is ephemeral.
-+            applicationIdSuffix = ".xuancai.black.v05"
++            applicationIdSuffix = ".xuancai.black.v06"
              resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
              resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "炫彩·曜黑 V05")
++            resValue("string", "app_name", "炫彩·曜黑 V06")
          }
      }
  
+@@ -125,6 +144,7 @@ dependencies {
+     implementation(libs.splitties.views.recyclerview)
+     implementation(libs.aboutlibraries.core)
+     testImplementation(libs.junit)
++    testImplementation("org.robolectric:robolectric:4.17")
+     androidTestImplementation(libs.androidx.test.runner)
+     androidTestImplementation(libs.androidx.test.rules)
+     androidTestImplementation(libs.androidx.lifecycle.testing)
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt b/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt
 index cec9078..8da5e41 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt
@@ -90,14 +122,14 @@ index bed1cbf..c076662 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
-index 93ba4d4..372c84a 100644
+index 93ba4d4..4853275 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 @@ -24,6 +24,7 @@ object ThemeManager {
      }
  
      val BuiltinThemes = listOf(
-+        ThemePreset.XuancaiBlackV05,
++        ThemePreset.XuancaiBlackV06,
          ThemePreset.MaterialLight,
          ThemePreset.MaterialDark,
          ThemePreset.PixelLight,
@@ -106,7 +138,7 @@ index 93ba4d4..372c84a 100644
      )
  
 -    val DefaultTheme = ThemePreset.PixelDark
-+    val DefaultTheme = ThemePreset.XuancaiBlackV05
++    val DefaultTheme = ThemePreset.XuancaiBlackV06
  
      private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
  
@@ -118,7 +150,7 @@ index 93ba4d4..372c84a 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..52fb4d8 100644
+index d3b4948..caaa645 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -142,7 +174,7 @@ index d3b4948..52fb4d8 100644
  
      val keyBorderStroke = switch(
          R.string.key_border_stroke, "key_border_stroke", false,
-@@ -43,6 +46,91 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -43,6 +46,96 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
  
@@ -156,6 +188,11 @@ index d3b4948..52fb4d8 100644
 +
 +    val pressEffect = switch(
 +        R.string.press_effect, "press_effect", true, R.string.press_effect_summary
++    )
++
++    val effectsFollowSystemAnimation = switch(
++        R.string.effects_follow_system_animation, "effects_follow_system_animation", false,
++        R.string.effects_follow_system_animation_summary
 +    )
 +
 +    val idleBreathing = switch(
@@ -200,7 +237,7 @@ index d3b4948..52fb4d8 100644
 +        enableUiOn = { idleBreathing.getValue() }
 +    )
 +    val idleBrightness = int(
-+        R.string.idle_brightness, "idle_brightness", 16, 5, 40, "%",
++        R.string.idle_brightness, "idle_brightness", 28, 5, 60, "%",
 +        enableUiOn = { idleBreathing.getValue() }
 +    )
 +
@@ -234,7 +271,7 @@ index d3b4948..52fb4d8 100644
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
-@@ -51,10 +139,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -51,10 +144,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_horizontal_margin,
              R.string.portrait,
              "key_horizontal_margin",
@@ -247,7 +284,7 @@ index d3b4948..52fb4d8 100644
              0,
              24,
              "dp"
-@@ -71,10 +159,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -71,10 +164,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_vertical_margin,
              R.string.portrait,
              "key_vertical_margin",
@@ -260,7 +297,7 @@ index d3b4948..52fb4d8 100644
              0,
              24,
              "dp"
-@@ -83,7 +171,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -83,7 +176,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
          keyVerticalMarginLandscape = secondary
      }
  
@@ -269,7 +306,7 @@ index d3b4948..52fb4d8 100644
  
      val textEditingButtonRadius =
          int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
-@@ -100,7 +188,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -100,7 +193,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val punctuationPosition = enumList(
          R.string.punctuation_position,
          "punctuation_position",
@@ -278,7 +315,7 @@ index d3b4948..52fb4d8 100644
      )
  
      enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-@@ -136,14 +224,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -136,14 +229,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val followSystemDayNightTheme = switch(
          R.string.follow_system_day_night_theme,
          "follow_system_dark_mode",
@@ -291,21 +328,21 @@ index d3b4948..52fb4d8 100644
          R.string.light_mode_theme,
          "light_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialLight else ThemePreset.PixelLight,
-+        ThemePreset.XuancaiBlackV05,
++        ThemePreset.XuancaiBlackV06,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
-@@ -151,7 +239,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -151,7 +244,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val darkModeTheme = themePreference(
          R.string.dark_mode_theme,
          "dark_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialDark else ThemePreset.PixelDark,
-+        ThemePreset.XuancaiBlackV05,
++        ThemePreset.XuancaiBlackV06,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..2ebaa76 100644
+index 239e22c..7b6a8ed 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
@@ -313,8 +350,8 @@ index 239e22c..2ebaa76 100644
  object ThemePreset {
  
 +    /** Quiet at rest; key-press colour is supplied by PressEffect. */
-+    val XuancaiBlackV05 = Theme.Builtin(
-+        name = "炫彩·曜黑 V05",
++    val XuancaiBlackV06 = Theme.Builtin(
++        name = "炫彩·曜黑 V06",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
@@ -328,7 +365,7 @@ index 239e22c..2ebaa76 100644
 +        altKeyTextColor = 0xffdedee4,
 +        accentKeyBackgroundColor = 0x00000000,
 +        accentKeyTextColor = 0xff00e8ff,
-+        keyPressHighlightColor = 0x18ffffff,
++        keyPressHighlightColor = 0x00000000,
 +        keyShadowColor = 0x00000000,
 +        popupBackgroundColor = 0xff202026,
 +        popupTextColor = 0xfff5f5f7,
@@ -531,7 +568,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..3fa188e 100644
+index 5c2fef9..cc9630a 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -625,7 +662,7 @@ index 5c2fef9..3fa188e 100644
      override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
          // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
          return if (vivoKeypressWorkaround && ev.actionMasked == MotionEvent.ACTION_DOWN) true
-@@ -484,8 +545,28 @@ abstract class BaseKeyboard(
+@@ -484,8 +545,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -649,13 +686,18 @@ index 5c2fef9..3fa188e 100644
 +        pressEffectLayer?.syncVisibility()
 +    }
 +
++    override fun onVisibilityAggregated(isVisible: Boolean) {
++        super.onVisibilityAggregated(isVisible)
++        pressEffectLayer?.syncVisibility()
++    }
++
      open fun onAttach() {
 -        // do nothing by default
 +        pressEffectLayer?.setActive(true)
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +583,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +588,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -666,7 +708,7 @@ index 5c2fef9..3fa188e 100644
 \ No newline at end of file
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleBreathing.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleBreathing.kt
 new file mode 100644
-index 0000000..7267a02
+index 0000000..ddf1d14
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleBreathing.kt
 @@ -0,0 +1,82 @@
@@ -686,13 +728,13 @@ index 0000000..7267a02
 +    cycleMs: Long = 5200L,
 +    fadeInMs: Long = 850L,
 +    fadeOutMs: Long = 180L,
-+    brightness: Float = 0.16f
++    brightness: Float = 0.28f
 +) {
 +    private val idleDelay = idleDelayMs.coerceIn(500L, 10000L)
 +    private val cycle = cycleMs.coerceIn(2000L, 15000L)
 +    private val fadeInDuration = fadeInMs.coerceIn(100L, 3000L)
 +    private val fadeOutDuration = fadeOutMs.coerceIn(50L, 1500L)
-+    private val peak = brightness.coerceIn(0.05f, 0.4f)
++    private val peak = brightness.coerceIn(0.05f, 0.6f)
 +    var running = false
 +        private set
 +    private var touching = false
@@ -737,7 +779,7 @@ index 0000000..7267a02
 +        if (touching || now < idleAt) return 0f
 +        val fadeIn = ((now - idleAt).toFloat() / fadeInDuration).coerceIn(0f, 1f)
 +        val pulse = (0.5 - 0.5 * cos(2.0 * PI * phase(now))).toFloat()
-+        return peak * (0.15f + 0.85f * pulse) * fadeIn
++        return peak * (0.04f + 0.96f * pulse) * fadeIn
 +    }
 +
 +    /** No timer while hidden or holding a key; a single timer during the idle delay. */
@@ -750,6 +792,50 @@ index 0000000..7267a02
 +
 +    companion object {
 +        const val IDLE_FRAME_MS = 42L
++    }
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleGlowPainter.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleGlowPainter.kt
+new file mode 100644
+index 0000000..8e22d3d
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleGlowPainter.kt
+@@ -0,0 +1,38 @@
++/*
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
++ */
++package org.fcitx.fcitx5.android.input.keyboard
++
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.ComposeShader
++import android.graphics.LinearGradient
++import android.graphics.Paint
++import android.graphics.PorterDuff
++import android.graphics.RadialGradient
++import android.graphics.Shader
++
++/** A cached, full-width feathered colour field; no press-texture attenuation or warm-up. */
++internal class IdleGlowPainter(firstColor: Int, secondColor: Int) {
++    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        shader = ComposeShader(
++            LinearGradient(-1f, 0f, 1f, 0f,
++                intArrayOf(firstColor, secondColor), null, Shader.TileMode.CLAMP),
++            RadialGradient(0f, 0f, 1f,
++                intArrayOf(Color.WHITE, Color.WHITE, Color.TRANSPARENT),
++                floatArrayOf(0f, 0.22f, 1f), Shader.TileMode.CLAMP),
++            PorterDuff.Mode.DST_IN
++        )
++    }
++
++    fun draw(canvas: Canvas, width: Int, height: Int, alpha: Float) {
++        if (width <= 0 || height <= 0 || alpha <= 0f) return
++        paint.alpha = (alpha.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
++        val save = canvas.save()
++        canvas.translate(width * 0.5f, height * 0.51f)
++        canvas.scale(width * 0.65f, height * 0.58f)
++        canvas.drawCircle(0f, 0f, 1f, paint)
++        canvas.restoreToCount(save)
 +    }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt
@@ -836,12 +922,28 @@ index c331341..721ddd8 100644
  )
  
  class ImageLayoutSwitchKey(
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
+index 9bfc478..fc4f20c 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
+@@ -146,6 +146,11 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
+     }
+ 
+     private fun setupPressHighlight(mask: Drawable? = null) {
++        // Seamless neon themes use the keyboard-wide light, not a rectangular key overlay.
++        if (Color.alpha(theme.keyPressHighlightColor) == 0) {
++            appearanceView.foreground = null
++            return
++        }
+         appearanceView.foreground = if (rippled) {
+             RippleDrawable(
+                 ColorStateList.valueOf(theme.keyPressHighlightColor), null,
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..be7ad5f
+index 0000000..5a535cb
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,512 @@
+@@ -0,0 +1,502 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -895,7 +997,13 @@ index 0000000..be7ad5f
 +    private val pressEnabled: Boolean,
 +    private val idleEnabled: Boolean,
 +    private val breathing: IdleBreathing,
-+    idleColors: IntArray
++    idleColors: IntArray,
++    private val clock: () -> Long = SystemClock::uptimeMillis,
++    private val animationsAllowed: () -> Boolean = {
++        !AppPrefs.getInstance().advanced.disableAnimation.getValue() &&
++            (!org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
++                Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
++    }
 +) {
 +
 +    private val colors: IntArray =
@@ -915,12 +1023,12 @@ index 0000000..be7ad5f
 +    private var lastColorIndex = -1
 +    private var frameTime = 0L
 +    private var active = false
-+    private val idleStyles = Array(2) { i ->
-+        RipplePaints(idleColors.getOrElse(i) { CYBERPUNK[i] })
-+    }
-+    private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
++    private val idleGlow = IdleGlowPainter(
++        idleColors.getOrElse(0) { CYBERPUNK[0] },
++        idleColors.getOrElse(1) { CYBERPUNK[4] }
++    )
 +    private val frameCallback = Runnable {
-+        if (canDraw()) host.invalidate()
++        if (canDraw() && animatorsEnabled()) host.invalidate() else clear()
 +    }
 +
 +    private fun canDraw() = active && host.isAttachedToWindow && host.isShown &&
@@ -937,14 +1045,14 @@ index 0000000..be7ad5f
 +            ripples.clear()
 +            breathing.stop()
 +        } else if (idleEnabled && !breathing.running) {
-+            breathing.resume(SystemClock.uptimeMillis())
++            breathing.resume(clock())
 +        }
 +        host.invalidate()
 +    }
 +
 +    fun onRelease() {
 +        if (!canDraw()) return
-+        breathing.activity(SystemClock.uptimeMillis(), held = false)
++        breathing.activity(clock(), held = false)
 +        host.removeCallbacks(frameCallback)
 +        host.postInvalidateOnAnimation()
 +    }
@@ -974,12 +1082,12 @@ index 0000000..be7ad5f
 +    }
 +
 +    init {
-+        Textures.ensure()
++        if (pressEnabled) Textures.ensure()
 +    }
 +
 +    fun onPress(pressX: Float, pressY: Float) {
 +        if (!canDraw() || !animatorsEnabled()) return
-+        val now = SystemClock.uptimeMillis()
++        val now = clock()
 +        if (idleEnabled && !breathing.running) breathing.resume(now)
 +        breathing.activity(now, held = true)
 +        host.removeCallbacks(frameCallback)
@@ -1013,11 +1121,14 @@ index 0000000..be7ad5f
 +
 +    /** Both light layers stay under the key legends. */
 +    fun drawUnder(canvas: Canvas) {
-+        frameTime = SystemClock.uptimeMillis()
++        frameTime = clock()
 +        if (!canDraw() || !animatorsEnabled()) {
 +            clear()
 +            return
 +        }
++        // IME views can be attached while an ancestor/window is still hidden. A later
++        // visible draw is authoritative even if the earlier callback could not start it.
++        if (idleEnabled && !breathing.running) breathing.resume(frameTime)
 +        ripples.expire(frameTime, duration)
 +        val idleAlpha = if (idleEnabled) breathing.alpha(frameTime) else 0f
 +        if (idleAlpha > 0.001f) drawBreathing(canvas, idleAlpha)
@@ -1042,25 +1153,7 @@ index 0000000..be7ad5f
 +    }
 +
 +    private fun drawBreathing(canvas: Canvas, alpha: Float) {
-+        val phase = breathing.phase(frameTime)
-+        val sizePulse = 0.92f + 0.08f * cos(2f * PI.toFloat() * phase)
-+        val radius = max(host.width * 0.62f, host.height * 0.85f) * sizePulse
-+        val textures = Textures.ready
-+        for (i in idleStyles.indices) {
-+            val x = host.width * if (i == 0) 0.28f else 0.76f
-+            val y = host.height * if (i == 0) 0.66f else 0.40f
-+            if (textures != null) {
-+                drawTexture(canvas, textures.bodies[i * 4], x, y, radius,
-+                    if (i == 0) -18f else 64f, idleStyles[i].paint, alpha)
-+            } else {
-+                val save = canvas.save()
-+                canvas.translate(x, y)
-+                canvas.scale(radius, radius)
-+                idleStyles[i].fallbackPaint.alpha = (alpha * 255).toInt()
-+                canvas.drawCircle(0f, 0f, 1f, idleStyles[i].fallbackPaint)
-+                canvas.restoreToCount(save)
-+            }
-+        }
++        idleGlow.draw(canvas, host.width, host.height, alpha)
 +    }
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
@@ -1127,8 +1220,7 @@ index 0000000..be7ad5f
 +        canvas.restoreToCount(save)
 +    }
 +
-+    private fun animatorsEnabled(): Boolean =
-+        !disableAnimation && (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ValueAnimator.areAnimatorsEnabled() else true)
++    private fun animatorsEnabled(): Boolean = animationsAllowed()
 +
 +    /** white alpha masks: irregular water-ripple bodies, echo rings and a soft dot */
 +    private class Textures(val bodies: Array<Bitmap>, val rings: Array<Bitmap>, val dot: Bitmap) {
@@ -1898,7 +1990,7 @@ index 0000000..28fcdba
 +        android:pathData="M4,4h6v6h-6z M14,4h6v6h-6z M4,14h6v6h-6z M14,14h6v6h-6z" />
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..557271a 100644
+index 40ef2c9..d605af9 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -1919,7 +2011,7 @@ index 40ef2c9..557271a 100644
      <string name="key_border">启用按键边框</string>
      <string name="brightness">亮度</string>
      <string name="key_radius">按键圆角半径</string>
-@@ -321,4 +332,31 @@
+@@ -321,4 +332,33 @@
      <string name="keyboard_height_percent_base">键盘高度百分比</string>
      <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
      <string name="real_size">真实尺寸 (Display.getRealSize)</string>
@@ -1950,9 +2042,11 @@ index 40ef2c9..557271a 100644
 +    <string name="neon_yellow">荧光黄</string>
 +    <string name="neon_green">荧光绿</string>
 +    <string name="neon_mint">薄荷青</string>
++    <string name="effects_follow_system_animation">光效跟随系统动画开关</string>
++    <string name="effects_follow_system_animation_summary">开启后，系统关闭动画时也暂停键盘光效。高级设置中的“禁用动画”始终优先。</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..a09093e 100644
+index fa9bc4e..acb6cc5 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -1973,7 +2067,7 @@ index fa9bc4e..a09093e 100644
      <string name="key_border">啟用按鍵邊框</string>
      <string name="brightness">亮度</string>
      <string name="key_radius">按鍵圓角半徑</string>
-@@ -316,4 +327,31 @@
+@@ -316,4 +327,33 @@
      <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
      <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
      <string name="preferred_voice_input">首選語音輸入</string>
@@ -2004,9 +2098,11 @@ index fa9bc4e..a09093e 100644
 +    <string name="neon_yellow">螢光黃</string>
 +    <string name="neon_green">螢光綠</string>
 +    <string name="neon_mint">薄荷青</string>
++    <string name="effects_follow_system_animation">光效跟隨系統動畫開關</string>
++    <string name="effects_follow_system_animation_summary">開啟後，系統關閉動畫時也暫停鍵盤光效。進階設定中的「停用動畫」始終優先。</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..984d992 100644
+index fe1fd3a..ee23a9f 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -2027,7 +2123,7 @@ index fe1fd3a..984d992 100644
      <string name="key_border">Enable key border</string>
      <string name="brightness">Brightness</string>
      <string name="key_radius">Key radius</string>
-@@ -321,4 +332,31 @@
+@@ -321,4 +332,33 @@
      <string name="keyboard_height_percent_base">Keyboard height percent base</string>
      <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
      <string name="real_size">Real size (Display.getRealSize)</string>
@@ -2058,10 +2154,12 @@ index fe1fd3a..984d992 100644
 +    <string name="neon_yellow">Neon yellow</string>
 +    <string name="neon_green">Neon green</string>
 +    <string name="neon_mint">Mint</string>
++    <string name="effects_follow_system_animation">Follow system animation switch for key effects</string>
++    <string name="effects_follow_system_animation_summary">When enabled, turning off system animations also pauses keyboard light effects. The advanced Disable animations setting always takes priority.</string>
  </resources>
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt
 new file mode 100644
-index 0000000..73292dc
+index 0000000..928c810
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt
 @@ -0,0 +1,93 @@
@@ -2154,8 +2252,144 @@ index 0000000..73292dc
 +        glow.resume(0)
 +        for (now in 0L..6000L step 10L) {
 +            val alpha = glow.alpha(now)
-+            assertTrue(alpha.isFinite() && alpha in 0f..0.4f)
++            assertTrue(alpha.isFinite() && alpha in 0f..0.6f)
 +        }
++    }
++}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
+new file mode 100644
+index 0000000..ba7743f
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
+@@ -0,0 +1,130 @@
++package org.fcitx.fcitx5.android
++
++import android.app.Activity
++import android.app.Application
++import android.content.Context
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import android.os.Looper
++import android.view.View
++import android.view.ViewGroup
++import android.widget.FrameLayout
++import org.fcitx.fcitx5.android.data.prefs.AppPrefs
++import org.fcitx.fcitx5.android.data.theme.ThemePreset
++import org.fcitx.fcitx5.android.input.keyboard.KeyDef
++import org.fcitx.fcitx5.android.input.keyboard.KeyView
++import org.fcitx.fcitx5.android.input.keyboard.LanguageKey
++import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
++import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.RuntimeEnvironment
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import org.robolectric.annotation.LooperMode
++import org.robolectric.util.ReflectionHelpers
++import java.io.File
++import java.time.Duration
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [33], application = Application::class, qualifiers = "w600dp-h900dp-mdpi")
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++@LooperMode(LooperMode.Mode.PAUSED)
++class KeyboardVisualRegressionTest {
++    @Before
++    fun prepareUiWithoutStartingTheNativeInputEngine() {
++        val application = RuntimeEnvironment.getApplication<Application>()
++        val uiApplication = FcitxApplication()
++        ReflectionHelpers.callInstanceMethod<Void>(uiApplication, "attachBaseContext",
++            ReflectionHelpers.ClassParameter.from(Context::class.java, application))
++        FcitxApplication::class.java.getDeclaredField("instance").apply {
++            isAccessible = true
++            set(null, uiApplication)
++        }
++        AppPrefs.init(application.getSharedPreferences("keyboard-visual", Context.MODE_PRIVATE))
++    }
++
++    private fun render(view: View): Bitmap {
++        val image = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
++        val canvas = Canvas(image)
++        canvas.drawColor(Color.BLACK)
++        view.draw(canvas)
++        return image
++    }
++
++    private fun save(image: Bitmap, name: String) {
++        val file = File("build/outputs/effect-checks/$name.png")
++        file.parentFile.mkdirs()
++        file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
++    }
++
++    private fun keys(view: View): List<KeyView> = when (view) {
++        is KeyView -> listOf(view)
++        is ViewGroup -> (0 until view.childCount).flatMap { keys(view.getChildAt(it)) }
++        else -> emptyList()
++    }
++
++    private fun layout(view: View, width: Int, height: Int) {
++        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
++            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
++        view.layout(0, 0, width, height)
++    }
++
++    @Test
++    fun realKeyboardBreathesBeforeAnyTouchAndFunctionKeysHaveNoPressedRectangle() {
++        val controller = Robolectric.buildActivity(Activity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val root = FrameLayout(activity)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV06)
++        activity.setContentView(root)
++        root.addView(keyboard, FrameLayout.LayoutParams(600, 300))
++        controller.visible()
++        layout(root, 600, 300)
++        val initial = render(keyboard)
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(4400))
++        val glowing = render(keyboard)
++        var changed = 0
++        for (y in 0 until 300) for (x in 0 until 600) {
++            if (initial.getPixel(x, y) != glowing.getPixel(x, y)) changed++
++        }
++        assertTrue("Idle must change actual keyboard pixels without pressing a key", changed > 20000)
++        save(initial, "keyboard-idle-start")
++        save(glowing, "keyboard-idle-bright")
++        val functionKeys = keys(keyboard).filter {
++            it.def.variant != KeyDef.Appearance.Variant.Normal || it.id == R.id.button_space
++        }
++        assertTrue(functionKeys.size >= 6)
++        for ((index, key) in functionKeys.withIndex()) {
++            key.isPressed = false
++            val normal = render(key)
++            key.isPressed = true
++            key.jumpDrawablesToCurrentState()
++            val pressed = render(key)
++            assertTrue("Function key $index must not acquire a solid pressed rectangle", normal.sameAs(pressed))
++            key.isPressed = false
++        }
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
++    }
++
++    @Test
++    fun oldHighlightReproducesTheRectangleSoThePixelCheckIsSensitive() {
++        val context = RuntimeEnvironment.getApplication<Application>()
++        val oldTheme = ThemePreset.XuancaiBlackV06.copy(keyPressHighlightColor = 0x18ffffff)
++        val key = TextKeyView(context, oldTheme, LanguageKey().appearance as KeyDef.Appearance.Text)
++        layout(key, 90, 64)
++        val normal = render(key)
++        key.isPressed = true
++        key.jumpDrawablesToCurrentState()
++        val pressed = render(key)
++        assertFalse(normal.sameAs(pressed))
++        assertTrue(Color.red(pressed.getPixel(5, 5)) > Color.red(normal.getPixel(5, 5)))
 +    }
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
@@ -2199,6 +2433,169 @@ index 0000000..a640055
 +        assertTrue(dot[(n / 2) * n + n / 2] ushr 24 > 240)
 +        assertEquals(0, dot[0] ushr 24)
 +        assertEquals(0, dot[n - 1] ushr 24)
++    }
++}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
+new file mode 100644
+index 0000000..cd7ac14
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
+@@ -0,0 +1,157 @@
++package org.fcitx.fcitx5.android
++
++import android.app.Activity
++import android.app.Application
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import android.os.Looper
++import android.view.View
++import android.widget.FrameLayout
++import org.fcitx.fcitx5.android.input.keyboard.IdleBreathing
++import org.fcitx.fcitx5.android.input.keyboard.PressEffect
++import org.junit.Assert.*
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import org.robolectric.annotation.LooperMode
++import java.io.File
++import java.time.Duration
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [33], application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++@LooperMode(LooperMode.Mode.PAUSED)
++class PressEffectRenderingTest {
++    private class Harness {
++        val controller = Robolectric.buildActivity(Activity::class.java).setup()
++        val activity = controller.get()
++        val root = FrameLayout(activity)
++        var invalidations = 0
++        val host = object : View(activity) {
++            override fun invalidate() {
++                invalidations++
++                super.invalidate()
++            }
++        }
++        var now = 0L
++        var enabled = true
++        val envelope = IdleBreathing()
++        val effect = PressEffect(host, PressEffect.CYBERPUNK, true, 100, 500, 280, 0,
++            false, true, envelope, intArrayOf(0xff00f0ff.toInt(), 0xffbe38ff.toInt()),
++            clock = { now }, animationsAllowed = { enabled })
++
++        init {
++            // Reproduce attach-before-visible without relying on a subsequent visibility callback.
++            effect.setActive(true)
++            assertFalse(envelope.running)
++            activity.setContentView(root)
++            root.addView(host, FrameLayout.LayoutParams(600, 240))
++            controller.visible()
++            host.measure(View.MeasureSpec.makeMeasureSpec(600, View.MeasureSpec.EXACTLY),
++                View.MeasureSpec.makeMeasureSpec(240, View.MeasureSpec.EXACTLY))
++            host.layout(0, 0, 600, 240)
++            assertTrue(host.isAttachedToWindow && host.isShown)
++        }
++
++        fun render(time: Long): Bitmap {
++            now = time
++            val image = Bitmap.createBitmap(600, 240, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(image)
++            canvas.drawColor(Color.BLACK)
++            effect.drawUnder(canvas)
++            effect.drawOver(canvas)
++            return image
++        }
++
++        fun finish() {
++            effect.setActive(false)
++            controller.pause().stop().destroy()
++        }
++    }
++
++    private fun peak(image: Bitmap): Int {
++        var result = 0
++        for (y in 0 until image.height step 3) for (x in 0 until image.width step 3) {
++            val p = image.getPixel(x, y)
++            result = maxOf(result, Color.red(p), Color.green(p), Color.blue(p))
++        }
++        return result
++    }
++
++    private fun save(image: Bitmap, name: String) {
++        val file = File("build/outputs/effect-checks/$name.png")
++        file.parentFile.mkdirs()
++        file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
++    }
++
++    @Test
++    fun firstVisibleDrawStartsWithoutAnyKeyPressAndActuallyChangesPixels() {
++        val h = Harness()
++        try {
++            val before = h.render(0)
++            assertEquals(0, peak(before))
++            assertTrue(h.envelope.running)
++            val lit = h.render(4400)
++            val dim = h.render(7000)
++            assertTrue("Default breathing must be visible, not just a running timer", peak(lit) >= 40)
++            assertTrue("The breath must have visibly different bright and dark phases", peak(lit) > peak(dim) * 5)
++            assertEquals(Color.BLACK, lit.getPixel(0, 0))
++            assertEquals(Color.BLACK, lit.getPixel(599, 239))
++            save(before, "idle-before")
++            save(lit, "idle-bright")
++            save(dim, "idle-dim")
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun idleSchedulesARealViewInvalidationWithoutTouchEvents() {
++        val h = Harness()
++        try {
++            h.render(0)
++            val count = h.invalidations
++            h.now = 1850
++            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1850))
++            assertTrue(h.invalidations > count)
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun hidingStopsDrawingAndShowingRestartsWithANewDelay() {
++        val h = Harness()
++        try {
++            h.render(0)
++            assertTrue(peak(h.render(4400)) >= 40)
++            h.host.visibility = View.GONE
++            h.effect.syncVisibility()
++            assertFalse(h.envelope.running)
++            assertEquals(0, peak(h.render(9000)))
++            h.host.visibility = View.VISIBLE
++            // Again test draw recovery even when a visibility notification was missed.
++            assertEquals(0, peak(h.render(10000)))
++            assertTrue(peak(h.render(14400)) >= 40)
++            h.effect.setActive(false)
++            assertEquals(0, peak(h.render(20000)))
++            assertFalse(h.envelope.running)
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun disablingAndReenablingEffectsCanRecoverOnTheNextVisibleDraw() {
++        val h = Harness()
++        try {
++            h.render(0)
++            assertTrue(peak(h.render(4400)) >= 40)
++            h.enabled = false
++            assertEquals(0, peak(h.render(4500)))
++            assertFalse(h.envelope.running)
++            h.enabled = true
++            assertEquals(0, peak(h.render(5000)))
++            assertTrue(peak(h.render(9400)) >= 40)
++        } finally { h.finish() }
 +    }
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt
@@ -2283,7 +2680,7 @@ index 6b9129f..afa223b 100644
 \ No newline at end of file
 +}
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-index b99ab3e..de33f40 100644
+index b99ab3e..807ae31 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 @@ -47,7 +47,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
@@ -2291,12 +2688,12 @@ index b99ab3e..de33f40 100644
                  }
                  debug {
 -                    applicationIdSuffix = ".debug"
-+                    applicationIdSuffix = ".xuancai.black.v05"
++                    applicationIdSuffix = ".xuancai.black.v06"
                  }
                  all {
                      // remove META-INF/version-control-info.textproto
 diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-index 8a19dd2..5f6380d 100644
+index 8a19dd2..ae2f7a7 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 @@ -29,10 +29,10 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
@@ -2304,16 +2701,16 @@ index 8a19dd2..5f6380d 100644
                  }
                  debug {
 -                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.debug\"")
-+                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v05\"")
++                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v06\"")
                      addManifestPlaceholders(
                          mapOf(
 -                            "mainApplicationId" to "org.fcitx.fcitx5.android.debug",
-+                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v05",
++                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v06",
                          )
                      )
                  }
 diff --git a/lib/plugin-base/src/debug/AndroidManifest.xml b/lib/plugin-base/src/debug/AndroidManifest.xml
-index d1d4123..87695d0 100644
+index d1d4123..9febd99 100644
 --- a/lib/plugin-base/src/debug/AndroidManifest.xml
 +++ b/lib/plugin-base/src/debug/AndroidManifest.xml
 @@ -7,7 +7,7 @@
@@ -2321,7 +2718,7 @@ index d1d4123..87695d0 100644
  
      <queries>
 -        <package android:name="org.fcitx.fcitx5.android.debug" />
-+        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v05" />
++        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v06" />
      </queries>
  
      <application>
@@ -2330,7 +2727,7 @@ index d1d4123..87695d0 100644
              tools:node="remove" />
          <meta-data
 -            android:name="org.fcitx.fcitx5.android.debug.plugin.METADATA"
-+            android:name="org.fcitx.fcitx5.android.xuancai.black.v05.plugin.METADATA"
++            android:name="org.fcitx.fcitx5.android.xuancai.black.v06.plugin.METADATA"
              android:resource="@xml/plugin" />
  
          <activity
@@ -2339,7 +2736,7 @@ index d1d4123..87695d0 100644
              </intent-filter>
              <intent-filter>
 -                <action android:name="org.fcitx.fcitx5.android.debug.plugin.MANIFEST" />
-+                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v05.plugin.MANIFEST" />
++                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v06.plugin.MANIFEST" />
              </intent-filter>
          </activity>
      </application>
@@ -2347,7 +2744,7 @@ index d1d4123..87695d0 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
-index 1733282..b41a9b0 100644
+index 1733282..89a41ce 100644
 --- a/plugin/rime/build.gradle.kts
 +++ b/plugin/rime/build.gradle.kts
 @@ -33,7 +33,7 @@ android {
@@ -2355,12 +2752,12 @@ index 1733282..b41a9b0 100644
          }
          debug {
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "曜黑 Rime V05")
++            resValue("string", "app_name", "曜黑 Rime V06")
          }
      }
  
 diff --git a/plugin/rime/src/main/cpp/CMakeLists.txt b/plugin/rime/src/main/cpp/CMakeLists.txt
-index 6ee8e78..fc95007 100644
+index 6ee8e78..8ba1542 100644
 --- a/plugin/rime/src/main/cpp/CMakeLists.txt
 +++ b/plugin/rime/src/main/cpp/CMakeLists.txt
 @@ -57,3 +57,30 @@ install(FILES
@@ -2371,7 +2768,7 @@ index 6ee8e78..fc95007 100644
 +# Pinned, checksum-verified data prepared by scripts/prepare-xuancai-rime.py.
 +set(XUANCAI_RIME_DATA "${CMAKE_CURRENT_SOURCE_DIR}/xuancai-rime-ice")
 +if(NOT EXISTS "${XUANCAI_RIME_DATA}/SOURCE.json")
-+    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V05 Rime plugin")
++    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V06 Rime plugin")
 +endif()
 +install(FILES
 +        "${XUANCAI_RIME_DATA}/rime_ice.schema.yaml"
