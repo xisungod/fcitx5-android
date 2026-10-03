@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 53f1eb8..c01578f 100644
+index 53f1eb8..0222e7f 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -46,9 +46,11 @@ android {
@@ -7,11 +7,11 @@ index 53f1eb8..c01578f 100644
          }
          debug {
 +            // Install alongside the original debug APK: its CI signing key is ephemeral.
-+            applicationIdSuffix = ".xuancai.black.v03"
++            applicationIdSuffix = ".xuancai.black.v04"
              resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
              resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "炫彩·曜黑 V03")
++            resValue("string", "app_name", "炫彩·曜黑 V04")
          }
      }
  
@@ -42,7 +42,7 @@ index cec9078..8da5e41 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
-index bed1cbf..c62899e 100644
+index bed1cbf..18264bc 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 @@ -137,15 +137,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
@@ -54,9 +54,8 @@ index bed1cbf..c62899e 100644
          val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
          val toolbarNumRowOnPassword =
 -            switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true)
--        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
 +            switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", false)
-+        val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", false)
+         val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
          val keepLettersUppercase = switch(
              R.string.keep_keyboard_letters_uppercase,
              "keep_keyboard_letters_uppercase",
@@ -100,14 +99,14 @@ index bed1cbf..c62899e 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
-index 93ba4d4..063280b 100644
+index 93ba4d4..57fe2f9 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 @@ -24,6 +24,7 @@ object ThemeManager {
      }
  
      val BuiltinThemes = listOf(
-+        ThemePreset.XuancaiBlackV03,
++        ThemePreset.XuancaiBlackV04,
          ThemePreset.MaterialLight,
          ThemePreset.MaterialDark,
          ThemePreset.PixelLight,
@@ -116,7 +115,7 @@ index 93ba4d4..063280b 100644
      )
  
 -    val DefaultTheme = ThemePreset.PixelDark
-+    val DefaultTheme = ThemePreset.XuancaiBlackV03
++    val DefaultTheme = ThemePreset.XuancaiBlackV04
  
      private var monetThemes = listOf(ThemeMonet.getLight(), ThemeMonet.getDark())
  
@@ -128,7 +127,7 @@ index 93ba4d4..063280b 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..e3d76ae 100644
+index d3b4948..8ffd997 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -171,7 +170,7 @@ index d3b4948..e3d76ae 100644
 +    val pressEffectPalette = enumList(
 +        R.string.press_effect_palette,
 +        "press_effect_palette",
-+        PressEffectPalette.Rainbow,
++        PressEffectPalette.Cyberpunk,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -250,7 +249,7 @@ index d3b4948..e3d76ae 100644
          R.string.light_mode_theme,
          "light_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialLight else ThemePreset.PixelLight,
-+        ThemePreset.XuancaiBlackV03,
++        ThemePreset.XuancaiBlackV04,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
@@ -259,12 +258,12 @@ index d3b4948..e3d76ae 100644
          R.string.dark_mode_theme,
          "dark_mode_theme",
 -        if (BuildConfig.DEBUG) ThemePreset.MaterialDark else ThemePreset.PixelDark,
-+        ThemePreset.XuancaiBlackV03,
++        ThemePreset.XuancaiBlackV04,
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..d8b6426 100644
+index 239e22c..193cdde 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
@@ -272,8 +271,8 @@ index 239e22c..d8b6426 100644
  object ThemePreset {
  
 +    /** Quiet at rest; key-press colour is supplied by PressEffect. */
-+    val XuancaiBlackV03 = Theme.Builtin(
-+        name = "炫彩·曜黑 V03",
++    val XuancaiBlackV04 = Theme.Builtin(
++        name = "炫彩·曜黑 V04",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
@@ -531,10 +530,10 @@ index c331341..eb54330 100644
      setOf(
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..8582553
+index 0000000..e2f17fc
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,435 @@
+@@ -0,0 +1,428 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -596,25 +595,12 @@ index 0000000..8582553
 +    private val overStrength = overKeysPercent.coerceIn(0, 100) / 100f * (if (isDark) 1f else 0.8f)
 +
 +    private val random = Random(SystemClock.uptimeMillis())
-+    private val ripples = ArrayList<Ripple>(MAX_RIPPLES + 1)
++    private val ripples = PressEffectTrail(MAX_RIPPLES)
++    private val styles = Array(colors.size) { RipplePaints(colors[it]) }
 +    private var lastColorIndex = -1
 +    private var frameTime = 0L
 +
-+    private class Ripple(
-+        val x: Float,
-+        val y: Float,
-+        color: Int,
-+        val shape: Int,
-+        val echoShape: Int,
-+        val rotation: Float,
-+        val spin: Float,
-+        val size: Float,
-+        val stretchX: Float,
-+        val stretchY: Float,
-+        val driftX: Float,
-+        val driftY: Float,
-+        val start: Long
-+    ) {
++    private class RipplePaints(color: Int) {
 +        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
 +            colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
 +        }
@@ -635,7 +621,7 @@ index 0000000..8582553
 +        Textures.ensure()
 +    }
 +
-+    fun onPress(x: Float, y: Float) {
++    fun onPress(pressX: Float, pressY: Float) {
 +        if (!animatorsEnabled()) return
 +        if (Textures.ready == null) Textures.ensure()
 +        var index = random.nextInt(colors.size)
@@ -644,23 +630,23 @@ index 0000000..8582553
 +        }
 +        lastColorIndex = index
 +        val shapes = PressEffectMasks.SHAPES
-+        val shape = random.nextInt(shapes)
-+        ripples.add(
-+            Ripple(
-+                x, y, colors[index],
-+                shape = shape,
-+                echoShape = (shape + 1 + random.nextInt(max(1, shapes - 1))) % shapes,
-+                rotation = random.nextFloat() * 360f,
-+                spin = (random.nextFloat() * 2f - 1f) * 24f,
-+                size = 0.88f + random.nextFloat() * 0.24f,
-+                stretchX = 0.82f + random.nextFloat() * 0.36f,
-+                stretchY = 0.82f + random.nextFloat() * 0.36f,
-+                driftX = (random.nextFloat() - 0.5f) * 22f * density,
-+                driftY = (random.nextFloat() - 0.5f) * 16f * density,
-+                start = SystemClock.uptimeMillis()
-+            )
-+        )
-+        while (ripples.size > MAX_RIPPLES) ripples.removeAt(0)
++        val selectedShape = random.nextInt(shapes)
++        val now = SystemClock.uptimeMillis()
++        ripples.expire(now, duration)
++        ripples.obtain(now).apply {
++            x = pressX
++            y = pressY
++            colorIndex = index
++            shape = selectedShape
++            echoShape = (selectedShape + 1 + random.nextInt(max(1, shapes - 1))) % shapes
++            rotation = random.nextFloat() * 360f
++            spin = (random.nextFloat() * 2f - 1f) * 24f
++            size = 0.88f + random.nextFloat() * 0.24f
++            stretchX = 0.82f + random.nextFloat() * 0.36f
++            stretchY = 0.82f + random.nextFloat() * 0.36f
++            driftX = (random.nextFloat() - 0.5f) * 22f * density
++            driftY = (random.nextFloat() - 0.5f) * 16f * density
++        }
 +        host.postInvalidateOnAnimation()
 +    }
 +
@@ -668,16 +654,16 @@ index 0000000..8582553
 +    fun drawUnder(canvas: Canvas) {
 +        frameTime = SystemClock.uptimeMillis()
 +        if (!animatorsEnabled()) ripples.clear()
-+        if (ripples.isEmpty()) return
++        ripples.expire(frameTime, duration)
++        if (ripples.size == 0) return
 +        draw(canvas, underStrength)
 +    }
 +
 +    /** call after the keys are drawn; also schedules the next frame */
 +    fun drawOver(canvas: Canvas) {
-+        if (ripples.isEmpty()) return
++        if (ripples.size == 0) return
 +        if (overStrength > 0f) draw(canvas, overStrength)
-+        ripples.removeAll { (frameTime - it.start) >= duration }
-+        if (ripples.isNotEmpty()) host.postInvalidateOnAnimation()
++        if (ripples.size > 0) host.postInvalidateOnAnimation()
 +    }
 +
 +    fun clear() {
@@ -687,7 +673,9 @@ index 0000000..8582553
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
 +        val textures = Textures.ready
-+        for (r in ripples) {
++        for (i in 0 until ripples.size) {
++            val r = ripples[i]
++            val style = styles[r.colorIndex]
 +            val elapsed = (frameTime - r.start).coerceAtLeast(0L)
 +            val t = elapsed.toFloat() / duration
 +            if (t >= 1f) continue
@@ -701,8 +689,8 @@ index 0000000..8582553
 +                canvas.translate(x, y)
 +                val radius = maxRadius * r.size * (0.16f + 0.84f * e)
 +                canvas.scale(radius * r.stretchX, radius * r.stretchY)
-+                r.fallbackPaint.alpha = (180f * strength * (1f - t)).toInt()
-+                canvas.drawCircle(0f, 0f, 1f, r.fallbackPaint)
++                style.fallbackPaint.alpha = (180f * strength * (1f - t)).toInt()
++                canvas.drawCircle(0f, 0f, 1f, style.fallbackPaint)
 +                canvas.restoreToCount(save)
 +                continue
 +            }
@@ -710,7 +698,7 @@ index 0000000..8582553
 +            if (t < FLASH_END) {
 +                val k = t / FLASH_END
 +                val alpha = 0.72f * (1f - k).pow(1.5f)
-+                drawTexture(canvas, textures.dot, r.x, r.y, flashRadius * (1f + 0.7f * k), 0f, r.flashPaint, alpha * strength)
++                drawTexture(canvas, textures.dot, r.x, r.y, flashRadius * (1f + 0.7f * k), 0f, style.flashPaint, alpha * strength)
 +            }
 +            // main mist: spreads fast then slows down (ease-out), lingers, dissolves
 +            val radius = maxRadius * r.size * (0.16f + 0.84f * e)
@@ -718,13 +706,13 @@ index 0000000..8582553
 +            val save = canvas.save()
 +            canvas.translate(x, y)
 +            canvas.scale(r.stretchX, r.stretchY)
-+            drawTexture(canvas, textures.bodies[r.shape], 0f, 0f, radius, angle, r.paint, bodyAlpha * strength)
-+            // trailing echo ring: the second ripple a moment later
++            drawTexture(canvas, textures.bodies[r.shape], 0f, 0f, radius, angle, style.paint, bodyAlpha * strength)
++            // Only recent presses need the faint echo: bound GPU overdraw during fast typing.
 +            val t2 = (t - ECHO_DELAY) / (1f - ECHO_DELAY)
-+            if (t2 > 0f) {
++            if (t2 > 0f && i >= ripples.size - 3) {
 +                val radius2 = maxRadius * r.size * (0.12f + 0.70f * easeOut(t2))
 +                val echoAlpha = 0.18f * ramp(t2, 0f, 0.1f) * (1f - smoothstep(0.3f, 1f, t2))
-+                drawTexture(canvas, textures.rings[r.echoShape], 0f, 0f, radius2, -angle * 0.6f, r.paint, echoAlpha * strength)
++                drawTexture(canvas, textures.rings[r.echoShape], 0f, 0f, radius2, -angle * 0.6f, style.paint, echoAlpha * strength)
 +            }
 +            canvas.restoreToCount(save)
 +        }
@@ -783,21 +771,25 @@ index 0000000..8582553
 +            }
 +
 +            private fun bitmap(pixels: IntArray, size: Int): Bitmap =
-+                Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
++                Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888).apply {
++                    prepareToDraw()
++                }
 +        }
 +    }
 +
 +    companion object {
 +        private const val BASE_RADIUS_DP = 200f
 +        private const val FLASH_RADIUS_DP = 19f
-+        private const val BASE_DURATION_MS = 900f
++        private const val BASE_DURATION_MS = 780f
 +        private const val FLASH_END = 0.22f
 +        private const val ECHO_DELAY = 0.16f
 +        private const val MAX_RIPPLES = 10
 +
-+        /** acid yellow, electric cyan, electric blue, neon violet, hot magenta */
++        /** Ten neon tones: cyan/blue/violet/pink with acid yellow, green and mint accents. */
 +        val CYBERPUNK = intArrayOf(
-+            0xFFFCEE0A.toInt(), 0xFF00F0FF.toInt(), 0xFF2D6BFF.toInt(), 0xFFB026FF.toInt(), 0xFFFF2BD6.toInt()
++            0xFF00F0FF.toInt(), 0xFF4DB8FF.toInt(), 0xFF386BFF.toInt(), 0xFF805BFF.toInt(),
++            0xFFBE38FF.toInt(), 0xFFFF2BD6.toInt(), 0xFFFF438E.toInt(), 0xFFE9FF48.toInt(),
++            0xFF76FF4D.toInt(), 0xFF00FFC6.toInt()
 +        )
 +
 +        /** One UI blue, sky, aqua, light blue, cobalt, ice */
@@ -970,8 +962,67 @@ index 0000000..8582553
 +        }
 +    }
 +}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
+new file mode 100644
+index 0000000..b4adafd
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
+@@ -0,0 +1,53 @@
++/*
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
++ */
++package org.fcitx.fcitx5.android.input.keyboard
++
++/** Fixed storage in chronological order: typing never allocates a new ripple. */
++internal class PressEffectTrail(capacity: Int) {
++    class Ripple {
++        var x = 0f
++        var y = 0f
++        var colorIndex = 0
++        var shape = 0
++        var echoShape = 0
++        var rotation = 0f
++        var spin = 0f
++        var size = 1f
++        var stretchX = 1f
++        var stretchY = 1f
++        var driftX = 0f
++        var driftY = 0f
++        var start = 0L
++    }
++
++    init { require(capacity > 0) }
++    private val slots = Array(capacity) { Ripple() }
++    private var head = 0
++    var size = 0
++        private set
++
++    operator fun get(index: Int): Ripple {
++        require(index in 0 until size)
++        return slots[(head + index) % slots.size]
++    }
++
++    fun obtain(now: Long): Ripple {
++        val slot = (head + size) % slots.size
++        if (size == slots.size) head = (head + 1) % slots.size else size++
++        return slots[slot].also { it.start = now }
++    }
++
++    fun expire(now: Long, duration: Long) {
++        while (size > 0 && now - slots[head].start >= duration) {
++            head = (head + 1) % slots.size
++            size--
++        }
++    }
++
++    fun clear() {
++        head = 0
++        size = 0
++    }
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
-index 368cf6c..d4906cb 100644
+index 368cf6c..e2c1a84 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt
 @@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
@@ -990,7 +1041,7 @@ index 368cf6c..d4906cb 100644
  import org.fcitx.fcitx5.android.input.popup.PopupAction
  import splitties.views.imageResource
  
-@@ -23,13 +25,25 @@ import splitties.views.imageResource
+@@ -23,13 +25,26 @@ import splitties.views.imageResource
  class TextKeyboard(
      context: Context,
      theme: Theme
@@ -1005,7 +1056,8 @@ index 368cf6c..d4906cb 100644
 +        private val NumberRow = "1234567890".map { digit ->
 +            KeyDef(
 +                KeyDef.Appearance.Text(digit.toString(), 20f),
-+                setOf(KeyDef.Behavior.Press(KeyAction.FcitxKeyAction(digit.toString())))
++                setOf(KeyDef.Behavior.Press(KeyAction.FcitxKeyAction(digit.toString()))),
++                arrayOf(KeyDef.Popup.Preview(digit.toString()))
 +            )
 +        }
 +
@@ -1017,7 +1069,7 @@ index 368cf6c..d4906cb 100644
          val Layout: List<List<KeyDef>> = listOf(
              listOf(
                  AlphabetKey("Q", "1"),
-@@ -67,10 +81,10 @@ class TextKeyboard(
+@@ -67,10 +82,10 @@ class TextKeyboard(
              ),
              listOf(
                  LayoutSwitchKey("?123", ""),
@@ -1030,7 +1082,7 @@ index 368cf6c..d4906cb 100644
                  ReturnKey()
              )
          )
-@@ -79,7 +93,7 @@ class TextKeyboard(
+@@ -79,7 +94,7 @@ class TextKeyboard(
      val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
      val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
      val quickphrase: ImageKeyView by lazy { findViewById(R.id.button_quickphrase) }
@@ -1039,7 +1091,7 @@ index 368cf6c..d4906cb 100644
      val space: TextKeyView by lazy { findViewById(R.id.button_space) }
      val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
  
-@@ -258,4 +272,4 @@ class TextKeyboard(
+@@ -258,4 +273,4 @@ class TextKeyboard(
          }
      }
  
@@ -1047,10 +1099,18 @@ index 368cf6c..d4906cb 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
-index daa13c4..5927b1a 100644
+index daa13c4..7558a4c 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
-@@ -48,16 +48,16 @@ class PopupComponent :
+@@ -5,6 +5,7 @@
+ package org.fcitx.fcitx5.android.input.popup
+ 
+ import android.graphics.Rect
++import android.os.SystemClock
+ import android.view.View
+ import android.view.ViewGroup
+ import android.widget.FrameLayout
+@@ -48,18 +49,18 @@ class PopupComponent :
          context.dp(ThemeManager.prefs.keyVerticalMargin.getValue())
      }
      private val popupWidth by lazy {
@@ -1069,12 +1129,118 @@ index daa13c4..5927b1a 100644
 -        context.dp(ThemeManager.prefs.keyRadius.getValue()).toFloat()
 +        context.dp(12f)
      }
-     private val hideThreshold = 100L
+-    private val hideThreshold = 100L
++    private val hideThreshold = 70L
  
+     private val rootLocation = intArrayOf(0, 0)
+     private val rootBounds: Rect = Rect()
+@@ -71,6 +72,14 @@ class PopupComponent :
+             isClickable = false
+             isFocusable = false
+ 
++            // Keep previews attached and measured; reuse them without add/remove layout churn.
++            repeat(3) {
++                val preview = PopupEntryUi(context, theme, popupKeyHeight, popupRadius)
++                preview.root.visibility = View.INVISIBLE
++                addView(preview.root, FrameLayout.LayoutParams(popupWidth, popupHeight))
++                freeEntryUi.add(preview)
++            }
++
+             addOnLayoutChangeListener { v, left, top, right, bottom, _, _, _, _ ->
+                 val (x, y) = rootLocation.also { v.getLocationInWindow(it) }
+                 val width = right - left
+@@ -81,33 +90,32 @@ class PopupComponent :
+     }
+ 
+     private fun showPopup(viewId: Int, content: String, bounds: Rect) {
++        val container = root
++        dismissJobs.remove(viewId)?.cancel()
+         showingEntryUi[viewId]?.apply {
+-            dismissJobs[viewId]?.also {
+-                dismissJobs.remove(viewId)?.cancel()
+-            }
+-            lastShowTime = System.currentTimeMillis()
++            lastShowTime = SystemClock.uptimeMillis()
+             setText(content)
+             return
+         }
+         val popup = (freeEntryUi.poll()
+             ?: PopupEntryUi(context, theme, popupKeyHeight, popupRadius)).apply {
+-            lastShowTime = System.currentTimeMillis()
++            lastShowTime = SystemClock.uptimeMillis()
+             setText(content)
+         }
+-        popup.root.layoutParams = FrameLayout.LayoutParams(popupWidth, popupHeight).apply {
+-            // align popup bottom with key border bottom [^1]
+-            topMargin = bounds.bottom - popupHeight - keyBottomMargin
+-            leftMargin = (bounds.left + bounds.right - popupWidth) / 2
+-        }
+         // make sure that popup.root does not have parent view before adding it under root container
+         // it's wired that on some devices it would have a parent view despite it was newly created
+         // or just polled from freeEntryUi
+         if (popup.root.parent == null) {
+-            root.addView(popup.root)
+-        } else if (popup.root.parent !== root) {
++            container.addView(popup.root, FrameLayout.LayoutParams(popupWidth, popupHeight))
++        } else if (popup.root.parent !== container) {
+             (popup.root.parent as? ViewGroup)?.removeView(popup.root)
+-            root.addView(popup.root)
++            container.addView(popup.root, FrameLayout.LayoutParams(popupWidth, popupHeight))
+         }
++        // Align popup bottom with key border bottom [^1]. Translations avoid a layout pass.
++        popup.root.translationY = (bounds.bottom - popupHeight - keyBottomMargin - rootBounds.top).toFloat()
++        popup.root.translationX = ((bounds.left + bounds.right - popupWidth) / 2 - rootBounds.left)
++            .coerceIn(0, (container.width - popupWidth).coerceAtLeast(0)).toFloat()
++        popup.root.visibility = View.VISIBLE
+         showingEntryUi[viewId] = popup
+     }
+ 
+@@ -185,8 +193,9 @@ class PopupComponent :
+ 
+     private fun dismissPopup(viewId: Int) {
+         dismissPopupContainer(viewId)
++        dismissJobs.remove(viewId)?.cancel()
+         showingEntryUi[viewId]?.also {
+-            val timeLeft = it.lastShowTime + hideThreshold - System.currentTimeMillis()
++            val timeLeft = it.lastShowTime + hideThreshold - SystemClock.uptimeMillis()
+             if (timeLeft <= 0L) {
+                 dismissPopupEntry(viewId, it)
+             } else {
+@@ -207,8 +216,11 @@ class PopupComponent :
+     }
+ 
+     private fun dismissPopupEntry(viewId: Int, popup: PopupEntryUi) {
++        // A delayed dismissal must never recycle a newer preview for the same key.
++        if (showingEntryUi[viewId] !== popup) return
++        dismissJobs.remove(viewId)?.cancel()
+         showingEntryUi.remove(viewId)
+-        root.removeView(popup.root)
++        popup.root.visibility = View.INVISIBLE
+         freeEntryUi.add(popup)
+     }
+ 
+@@ -225,7 +237,7 @@ class PopupComponent :
+         showingContainerUi.clear()
+         // too too
+         showingEntryUi.forEach { (_, entry) ->
+-            root.removeView(entry.root)
++            entry.root.visibility = View.INVISIBLE
+             freeEntryUi.add(entry)
+         }
+         showingEntryUi.clear()
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
-index ed6a05f..fb48ff6 100644
+index ed6a05f..583cde8 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
+@@ -26,7 +26,7 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
+     var lastShowTime = -1L
+ 
+     val textView = view(::AutoScaleTextView) {
+-        textSize = 23f
++        textSize = 30f
+         gravity = gravityCenter
+         setTextColor(theme.popupTextColor)
+     }
 @@ -35,9 +35,10 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
          background = GradientDrawable().apply {
              cornerRadius = radius
@@ -1087,6 +1253,14 @@ index ed6a05f..fb48ff6 100644
          add(textView, lParams(matchParent, keyHeight) {
              topOfParent()
              centerHorizontally()
+@@ -45,6 +46,6 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
+     }
+ 
+     fun setText(text: String) {
+-        textView.text = text
++        if (textView.text.toString() != text) textView.text = text
+     }
+ }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt
 index f7ba9c4..4579601 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt
@@ -1243,7 +1417,7 @@ index 86a4107..8690397 100644
      }
  
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..035560b 100644
+index 40ef2c9..43aa976 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -1253,7 +1427,7 @@ index 40ef2c9..035560b 100644
 +    <string name="press_effect">炫彩按键特效</string>
 +    <string name="press_effect_summary">每次按键随机颜色的水波涟漪，在按键下方和上方扩散</string>
 +    <string name="press_effect_palette">特效配色</string>
-+    <string name="press_effect_palette_cyberpunk">赛博朋克霓虹</string>
++    <string name="press_effect_palette_cyberpunk">霓虹赛博（10 色）</string>
 +    <string name="press_effect_palette_cool">冷色系</string>
 +    <string name="press_effect_palette_rainbow">彩虹</string>
 +    <string name="press_effect_palette_berry">雾莓紫</string>
@@ -1274,7 +1448,7 @@ index 40ef2c9..035560b 100644
 +    <string name="popup_unicode">字符</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..b5bbbaa 100644
+index fa9bc4e..8d782f8 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -1284,7 +1458,7 @@ index fa9bc4e..b5bbbaa 100644
 +    <string name="press_effect">炫彩按鍵特效</string>
 +    <string name="press_effect_summary">每次按鍵隨機顏色的水波漣漪，在按鍵下方和上方擴散</string>
 +    <string name="press_effect_palette">特效配色</string>
-+    <string name="press_effect_palette_cyberpunk">賽博朋克霓虹</string>
++    <string name="press_effect_palette_cyberpunk">霓虹賽博（10 色）</string>
 +    <string name="press_effect_palette_cool">冷色系</string>
 +    <string name="press_effect_palette_rainbow">彩虹</string>
 +    <string name="press_effect_palette_berry">霧莓紫</string>
@@ -1305,7 +1479,7 @@ index fa9bc4e..b5bbbaa 100644
 +    <string name="popup_unicode">字元</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..c46cb1c 100644
+index fe1fd3a..d565560 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -1315,7 +1489,7 @@ index fe1fd3a..c46cb1c 100644
 +    <string name="press_effect">Colourful press effect</string>
 +    <string name="press_effect_summary">Random-colour water ripples that spread under and over the keys</string>
 +    <string name="press_effect_palette">Press effect colours</string>
-+    <string name="press_effect_palette_cyberpunk">Cyberpunk neon</string>
++    <string name="press_effect_palette_cyberpunk">Cyberpunk neon (10 colours)</string>
 +    <string name="press_effect_palette_cool">Cool blues</string>
 +    <string name="press_effect_palette_rainbow">Rainbow</string>
 +    <string name="press_effect_palette_berry">Misty berry purple</string>
@@ -1378,6 +1552,57 @@ index 0000000..a640055
 +        assertEquals(0, dot[n - 1] ushr 24)
 +    }
 +}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt
+new file mode 100644
+index 0000000..7a580b9
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt
+@@ -0,0 +1,45 @@
++package org.fcitx.fcitx5.android
++
++import org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertSame
++import org.junit.Test
++import java.util.Collections
++import java.util.IdentityHashMap
++
++class PressEffectTrailTest {
++    @Test
++    fun rapidTypingKeepsOnlyNewestPressesAndReusesFixedStorage() {
++        val trail = PressEffectTrail(10)
++        val identities = Collections.newSetFromMap(
++            IdentityHashMap<PressEffectTrail.Ripple, Boolean>()
++        )
++        repeat(100_000) { index ->
++            identities.add(trail.obtain(index.toLong()))
++        }
++        assertEquals(10, identities.size)
++        assertEquals(10, trail.size)
++        repeat(10) { assertEquals(99_990L + it, trail[it].start) }
++    }
++
++    @Test
++    fun expiryKeepsNewPressAliveAndClearDropsAllPendingAnimation() {
++        val trail = PressEffectTrail(3)
++        trail.obtain(0)
++        val held = trail.obtain(500)
++        trail.expire(780, 780)
++        assertEquals(1, trail.size)
++        assertSame(held, trail[0])
++        val next = trail.obtain(781)
++        trail.expire(1280, 780)
++        assertEquals(1, trail.size)
++        assertSame(next, trail[0])
++        trail.clear()
++        assertEquals(0, trail.size)
++        val fresh = trail.obtain(2000)
++        trail.expire(2779, 780)
++        assertSame(fresh, trail[0])
++        trail.expire(2780, 780)
++        assertEquals(0, trail.size)
++    }
++}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt
 index 6b9129f..afa223b 100644
 --- a/app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt
@@ -1409,7 +1634,7 @@ index 6b9129f..afa223b 100644
 \ No newline at end of file
 +}
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-index b99ab3e..48b2830 100644
+index b99ab3e..7657e31 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 @@ -47,7 +47,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
@@ -1417,12 +1642,12 @@ index b99ab3e..48b2830 100644
                  }
                  debug {
 -                    applicationIdSuffix = ".debug"
-+                    applicationIdSuffix = ".xuancai.black.v03"
++                    applicationIdSuffix = ".xuancai.black.v04"
                  }
                  all {
                      // remove META-INF/version-control-info.textproto
 diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-index 8a19dd2..4c6c0f2 100644
+index 8a19dd2..8bbd125 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 @@ -29,10 +29,10 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
@@ -1430,16 +1655,16 @@ index 8a19dd2..4c6c0f2 100644
                  }
                  debug {
 -                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.debug\"")
-+                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v03\"")
++                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.xuancai.black.v04\"")
                      addManifestPlaceholders(
                          mapOf(
 -                            "mainApplicationId" to "org.fcitx.fcitx5.android.debug",
-+                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v03",
++                            "mainApplicationId" to "org.fcitx.fcitx5.android.xuancai.black.v04",
                          )
                      )
                  }
 diff --git a/lib/plugin-base/src/debug/AndroidManifest.xml b/lib/plugin-base/src/debug/AndroidManifest.xml
-index d1d4123..3e58785 100644
+index d1d4123..fd9b151 100644
 --- a/lib/plugin-base/src/debug/AndroidManifest.xml
 +++ b/lib/plugin-base/src/debug/AndroidManifest.xml
 @@ -7,7 +7,7 @@
@@ -1447,7 +1672,7 @@ index d1d4123..3e58785 100644
  
      <queries>
 -        <package android:name="org.fcitx.fcitx5.android.debug" />
-+        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v03" />
++        <package android:name="org.fcitx.fcitx5.android.xuancai.black.v04" />
      </queries>
  
      <application>
@@ -1456,7 +1681,7 @@ index d1d4123..3e58785 100644
              tools:node="remove" />
          <meta-data
 -            android:name="org.fcitx.fcitx5.android.debug.plugin.METADATA"
-+            android:name="org.fcitx.fcitx5.android.xuancai.black.v03.plugin.METADATA"
++            android:name="org.fcitx.fcitx5.android.xuancai.black.v04.plugin.METADATA"
              android:resource="@xml/plugin" />
  
          <activity
@@ -1465,7 +1690,7 @@ index d1d4123..3e58785 100644
              </intent-filter>
              <intent-filter>
 -                <action android:name="org.fcitx.fcitx5.android.debug.plugin.MANIFEST" />
-+                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v03.plugin.MANIFEST" />
++                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v04.plugin.MANIFEST" />
              </intent-filter>
          </activity>
      </application>
@@ -1473,7 +1698,7 @@ index d1d4123..3e58785 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
-index 1733282..cf4f97a 100644
+index 1733282..06f109a 100644
 --- a/plugin/rime/build.gradle.kts
 +++ b/plugin/rime/build.gradle.kts
 @@ -33,7 +33,7 @@ android {
@@ -1481,12 +1706,12 @@ index 1733282..cf4f97a 100644
          }
          debug {
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "曜黑 Rime V03")
++            resValue("string", "app_name", "曜黑 Rime V04")
          }
      }
  
 diff --git a/plugin/rime/src/main/cpp/CMakeLists.txt b/plugin/rime/src/main/cpp/CMakeLists.txt
-index 6ee8e78..7e48bf1 100644
+index 6ee8e78..59a5192 100644
 --- a/plugin/rime/src/main/cpp/CMakeLists.txt
 +++ b/plugin/rime/src/main/cpp/CMakeLists.txt
 @@ -57,3 +57,30 @@ install(FILES
@@ -1497,7 +1722,7 @@ index 6ee8e78..7e48bf1 100644
 +# Pinned, checksum-verified data prepared by scripts/prepare-xuancai-rime.py.
 +set(XUANCAI_RIME_DATA "${CMAKE_CURRENT_SOURCE_DIR}/xuancai-rime-ice")
 +if(NOT EXISTS "${XUANCAI_RIME_DATA}/SOURCE.json")
-+    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V03 Rime plugin")
++    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the V04 Rime plugin")
 +endif()
 +install(FILES
 +        "${XUANCAI_RIME_DATA}/rime_ice.schema.yaml"
