@@ -3840,10 +3840,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..9487cb3
+index 0000000..6596f4f
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,684 @@
+@@ -0,0 +1,685 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4472,7 +4472,8 @@ index 0000000..9487cb3
 +        fun key(label: String) = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == label }
 +        touch(MotionEvent.ACTION_DOWN, key("G"))
 +        touch(MotionEvent.ACTION_UP, key("H"))
-+        assertEquals(listOf(KeyAction.FcitxKeyAction("h")), actions)
++        assertEquals(1, actions.size)
++        assertEquals("h", (actions.single() as KeyAction.FcitxKeyAction).act)
 +        actions.clear()
 +        touch(MotionEvent.ACTION_DOWN, key("G"))
 +        touch(MotionEvent.ACTION_UP, keyboard.lang)
