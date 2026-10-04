@@ -3093,10 +3093,10 @@ index daa13c4..7558a4c 100644
          }
          showingEntryUi.clear()
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
-index ed6a05f..583cde8 100644
+index ed6a05f..7a36942 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
-@@ -26,7 +26,7 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
+@@ -26,18 +26,21 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
      var lastShowTime = -1L
  
      val textView = view(::AutoScaleTextView) {
@@ -3104,8 +3104,11 @@ index ed6a05f..583cde8 100644
 +        textSize = 30f
          gravity = gravityCenter
          setTextColor(theme.popupTextColor)
-     }
-@@ -35,9 +35,10 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
+-    }
+-
+-    override val root = constraintLayout {
++        // Keep the lower part of the preview transparent: the real key face
++        // underneath must remain visible while the finger is down.
          background = GradientDrawable().apply {
              cornerRadius = radius
              setColor(theme.popupBackgroundColor)
@@ -3114,10 +3117,13 @@ index ed6a05f..583cde8 100644
          outlineProvider = ViewOutlineProvider.BACKGROUND
 -        elevation = dp(2f)
 +        elevation = dp(6f)
++    }
++
++    override val root = constraintLayout {
          add(textView, lParams(matchParent, keyHeight) {
              topOfParent()
              centerHorizontally()
-@@ -45,6 +46,6 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
+@@ -45,6 +48,6 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
      }
  
      fun setText(text: String) {
@@ -3929,10 +3935,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..e0c470f
+index 0000000..fb1e9d4
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,742 @@
+@@ -0,0 +1,753 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4418,7 +4424,18 @@ index 0000000..e0c470f
 +                event.recycle()
 +            }
 +            layout(root, 360, 312)
-+            save(render(root), "continuous/typing-%03d".format(frame))
++            val image = render(root)
++            save(image, "continuous/typing-%03d".format(frame))
++            if (frame == 0) {
++                assertEquals(View.VISIBLE, popup.root.visibility)
++                val first = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == "L" }
++                val bounds = Rect()
++                first.getDrawingRect(bounds)
++                root.offsetDescendantRectToMyCoords(first, bounds)
++                val pixel = image.getPixel(bounds.left + 10, bounds.top + 10)
++                assertTrue("The character preview must not hide the pressed key colour",
++                    maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) > 190)
++            }
 +            if (frame == 75) {
 +                val burst = render(keyboard)
 +                var light = 0L
