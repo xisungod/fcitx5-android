@@ -1,0 +1,38 @@
+{
+  "counts": {
+    "tests": 104,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "metrics": {
+    "gap_mean_maxrgb": {
+      "max": 56.95,
+      "frame": 65
+    },
+    "gap_colour_gt60": {
+      "max": 18382.0,
+      "frame": 70
+    },
+    "candidate_mean_maxrgb": {
+      "max": 34.04,
+      "frame": 70
+    },
+    "candidate_peak": {
+      "max": 48.0,
+      "frame": 70
+    },
+    "candidate_colour_gt30": {
+      "max": 2873.0,
+      "frame": 70
+    },
+    "fixed_gap_mean_maxrgb": {
+      "max": 53.74,
+      "frame": 32
+    },
+    "candidate_visible_run": 8,
+    "gap_visible_frames": 65,
+    "tail_fixed_gap_peak": 55.32,
+    "old4line_mean": 69.0951388888889
+  }
+}

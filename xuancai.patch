@@ -335,6 +335,38 @@ index 0000000..dfdaa52
 +        }
 +    }
 +}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/PressColorPalette.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/PressColorPalette.kt
+new file mode 100644
+index 0000000..0c71004
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/PressColorPalette.kt
+@@ -0,0 +1,26 @@
++/*
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
++ */
++package org.fcitx.fcitx5.android.data.theme
++
++import java.util.Locale
++
++/** RGB colours shared by the picker, persistent settings and the keyboard renderer. */
++object PressColorPalette {
++    const val MAX_COLORS = 8
++    private val rgb = Regex("[0-9a-fA-F]{6}")
++
++    fun parseColor(raw: String): Int? {
++        val value = raw.trim().removePrefix("#")
++        if (!rgb.matches(value)) return null
++        return value.toInt(16) or 0xff000000.toInt()
++    }
++
++    fun formatColor(color: Int): String = String.format(Locale.ROOT, "#%06X", color and 0x00ffffff)
++
++    fun parse(raw: String): IntArray = raw.split(',').asSequence()
++        .mapNotNull(::parseColor).take(MAX_COLORS).toList().toIntArray()
++
++    fun encode(colors: IntArray): String = colors.take(MAX_COLORS).joinToString(",", transform = ::formatColor)
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
 index 93ba4d4..b40dc34 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt
@@ -364,7 +396,7 @@ index 93ba4d4..b40dc34 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..37bac4f 100644
+index d3b4948..7b239ad 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -388,7 +420,7 @@ index d3b4948..37bac4f 100644
  
      val keyBorderStroke = switch(
          R.string.key_border_stroke, "key_border_stroke", false,
-@@ -43,6 +46,190 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -43,6 +46,225 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
  
@@ -400,6 +432,12 @@ index d3b4948..37bac4f 100644
 +        Berry(R.string.press_effect_palette_berry),
 +        Accent(R.string.press_effect_palette_accent),
 +        Custom(R.string.press_effect_palette_custom);
++    }
++
++    enum class PressColorMode(override val stringRes: Int) : ManagedPreferenceEnum {
++        Random(R.string.press_color_mode_random),
++        Single(R.string.press_color_mode_single),
++        Custom(R.string.press_color_mode_custom);
 +    }
 +
 +    /** how the pressed key itself shows its colour (Keys Cafe "key colour effect") */
@@ -488,14 +526,22 @@ index d3b4948..37bac4f 100644
 +        enableUiOn = { idleBreathing.getValue() }
 +    )
 +
++    val pressColorMode = enumList(
++        R.string.press_color_mode, "press_color_mode", PressColorMode.Random,
++        enableUiOn = { pressEffect.getValue() }
++    )
++
 +    val pressEffectPalette = enumList(
 +        R.string.press_effect_palette,
 +        "press_effect_palette",
 +        PressEffectPalette.Cyberpunk,
-+        enableUiOn = { pressEffect.getValue() }
++        enableUiOn = { pressEffect.getValue() && pressColorMode.getValue() == PressColorMode.Random }
 +    )
 +
-+    private val customPaletteUi = { pressEffect.getValue() && pressEffectPalette.getValue() == PressEffectPalette.Custom }
++    private val customPaletteUi = {
++        pressEffect.getValue() && pressColorMode.getValue() == PressColorMode.Random &&
++            pressEffectPalette.getValue() == PressEffectPalette.Custom
++    }
 +    val pressCustomColorCount = int(
 +        R.string.press_custom_color_count, "press_custom_color_count", 3, 1, 4, "", 1,
 +        enableUiOn = customPaletteUi
@@ -504,6 +550,22 @@ index d3b4948..37bac4f 100644
 +    val pressCustomColor2 = enumList(R.string.press_custom_color_2, "press_custom_color_2", NeonColor.Magenta, enableUiOn = customPaletteUi)
 +    val pressCustomColor3 = enumList(R.string.press_custom_color_3, "press_custom_color_3", NeonColor.Yellow, enableUiOn = customPaletteUi)
 +    val pressCustomColor4 = enumList(R.string.press_custom_color_4, "press_custom_color_4", NeonColor.Purple, enableUiOn = customPaletteUi)
++
++    // The dedicated effects screen edits RGB values; the original preset preferences
++    // remain readable for existing configurations and backups.
++    val pressSingleColor = ManagedPreference.PInt(
++        sharedPreferences, "press_single_argb", NeonColor.Cyan.argb
++    ).also { it.register() }
++    val pressUserColors = ManagedPreference.PString(
++        sharedPreferences, "press_user_colors", PressColorPalette.encode(
++            listOf(pressCustomColor1, pressCustomColor2, pressCustomColor3, pressCustomColor4)
++                .take(pressCustomColorCount.getValue().coerceIn(1, 4))
++                .map { it.getValue().argb }.toIntArray()
++        )
++    ).also { it.register() }
++
++    fun userPressColors(): IntArray = PressColorPalette.parse(pressUserColors.getValue())
++        .takeIf { it.isNotEmpty() } ?: PressColorPalette.parse(pressUserColors.defaultValue)
 +
 +    val keyColorStyle = enumList(
 +        R.string.key_color_style, "key_color_style", KeyColorStyle.Fill,
@@ -552,17 +614,22 @@ index d3b4948..37bac4f 100644
 +    )
 +
 +    val pressKeyRetreatTime = int(
-+        R.string.press_key_retreat_time, "press_key_retreat_time", 1400, 100, 3000, "ms", 20,
++        R.string.press_key_retreat_time, "press_key_retreat_time", 1800, 100, 5000, "ms", 50,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
 +    val pressExpansionTime = int(
-+        R.string.press_expansion_time, "press_expansion_time", 900, 100, 2000, "ms", 20,
++        R.string.press_expansion_time, "press_expansion_time", 1400, 100, 4000, "ms", 50,
++        enableUiOn = { pressEffect.getValue() }
++    )
++
++    val pressWaveHoldTime = int(
++        R.string.press_wave_hold_time, "press_wave_hold_time", 350, 0, 2000, "ms", 50,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
 +    val pressFadeOutTime = int(
-+        R.string.press_fade_out_time, "press_fade_out_time", 450, 100, 2000, "ms", 20,
++        R.string.press_fade_out_time, "press_fade_out_time", 900, 100, 5000, "ms", 50,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -579,7 +646,7 @@ index d3b4948..37bac4f 100644
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
-@@ -71,10 +258,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -71,10 +293,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_vertical_margin,
              R.string.portrait,
              "key_vertical_margin",
@@ -592,7 +659,7 @@ index d3b4948..37bac4f 100644
              0,
              24,
              "dp"
-@@ -83,7 +270,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -83,7 +305,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
          keyVerticalMarginLandscape = secondary
      }
  
@@ -601,7 +668,7 @@ index d3b4948..37bac4f 100644
  
      val textEditingButtonRadius =
          int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
-@@ -93,6 +280,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -93,6 +315,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
          None(R.string.punctuation_pos_none),
@@ -609,7 +676,7 @@ index d3b4948..37bac4f 100644
          Bottom(R.string.punctuation_pos_bottom),
          TopRight(R.string.punctuation_pos_top_right);
      }
-@@ -100,7 +288,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -100,7 +323,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val punctuationPosition = enumList(
          R.string.punctuation_position,
          "punctuation_position",
@@ -618,7 +685,7 @@ index d3b4948..37bac4f 100644
      )
  
      enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-@@ -136,14 +324,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -136,14 +359,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val followSystemDayNightTheme = switch(
          R.string.follow_system_day_night_theme,
          "follow_system_dark_mode",
@@ -635,7 +702,7 @@ index d3b4948..37bac4f 100644
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
-@@ -151,7 +339,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -151,7 +374,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val darkModeTheme = themePreference(
          R.string.dark_mode_theme,
          "dark_mode_theme",
@@ -1032,10 +1099,18 @@ index 14c09e6..81e1de7 100644
      }
  
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt
-index 3170536..9716836 100644
+index 3170536..62ef4cb 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt
-@@ -20,7 +20,7 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
+@@ -12,6 +12,7 @@ import com.google.android.flexbox.JustifyContent
+ import org.fcitx.fcitx5.android.R
+ import org.fcitx.fcitx5.android.data.theme.Theme
+ import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
++import org.fcitx.fcitx5.android.utils.AppUtil
+ import splitties.dimensions.dp
+ import splitties.views.dsl.core.Ui
+ import splitties.views.dsl.core.view
+@@ -20,32 +21,35 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
  
      override val root = view(::FlexboxLayout) {
          alignItems = AlignItems.CENTER
@@ -1044,14 +1119,20 @@ index 3170536..9716836 100644
      }
  
      private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
-@@ -28,24 +28,22 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
-         root.addView(it, FlexboxLayout.LayoutParams(size, size))
-     }
- 
+         val size = ctx.dp(40)
+-        root.addView(it, FlexboxLayout.LayoutParams(size, size))
++        root.addView(it, FlexboxLayout.LayoutParams(size, size).apply { flexShrink = 1f })
++    }
++
 +    val textEditingButton = toolButton(R.drawable.ic_cursor_move).apply {
 +        contentDescription = ctx.getString(R.string.text_editing)
 +    }
 +
++    val lightEffectsButton = toolButton(R.drawable.ic_baseline_palette_24).apply {
++        contentDescription = ctx.getString(R.string.light_effect_settings)
++        setOnClickListener { AppUtil.launchMainToLightEffects(ctx) }
+     }
+ 
      val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
          contentDescription = ctx.getString(R.string.undo)
      }
@@ -1551,7 +1632,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..2f54215 100644
+index 5c2fef9..89f6fa0 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1574,7 +1655,7 @@ index 5c2fef9..2f54215 100644
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
  import org.fcitx.fcitx5.android.input.popup.PopupAction
-@@ -48,23 +52,107 @@ abstract class BaseKeyboard(
+@@ -48,23 +52,112 @@ abstract class BaseKeyboard(
  ) : ConstraintLayout(context) {
  
      var keyActionListener: KeyActionListener? = null
@@ -1592,20 +1673,24 @@ index 5c2fef9..2f54215 100644
 +        if (!p.pressEffect.getValue() && !p.idleBreathing.getValue()) null
 +        else PressEffect(
 +            this,
-+            when (p.pressEffectPalette.getValue()) {
-+                ThemePrefs.PressEffectPalette.SamsungCool -> PressEffect.SAMSUNG_COOL
-+                ThemePrefs.PressEffectPalette.Cyberpunk -> PressEffect.CYBERPUNK
-+                ThemePrefs.PressEffectPalette.Cool -> PressEffect.COOL
-+                ThemePrefs.PressEffectPalette.Rainbow -> PressEffect.RAINBOW
-+                ThemePrefs.PressEffectPalette.Berry -> PressEffect.BERRY
-+                ThemePrefs.PressEffectPalette.Accent -> intArrayOf(
-+                    theme.accentKeyBackgroundColor.takeIf { it ushr 24 != 0 }
-+                        ?: 0xFF76B5FF.toInt()
-+                )
-+                ThemePrefs.PressEffectPalette.Custom -> listOf(
-+                    p.pressCustomColor1, p.pressCustomColor2, p.pressCustomColor3, p.pressCustomColor4
-+                ).take(p.pressCustomColorCount.getValue().coerceIn(1, 4))
-+                    .map { it.getValue().argb }.toIntArray()
++            when (p.pressColorMode.getValue()) {
++                ThemePrefs.PressColorMode.Single -> intArrayOf(p.pressSingleColor.getValue() or 0xff000000.toInt())
++                ThemePrefs.PressColorMode.Custom -> p.userPressColors()
++                ThemePrefs.PressColorMode.Random -> when (p.pressEffectPalette.getValue()) {
++                    ThemePrefs.PressEffectPalette.SamsungCool -> PressEffect.SAMSUNG_COOL
++                    ThemePrefs.PressEffectPalette.Cyberpunk -> PressEffect.CYBERPUNK
++                    ThemePrefs.PressEffectPalette.Cool -> PressEffect.COOL
++                    ThemePrefs.PressEffectPalette.Rainbow -> PressEffect.RAINBOW
++                    ThemePrefs.PressEffectPalette.Berry -> PressEffect.BERRY
++                    ThemePrefs.PressEffectPalette.Accent -> intArrayOf(
++                        theme.accentKeyBackgroundColor.takeIf { it ushr 24 != 0 }
++                            ?: 0xFF76B5FF.toInt()
++                    )
++                    ThemePrefs.PressEffectPalette.Custom -> listOf(
++                        p.pressCustomColor1, p.pressCustomColor2, p.pressCustomColor3, p.pressCustomColor4
++                    ).take(p.pressCustomColorCount.getValue().coerceIn(1, 4))
++                        .map { it.getValue().argb }.toIntArray()
++                }
 +            },
 +            theme.isDark,
 +            p.pressEffectSize.getValue(),
@@ -1640,7 +1725,8 @@ index 5c2fef9..2f54215 100644
 +            exactKeyShape = true,
 +            normalizeOldLight = true,
 +            extensionStrength = 1f,
-+            glowBrightnessPercent = p.pressGlowBrightness.getValue()
++            glowBrightnessPercent = p.pressGlowBrightness.getValue(),
++            waveHoldTimeMs = p.pressWaveHoldTime.getValue()
 +        )
 +    }
 +
@@ -1684,7 +1770,7 @@ index 5c2fef9..2f54215 100644
      private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
  
      var popupActionListener: PopupActionListener? = null
-@@ -135,6 +223,23 @@ abstract class BaseKeyboard(
+@@ -135,6 +228,23 @@ abstract class BaseKeyboard(
              })
          }
          spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
@@ -1708,7 +1794,7 @@ index 5c2fef9..2f54215 100644
      }
  
      private fun createKeyView(def: KeyDef): KeyView {
-@@ -144,6 +249,13 @@ abstract class BaseKeyboard(
+@@ -144,6 +254,13 @@ abstract class BaseKeyboard(
              is KeyDef.Appearance.Text -> TextKeyView(context, theme, def.appearance)
              is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
          }.apply {
@@ -1722,7 +1808,7 @@ index 5c2fef9..2f54215 100644
              soundEffect = when (def) {
                  is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
                  is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
-@@ -153,7 +265,7 @@ abstract class BaseKeyboard(
+@@ -153,7 +270,7 @@ abstract class BaseKeyboard(
              }
              if (def is SpaceKey) {
                  spaceKeys.add(this)
@@ -1731,7 +1817,7 @@ index 5c2fef9..2f54215 100644
                  swipeRepeatEnabled = true
                  swipeThresholdX = selectionSwipeThreshold
                  swipeThresholdY = disabledSwipeThreshold
-@@ -356,6 +468,7 @@ abstract class BaseKeyboard(
+@@ -356,6 +473,7 @@ abstract class BaseKeyboard(
              onPopupAction(PopupAction.DismissAction(keyView.id))
          }
          touchTargets.clear()
@@ -1739,7 +1825,7 @@ index 5c2fef9..2f54215 100644
      }
  
      private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-@@ -392,16 +505,151 @@ abstract class BaseKeyboard(
+@@ -392,16 +510,151 @@ abstract class BaseKeyboard(
              event.deviceId, event.edgeFlags
          )
          target.view.dispatchTouchEvent(e)
@@ -1893,7 +1979,7 @@ index 5c2fef9..2f54215 100644
              when (event.actionMasked) {
                  MotionEvent.ACTION_DOWN -> {
                      releaseAllTouchTargets()
-@@ -423,6 +671,18 @@ abstract class BaseKeyboard(
+@@ -423,6 +676,18 @@ abstract class BaseKeyboard(
                      for (i in 0 until event.pointerCount) {
                          val pid = event.getPointerId(i)
                          val target = touchTargets[pid] ?: continue
@@ -1912,7 +1998,7 @@ index 5c2fef9..2f54215 100644
                          dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                      }
                      return true
-@@ -431,7 +691,7 @@ abstract class BaseKeyboard(
+@@ -431,7 +696,7 @@ abstract class BaseKeyboard(
                      val i = event.actionIndex
                      val pid = event.getPointerId(i)
                      val target = touchTargets[pid] ?: return true
@@ -1921,7 +2007,7 @@ index 5c2fef9..2f54215 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -442,7 +702,7 @@ abstract class BaseKeyboard(
+@@ -442,7 +707,7 @@ abstract class BaseKeyboard(
                          releaseAllTouchTargets()
                          return true
                      }
@@ -1930,7 +2016,7 @@ index 5c2fef9..2f54215 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -465,6 +725,12 @@ abstract class BaseKeyboard(
+@@ -465,6 +730,12 @@ abstract class BaseKeyboard(
  
      @CallSuper
      protected open fun onPopupAction(action: PopupAction) {
@@ -1943,7 +2029,7 @@ index 5c2fef9..2f54215 100644
          popupActionListener?.onPopupAction(action)
      }
  
-@@ -484,8 +750,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +755,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1978,7 +2064,7 @@ index 5c2fef9..2f54215 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +793,8 @@ abstract class BaseKeyboard(
+@@ -502,6 +798,8 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -2738,10 +2824,10 @@ index 89dff00..b083263 100644
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..fb799d2
+index 0000000..32fa390
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,972 @@
+@@ -0,0 +1,1018 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -2828,7 +2914,8 @@ index 0000000..fb799d2
 +            (!org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
 +                Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
 +    },
-+    glowBrightnessPercent: Int = 100
++    glowBrightnessPercent: Int = 100,
++    waveHoldTimeMs: Int = 0
 +) {
 +
 +    private val colors: IntArray =
@@ -2841,11 +2928,14 @@ index 0000000..fb799d2
 +    private val glowReach = glowReachPercent.coerceIn(10, 100) / 100f
 +    private val maxRadius: Float get() = max(BASE_RADIUS_DP * density, host.height * 1.15f) * sizeScale * 0.85f * glowReach
 +    private val flashRadius = FLASH_RADIUS_DP * density
-+    private val expansionDuration = expansionTimeMs.coerceIn(100, 2000).toLong()
++    private val expansionDuration = expansionTimeMs.coerceIn(100, 4000).toLong()
 +    private val ignitionDuration = ignitionTimeMs.coerceIn(30, 300).toLong()
-+    private val waveDuration = ignitionDuration + expansionDuration + fadeOutTimeMs.coerceIn(100, 2000)
++    private val waveHoldDuration = waveHoldTimeMs.coerceIn(0, 2000).toLong()
++    private val fadeDuration = fadeOutTimeMs.coerceIn(100, 5000).toLong()
++    private val fadeStart = ignitionDuration + expansionDuration + waveHoldDuration
++    private val waveDuration = fadeStart + fadeDuration
 +    private val keyHoldDuration = keyHoldTimeMs.coerceIn(100, 1000).toLong()
-+    private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(100, 3000).toLong()
++    private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(100, 5000).toLong()
 +    private val duration = max(waveDuration, keyHoldDuration + keyRetreatDuration)
 +    private val keyFlashTextures = KEY_FLASH_TEXTURES
 +    private val underStrength = if (isDark) 1f else 0.9f
@@ -2891,6 +2981,7 @@ index 0000000..fb799d2
 +    // Travelling light and key faces have separate lifetimes. A busy wave queue cannot
 +    // erase a still-visible key, and repeated presses never stack old colours on a face.
 +    private val ripples = PressEffectTrail(MAX_RIPPLES)
++    private val freshAttention = FloatArray(MAX_RIPPLES)
 +    private val keyFaces = PressEffectTrail(MAX_KEY_FACES)
 +    private val heldFaces = android.util.SparseArray<PressEffectTrail.Ripple>()
 +    private val ownedColorKeys = android.util.SparseBooleanArray()
@@ -3074,6 +3165,7 @@ index 0000000..fb799d2
 +            this.pointerId = pointerId
 +            releasedAt = -1L
 +            lightGain = 1f
++            bridgeGain = 1f
 +            keyFill = highlightKey && keyBounds != null
 +            this.keyId = keyId
 +            x = keyBounds?.exactCenterX() ?: pressX
@@ -3262,16 +3354,27 @@ index 0000000..fb799d2
 +            a * styles[ripple.colorIndex].luminance else 0f
 +    }
 +
-+    /** The front starts moving promptly, while the configured total expansion time stays intact. */
++    /** A short local start stays responsive even with a several-second expansion. */
 +    private fun waveProgress(spread: Long): Float {
-+        val t = (spread.toFloat() / expansionDuration).coerceIn(0f, 1f)
-+        return 1f - (1f - t).pow(1.45f)
++        val elapsed = spread.coerceAtLeast(0L).toFloat()
++        val localStart = min(160f, expansionDuration * 0.25f)
++        if (elapsed < localStart) {
++            val t = (elapsed / localStart).coerceIn(0f, 1f)
++            return 0.24f * (1f - (1f - t).pow(1.45f))
++        }
++        val rest = ((elapsed - localStart) / (expansionDuration - localStart)).coerceIn(0f, 1f)
++        return 0.24f + 0.76f * smoothstep(0f, 1f, rest)
 +    }
 +
 +    private fun freshLightWeight(r: PressEffectTrail.Ripple): Float {
-+        val age = (frameTime - r.start).coerceAtLeast(0L).toFloat()
-+        return 1f - smoothstep(250f, 650f, age)
++        val phase = ((frameTime - r.start - ignitionDuration).toFloat() / expansionDuration).coerceIn(0f, 1f)
++        // With 900ms this reproduces 250..650ms. Longer expansion settings stretch
++        // the transition, and the fully expanded hold has a stable old-light level.
++        return 1f - smoothstep(1f / 6f, 11f / 18f, phase)
 +    }
++
++    private fun fadeEnvelope(r: PressEffectTrail.Ripple): Float =
++        1f - smoothstep(fadeStart.toFloat(), waveDuration.toFloat(), (frameTime - r.start).toFloat())
 +
 +    private fun waveAlpha(r: PressEffectTrail.Ripple): Float {
 +        val elapsed = (frameTime - r.start).coerceAtLeast(0L)
@@ -3279,10 +3382,20 @@ index 0000000..fb799d2
 +        if (spread < 0L || elapsed >= waveDuration) return 0f
 +        val progress = waveProgress(spread)
 +        val ignition = smoothstep(0f, 45f, spread.toFloat())
-+        val end = 1f - smoothstep((ignitionDuration + expansionDuration).toFloat(), waveDuration.toFloat(), elapsed.toFloat())
++        val end = fadeEnvelope(r)
 +        // Keep the outward front readable instead of draining most energy before it
 +        // reaches a neighbour. The late fade still supplies a soft, bounded tail.
 +        return 0.80f * ignition * (1f - 0.35f * smoothstep(0.55f, 1f, progress)) * end
++    }
++
++    private fun bridgeAlpha(r: PressEffectTrail.Ripple): Float {
++        val spread = (frameTime - r.start - ignitionDuration).coerceAtLeast(0L)
++        val progress = waveProgress(spread)
++        val expansionPhase = (spread.toFloat() / expansionDuration).coerceIn(0f, 1f)
++        // Reach and lifetime follow the same shape and configured stages. Only the
++        // far light's budget is independent of the newest key's local priority.
++        val tail = (0.55f + 0.45f * (1f - smoothstep(0.35f, 1f, expansionPhase))) * fadeEnvelope(r)
++        return waveAlpha(r) * 0.32f * smoothstep(0.06f, 0.32f, progress) * tail
 +    }
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
@@ -3294,27 +3407,46 @@ index 0000000..fb799d2
 +                    strength, face.x, face.y)
 +            }
 +        }
++        // A long user-selected expansion may leave many waves in the fresh phase.
++        // Recent visible waves get smooth priority, rather than splitting that
++        // budget equally among all long tails. Both the sum and each numerator use
++        // this priority; no extra storage or draw-time allocation is needed.
++        var attention = 1f
++        for (i in ripples.size - 1 downTo 0) {
++            val r = ripples[i]
++            freshAttention[i] = attention
++            val fresh = freshLightWeight(r)
++            val onset = (waveAlpha(r) / 0.80f).coerceIn(0f, 1f)
++            attention *= 1f - 0.40f * fresh * onset
++        }
 +        var freshEnergy = 0f
 +        var oldEnergy = 0f
++        var bridgeEnergy = 0f
 +        for (i in 0 until ripples.size) {
 +            val r = ripples[i]
 +            val alpha = waveAlpha(r)
 +            val fresh = freshLightWeight(r)
-+            freshEnergy += alpha * fresh * 1.32f
++            freshEnergy += alpha * fresh * freshAttention[i] * 1.32f
 +            oldEnergy += alpha * (1f - fresh) * 1.32f
++            if (glowOnCandidates) bridgeEnergy += bridgeAlpha(r)
 +        }
 +        val freshScale = if (normalizeOldLight && freshEnergy > FRESH_LIGHT_BUDGET)
 +            FRESH_LIGHT_BUDGET / freshEnergy else 1f
 +        val oldScale = if (normalizeOldLight && oldEnergy > OLD_LIGHT_BUDGET)
 +            OLD_LIGHT_BUDGET / oldEnergy else 1f
++        val bridgeScale = if (normalizeOldLight && bridgeEnergy > BRIDGE_LIGHT_BUDGET)
++            BRIDGE_LIGHT_BUDGET / bridgeEnergy else 1f
 +        val textures = Textures.ready
 +        for (i in 0 until ripples.size) {
 +            val r = ripples[i]
 +            val fresh = freshLightWeight(r)
-+            val proposedGain = fresh * freshScale + (1f - fresh) * oldScale
++            val proposedGain = fresh * freshAttention[i] * freshScale + (1f - fresh) * oldScale
 +            if (normalizeOldLight) r.lightGain = min(r.lightGain, proposedGain)
++            if (normalizeOldLight) r.bridgeGain = min(r.bridgeGain, bridgeScale)
 +            val alpha = waveAlpha(r) * r.lightGain * strength * glowStrength
-+            if (alpha <= 0.003f) continue
++            val farAlpha = if (glowOnCandidates)
++                bridgeAlpha(r) * r.bridgeGain * strength * glowStrength else 0f
++            if (alpha <= 0.003f && farAlpha <= 0.002f) continue
 +            val spread = (frameTime - r.start - ignitionDuration).coerceAtLeast(0L)
 +            val progress = waveProgress(spread)
 +            val travel = maxRadius * r.size * progress
@@ -3332,11 +3464,10 @@ index 0000000..fb799d2
 +            val edgeAlpha = localAlpha * (1f - smoothstep(0.02f, 0.25f, progress))
 +            if (edgeAlpha > 0.003f) drawKeyEdgeMist(canvas, r, styles[r.colorIndex], edgeAlpha, travel)
 +            drawFluidLayer(canvas, textures, r, styles[r.colorIndex], localAlpha, width, height, progress)
-+            // A faint wide shoulder carries the same field towards the candidate strip.
-+            // It is also drawn under the keyboard, so the strip has no radius/seam discontinuity.
-+            val farTail = 1f - smoothstep(450f, 1000f, (frameTime - r.start).toFloat())
-+            val farAlpha = alpha * 0.32f * smoothstep(0.06f, 0.32f, progress) * farTail
-+            if (glowOnCandidates && farAlpha > 0.002f) {
++            // A separately bounded weak shoulder can finish travelling to the
++            // candidate strip even when typing has moved attention to a new key.
++            // Stored gain only decreases, so stopping input never relights old fog.
++            if (farAlpha > 0.002f) {
 +                drawFluidLayer(canvas, textures, r, styles[r.colorIndex], farAlpha,
 +                    r.flashWidth + 3.3f * travel * r.stretchX,
 +                    r.flashHeight + 3.3f * travel * r.stretchY, progress)
@@ -3485,6 +3616,7 @@ index 0000000..fb799d2
 +        private const val MAX_KEY_FACES = 96
 +        private const val FRESH_LIGHT_BUDGET = 1.50f
 +        private const val OLD_LIGHT_BUDGET = 0.45f
++        private const val BRIDGE_LIGHT_BUDGET = 0.40f
 +        private const val FLUID_PHASES = 9
 +        private const val FLUID_TEXTURE_SIZE = 128
 +
@@ -3716,10 +3848,10 @@ index 0000000..fb799d2
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
 new file mode 100644
-index 0000000..bb6e80b
+index 0000000..e7658ee
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,90 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -3750,6 +3882,8 @@ index 0000000..bb6e80b
 +        var releasedAt = -1L
 +        /** Once older light has been dimmed by typing, ending the burst cannot relight it. */
 +        var lightGain = 1f
++        /** The weak far bridge has its own budget, and cannot rebound when waves expire. */
++        var bridgeGain = 1f
 +
 +        fun copyFrom(other: Ripple) {
 +            x = other.x; y = other.y
@@ -3760,6 +3894,7 @@ index 0000000..bb6e80b
 +            stretchX = other.stretchX; stretchY = other.stretchY
 +            driftX = other.driftX; driftY = other.driftY
 +            start = other.start; releasedAt = other.releasedAt; lightGain = other.lightGain
++            bridgeGain = other.bridgeGain
 +        }
 +    }
 +
@@ -5023,6 +5158,61 @@ index b7a8ee1..0d7dd02 100644
          enableEdgeToEdge()
          val binding = ActivityMainBinding.inflate(layoutInflater)
          ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainFragment.kt
+index f1273cb..e17b4ce 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainFragment.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainFragment.kt
+@@ -84,6 +84,11 @@ class MainFragment : PaddingPreferenceFragment() {
+                 )
+             }
+             addCategory("Android") {
++                addDestinationPreference(
++                    R.string.light_effect_settings,
++                    R.drawable.ic_baseline_palette_24,
++                    SettingsRoute.LightEffects
++                )
+                 addDestinationPreference(
+                     R.string.theme,
+                     R.drawable.ic_baseline_palette_24,
+@@ -122,4 +127,4 @@ class MainFragment : PaddingPreferenceFragment() {
+             }
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/SettingsRoute.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/SettingsRoute.kt
+index 0ca9fac..285cfe0 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/SettingsRoute.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/SettingsRoute.kt
+@@ -34,6 +34,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.global.GlobalConfigFragment
+ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodConfigFragment
+ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodListFragment
+ import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
++import org.fcitx.fcitx5.android.ui.main.settings.theme.LightEffectSettingsFragment
+ import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
+ import org.fcitx.fcitx5.android.utils.parcelable
+ import kotlin.reflect.typeOf
+@@ -68,6 +69,9 @@ sealed class SettingsRoute : Parcelable {
+     @Serializable
+     data object Theme : SettingsRoute()
+ 
++    @Serializable
++    data object LightEffects : SettingsRoute()
++
+     @Serializable
+     data object VirtualKeyboard : SettingsRoute()
+ 
+@@ -207,6 +211,9 @@ sealed class SettingsRoute : Parcelable {
+             fragment<ThemeFragment, Theme> {
+                 label = ctx.getString(R.string.theme)
+             }
++            fragment<LightEffectSettingsFragment, LightEffects> {
++                label = ctx.getString(R.string.light_effect_settings)
++            }
+             fragment<KeyboardSettingsFragment, VirtualKeyboard> {
+                 label = ctx.getString(R.string.virtual_keyboard)
+             }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt
 index f8f2778..9ab8223 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt
@@ -5101,6 +5291,130 @@ index f8f2778..9ab8223 100644
 +        })
 +    }
 +}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/EffectColorEditor.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/EffectColorEditor.kt
+new file mode 100644
+index 0000000..97c7515
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/EffectColorEditor.kt
+@@ -0,0 +1,118 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.ui.main.settings.theme
++
++import android.app.AlertDialog
++import android.content.Context
++import android.content.res.ColorStateList
++import android.graphics.Color
++import android.graphics.drawable.GradientDrawable
++import android.text.Editable
++import android.text.InputType
++import android.text.TextWatcher
++import android.view.ContextThemeWrapper
++import android.view.View
++import android.widget.EditText
++import android.widget.LinearLayout
++import android.widget.SeekBar
++import android.widget.TextView
++import org.fcitx.fcitx5.android.R
++import org.fcitx.fcitx5.android.data.theme.PressColorPalette
++
++/** Native HSV editor with an exact RGB value; every RGB colour is available. */
++internal class EffectColorEditor(context: Context, initialColor: Int, private val onSave: (Int) -> Unit) {
++    private val ctx = ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
++    private fun dp(value: Int) = (value * ctx.resources.displayMetrics.density).toInt()
++    private val hsv = FloatArray(3).also { Color.colorToHSV(initialColor, it) }
++    private var updating = false
++    private var color = initialColor or Color.BLACK
++    private val body = LinearLayout(ctx).apply {
++        orientation = LinearLayout.VERTICAL
++        setPadding(dp(24), dp(12), dp(24), dp(8))
++    }
++    private val swatch = View(ctx).apply {
++        background = GradientDrawable().apply { cornerRadius = dp(12).toFloat(); setColor(color) }
++    }
++    val hex = EditText(ctx).apply {
++        tag = "effect-color-hex"
++        hint = "#RRGGBB"
++        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
++        isSingleLine = true
++        setText(hexFor(color))
++        setSelection(text.length)
++        contentDescription = ctx.getString(R.string.light_effect_color_hex)
++    }
++    private val sliders = ArrayList<SeekBar>()
++    private val labels = ArrayList<TextView>()
++
++    val dialog: AlertDialog
++
++    init {
++        body.addView(swatch, LinearLayout.LayoutParams(-1, dp(64)).apply { bottomMargin = dp(12) })
++        body.addView(hex, LinearLayout.LayoutParams(-1, dp(52)))
++        listOf(R.string.light_effect_hue, R.string.light_effect_saturation, R.string.light_effect_value).forEachIndexed { i, title ->
++            labels += TextView(ctx).apply { textSize = 14f; setPadding(0, dp(12), 0, 0) }.also { body.addView(it) }
++            sliders += SeekBar(ctx).apply {
++                tag = "effect-color-hsv-$i"
++                max = if (i == 0) 359 else 100
++                progress = if (i == 0) hsv[i].toInt() else (hsv[i] * 100).toInt()
++                progressTintList = ColorStateList.valueOf(0xFF85C9FF.toInt())
++                thumbTintList = progressTintList
++                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
++                    override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {
++                        if (updating || !fromUser) return
++                        hsv[i] = if (i == 0) value.toFloat() else value / 100f
++                        color = Color.HSVToColor(hsv)
++                        updateViews(updateHex = true)
++                    }
++                    override fun onStartTrackingTouch(bar: SeekBar) {}
++                    override fun onStopTrackingTouch(bar: SeekBar) {}
++                })
++            }.also { body.addView(it, LinearLayout.LayoutParams(-1, dp(40))) }
++        }
++        hex.addTextChangedListener(object : TextWatcher {
++            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
++            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
++            override fun afterTextChanged(s: Editable?) {
++                if (updating) return
++                parseHex(s.toString())?.let {
++                    color = it
++                    Color.colorToHSV(color, hsv)
++                    hex.error = null
++                    updateViews(updateHex = false)
++                }
++            }
++        })
++        updateViews(updateHex = false)
++        dialog = AlertDialog.Builder(ctx)
++            .setTitle(R.string.light_effect_edit_color)
++            .setView(body)
++            .setNegativeButton(android.R.string.cancel, null)
++            .setPositiveButton(android.R.string.ok, null)
++            .create()
++        dialog.setOnShowListener {
++            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
++                val parsed = parseHex(hex.text.toString())
++                if (parsed == null) hex.error = ctx.getString(R.string.light_effect_hex_error)
++                else { onSave(parsed); dialog.dismiss() }
++            }
++        }
++    }
++
++    private fun updateViews(updateHex: Boolean) {
++        updating = true
++        (swatch.background as GradientDrawable).setColor(color)
++        if (updateHex) hex.setText(hexFor(color))
++        sliders.forEachIndexed { i, bar -> bar.progress = if (i == 0) hsv[i].toInt() else (hsv[i] * 100).toInt() }
++        listOf(R.string.light_effect_hue, R.string.light_effect_saturation, R.string.light_effect_value).forEachIndexed { i, title ->
++            labels[i].text = "${ctx.getString(title)}   ${if (i == 0) hsv[i].toInt() else (hsv[i] * 100).toInt()}${if (i == 0) "°" else "%"}"
++        }
++        updating = false
++    }
++
++    companion object {
++        fun parseHex(raw: String): Int? {
++            return PressColorPalette.parseColor(raw)
++        }
++        fun hexFor(color: Int) = PressColorPalette.formatColor(color)
++    }
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt
 index b8c048c..bbc9139 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt
@@ -5123,6 +5437,417 @@ index b8c048c..bbc9139 100644
              centerHorizontally()
          })
      }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsFragment.kt
+new file mode 100644
+index 0000000..258d9ee
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsFragment.kt
+@@ -0,0 +1,28 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.ui.main.settings.theme
++
++import android.os.Build
++import android.os.Bundle
++import android.view.LayoutInflater
++import android.view.ViewGroup
++import androidx.fragment.app.Fragment
++import org.fcitx.fcitx5.android.data.prefs.AppPrefs
++
++/** Directly reachable from the keyboard's palette tool button. */
++class LightEffectSettingsFragment : Fragment() {
++    private var ui: LightEffectSettingsUi? = null
++
++    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?) =
++        LightEffectSettingsUi(requireContext()).also { ui = it }.root
++
++    override fun onDestroyView() {
++        ui?.dismissDialogs()
++        ui = null
++        super.onDestroyView()
++    }
++
++    override fun onStop() {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) AppPrefs.getInstance().syncToDeviceEncryptedStorage()
++        super.onStop()
++    }
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt
+new file mode 100644
+index 0000000..6746d1b
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt
+@@ -0,0 +1,324 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++package org.fcitx.fcitx5.android.ui.main.settings.theme
++
++import android.app.AlertDialog
++import android.content.Context
++import android.content.res.ColorStateList
++import android.graphics.Color
++import android.graphics.Typeface
++import android.graphics.drawable.GradientDrawable
++import android.view.Gravity
++import android.view.View
++import android.view.ViewGroup
++import android.widget.Button
++import android.widget.LinearLayout
++import android.widget.ScrollView
++import android.widget.SeekBar
++import android.widget.Switch
++import android.widget.TextView
++import android.widget.Toast
++import androidx.core.graphics.ColorUtils
++import androidx.core.view.ViewCompat
++import androidx.core.view.WindowInsetsCompat
++import org.fcitx.fcitx5.android.R
++import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
++import org.fcitx.fcitx5.android.data.theme.PressColorPalette
++import org.fcitx.fcitx5.android.data.theme.ThemeManager
++import org.fcitx.fcitx5.android.data.theme.ThemePrefs
++import org.fcitx.fcitx5.android.input.keyboard.PressEffect
++
++/** Real settings controls shared by the production fragment and its rendering tests. */
++class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs = ThemeManager.prefs) {
++    private val ink = 0xFFF2F3F8.toInt()
++    private val subdued = 0xFF949AAA.toInt()
++    private val accent = 0xFF90C9FF.toInt()
++    private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
++
++    private fun text(value: String, size: Float = 14f, color: Int = ink) = TextView(context).apply {
++        text = value
++        textSize = size
++        setTextColor(color)
++    }
++
++    private fun background(fill: Int, stroke: Int? = null) = GradientDrawable().apply {
++        cornerRadius = dp(14).toFloat()
++        setColor(fill)
++        stroke?.let { setStroke(dp(1).coerceAtLeast(1), it) }
++    }
++
++    private val body = LinearLayout(context).apply {
++        orientation = LinearLayout.VERTICAL
++        setPadding(dp(20), dp(20), dp(20), dp(32))
++    }
++
++    val root = ScrollView(context).apply {
++        tag = "light-effect-settings"
++        isFillViewport = true
++        setBackgroundColor(0xFF0B0C10.toInt())
++        addView(body, ViewGroup.LayoutParams(-1, -2))
++        ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
++            val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
++            view.setPadding(0, 0, 0, bottom)
++            insets
++        }
++    }
++
++    val modeButtons = linkedMapOf<ThemePrefs.PressColorMode, Button>()
++    private val paletteCard = card()
++    private val colorsBody = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
++    private val palettePreview = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; tag = "effect-palette-preview" }
++    private val modeSummary = text("", color = subdued)
++    private val totalLabel = text("", 13f, accent)
++    val durationControls = linkedMapOf<String, EffectRangeControl>()
++    var activeColorDialog: AlertDialog? = null
++        private set
++
++    init {
++        body.addView(text(context.getString(R.string.light_effect_settings), 27f).apply { setTypeface(typeface, Typeface.BOLD) })
++        body.addView(text(context.getString(R.string.light_effect_saved), 13f, subdued),
++            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(22) })
++        addSwitch(R.string.light_effect_enable, prefs.pressEffect)
++        section(R.string.light_effect_palette)
++        val modeRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
++        listOf(ThemePrefs.PressColorMode.Random to R.string.press_color_mode_random,
++            ThemePrefs.PressColorMode.Single to R.string.press_color_mode_single,
++            ThemePrefs.PressColorMode.Custom to R.string.press_color_mode_custom).forEach { (mode, title) ->
++            val button = Button(context).apply {
++                tag = "effect-mode-${mode.name}"
++                text = context.getString(title)
++                textSize = 13f
++                isAllCaps = false
++                minWidth = 0
++                minimumWidth = 0
++                minHeight = dp(48)
++                setPadding(dp(2), 0, dp(2), 0)
++                setOnClickListener {
++                    prefs.pressColorMode.setValue(mode)
++                    if (mode == ThemePrefs.PressColorMode.Random) prefs.pressEffectPalette.setValue(ThemePrefs.PressEffectPalette.Cyberpunk)
++                    renderColors()
++                }
++            }
++            modeButtons[mode] = button
++            modeRow.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
++                if (modeRow.childCount > 0) leftMargin = dp(6)
++            })
++        }
++        paletteCard.addView(modeRow)
++        paletteCard.addView(modeSummary, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
++        paletteCard.addView(palettePreview, LinearLayout.LayoutParams(-1, dp(8)).apply { topMargin = dp(14); bottomMargin = dp(16) })
++        paletteCard.addView(colorsBody)
++        body.addView(paletteCard)
++        renderColors()
++
++        section(R.string.light_effect_animation)
++        val animationCard = card()
++        animationCard.addView(totalLabel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
++        animationCard.addView(text(context.getString(R.string.light_effect_total_detail, prefs.pressIgnitionTime.getValue()), 12f, subdued),
++            LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
++        listOf(
++            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
++            Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 50),
++            Range(R.string.light_effect_wave_fade, prefs.pressFadeOutTime, 100, 5000, 20),
++            Range(R.string.light_effect_face_hold, prefs.pressKeyHoldTime, 100, 1000, 20),
++            Range(R.string.light_effect_face_exit, prefs.pressKeyRetreatTime, 100, 5000, 20)
++        ).forEach { range -> addRange(animationCard, range, "ms") }
++        body.addView(animationCard)
++        updateTotal()
++        section(R.string.light_effect_light)
++        val lightCard = card()
++        addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 100, 5), "%")
++        addRange(lightCard, Range(R.string.light_effect_brightness, prefs.pressGlowBrightness, 0, 100, 5), "%")
++        body.addView(lightCard)
++        addSwitch(R.string.light_effect_glow_candidates, prefs.pressGlowOnCandidates)
++    }
++
++    private data class Range(val title: Int, val pref: ManagedPreference.PInt, val min: Int, val max: Int, val step: Int)
++
++    private fun card() = LinearLayout(context).apply {
++        orientation = LinearLayout.VERTICAL
++        background = background(0xFF171A22.toInt(), 0xFF252B38.toInt())
++        setPadding(dp(16), dp(16), dp(16), dp(12))
++    }
++
++    private fun section(title: Int) {
++        body.addView(text(context.getString(title), 17f).apply { setTypeface(typeface, Typeface.BOLD) },
++            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(22); bottomMargin = dp(12) })
++    }
++
++    private fun addSwitch(title: Int, pref: ManagedPreference.PBool) {
++        body.addView(Switch(context).apply {
++            tag = pref.key
++            text = context.getString(title)
++            textSize = 14f
++            setTextColor(ink)
++            isChecked = pref.getValue()
++            thumbTintList = ColorStateList.valueOf(accent)
++            setOnCheckedChangeListener { _, checked -> pref.setValue(checked) }
++        }, LinearLayout.LayoutParams(-1, dp(54)))
++    }
++
++    private fun addRange(parent: LinearLayout, range: Range, unit: String) {
++        val control = EffectRangeControl(context, context.getString(range.title), range.pref,
++            range.min, range.max, range.step, unit, ::updateTotal)
++        durationControls[range.pref.key] = control
++        parent.addView(control.root)
++    }
++
++    private fun updateTotal() {
++        totalLabel.text = context.getString(R.string.light_effect_total,
++            prefs.pressIgnitionTime.getValue() + prefs.pressExpansionTime.getValue() +
++                prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
++    }
++
++    private fun renderColors() {
++        val mode = prefs.pressColorMode.getValue()
++        modeButtons.forEach { (entry, button) ->
++            val selected = entry == mode
++            button.isSelected = selected
++            button.setTextColor(if (selected) accent else ink)
++            button.background = background(if (selected) 0xFF25384D.toInt() else 0xFF21252F.toInt(),
++                if (selected) accent else 0xFF343A49.toInt())
++        }
++        val colors = when (mode) {
++            ThemePrefs.PressColorMode.Random -> randomPaletteColors()
++            ThemePrefs.PressColorMode.Single -> intArrayOf(prefs.pressSingleColor.getValue() or 0xFF000000.toInt())
++            ThemePrefs.PressColorMode.Custom -> prefs.userPressColors()
++        }
++        modeSummary.setText(when (mode) {
++            ThemePrefs.PressColorMode.Random -> R.string.light_effect_random_summary
++            ThemePrefs.PressColorMode.Single -> R.string.light_effect_single_summary
++            ThemePrefs.PressColorMode.Custom -> R.string.light_effect_custom_summary
++        })
++        palettePreview.removeAllViews()
++        colors.forEachIndexed { index, color ->
++            palettePreview.addView(View(context).apply { background = background(color) },
++                LinearLayout.LayoutParams(0, -1, 1f).apply { if (index > 0) leftMargin = dp(3) })
++        }
++        colorsBody.removeAllViews()
++        when (mode) {
++            ThemePrefs.PressColorMode.Random -> {}
++            ThemePrefs.PressColorMode.Single -> colorsBody.addView(colorButton(colors[0], "effect-single-color") {
++                editColor(colors[0]) { prefs.pressSingleColor.setValue(it); renderColors() }
++            }, LinearLayout.LayoutParams(-1, dp(58)))
++            ThemePrefs.PressColorMode.Custom -> {
++                colorsBody.addView(text(context.getString(R.string.light_effect_color_guide), 12f, subdued),
++                    LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
++                (colors.indices).chunked(4).forEach { indices ->
++                    val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
++                    indices.forEach { i ->
++                        val button = colorButton(colors[i], "effect-custom-color-$i") {
++                            editColor(colors[i]) { value ->
++                                val updated = prefs.userPressColors().copyOf()
++                                if (i < updated.size) { updated[i] = value; saveColors(updated) }
++                            }
++                        }.apply {
++                            contentDescription = context.getString(R.string.light_effect_color_number, i + 1) + " " + EffectColorEditor.hexFor(colors[i])
++                            setOnLongClickListener {
++                                val current = prefs.userPressColors()
++                                if (current.size <= 1) Toast.makeText(context, R.string.light_effect_color_single_min, Toast.LENGTH_SHORT).show()
++                                else saveColors(current.filterIndexed { index, _ -> index != i }.toIntArray())
++                                true
++                            }
++                        }
++                        row.addView(button, LinearLayout.LayoutParams(0, dp(54), 1f).apply { rightMargin = dp(4); bottomMargin = dp(6) })
++                    }
++                    repeat(4 - indices.size) { row.addView(View(context), LinearLayout.LayoutParams(0, dp(54), 1f)) }
++                    colorsBody.addView(row)
++                }
++                colorsBody.addView(Button(context).apply {
++                    tag = "effect-color-add"
++                    text = context.getString(R.string.light_effect_color_add)
++                    isAllCaps = false
++                    setTextColor(accent)
++                    background = background(0xFF202E3D.toInt(), 0xFF3C526A.toInt())
++                    isEnabled = colors.size < 8
++                    alpha = if (isEnabled) 1f else 0.45f
++                    setOnClickListener {
++                        val current = prefs.userPressColors()
++                        if (current.size < 8) {
++                            val hsv = FloatArray(3).also { Color.colorToHSV(current.last(), it) }
++                            hsv[0] = (hsv[0] + 47f) % 360f
++                            hsv[1] = 0.82f; hsv[2] = 1f
++                            saveColors(current + Color.HSVToColor(hsv))
++                        }
++                    }
++                }, LinearLayout.LayoutParams(-1, dp(44)))
++            }
++        }
++    }
++
++    /** Keep legacy preset choices visible without silently replacing them when this page opens. */
++    private fun randomPaletteColors(): IntArray = when (prefs.pressEffectPalette.getValue()) {
++        ThemePrefs.PressEffectPalette.SamsungCool -> PressEffect.SAMSUNG_COOL
++        ThemePrefs.PressEffectPalette.Cyberpunk -> PressEffect.CYBERPUNK
++        ThemePrefs.PressEffectPalette.Cool -> PressEffect.COOL
++        ThemePrefs.PressEffectPalette.Rainbow -> PressEffect.RAINBOW
++        ThemePrefs.PressEffectPalette.Berry -> PressEffect.BERRY
++        ThemePrefs.PressEffectPalette.Accent -> intArrayOf(
++            (runCatching { ThemeManager.activeTheme }.getOrDefault(ThemeManager.DefaultTheme))
++                .accentKeyBackgroundColor.takeIf { it ushr 24 != 0 } ?: 0xFF76B5FF.toInt()
++        )
++        ThemePrefs.PressEffectPalette.Custom -> listOf(
++            prefs.pressCustomColor1, prefs.pressCustomColor2, prefs.pressCustomColor3, prefs.pressCustomColor4
++        ).take(prefs.pressCustomColorCount.getValue().coerceIn(1, 4))
++            .map { it.getValue().argb }.toIntArray()
++    }
++
++    private fun colorButton(color: Int, buttonTag: String, action: () -> Unit) = Button(context).apply {
++        tag = buttonTag
++        text = EffectColorEditor.hexFor(color)
++        textSize = 12f
++        isAllCaps = false
++        minWidth = 0; minimumWidth = 0
++        setPadding(dp(2), 0, dp(2), 0)
++        background = background(color, 0xFF667084.toInt())
++        setTextColor(if (ColorUtils.calculateLuminance(color) > 0.179) Color.BLACK else Color.WHITE)
++        setOnClickListener { action() }
++    }
++
++    private fun saveColors(colors: IntArray) {
++        prefs.pressUserColors.setValue(PressColorPalette.encode(colors))
++        renderColors()
++    }
++
++    private fun editColor(color: Int, save: (Int) -> Unit) {
++        activeColorDialog?.dismiss()
++        activeColorDialog = EffectColorEditor(context, color, save).dialog.also { it.show() }
++    }
++
++    fun dismissDialogs() { activeColorDialog?.dismiss(); activeColorDialog = null }
++}
++
++/** Native slider; persist once on release rather than rebuilding the keyboard on every pixel. */
++class EffectRangeControl(private val context: Context, label: String, private val pref: ManagedPreference.PInt,
++    private val min: Int, private val max: Int, private val step: Int, private val unit: String, private val afterCommit: () -> Unit) {
++    private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
++    val root = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; tag = pref.key }
++    private val value = TextView(context).apply { setTextColor(0xFF90C9FF.toInt()); textSize = 13f }
++    val slider = SeekBar(context).apply {
++        tag = "effect-slider-${pref.key}"
++        this.max = (this@EffectRangeControl.max - this@EffectRangeControl.min) / step
++        progress = (pref.getValue().coerceIn(this@EffectRangeControl.min, this@EffectRangeControl.max) - this@EffectRangeControl.min) / step
++        progressTintList = ColorStateList.valueOf(0xFF90C9FF.toInt())
++        thumbTintList = progressTintList
++        contentDescription = label
++    }
++
++    init {
++        val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
++        row.addView(TextView(context).apply { text = label; textSize = 14f; setTextColor(0xFFF2F3F8.toInt()) },
++            LinearLayout.LayoutParams(0, -2, 1f))
++        row.addView(value)
++        root.addView(row, LinearLayout.LayoutParams(-1, dp(28)))
++        root.addView(slider, LinearLayout.LayoutParams(-1, dp(36)).apply { bottomMargin = dp(8) })
++        updateLabel(pref.getValue().coerceIn(min, max))
++        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
++            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) { updateLabel() }
++            override fun onStartTrackingTouch(bar: SeekBar) {}
++            override fun onStopTrackingTouch(bar: SeekBar) { commit() }
++        })
++    }
++
++    private fun updateLabel(exact: Int = min + slider.progress * step) { value.text = "$exact $unit" }
++    fun commit() { pref.setValue((min + slider.progress * step).coerceIn(min, max)); afterCommit() }
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt
+index 73858d4..5dd9a34 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt
+@@ -6,12 +6,28 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
+ 
+ import android.os.Bundle
+ import androidx.preference.SwitchPreference
++import androidx.preference.Preference
++import androidx.preference.PreferenceScreen
++import org.fcitx.fcitx5.android.R
+ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
+ import org.fcitx.fcitx5.android.data.theme.ThemeManager
++import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
++import org.fcitx.fcitx5.android.utils.navigateWithAnim
+ 
+ class ThemeSettingsFragment : ManagedPreferenceFragment(ThemeManager.prefs) {
+ 
++    override fun onPreferenceUiCreated(screen: PreferenceScreen) {
++        screen.addPreference(Preference(requireContext()).apply {
++            key = "detailed_light_effect_settings"
++            setTitle(R.string.light_effect_settings)
++            setSummary(R.string.light_effect_settings_summary)
++            setIcon(R.drawable.ic_baseline_palette_24)
++            order = -1
++            setOnPreferenceClickListener { navigateWithAnim(SettingsRoute.LightEffects); true }
++        })
++    }
++
+     private val followSystemDayNightTheme = ThemeManager.prefs.followSystemDayNightTheme
+ 
+     private var resumed = false
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/utils/AppUtil.kt b/app/src/main/java/org/fcitx/fcitx5/android/utils/AppUtil.kt
+index a425df0..a7d550a 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/utils/AppUtil.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/utils/AppUtil.kt
+@@ -42,6 +42,9 @@ object AppUtil {
+     fun launchMainToThemeList(context: Context) =
+         launchMainToDest(context, SettingsRoute.Theme)
+ 
++    fun launchMainToLightEffects(context: Context) =
++        launchMainToDest(context, SettingsRoute.LightEffects)
++
+     fun launchMainToInputMethodConfig(context: Context, uniqueName: String, displayName: String) =
+         launchMainToDest(context, SettingsRoute.InputMethodConfig(displayName, uniqueName))
+ 
 diff --git a/app/src/main/res/drawable/ic_keyboard_backspace_outline.xml b/app/src/main/res/drawable/ic_keyboard_backspace_outline.xml
 new file mode 100644
 index 0000000..f1e6c33
@@ -5180,6 +5905,49 @@ index 0000000..e448d62
 +<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
 +    <path android:fillColor="#FFFFFFFF" android:pathData="M18,8H9V6a3,3 0,0 1,5.8,-1h2.1A5,5 0,0 0,7,6v2H6a2,2 0,0 0,-2,2v10a2,2 0,0 0,2,2h12a2,2 0,0 0,2,-2V10a2,2 0,0 0,-2,-2zM13,17h-2v-4h2z" />
 +</vector>
+diff --git a/app/src/main/res/values-zh-rCN/light_effect_settings.xml b/app/src/main/res/values-zh-rCN/light_effect_settings.xml
+new file mode 100644
+index 0000000..c0890a0
+--- /dev/null
++++ b/app/src/main/res/values-zh-rCN/light_effect_settings.xml
+@@ -0,0 +1,37 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="press_color_mode">按键配色模式</string>
++    <string name="press_color_mode_random">随机多彩</string>
++    <string name="press_color_mode_single">任意单色</string>
++    <string name="press_color_mode_custom">自选搭配</string>
++    <string name="press_wave_hold_time">波纹停留</string>
++    <string name="light_effect_settings">按键光效</string>
++    <string name="light_effect_settings_summary">任意颜色、自选搭配与动画时长</string>
++    <string name="light_effect_saved">自动保存，返回键盘即可试按。</string>
++    <string name="light_effect_palette">配色</string>
++    <string name="light_effect_random_summary">每次按键随机一色，键面与柔光使用同一色。</string>
++    <string name="light_effect_single_summary">所有按键使用你选的颜色，点按色块编辑。</string>
++    <string name="light_effect_custom_summary">每次按键从你搭配的颜色中选取一色。</string>
++    <string name="light_effect_color_guide">点按改色 · 长按移除 · 最多 8 色</string>
++    <string name="light_effect_color_add">+ 添加颜色</string>
++    <string name="light_effect_color_single_min">至少保留一种颜色。</string>
++    <string name="light_effect_color_number">颜色 %1$d</string>
++    <string name="light_effect_animation">动画节奏</string>
++    <string name="light_effect_expand">扩散时间</string>
++    <string name="light_effect_wave_fade">消失淡出</string>
++    <string name="light_effect_face_hold">键面亮色保持</string>
++    <string name="light_effect_face_exit">键面退场</string>
++    <string name="light_effect_total">一次波纹总时长：%1$d 毫秒</string>
++    <string name="light_effect_total_detail">已含 %1$d 毫秒点亮；波纹与键面分别计时。</string>
++    <string name="light_effect_light">柔光范围</string>
++    <string name="light_effect_reach">扩散范围</string>
++    <string name="light_effect_brightness">波纹亮度</string>
++    <string name="light_effect_enable">启用按键光效</string>
++    <string name="light_effect_glow_candidates">柔光延伸到候选栏</string>
++    <string name="light_effect_edit_color">编辑颜色</string>
++    <string name="light_effect_color_hex">色值（HEX）</string>
++    <string name="light_effect_hex_error">请输入 6 位色值，例如 #18FFC1。</string>
++    <string name="light_effect_hue">色相</string>
++    <string name="light_effect_saturation">饱和度</string>
++    <string name="light_effect_value">明度</string>
++</resources>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
 index 40ef2c9..d3fc0cf 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
@@ -5290,6 +6058,49 @@ index 40ef2c9..d3fc0cf 100644
 +    <string name="key_exit_dim">原地渐暗（留下光迹）</string>
 +    <string name="key_exit_shrink">收成光点</string>
  </resources>
+diff --git a/app/src/main/res/values-zh-rTW/light_effect_settings.xml b/app/src/main/res/values-zh-rTW/light_effect_settings.xml
+new file mode 100644
+index 0000000..c608fe6
+--- /dev/null
++++ b/app/src/main/res/values-zh-rTW/light_effect_settings.xml
+@@ -0,0 +1,37 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="press_color_mode">按鍵配色模式</string>
++    <string name="press_color_mode_random">隨機多彩</string>
++    <string name="press_color_mode_single">任意單色</string>
++    <string name="press_color_mode_custom">自選搭配</string>
++    <string name="press_wave_hold_time">波紋停留</string>
++    <string name="light_effect_settings">按鍵光效</string>
++    <string name="light_effect_settings_summary">任意顏色、自選搭配與動畫時長</string>
++    <string name="light_effect_saved">自動儲存，返回鍵盤即可試按。</string>
++    <string name="light_effect_palette">配色</string>
++    <string name="light_effect_random_summary">每次按鍵隨機一色，鍵面與柔光使用同一色。</string>
++    <string name="light_effect_single_summary">所有按鍵使用你選的顏色，點按色塊編輯。</string>
++    <string name="light_effect_custom_summary">每次按鍵從你搭配的顏色中選取一色。</string>
++    <string name="light_effect_color_guide">點按改色 · 長按移除 · 最多 8 色</string>
++    <string name="light_effect_color_add">+ 新增顏色</string>
++    <string name="light_effect_color_single_min">至少保留一種顏色。</string>
++    <string name="light_effect_color_number">顏色 %1$d</string>
++    <string name="light_effect_animation">動畫節奏</string>
++    <string name="light_effect_expand">擴散時間</string>
++    <string name="light_effect_wave_fade">消失淡出</string>
++    <string name="light_effect_face_hold">鍵面亮色保持</string>
++    <string name="light_effect_face_exit">鍵面退場</string>
++    <string name="light_effect_total">一次波紋總時長：%1$d 毫秒</string>
++    <string name="light_effect_total_detail">已含 %1$d 毫秒點亮；波紋與鍵面分別計時。</string>
++    <string name="light_effect_light">柔光範圍</string>
++    <string name="light_effect_reach">擴散範圍</string>
++    <string name="light_effect_brightness">波紋亮度</string>
++    <string name="light_effect_enable">啟用按鍵光效</string>
++    <string name="light_effect_glow_candidates">柔光延伸到候選列</string>
++    <string name="light_effect_edit_color">編輯顏色</string>
++    <string name="light_effect_color_hex">色值（HEX）</string>
++    <string name="light_effect_hex_error">請輸入 6 位色值，例如 #18FFC1。</string>
++    <string name="light_effect_hue">色相</string>
++    <string name="light_effect_saturation">飽和度</string>
++    <string name="light_effect_value">明度</string>
++</resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
 index fa9bc4e..cdc5df8 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
@@ -5400,6 +6211,49 @@ index fa9bc4e..cdc5df8 100644
 +    <string name="key_exit_dim">原地漸暗（留下光跡）</string>
 +    <string name="key_exit_shrink">收成光點</string>
  </resources>
+diff --git a/app/src/main/res/values/light_effect_settings.xml b/app/src/main/res/values/light_effect_settings.xml
+new file mode 100644
+index 0000000..f4a8bf6
+--- /dev/null
++++ b/app/src/main/res/values/light_effect_settings.xml
+@@ -0,0 +1,37 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="press_color_mode">Press colour mode</string>
++    <string name="press_color_mode_random">Random colours</string>
++    <string name="press_color_mode_single">Single colour</string>
++    <string name="press_color_mode_custom">My palette</string>
++    <string name="press_wave_hold_time">Wave hold time</string>
++    <string name="light_effect_settings">Key lighting</string>
++    <string name="light_effect_settings_summary">Any RGB colour, your own palette and animation timing</string>
++    <string name="light_effect_saved">Saved automatically. Return to the keyboard to try it.</string>
++    <string name="light_effect_palette">Colours</string>
++    <string name="light_effect_random_summary">One random colour per press, shared by the key and its light.</string>
++    <string name="light_effect_single_summary">Use any colour for every press. Tap the colour to edit it.</string>
++    <string name="light_effect_custom_summary">Pick from your own colours on each press.</string>
++    <string name="light_effect_color_guide">Tap to edit · Hold to remove · Up to 8 colours</string>
++    <string name="light_effect_color_add">+ Add a colour</string>
++    <string name="light_effect_color_single_min">Keep at least one colour.</string>
++    <string name="light_effect_color_number">Colour %1$d</string>
++    <string name="light_effect_animation">Animation timing</string>
++    <string name="light_effect_expand">Expansion time</string>
++    <string name="light_effect_wave_fade">Wave fade out</string>
++    <string name="light_effect_face_hold">Key colour hold</string>
++    <string name="light_effect_face_exit">Key colour fade</string>
++    <string name="light_effect_total">Total wave duration: %1$d ms</string>
++    <string name="light_effect_total_detail">Includes %1$d ms of ignition. Wave and key holds are independent.</string>
++    <string name="light_effect_light">Light spread</string>
++    <string name="light_effect_reach">Spread distance</string>
++    <string name="light_effect_brightness">Wave brightness</string>
++    <string name="light_effect_enable">Enable key lighting</string>
++    <string name="light_effect_glow_candidates">Extend light into the candidate bar</string>
++    <string name="light_effect_edit_color">Edit colour</string>
++    <string name="light_effect_color_hex">Colour value (HEX)</string>
++    <string name="light_effect_hex_error">Enter six hexadecimal digits, for example #18FFC1.</string>
++    <string name="light_effect_hue">Hue</string>
++    <string name="light_effect_saturation">Saturation</string>
++    <string name="light_effect_value">Brightness</string>
++</resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
 index fe1fd3a..215e2da 100644
 --- a/app/src/main/res/values/strings.xml
@@ -5723,10 +6577,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..d10fa4d
+index 0000000..ccfecc9
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,781 @@
+@@ -0,0 +1,786 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -5799,6 +6653,11 @@ index 0000000..d10fa4d
 +            set(null, uiApplication)
 +        }
 +        AppPrefs.init(application.getSharedPreferences("keyboard-visual", Context.MODE_PRIVATE))
++        // AppPrefs.init is idempotent: ThemeManager may still use another test's
++        // existing backing store. Reset the actual store, not just this filename.
++        val prefs = ThemeManager.prefs
++        assertTrue(prefs.idleBreathing.sharedPreferences.edit().clear().commit())
++        assertTrue("Every visual fixture must start with idle breathing enabled", prefs.idleBreathing.getValue())
 +    }
 +
 +    private fun render(view: View): Bitmap {
@@ -6508,6 +7367,306 @@ index 0000000..d10fa4d
 +    }
 +
 +}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt
+new file mode 100644
+index 0000000..894a5bf
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt
+@@ -0,0 +1,294 @@
++package org.fcitx.fcitx5.android
++
++import android.app.AlertDialog
++import android.app.Application
++import android.content.Context
++import android.content.Intent
++import android.content.SharedPreferences
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Rect
++import android.graphics.drawable.GradientDrawable
++import android.os.Looper
++import android.view.View
++import android.view.ViewGroup
++import android.widget.Button
++import android.widget.EditText
++import android.widget.LinearLayout
++import android.widget.ScrollView
++import androidx.appcompat.app.AppCompatActivity
++import androidx.navigation.NavController
++import androidx.navigation.NavDestination.Companion.hasRoute
++import androidx.navigation.fragment.FragmentNavigator
++import org.fcitx.fcitx5.android.data.prefs.AppPrefs
++import org.fcitx.fcitx5.android.data.theme.PressColorPalette
++import org.fcitx.fcitx5.android.data.theme.ThemeManager
++import org.fcitx.fcitx5.android.data.theme.ThemePrefs
++import org.fcitx.fcitx5.android.data.theme.ThemePreset
++import org.fcitx.fcitx5.android.input.bar.ui.idle.ButtonsBarUi
++import org.fcitx.fcitx5.android.input.keyboard.PressEffect
++import org.fcitx.fcitx5.android.ui.main.MainActivity
++import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
++import org.fcitx.fcitx5.android.ui.main.settings.theme.LightEffectSettingsFragment
++import org.fcitx.fcitx5.android.ui.main.settings.theme.LightEffectSettingsUi
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.RuntimeEnvironment
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import org.robolectric.annotation.LooperMode
++import org.robolectric.util.ReflectionHelpers
++import java.io.File
++import kotlin.math.abs
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [33], application = Application::class, qualifiers = "zh-rCN-w400dp-h900dp-hdpi")
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++@LooperMode(LooperMode.Mode.PAUSED)
++class LightEffectSettingsUiTest {
++    @Before fun prepare() {
++        val application = RuntimeEnvironment.getApplication()
++        val app = FcitxApplication()
++        ReflectionHelpers.callInstanceMethod<Void>(app, "attachBaseContext",
++            ReflectionHelpers.ClassParameter.from(Context::class.java, application))
++        FcitxApplication::class.java.getDeclaredField("instance").apply { isAccessible = true; set(null, app) }
++        AppPrefs.init(application.getSharedPreferences("light-settings-test", Context.MODE_PRIVATE))
++        val prefs = ThemeManager.prefs
++        prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Random)
++        prefs.pressEffectPalette.setValue(ThemePrefs.PressEffectPalette.Cyberpunk)
++        prefs.pressEffect.setValue(true)
++        prefs.pressSingleColor.setValue(0xFF00E8FF.toInt())
++        prefs.pressUserColors.setValue("#18FFC1,#D96EFF,#FF8A32")
++        prefs.pressIgnitionTime.setValue(100)
++        prefs.pressExpansionTime.setValue(1400)
++        prefs.pressWaveHoldTime.setValue(350)
++        prefs.pressFadeOutTime.setValue(900)
++        prefs.pressKeyHoldTime.setValue(120)
++        prefs.pressKeyRetreatTime.setValue(1800)
++    }
++
++    private fun activity() = Robolectric.buildActivity(AppCompatActivity::class.java).also {
++        it.get().setTheme(R.style.Theme_FcitxAppTheme)
++    }.setup()
++
++    private fun layout(view: View, width: Int = 600, height: Int = 1260) {
++        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
++            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
++        view.layout(0, 0, width, height)
++    }
++
++    private fun save(view: View, filename: String) {
++        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
++        view.draw(Canvas(bitmap))
++        save(bitmap, filename)
++    }
++
++    private fun save(bitmap: Bitmap, filename: String) {
++        val target = File("build/outputs/effect-checks/$filename.png")
++        target.parentFile.mkdirs()
++        target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
++    }
++
++    /** Render the actual native child at the actual scroll offset, bypassing Robolectric's stale ScrollView display list. */
++    private fun captureScrollViewport(scroll: ScrollView): Bitmap {
++        val body = scroll.getChildAt(0)
++        fun draw(): Bitmap = Bitmap.createBitmap(scroll.width, scroll.height, Bitmap.Config.ARGB_8888).also { bitmap ->
++            val canvas = Canvas(bitmap)
++            scroll.background?.draw(canvas)
++            canvas.clipRect(scroll.paddingLeft, scroll.paddingTop, scroll.width - scroll.paddingRight, scroll.height - scroll.paddingBottom)
++            canvas.translate((body.left - scroll.scrollX).toFloat(), (body.top - scroll.scrollY).toFloat())
++            body.draw(canvas)
++        }
++        // Native TextViews/SeekBars build their display lists lazily; use real draws to warm them.
++        repeat(2) { draw().recycle() }
++        return draw()
++    }
++
++    private fun assertSliderPixelsAreVisible(bitmap: Bitmap, viewport: View, slider: View) {
++        val origin = IntArray(2).also { viewport.getLocationOnScreen(it) }
++        val position = IntArray(2).also { slider.getLocationOnScreen(it) }
++        val area = Rect(position[0] - origin[0], position[1] - origin[1],
++            position[0] - origin[0] + slider.width, position[1] - origin[1] + slider.height)
++        assertTrue("Slider must lie within the captured viewport", area.intersect(0, 0, bitmap.width, bitmap.height))
++        var bluePixels = 0
++        for (y in area.top until area.bottom) for (x in area.left until area.right) {
++            val color = bitmap.getPixel(x, y)
++            if (Color.alpha(color) > 240 && abs(Color.red(color) - 144) < 20 &&
++                abs(Color.green(color) - 201) < 20 && Color.blue(color) > 235) bluePixels++
++        }
++        assertTrue("${slider.contentDescription} must be drawn as real visible slider pixels", bluePixels > 10)
++    }
++
++    @Test fun toolbarPaletteButtonLaunchesTheRegisteredSettingsDestination() {
++        val controller = activity()
++        val activity = controller.get()
++        val toolbar = ButtonsBarUi(activity, ThemePreset.XuancaiBlackV09)
++        layout(toolbar.root, 324, 78) // 320dp device minus the two 52dp end buttons.
++        toolbar.lightEffectsButton.performClick()
++        val intent = shadowOf(activity).nextStartedActivity
++        assertEquals(Intent.ACTION_RUN, intent.action)
++        assertEquals(MainActivity::class.java.name, intent.component!!.className)
++        @Suppress("DEPRECATION") val route = intent.getParcelableExtra<SettingsRoute>(MainActivity.EXTRA_SETTINGS_ROUTE)
++        assertEquals(SettingsRoute.LightEffects, route)
++        assertTrue(intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
++        val nav = NavController(activity)
++        nav.navigatorProvider.addNavigator(FragmentNavigator(activity, activity.supportFragmentManager, 100))
++        assertTrue(SettingsRoute.createGraph(nav).any { it.hasRoute<SettingsRoute.LightEffects>() })
++        for (i in 0 until toolbar.root.childCount) {
++            val button = toolbar.root.getChildAt(i)
++            assertTrue(button.width > 0)
++            assertTrue(button.right <= toolbar.root.width)
++        }
++        controller.pause().stop().destroy()
++    }
++
++    @Test fun singleColourCanBeAnyRgbValueAndInvalidHexCannotSave() {
++        val controller = activity()
++        val activity = controller.get()
++        val prefs = ThemeManager.prefs
++        val ui = LightEffectSettingsUi(activity)
++        activity.setContentView(ui.root)
++        ui.modeButtons.getValue(ThemePrefs.PressColorMode.Single).performClick()
++        ui.root.findViewWithTag<Button>("effect-single-color").performClick()
++        shadowOf(Looper.getMainLooper()).idle() // Dialog dispatches OnShow through the main handler.
++        val dialog = ui.activeColorDialog!!
++        val hex = dialog.findViewById<EditText>(android.R.id.edit) ?: dialog.window!!.decorView.findViewWithTag<EditText>("effect-color-hex")
++        hex.setText("#12345Z")
++        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
++        shadowOf(Looper.getMainLooper()).idle()
++        assertTrue(dialog.isShowing)
++        assertEquals(0xFF00E8FF.toInt(), prefs.pressSingleColor.getValue())
++        hex.setText("#376BAD")
++        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
++        shadowOf(Looper.getMainLooper()).idle()
++        assertFalse(dialog.isShowing)
++        assertEquals(0xFF376BAD.toInt(), prefs.pressSingleColor.getValue())
++        assertEquals(ThemePrefs.PressColorMode.Single, prefs.pressColorMode.getValue())
++        ui.dismissDialogs()
++        controller.pause().stop().destroy()
++    }
++
++    @Test fun customPaletteEditsAddsAndRemovesRealStoredColoursUpToEight() {
++        val controller = activity()
++        val activity = controller.get()
++        val ui = LightEffectSettingsUi(activity)
++        activity.setContentView(ui.root)
++        ui.modeButtons.getValue(ThemePrefs.PressColorMode.Custom).performClick()
++        repeat(5) { ui.root.findViewWithTag<Button>("effect-color-add").performClick() }
++        assertEquals(8, ThemeManager.prefs.userPressColors().size)
++        assertFalse(ui.root.findViewWithTag<Button>("effect-color-add").isEnabled)
++        ui.root.findViewWithTag<Button>("effect-custom-color-7").performClick()
++        shadowOf(Looper.getMainLooper()).idle()
++        val dialog = ui.activeColorDialog!!
++        dialog.window!!.decorView.findViewWithTag<EditText>("effect-color-hex").setText("#A1B2C3")
++        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
++        shadowOf(Looper.getMainLooper()).idle()
++        assertEquals(0xFFA1B2C3.toInt(), ThemeManager.prefs.userPressColors().last())
++        repeat(8) { ui.root.findViewWithTag<Button>("effect-custom-color-0").performLongClick() }
++        assertEquals(1, ThemeManager.prefs.userPressColors().size)
++        ui.dismissDialogs()
++        controller.pause().stop().destroy()
++    }
++
++    @Test fun openingThePageKeepsExistingTimingsAndSliderReleasePersistsTheChosenDuration() {
++        val prefs = ThemeManager.prefs
++        prefs.pressExpansionTime.setValue(1410)
++        prefs.pressFadeOutTime.setValue(450)
++        val ui = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
++        assertEquals(1410, prefs.pressExpansionTime.getValue())
++        assertEquals(450, prefs.pressFadeOutTime.getValue())
++        val control = ui.durationControls.getValue(prefs.pressExpansionTime.key)
++        control.slider.progress = 95 // 100 + 95*20 = 2000 ms.
++        assertEquals(1410, prefs.pressExpansionTime.getValue())
++        control.commit()
++        assertEquals(2000, prefs.pressExpansionTime.getValue())
++        assertEquals(350, prefs.pressWaveHoldTime.getValue())
++    }
++
++    @Test fun openingRandomModeDisplaysItsActualLegacyPaletteWithoutChangingPreferences() {
++        val prefs = ThemeManager.prefs
++        prefs.pressCustomColorCount.setValue(2)
++        prefs.pressCustomColor1.setValue(ThemePrefs.NeonColor.Magenta)
++        prefs.pressCustomColor2.setValue(ThemePrefs.NeonColor.Yellow)
++        val theme = runCatching { ThemeManager.activeTheme }.getOrDefault(ThemeManager.DefaultTheme)
++        val expected = linkedMapOf(
++            ThemePrefs.PressEffectPalette.SamsungCool to PressEffect.SAMSUNG_COOL,
++            ThemePrefs.PressEffectPalette.Cool to PressEffect.COOL,
++            ThemePrefs.PressEffectPalette.Rainbow to PressEffect.RAINBOW,
++            ThemePrefs.PressEffectPalette.Berry to PressEffect.BERRY,
++            ThemePrefs.PressEffectPalette.Cyberpunk to PressEffect.CYBERPUNK,
++            ThemePrefs.PressEffectPalette.Accent to intArrayOf(theme.accentKeyBackgroundColor.takeIf { it ushr 24 != 0 } ?: 0xFF76B5FF.toInt()),
++            ThemePrefs.PressEffectPalette.Custom to intArrayOf(ThemePrefs.NeonColor.Magenta.argb, ThemePrefs.NeonColor.Yellow.argb)
++        )
++        val stored = ReflectionHelpers.getField<SharedPreferences>(prefs, "sharedPreferences")
++        expected.forEach { (palette, colors) ->
++            prefs.pressEffectPalette.setValue(palette)
++            val before = stored.all.toMap()
++            val ui = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
++            val preview = ui.root.findViewWithTag<LinearLayout>("effect-palette-preview")
++            assertEquals(palette.name, colors.size, preview.childCount)
++            colors.forEachIndexed { i, color ->
++                assertEquals(palette.name, color, (preview.getChildAt(i).background as GradientDrawable).color!!.defaultColor)
++            }
++            assertEquals(before, stored.all)
++            assertEquals(palette, prefs.pressEffectPalette.getValue())
++        }
++    }
++
++    @Test fun nativeFragmentOpensWithoutStartingTheInputEngine() {
++        val controller = activity()
++        val activity = controller.get()
++        val fragment = LightEffectSettingsFragment()
++        activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment).commitNow()
++        assertEquals("light-effect-settings", fragment.requireView().tag)
++        assertNotNull(fragment.requireView().findViewWithTag<View>("effect-mode-Single"))
++        controller.pause().stop().destroy()
++    }
++
++    @Test fun renderTheActualSettingsScreenAndNativeColourEditor() {
++        val controller = activity()
++        val activity = controller.get()
++        val prefs = ThemeManager.prefs
++        prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Custom)
++        prefs.pressUserColors.setValue(PressColorPalette.encode(intArrayOf(0xFF18FFC1.toInt(), 0xFFD96EFF.toInt(),
++            0xFFFF8A32.toInt(), 0xFF00DAFF.toInt(), 0xFFFF3FA5.toInt(), 0xFFB1FF42.toInt())))
++        val ui = LightEffectSettingsUi(activity)
++        activity.setContentView(ui.root)
++        shadowOf(Looper.getMainLooper()).idle()
++        layout(ui.root)
++        save(ui.root, "light-settings-colours")
++        val timingScroll = (ui.root.getChildAt(0).height - ui.root.height).coerceAtLeast(0)
++        assertTrue("Animation controls must extend beyond the palette viewport", timingScroll > 0)
++        ui.root.scrollTo(0, timingScroll)
++        ui.root.requestLayout()
++        shadowOf(Looper.getMainLooper()).idle()
++        layout(ui.root)
++        ui.root.invalidate()
++        shadowOf(Looper.getMainLooper()).idle()
++        assertTrue("Scroll must finish before capturing the timing screen", ui.root.scrollY > 0)
++        listOf(prefs.pressFadeOutTime, prefs.pressKeyHoldTime, prefs.pressKeyRetreatTime).forEach { pref ->
++            val control = ui.durationControls.getValue(pref.key).root
++            val visible = Rect()
++            assertTrue("${pref.key} must be visible in the timing screenshot", control.getGlobalVisibleRect(visible))
++            assertTrue("${pref.key} must show its label and slider", visible.height() >= control.height)
++        }
++        val timing = captureScrollViewport(ui.root)
++        listOf(prefs.pressFadeOutTime, prefs.pressKeyHoldTime, prefs.pressKeyRetreatTime).forEach { pref ->
++            assertSliderPixelsAreVisible(timing, ui.root, ui.durationControls.getValue(pref.key).slider)
++        }
++        save(timing, "light-settings-timing")
++        ui.root.findViewWithTag<Button>("effect-custom-color-0").performClick()
++        shadowOf(Looper.getMainLooper()).idle()
++        val decor = ui.activeColorDialog!!.window!!.decorView
++        layout(decor, 540, 860)
++        save(decor, "light-settings-colour-editor")
++        ui.dismissDialogs()
++        controller.pause().stop().destroy()
++    }
++}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PopupPreviewLifecycleTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PopupPreviewLifecycleTest.kt
 new file mode 100644
 index 0000000..990d955
@@ -6779,6 +7938,359 @@ index 0000000..990d955
 +            PopupAnimationPolicy.canMatchPressColor(true, false, true, true))
 +    }
 +}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressColorSettingsTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressColorSettingsTest.kt
+new file mode 100644
+index 0000000..b8565ad
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/PressColorSettingsTest.kt
+@@ -0,0 +1,347 @@
++/*
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
++ */
++package org.fcitx.fcitx5.android
++
++import android.app.Application
++import android.content.Context
++import android.content.SharedPreferences
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Rect
++import android.os.Looper
++import android.os.SystemClock
++import android.view.MotionEvent
++import android.view.View
++import android.view.ViewGroup
++import android.widget.FrameLayout
++import androidx.activity.ComponentActivity
++import org.fcitx.fcitx5.android.data.prefs.AppPrefs
++import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
++import org.fcitx.fcitx5.android.data.theme.PressColorPalette
++import org.fcitx.fcitx5.android.data.theme.ThemeManager
++import org.fcitx.fcitx5.android.data.theme.ThemePrefs
++import org.fcitx.fcitx5.android.data.theme.ThemePreset
++import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
++import org.fcitx.fcitx5.android.input.keyboard.KeyDef
++import org.fcitx.fcitx5.android.input.keyboard.KeyView
++import org.fcitx.fcitx5.android.input.keyboard.PressEffect
++import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
++import org.fcitx.fcitx5.android.input.popup.PopupAction
++import org.fcitx.fcitx5.android.input.popup.PopupActionListener
++import org.fcitx.fcitx5.android.input.popup.PopupComponent
++import org.fcitx.fcitx5.android.input.popup.PopupEntryUi
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.RuntimeEnvironment
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import org.robolectric.annotation.LooperMode
++import org.robolectric.shadows.ShadowChoreographer
++import org.robolectric.util.ReflectionHelpers
++import java.time.Duration
++import kotlin.math.abs
++import kotlin.random.Random
++
++/** User RGB values must survive settings, keyboard construction and popup colour routing. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [33], application = Application::class, qualifiers = "zh-rCN-w600dp-h900dp-mdpi")
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++@LooperMode(LooperMode.Mode.PAUSED)
++class PressColorSettingsTest {
++    private var oldUiApplication: Any? = null
++
++    @Before
++    fun prepareWithoutStartingTheNativeEngine() {
++        val application = RuntimeEnvironment.getApplication()
++        val instance = FcitxApplication::class.java.getDeclaredField("instance").apply { isAccessible = true }
++        oldUiApplication = instance.get(null)
++        val uiApplication = FcitxApplication()
++        ReflectionHelpers.callInstanceMethod<Void>(uiApplication, "attachBaseContext",
++            ReflectionHelpers.ClassParameter.from(Context::class.java, application))
++        instance.set(null, uiApplication)
++        AppPrefs.init(application.getSharedPreferences("press-color-settings", Context.MODE_PRIVATE))
++    }
++
++    @After
++    fun restoreUiApplication() {
++        FcitxApplication::class.java.getDeclaredField("instance").apply {
++            isAccessible = true
++            set(null, oldUiApplication)
++        }
++    }
++
++    private class Harness {
++        init {
++            ShadowChoreographer.setPaused(true)
++            ShadowChoreographer.setFrameDelay(Duration.ofMillis(16))
++        }
++
++        private val restore = mutableListOf<() -> Unit>()
++        private val saved = mutableSetOf<Pair<SharedPreferences, String>>()
++        private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        private val activity = controller.get()
++        private val root = FrameLayout(activity)
++        private val popup = PopupComponent()
++        private val preview = PopupEntryUi(activity, ThemePreset.XuancaiBlackV09, 52, 12f)
++        private var keyboard: TextKeyboard? = null
++        private var unlitFace = intArrayOf(0, 0, 0)
++        private var downTime = 0L
++        private var popupTint: Int? = null
++        val prefs = ThemeManager.prefs
++
++        init {
++            setting(prefs.pressEffect, true)
++            setting(prefs.idleBreathing, false)
++            setting(prefs.effectsFollowSystemAnimation, false)
++            setting(prefs.pressGlowBrightness, 0)
++            setting(prefs.keyColorStyle, ThemePrefs.KeyColorStyle.Fill)
++            setting(prefs.keyExitStyle, ThemePrefs.KeyExitStyle.Dim)
++            setting(prefs.keyMotionEffect, ThemePrefs.KeyMotionEffect.Off)
++            setting(prefs.coloredPreview, true)
++            setting(prefs.previewSameColor, true)
++            setting(AppPrefs.getInstance().advanced.disableAnimation, false)
++            setting(AppPrefs.getInstance().keyboard.popupOnKeyPress, true)
++            activity.setTheme(R.style.Theme_InputViewTheme)
++            activity.setContentView(root)
++            root.addView(preview.root, FrameLayout.LayoutParams(44, 100))
++            controller.visible()
++            advance(32)
++            root.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
++                View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY))
++            root.layout(0, 0, 360, 400)
++            assertTrue(root.isAttachedToWindow && root.isShown)
++        }
++
++        fun <T : Any> setting(preference: ManagedPreference<T>, value: T) {
++            if (saved.add(preference.sharedPreferences to preference.key)) {
++                val existed = preference.sharedPreferences.contains(preference.key)
++                val old = preference.getValue()
++                restore.add {
++                    if (existed) preference.setValue(old)
++                    else preference.sharedPreferences.edit().remove(preference.key).commit()
++                }
++            }
++            preference.setValue(value)
++        }
++
++        fun rebuild() {
++            keyboard?.let { it.onDetach(); root.removeView(it) }
++            val next = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++            keyboard = next
++            root.addView(next, 0, FrameLayout.LayoutParams(360, 260))
++            next.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
++                View.MeasureSpec.makeMeasureSpec(260, View.MeasureSpec.EXACTLY))
++            next.layout(0, 0, 360, 260)
++            keys(next).forEach { it.longPressEnabled = false; it.repeatEnabled = false }
++            next.keyActionListener = KeyActionListener { _, _ -> }
++            val effect = ReflectionHelpers.getField<PressEffect>(next, "pressEffectLayer")
++            ReflectionHelpers.setField(effect, "random", Random(1405))
++            next.popupActionListener = PopupActionListener { action ->
++                if (action is PopupAction.PreviewAction) {
++                    // Invoke the production resolver without constructing engine dependencies.
++                    val tint = ReflectionHelpers.callInstanceMethod<Int?>(popup, "nextPreviewColor",
++                        ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType!!, action.viewId))
++                    popupTint = tint
++                    preview.setText(action.content)
++                    preview.tint(tint)
++                }
++            }
++            assertTrue(next.isAttachedToWindow && next.isShown)
++            unlitFace = sample(render(), key())
++        }
++
++        private fun keys(view: View): List<KeyView> = when (view) {
++            is KeyView -> listOf(view)
++            is ViewGroup -> (0 until view.childCount).flatMap { keys(view.getChildAt(it)) }
++            else -> emptyList()
++        }
++
++        private fun key() = keys(keyboard!!).first {
++            (it.def as? KeyDef.Appearance.Text)?.displayText == "A"
++        }
++
++        private fun bounds(key: KeyView) = Rect().also {
++            key.getDrawingRect(it)
++            keyboard!!.offsetDescendantRectToMyCoords(key, it)
++        }
++
++        private fun touch(action: Int, key: KeyView) {
++            if (action == MotionEvent.ACTION_DOWN) downTime = SystemClock.uptimeMillis()
++            val rect = bounds(key)
++            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
++                rect.exactCenterX(), rect.exactCenterY(), 0)
++            try { assertTrue(keyboard!!.dispatchTouchEvent(event)) }
++            finally { event.recycle() }
++        }
++
++        private fun render(): Bitmap = Bitmap.createBitmap(360, 260, Bitmap.Config.ARGB_8888).also {
++            keyboard!!.draw(Canvas(it).apply { drawColor(Color.BLACK) })
++        }
++
++        /** A patch beside the glyph measures the key face through its real view background. */
++        private fun sample(image: Bitmap, key: KeyView): IntArray {
++            val rect = bounds(key)
++            val x = rect.left + key.hMargin + ((rect.width() - key.hMargin * 2) * 0.18f).toInt()
++            val y = rect.top + key.vMargin + ((rect.height() - key.vMargin * 2) * 0.55f).toInt()
++            val rgb = IntArray(3)
++            for (dy in -1..1) for (dx in -1..1) {
++                val colour = image.getPixel(x + dx, y + dy)
++                rgb[0] += Color.red(colour); rgb[1] += Color.green(colour); rgb[2] += Color.blue(colour)
++            }
++            return rgb.map { it / 9 }.toIntArray()
++        }
++
++        fun pressAndCheck(): Int {
++            val key = key()
++            popupTint = null
++            touch(MotionEvent.ACTION_DOWN, key)
++            try {
++                val colour = PressEffect.colorForKey(key.id)
++                assertNotNull("A real DOWN must publish its current key colour", colour)
++                val tint = colour!!
++                assertEquals("The real popup resolver must select the current arbitrary RGB", tint, popupTint)
++                val popupImage = Bitmap.createBitmap(44, 52, Bitmap.Config.ARGB_8888)
++                preview.textView.background.apply {
++                    setBounds(0, 0, 44, 52)
++                    draw(Canvas(popupImage))
++                }
++                assertEquals("The rendered bubble must retain that exact colour", tint, popupImage.getPixel(6, 26))
++                val actual = sample(render(), key)
++                val channels = intArrayOf(Color.red(tint), Color.green(tint), Color.blue(tint))
++                for (i in 0..2) {
++                    val expected = (channels[i] * 0.92f + unlitFace[i] * 0.08f).toInt()
++                    assertTrue("Real key face channel $i must follow the chosen RGB: ${actual.toList()}",
++                        abs(actual[i] - expected) <= 8)
++                }
++                return tint
++            } finally {
++                touch(MotionEvent.ACTION_UP, key)
++                advance(16)
++            }
++        }
++
++        private fun advance(milliseconds: Long) {
++            var remaining = milliseconds
++            while (remaining > 0) {
++                val step = minOf(remaining, 16L)
++                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(step))
++                remaining -= step
++            }
++        }
++
++        fun finish() {
++            try {
++                keyboard?.onDetach()
++                controller.pause().stop().destroy()
++            } finally {
++                restore.asReversed().forEach { it() }
++                ShadowChoreographer.setPaused(false)
++            }
++        }
++    }
++
++    @Test
++    fun anArbitrarySingleRgbPersistsAndSurvivesRebuildingTheRealKeyboard() {
++        val orange = 0xffff8a32.toInt()
++        assertFalse(ThemePrefs.NeonColor.entries.any { it.argb == orange })
++        val h = Harness()
++        try {
++            h.setting(h.prefs.pressColorMode, ThemePrefs.PressColorMode.Single)
++            h.setting(h.prefs.pressSingleColor, orange)
++            h.setting(h.prefs.pressUserColors, "#18FFC1,#D96EFF")
++            h.setting(h.prefs.pressExpansionTime, 1400)
++            h.setting(h.prefs.pressWaveHoldTime, 350)
++            h.setting(h.prefs.pressFadeOutTime, 900)
++            h.rebuild()
++            repeat(4) { assertEquals(orange, h.pressAndCheck()) }
++
++            val storage = h.prefs.pressSingleColor.sharedPreferences
++            assertEquals(orange, storage.getInt("press_single_argb", 0))
++            assertEquals("#18FFC1,#D96EFF", storage.getString("press_user_colors", null))
++            // A fresh preference provider reads persisted data, not the previous objects.
++            val reopened = ThemePrefs(storage)
++            assertEquals(ThemePrefs.PressColorMode.Single, reopened.pressColorMode.getValue())
++            assertEquals(orange, reopened.pressSingleColor.getValue())
++            assertArrayEquals(intArrayOf(0xff18ffc1.toInt(), 0xffd96eff.toInt()), reopened.userPressColors())
++            assertEquals(1400, reopened.pressExpansionTime.getValue())
++            assertEquals(350, reopened.pressWaveHoldTime.getValue())
++            assertEquals(900, reopened.pressFadeOutTime.getValue())
++            h.rebuild()
++            repeat(3) { assertEquals(orange, h.pressAndCheck()) }
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun aCustomRgbPairIsTheOnlySourceForRealKeysAndTheirBubbles() {
++        val expected = setOf(0xff18ffc1.toInt(), 0xffd96eff.toInt())
++        val h = Harness()
++        try {
++            h.setting(h.prefs.pressColorMode, ThemePrefs.PressColorMode.Custom)
++            h.setting(h.prefs.pressUserColors, "#18FFC1,#D96EFF")
++            h.setting(h.prefs.pressEffectPalette, ThemePrefs.PressEffectPalette.Rainbow)
++            h.rebuild()
++            val observed = (0 until 8).map { h.pressAndCheck() }.toSet()
++            assertEquals("Custom mode must use both user colours and no preset colours", expected, observed)
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun legacyRandomModeKeepsItsSavedNeonCustomPalette() {
++        val expected = setOf(ThemePrefs.NeonColor.IceBlue.argb, ThemePrefs.NeonColor.Magenta.argb)
++        val h = Harness()
++        try {
++            h.setting(h.prefs.pressColorMode, ThemePrefs.PressColorMode.Random)
++            h.setting(h.prefs.pressEffectPalette, ThemePrefs.PressEffectPalette.Custom)
++            h.setting(h.prefs.pressCustomColorCount, 2)
++            h.setting(h.prefs.pressCustomColor1, ThemePrefs.NeonColor.IceBlue)
++            h.setting(h.prefs.pressCustomColor2, ThemePrefs.NeonColor.Magenta)
++            h.setting(h.prefs.pressUserColors, "#18FFC1,#D96EFF")
++            h.setting(h.prefs.pressSingleColor, 0xffff8a32.toInt())
++            h.rebuild()
++            assertEquals("Existing custom NeonColor settings must remain the Random-mode palette",
++                expected, (0 until 6).map { h.pressAndCheck() }.toSet())
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun rgbTextRoundTripsAndBoundsTheUserPaletteToEightColours() {
++        assertEquals(0xff18ffc1.toInt(), PressColorPalette.parseColor("  #18ffC1  "))
++        assertEquals("#18FFC1", PressColorPalette.formatColor(0x0018ffc1))
++        assertNull(PressColorPalette.parseColor("#F80"))
++        assertNull(PressColorPalette.parseColor("#11223344"))
++        assertNull(PressColorPalette.parseColor("not-a-colour"))
++        val eight = intArrayOf(0xff102030.toInt(), 0xff203040.toInt(), 0xff304050.toInt(),
++            0xff405060.toInt(), 0xff506070.toInt(), 0xff607080.toInt(), 0xff708090.toInt(), 0xff8090a0.toInt())
++        val encoded = PressColorPalette.encode(eight + intArrayOf(0xff90a0b0.toInt(), 0xffa0b0c0.toInt()))
++        assertArrayEquals(eight, PressColorPalette.parse(encoded))
++        assertArrayEquals(eight, PressColorPalette.parse(encoded + ",#90A0B0,invalid,#A0B0C0"))
++    }
++
++    @Test
++    fun invalidUserPaletteFallsBackToTheSavedLegacyColours() {
++        val context = RuntimeEnvironment.getApplication()
++        val storage = context.getSharedPreferences("invalid-user-press-palette", Context.MODE_PRIVATE)
++        storage.edit().clear().commit()
++        try {
++            val legacy = ThemePrefs(storage)
++            legacy.pressCustomColorCount.setValue(2)
++            legacy.pressCustomColor1.setValue(ThemePrefs.NeonColor.Mint)
++            legacy.pressCustomColor2.setValue(ThemePrefs.NeonColor.Purple)
++            legacy.pressUserColors.setValue("#F80,broken,#11223344")
++            val reopened = ThemePrefs(storage)
++            assertArrayEquals("An invalid custom string must not silently replace a user's saved legacy palette",
++                intArrayOf(ThemePrefs.NeonColor.Mint.argb, ThemePrefs.NeonColor.Purple.argb), reopened.userPressColors())
++            reopened.pressUserColors.setValue("broken,#18FFC1")
++            assertArrayEquals(intArrayOf(0xff18ffc1.toInt()), reopened.userPressColors())
++        } finally { storage.edit().clear().commit() }
++    }
++}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
 new file mode 100644
 index 0000000..a34c98f
@@ -6870,10 +8382,10 @@ index 0000000..a34c98f
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
 new file mode 100644
-index 0000000..62e359b
+index 0000000..0375df4
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
-@@ -0,0 +1,630 @@
+@@ -0,0 +1,861 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
@@ -6906,7 +8418,8 @@ index 0000000..62e359b
 +    private class Harness(press: Boolean = false, expansion: Int = 500, fade: Int = 280,
 +        ignition: Int = 100, hold: Int = 260, retreat: Int = 480,
 +        production: Boolean = false, palette: IntArray = PressEffect.CYBERPUNK, sequential: Boolean = false,
-+        glowBrightness: Int = 100, randomSeed: Int? = null) {
++        glowBrightness: Int = 100, randomSeed: Int? = null,
++        waveHold: Int = 0, idle: Boolean = true) {
 +        val controller = Robolectric.buildActivity(Activity::class.java).setup()
 +        val activity = controller.get()
 +        val root = FrameLayout(activity)
@@ -6921,12 +8434,12 @@ index 0000000..62e359b
 +        var enabled = true
 +        val envelope = IdleBreathing()
 +        val effect = PressEffect(host, palette, true, 100, expansion, fade, 0,
-+            press, true, envelope, intArrayOf(0xff00f0ff.toInt(), 0xffbe38ff.toInt()),
++            press, idle, envelope, intArrayOf(0xff00f0ff.toInt(), 0xffbe38ff.toInt()),
 +            clock = { now }, ignitionTimeMs = ignition, keyHoldTimeMs = hold,
 +            keyRetreatTimeMs = retreat, animationsAllowed = { enabled },
 +            keySurfaceEffects = production, holdWhilePressed = production, dimExit = production,
 +            exactKeyShape = production, normalizeOldLight = production, keyCornerRadius = 5f,
-+            sequentialColors = sequential, glowBrightnessPercent = glowBrightness)
++            sequentialColors = sequential, glowBrightnessPercent = glowBrightness, waveHoldTimeMs = waveHold)
 +
 +        init {
 +            if (randomSeed != null) org.robolectric.util.ReflectionHelpers.setField(effect, "random", kotlin.random.Random(randomSeed))
@@ -6959,6 +8472,16 @@ index 0000000..62e359b
 +            canvas.drawColor(Color.BLACK)
 +            val brightness = effect.drawKeySurface(canvas, keyId, 60, 70)
 +            return image to brightness
++        }
++
++        fun candidate(time: Long): Bitmap {
++            now = time
++            val image = Bitmap.createBitmap(600, 60, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(image)
++            canvas.drawColor(Color.BLACK)
++            canvas.translate(0f, 60f)
++            effect.drawExtension(canvas)
++            return image
 +        }
 +
 +        fun press(keyId: Int, pointerId: Int, time: Long, x: Int = 300) {
@@ -7503,6 +9026,226 @@ index 0000000..62e359b
 +        } finally { h.finish() }
 +    }
 +
++    @Test
++    fun productionSlowWaveHasARealHoldThenUsesTheConfiguredFade() {
++        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
++            fade = 900, hold = 120, retreat = 1800, idle = false,
++            palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        fun pixels(image: Bitmap): IntArray = IntArray(image.width * image.height).also {
++            image.getPixels(it, 0, image.width, 0, 0, image.width, image.height)
++        }
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0).recycle()
++            h.press(801, 0, 0)
++            h.now = 50
++            h.effect.onRelease(0)
++            val heldEarly = h.render(1550)
++            val heldLate = h.render(1800)
++            assertTrue("The fully expanded hold must retain visible colour", peak(heldEarly) > 30)
++            assertArrayEquals("Hold must preserve shape and brightness before fade starts", pixels(heldEarly), pixels(heldLate))
++            val fading = h.render(2400)
++            assertTrue("A 900ms fade must still have a visible field beyond the old 1450ms limit", peak(fading) > 10)
++            assertTrue("Fade changes opacity without cutting the whole field at once", peak(fading) < peak(heldLate))
++            assertEquals("100 + 1400 + 350 + 900 completes at 2750ms", 0, peak(h.render(2750)))
++            save(heldEarly, "soft-wave-hold-1550ms")
++            save(heldLate, "soft-wave-hold-1800ms")
++            save(fading, "soft-wave-fade-2400ms")
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun productionLongExpansionHoldAndFadeReachTheirActualConfiguredEnd() {
++        val h = Harness(press = true, production = true, expansion = 4000, waveHold = 2000,
++            fade = 5000, hold = 120, retreat = 5000, idle = false,
++            palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        fun pixels(image: Bitmap): IntArray = IntArray(image.width * image.height).also {
++            image.getPixels(it, 0, image.width, 0, 0, image.width, image.height)
++        }
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0).recycle()
++            h.press(802, 0, 0)
++            h.now = 50
++            h.effect.onRelease(0)
++            val early = h.render(200)
++            assertTrue("Long expansion must still start promptly", peak(early) > 80)
++            val holdStart = h.render(4400)
++            val holdEnd = h.render(5800)
++            assertArrayEquals("A 2000ms hold must not be replaced by an old fixed timeout", pixels(holdStart), pixels(holdEnd))
++            val late = h.render(9000)
++            assertTrue("The 5000ms fade must retain real pixels at 9000ms", peak(late) > 12)
++            assertEquals("100 + 4000 + 2000 + 5000 reaches 11100ms", 0, peak(h.render(11100)))
++            save(early, "long-setting-local-200ms")
++            save(holdEnd, "long-setting-hold-5800ms")
++            save(late, "long-setting-fade-9000ms")
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun productionExpansionSliderChangesTheActualFrontWithoutSlowingTheLocalStart() {
++        fun radius(image: Bitmap): Double {
++            var weighted = 0.0
++            var energy = 0.0
++            for (y in 0 until image.height) for (x in 0 until image.width) {
++                val pixel = image.getPixel(x, y)
++                val value = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++                if (value <= 2) continue
++                energy += value
++                weighted += value * kotlin.math.hypot((x - 300).toDouble(), (y - 100).toDouble())
++            }
++            return weighted / energy
++        }
++        fun renderCase(expansion: Int): Pair<Bitmap, Bitmap> {
++            val h = Harness(press = true, production = true, expansion = expansion, waveHold = 350,
++                fade = 900, hold = 120, retreat = 1800, idle = false,
++                palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++            try {
++                h.effect.prepareTexturesForTest()
++                h.render(0).recycle()
++                h.press(803, 0, 0)
++                h.now = 50
++                h.effect.onRelease(0)
++                return h.render(200) to h.render(950)
++            } finally { h.finish() }
++        }
++        val fast = renderCase(900)
++        val slow = renderCase(4000)
++        assertTrue("Both speeds need immediate visible local feedback", peak(fast.first) > 80 && peak(slow.first) > 80)
++        assertTrue("The configured expansion time must change the rendered propagation distance",
++            radius(fast.second) >= radius(slow.second) + 20.0)
++        save(fast.second, "expansion-900ms-front-at-950ms")
++        save(slow.second, "expansion-4000ms-front-at-950ms")
++    }
++
++    @Test
++    fun productionLongSettingsKeepTheNewestTypingLightAndFixedWaveStorage() {
++        val h = Harness(press = true, production = true, expansion = 4000, waveHold = 2000,
++            fade = 5000, hold = 120, retreat = 5000, idle = false,
++            palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0).recycle()
++            val trail = org.robolectric.util.ReflectionHelpers.getField<org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail>(h.effect, "ripples")
++            val identities = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail.Ripple, Boolean>())
++            var lastTime = 0L
++            repeat(80) { i ->
++                h.press(900 + i, 0, i * 150L)
++                h.render(i * 150L).recycle()
++                h.now += 50
++                h.effect.onRelease(0)
++                lastTime = i * 150L + 149
++                val image = h.render(lastTime)
++                assertTrue("Long trails must not divide the latest light among dozens of waves", trail[trail.size - 1].lightGain >= 0.45f)
++                assertTrue("The long-setting active field remains visible", peak(image) > 70)
++                for (j in 0 until trail.size) identities.add(trail[j])
++                assertTrue("Wave storage stays bounded regardless of the selected duration", trail.size <= 32)
++                image.recycle()
++            }
++            assertEquals("Typing reuses exactly the fixed 32 wave objects", 32, identities.size)
++            val gains = mutableMapOf<Long, Float>()
++            val bridgeGains = mutableMapOf<Long, Float>()
++            for (i in 0 until trail.size) gains[trail[i].start] = trail[i].lightGain
++            for (i in 0 until trail.size) bridgeGains[trail[i].start] = trail[i].bridgeGain
++            repeat(12) { step ->
++                h.render(lastTime + (step + 1) * 400L).recycle()
++                for (i in 0 until trail.size) {
++                    val r = trail[i]
++                    assertTrue("Long-set tails cannot become brighter after a burst", r.lightGain <= gains[r.start]!! + 0.0001f)
++                    assertTrue("The far bridge also cannot brighten as other waves disappear", r.bridgeGain <= bridgeGains[r.start]!! + 0.0001f)
++                    gains[r.start] = r.lightGain
++                    bridgeGains[r.start] = r.bridgeGain
++                }
++            }
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun productionSlowTypingLetsTheWeakBridgeReachTheCandidateStrip() {
++        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
++            fade = 900, hold = 120, retreat = 1800, idle = false,
++            palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        fun colouredStripArea(image: Bitmap): Int {
++            var count = 0
++            for (y in 0 until 7) for (x in 0 until image.width) {
++                val p = image.getPixel(x, y)
++                val high = maxOf(Color.red(p), Color.green(p), Color.blue(p))
++                val low = minOf(Color.red(p), Color.green(p), Color.blue(p))
++                if (high > 30 && high - low >= 15) count++
++            }
++            return count
++        }
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0).recycle()
++            val trail = org.robolectric.util.ReflectionHelpers.getField<org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail>(h.effect, "ripples")
++            var visibleSamples = 0
++            repeat(24) { i ->
++                val time = i * 150L
++                h.press(1100 + i, 0, time, intArrayOf(120, 300, 480)[i % 3])
++                h.render(time).recycle()
++                h.now = time + 50
++                h.effect.onRelease(0)
++                h.render(time + 149).recycle()
++                val candidate = h.candidate(time + 149)
++                if (colouredStripArea(candidate) >= 630) visibleSamples++
++                if (i == 22) save(candidate, "soft-typing-candidate-bridge")
++                candidate.recycle()
++            }
++            assertTrue("A long expansion must retain a visible coloured bridge during input", visibleSamples >= 3)
++            assertTrue("A travelling bridge must not inherit the newest key's local attention cutoff",
++                trail[0].bridgeGain > trail[0].lightGain)
++            val past = mutableMapOf<Long, Float>()
++            for (i in 0 until trail.size) past[trail[i].start] = trail[i].bridgeGain
++            repeat(10) { step ->
++                h.render(3599L + (step + 1) * 200L).recycle()
++                for (i in 0 until trail.size) {
++                    val r = trail[i]
++                    assertTrue("Stopping input cannot relight the weak candidate bridge", r.bridgeGain <= past[r.start]!! + 0.0001f)
++                    past[r.start] = r.bridgeGain
++                }
++            }
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun productionArbitraryPalettePreservesEachChosenKeyAndCloudHue() {
++        val custom = intArrayOf(0xff8d23c2.toInt(), 0xff14a37f.toInt(), 0xffecb119.toInt())
++        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
++            fade = 900, hold = 120, retreat = 1800, idle = false,
++            palette = custom, sequential = true, randomSeed = 1401)
++        try {
++            h.effect.prepareTexturesForTest()
++            repeat(custom.size) { i ->
++                h.effect.clear()
++                val time = i * 3000L
++                h.render(time).recycle()
++                h.press(1001 + i, 0, time)
++                assertEquals("An arbitrary palette colour is the shared press/popup source", custom[i], PressEffect.colorForKey(1001 + i))
++                h.now = time + 50
++                h.effect.onRelease(0)
++                val cloud = h.render(time + 200)
++                var strongest = 0
++                var strongestValue = 0
++                for (y in 0 until cloud.height) for (x in 0 until cloud.width) {
++                    if (x in 270 until 330 && y in 65 until 135) continue
++                    val pixel = cloud.getPixel(x, y)
++                    val value = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++                    if (value > strongestValue) { strongestValue = value; strongest = pixel }
++                }
++                assertTrue("Every custom colour needs actual peripheral pixels", strongestValue > 40)
++                val expectedHue = FloatArray(3)
++                val actualHue = FloatArray(3)
++                Color.colorToHSV(custom[i], expectedHue)
++                Color.colorToHSV(strongest, actualHue)
++                val difference = kotlin.math.abs(expectedHue[0] - actualHue[0])
++                assertTrue("A cloud must retain its selected base hue", minOf(difference, 360f - difference) < 3f)
++                save(cloud, "custom-colour-${i + 1}-flow")
++                cloud.recycle()
++            }
++        } finally { h.finish() }
++    }
++
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt
 new file mode 100644
@@ -7817,10 +9560,10 @@ index 6b9129f..afa223b 100644
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
 new file mode 100644
-index 0000000..ee21b7a
+index 0000000..b444d57
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
-@@ -0,0 +1,637 @@
+@@ -0,0 +1,800 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -7913,6 +9656,12 @@ index 0000000..ee21b7a
 +        val preferences = application.getSharedPreferences("v14-preview", Context.MODE_PRIVATE)
 +        preferences.edit().clear().commit()
 +        AppPrefs.init(preferences)
++        // AppPrefs.init is intentionally idempotent. Robolectric can reuse its already
++        // registered ThemePrefs from another test class, backed by a different file.
++        // Reset that actual file rather than leaving a previous palette/timing fixture active.
++        ThemeManager.prefs.pressEffect.sharedPreferences.edit().clear().commit()
++        assertEquals(ThemePrefs.PressColorMode.Random, ThemeManager.prefs.pressColorMode.getValue())
++        assertEquals(ThemePrefs.PressEffectPalette.Cyberpunk, ThemeManager.prefs.pressEffectPalette.getValue())
 +    }
 +
 +    @After
@@ -8052,6 +9801,35 @@ index 0000000..ee21b7a
 +        return longest
 +    }
 +
++    private data class EffectTiming(
++        val ignition: Long,
++        val expansion: Long,
++        val hold: Long,
++        val fade: Long,
++        val keyHold: Long,
++        val keyRetreat: Long
++    ) {
++        val waveTotal get() = ignition + expansion + hold + fade
++        val releasedKeyTotal get() = 50L + keyHold + keyRetreat
++        val completeTail get() = maxOf(waveTotal, releasedKeyTotal)
++        fun provenance() = "ignition_ms=$ignition\nexpansion_ms=$expansion\nwave_hold_ms=$hold\n" +
++            "fade_ms=$fade\nwave_total_ms=$waveTotal\nkey_hold_ms=$keyHold\nkey_retreat_ms=$keyRetreat\n"
++    }
++
++    private fun defaultSoftTiming(): EffectTiming {
++        val prefs = ThemeManager.prefs
++        val timing = EffectTiming(prefs.pressIgnitionTime.getValue().toLong(),
++            prefs.pressExpansionTime.getValue().toLong(), prefs.pressWaveHoldTime.getValue().toLong(),
++            prefs.pressFadeOutTime.getValue().toLong(), prefs.pressKeyHoldTime.getValue().toLong(),
++            prefs.pressKeyRetreatTime.getValue().toLong())
++        assertEquals("Use the APK's complete default soft-wave timing", 2750L, timing.waveTotal)
++        assertEquals(1400L, timing.expansion)
++        assertEquals(350L, timing.hold)
++        assertEquals(900L, timing.fade)
++        assertEquals(1800L, timing.keyRetreat)
++        return timing
++    }
++
 +    /** Same reusable UI and lifecycle as PopupComponent, without its engine dependencies. */
 +    private inner class PreviewHost(private val root: FrameLayout) {
 +        private val entries = mutableMapOf<Int, PopupEntryUi>()
@@ -8112,6 +9890,9 @@ index 0000000..ee21b7a
 +
 +    @Test
 +    fun continuousTypingUsesRealTouchesKeyFacesCandidateExtensionAndPopupLifecycle() {
++        val timing = defaultSoftTiming()
++        // Isolate the press-wave tail from idle breathing, which has a separate envelope.
++        ThemeManager.prefs.idleBreathing.setValue(false)
 +        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
 +        val activity = controller.get()
 +        activity.setTheme(R.style.Theme_InputViewTheme)
@@ -8217,8 +9998,7 @@ index 0000000..ee21b7a
 +        }
 +        val keyRectangles = keys(keyboard).associate { it.id to screenBoundsIn(it, root)!! }
 +        val lastPressTimes = mutableMapOf<Int, Long>()
-+        val faceTail = 50L + ThemeManager.prefs.pressKeyHoldTime.getValue() +
-+            ThemeManager.prefs.pressKeyRetreatTime.getValue()
++        val faceTail = timing.releasedKeyTotal
 +        // A fixed, conservative mask enables before/after-stop comparisons without
 +        // gaining newly eligible pixels merely because an old key face has disappeared.
 +        val fixedGapMask = baseGapMask.copyOf()
@@ -8236,8 +10016,11 @@ index 0000000..ee21b7a
 +                exclude(fixedGapMask, previewRect, root.width, root.height)
 +            }
 +        val visibility = ArrayList<VisibilityFrame>()
-+        // 6.67 keys/sec, down for 50 ms, 20 fps; one second of the release tail is retained.
-+        for (frame in 0..92) {
++        val lastDown = (input.length - 1) * 150L
++        val lastUp = lastDown + 50L
++        // Preserve real 20fps time: retain the complete configured wave, then 450ms of black rest.
++        val finalFrame = ((lastDown + timing.completeTail + 450L + 49L) / 50L).toInt()
++        for (frame in 0..finalFrame) {
 +            reviewTime = start + frame * 50L
 +            layout(root)
 +            val index = frame / 3
@@ -8263,7 +10046,7 @@ index 0000000..ee21b7a
 +            layout(root)
 +            render(root).recycle() // The real legend changes ink in response to the new face light.
 +            val image = render(root)
-+            save(image, "v14-typing/frame-%03d".format(frame))
++            save(image, "v14-soft-typing/frame-%03d".format(frame))
 +            if (frame == 0) {
 +                val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == "L" }
 +                val rect = bounds(keyboard, key).apply { offset(0, 60) }
@@ -8304,8 +10087,8 @@ index 0000000..ee21b7a
 +        }
 +        assertEquals(input, typed.toString())
 +        assertEquals("两个黄鹂鸣翠柳", adapter.candidates.first().text)
-+        val active = visibility.filter { it.frame in 6..70 }
-+        val tail = visibility.filter { it.frame > 70 }
++        val active = visibility.filter { it.frame * 50L in 300L..lastUp }
++        val tail = visibility.filter { it.frame * 50L > lastUp }
 +        val summary = String.format(Locale.US,
 +            "seed=1401\nactive_gap_colour60_peak_area=%d\nactive_gap_colour60_visible_frames=%d\n" +
 +                "active_candidate_colour30_longest_run=%d\nactive_fixed_gap_peak_mean=%.2f\ntail_fixed_gap_peak_mean=%.2f\n",
@@ -8316,10 +10099,14 @@ index 0000000..ee21b7a
 +            "gap_centre_x,gap_centre_y,candidate_strip_pixels,candidate_mean_maxrgb,candidate_peak," +
 +            "candidate_colour_gt30,candidate_colour_gt60,fixed_gap_mean_maxrgb\n" +
 +            visibility.joinToString("\n") { it.csv() } + "\n"
-+        File("build/outputs/effect-checks/v14-typing/visibility.csv").writeText(csv)
-+        File("build/outputs/effect-checks/v14-typing/preview.txt").writeText(
++        File("build/outputs/effect-checks/v14-soft-typing/visibility.csv").writeText(csv)
++        File("build/outputs/effect-checks/v14-soft-typing/preview.txt").writeText(
 +            "source=Android TextKeyboard/CandidateUi/RippleBarView/PopupEntryUi\n" +
-+                "graphics=Robolectric NATIVE\nframes=93\nfps=20\nwidth=600\nheight=420\ndensity=hdpi\nlogical_width_dp=400\n" +
++                "graphics=Robolectric NATIVE\nframes=${finalFrame + 1}\nfps=20\nlast_frame_ms=${finalFrame * 50}\n" +
++                "width=600\nheight=420\ndensity=hdpi\nlogical_width_dp=400\nidle_breathing=false (isolated press-wave review)\n" +
++                "colour_mode=${ThemeManager.prefs.pressColorMode.getValue()}\n" +
++                "random_palette=${ThemeManager.prefs.pressEffectPalette.getValue()}\n" +
++                timing.provenance() +
 +                "key_interval_ms=150\nkey_hold_ms=50\ninput=$input\n" +
 +                "candidates=replay of real bundled Rime fixture; not live native execution in this UI test\n" +
 +                "measurement=actual KeyView bounds; baseline black gaps; active key cells and popup glyph bounds excluded\n" +
@@ -8336,6 +10123,12 @@ index 0000000..ee21b7a
 +            active.maxOf { it.candidate.meanMaxRgb } < 45.0)
 +        assertTrue("Stopping input must not release the old light into a much brighter wash: $summary",
 +            tail.maxOf { it.fixedGap.meanMaxRgb } <= active.maxOf { it.fixedGap.meanMaxRgb } * 1.6 + 5.0)
++        val restFrames = visibility.filter { it.frame * 50L >= lastDown + timing.completeTail + 100L }
++        assertTrue("The review must retain at least 300ms after the complete configured tail", restFrames.size >= 6)
++        assertTrue("After the soft tail, actual keyboard gaps return to the black baseline",
++            restFrames.all { it.gap.meanMaxRgb <= 3.0 && it.gap.colour30 == 0 })
++        assertTrue("The candidate strip also returns to its black baseline after the press wave",
++            restFrames.all { it.candidate.meanMaxRgb <= 3.0 && it.candidate.colour30 == 0 })
 +        previews.stop()
 +        keyboard.onDetach()
 +        controller.pause().stop().destroy()
@@ -8343,6 +10136,8 @@ index 0000000..ee21b7a
 +
 +    @Test
 +    fun oneReleasedKeyDimsThroughTheActualViewInsteadOfDisappearingOnUp() {
++        val timing = defaultSoftTiming()
++        ThemeManager.prefs.idleBreathing.setValue(false)
 +        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
 +        val activity = controller.get()
 +        activity.setTheme(R.style.Theme_InputViewTheme)
@@ -8363,12 +10158,22 @@ index 0000000..ee21b7a
 +        val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == "G" }
 +        val rect = bounds(keyboard, key)
 +        val idle = render(keyboard)
++        val idlePixels = IntArray(keyboard.width * keyboard.height).also {
++            idle.getPixels(it, 0, keyboard.width, 0, 0, keyboard.width, keyboard.height)
++        }
++        val gapMask = BooleanArray(idlePixels.size) { index ->
++            maxOf(Color.red(idlePixels[index]), Color.green(idlePixels[index]), Color.blue(idlePixels[index])) <= 3
++        }
++        // The still-lit G surface and its static edge are not evidence of a travelling wave.
++        exclude(gapMask, rect, keyboard.width, keyboard.height)
 +        val sampleX = rect.left + 10
 +        val sampleY = rect.bottom - 15
 +        val rest = idle.getPixel(sampleX, sampleY)
 +        var earlyDistance = 0
 +        var finalDistance = 0
-+        for (frame in 0..44) {
++        val finalFrame = ((timing.completeTail + 450L + 49L) / 50L).toInt()
++        val visibility = ArrayList<LightArea>()
++        for (frame in 0..finalFrame) {
 +            reviewTime = start + frame * 50L
 +            if (frame < 2) {
 +                val action = if (frame == 0) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_UP
@@ -8379,20 +10184,121 @@ index 0000000..ee21b7a
 +            layout(keyboard, 600, 360)
 +            render(keyboard).recycle()
 +            val image = render(keyboard)
-+            save(image, "v14-release/frame-%03d".format(frame))
++            save(image, "v14-soft-release/frame-%03d".format(frame))
 +            val pixel = image.getPixel(sampleX, sampleY)
 +            val difference = abs(Color.red(pixel) - Color.red(rest)) +
 +                abs(Color.green(pixel) - Color.green(rest)) + abs(Color.blue(pixel) - Color.blue(rest))
 +            if (frame == 2) earlyDistance = difference
-+            if (frame == 44) finalDistance = difference
++            if (frame == finalFrame) finalDistance = difference
++            val pixels = IntArray(idlePixels.size)
++            image.getPixels(pixels, 0, keyboard.width, 0, 0, keyboard.width, keyboard.height)
++            visibility.add(lightArea(pixels, gapMask, keyboard.width))
 +            image.recycle()
 +            advance(50)
 +        }
++        val csv = "frame,time_ms,gap_pixels,gap_mean_maxrgb,gap_peak,gap_colour_gt30,gap_colour_gt60\n" +
++            visibility.mapIndexed { frame, area -> String.format(Locale.US, "%d,%d,%d,%.2f,%d,%d,%d",
++                frame, frame * 50, area.pixels, area.meanMaxRgb, area.peak, area.colour30, area.colour60) }
++                .joinToString("\n") + "\n"
++        File("build/outputs/effect-checks/v14-soft-release/visibility.csv").writeText(csv)
++        File("build/outputs/effect-checks/v14-soft-release/preview.txt").writeText(
++            "source=Android TextKeyboard\ngraphics=Robolectric NATIVE\nframes=${finalFrame + 1}\nfps=20\n" +
++                "last_frame_ms=${finalFrame * 50}\nwidth=600\nheight=360\ndensity=hdpi\nseed=1401\n" +
++                "colour_mode=${ThemeManager.prefs.pressColorMode.getValue()}\n" +
++                "random_palette=${ThemeManager.prefs.pressEffectPalette.getValue()}\n" +
++                "input=G\ndown_ms=0\nup_ms=50\npopup=absent (isolated key surface and travelling light)\n" +
++                "idle_breathing=false (isolated press-wave review)\n" + timing.provenance() + "\n" + csv)
 +        assertTrue("The key keeps a visible colour after release", earlyDistance > 50)
 +        assertTrue("The released key colour returns towards its original dark background",
 +            finalDistance < earlyDistance / 3)
++        assertTrue("The softer default keeps external light visible beyond the old short wave",
++            visibility.filterIndexed { frame, _ -> frame * 50L in 1550L..2000L }.any { it.colour30 >= 500 })
++        assertTrue("The isolated single-key wave fully returns to the black gaps after its configured tail",
++            visibility.filterIndexed { frame, _ -> frame * 50L >= timing.completeTail + 100L }
++                .all { it.meanMaxRgb <= 3.0 && it.colour30 == 0 })
 +        keyboard.onDetach()
 +        controller.pause().stop().destroy()
++    }
++
++    @Test
++    fun arbitrarySingleAndTwoColourChoicesRenderThroughTheProductionKeyboard() {
++        val timing = defaultSoftTiming()
++        val prefs = ThemeManager.prefs
++        prefs.idleBreathing.setValue(false)
++        val orange = Color.parseColor("#FF8A32")
++        val custom = setOf(Color.parseColor("#18FFC1"), Color.parseColor("#D96EFF"))
++        val provenance = StringBuilder("source=Android TextKeyboard/PopupEntryUi\ngraphics=Robolectric NATIVE\n" +
++            "density=hdpi\nseed=1401\nidle_breathing=false (isolated palette review)\n" + timing.provenance())
++        for (mode in listOf(ThemePrefs.PressColorMode.Single, ThemePrefs.PressColorMode.Custom)) {
++            prefs.pressColorMode.setValue(mode)
++            prefs.pressSingleColor.setValue(orange)
++            prefs.pressUserColors.setValue("#18FFC1,#D96EFF")
++            val allowed = if (mode == ThemePrefs.PressColorMode.Single) setOf(orange) else custom
++            val name = if (mode == ThemePrefs.PressColorMode.Single) "single-ff8a32" else "custom-18ffc1-d96eff"
++            val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++            val activity = controller.get()
++            activity.setTheme(R.style.Theme_InputViewTheme)
++            val root = FrameLayout(activity)
++            activity.setContentView(root)
++            val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++            root.addView(keyboard, FrameLayout.LayoutParams(600, 360))
++            keyboard.keyActionListener = KeyActionListener { _, _ -> }
++            val previews = PreviewHost(root)
++            keyboard.popupActionListener = previews.listener
++            controller.visible()
++            advance(32)
++            layout(root, 600, 360)
++            assertTrue(keyboard.isAttachedToWindow && keyboard.isShown)
++            keyboard.onInputMethodUpdate(english(true))
++            val effect = ReflectionHelpers.getField<PressEffect>(keyboard, "pressEffectLayer")
++            effect.prepareTexturesForTest()
++            ReflectionHelpers.setField(effect, "random", Random(1401))
++            var reviewTime = SystemClock.uptimeMillis()
++            ReflectionHelpers.setField(effect, "clock", { reviewTime } as () -> Long)
++            val start = reviewTime
++            val chosen = mutableSetOf<Int>()
++            for ((index, label) in listOf("G", "H", "J", "F").withIndex()) {
++                val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == label }
++                val rectangle = bounds(keyboard, key)
++                val downTime = start + index * 250L
++                assertEquals(downTime, reviewTime)
++                val down = MotionEvent.obtain(downTime, reviewTime, MotionEvent.ACTION_DOWN,
++                    rectangle.exactCenterX(), rectangle.exactCenterY(), 0)
++                assertTrue(keyboard.dispatchTouchEvent(down))
++                down.recycle()
++                val colour = PressEffect.colorForKey(key.id)!!
++                assertTrue("The actual press must choose from the configured arbitrary RGB values", colour in allowed)
++                chosen.add(colour)
++                reviewTime += 50L
++                advance(50)
++                layout(root, 600, 360)
++                val popup = previews.entry(key.id)!!
++                assertTrue("The production popup lifecycle must be visible during the held press", popup.root.alpha > 0.75f)
++                assertEquals(colour, (popup.textView.background as GradientDrawable).color?.defaultColor)
++                render(root).recycle()
++                val image = render(root)
++                save(image, "v14-soft-palettes/$name-press-$index")
++                val face = image.getPixel(rectangle.left + 10, rectangle.bottom - 15)
++                assertTrue("The configured colour is visible on the real key face",
++                    maxOf(Color.red(face), Color.green(face), Color.blue(face)) > 100)
++                image.recycle()
++                val up = MotionEvent.obtain(downTime, reviewTime, MotionEvent.ACTION_UP,
++                    rectangle.exactCenterX(), rectangle.exactCenterY(), 0)
++                assertTrue(keyboard.dispatchTouchEvent(up))
++                up.recycle()
++                reviewTime += 200L
++                advance(200)
++            }
++            assertEquals("The fixed review sequence must demonstrate every configured colour", allowed, chosen)
++            layout(root, 600, 360)
++            save(render(root), "v14-soft-palettes/$name-external-light")
++            provenance.append("mode=$mode\ncolours=${chosen.joinToString { "#%06X".format(it and 0xffffff) }}\n" +
++                "press_frames_ms=50,300,550,800\nexternal_light_ms=1000\n")
++            previews.stop()
++            keyboard.onDetach()
++            controller.pause().stop().destroy()
++        }
++        File("build/outputs/effect-checks/v14-soft-palettes/preview.txt").writeText(provenance.toString())
 +    }
 +
 +    @Test
@@ -8460,10 +10366,10 @@ index 0000000..ee21b7a
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/V14TouchRoutingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/V14TouchRoutingTest.kt
 new file mode 100644
-index 0000000..4e6a2f4
+index 0000000..9dedab1
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/V14TouchRoutingTest.kt
-@@ -0,0 +1,249 @@
+@@ -0,0 +1,256 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -8539,12 +10445,19 @@ index 0000000..4e6a2f4
 +            val p = ThemeManager.prefs
 +            setting(p.pressEffect, true)
 +            setting(p.idleBreathing, false)
++            setting(p.pressColorMode, ThemePrefs.PressColorMode.Random)
 +            setting(p.pressEffectPalette, ThemePrefs.PressEffectPalette.Custom)
 +            setting(p.pressCustomColorCount, 1)
 +            setting(p.pressCustomColor1, ThemePrefs.NeonColor.Cyan)
 +            setting(p.keyColorStyle, ThemePrefs.KeyColorStyle.Fill)
 +            setting(p.keyExitStyle, ThemePrefs.KeyExitStyle.Dim)
 +            setting(p.keyMotionEffect, ThemePrefs.KeyMotionEffect.Off)
++            // This fixture measures held-face routing. End its travelling light
++            // before sampling the released face, independently of user defaults.
++            setting(p.pressIgnitionTime, 100)
++            setting(p.pressExpansionTime, 100)
++            setting(p.pressWaveHoldTime, 0)
++            setting(p.pressFadeOutTime, 100)
 +            setting(p.pressKeyHoldTime, 120)
 +            setting(p.pressKeyRetreatTime, 300)
 +            setting(AppPrefs.getInstance().advanced.disableAnimation, false)

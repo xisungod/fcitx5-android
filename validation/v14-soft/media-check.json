@@ -1,0 +1,42 @@
+{
+  "v14-soft-continuous": {
+    "gif_frames": 134,
+    "gif_frame_ms": 50,
+    "mp4": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 420,
+          "r_frame_rate": "20/1",
+          "nb_read_frames": "134"
+        }
+      ],
+      "format": {
+        "duration": "6.700000"
+      }
+    },
+    "gif_bytes": 4235851,
+    "mp4_bytes": 459219
+  },
+  "v14-soft-single-press": {
+    "gif_frames": 65,
+    "gif_frame_ms": 50,
+    "mp4": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 360,
+          "r_frame_rate": "20/1",
+          "nb_read_frames": "65"
+        }
+      ],
+      "format": {
+        "duration": "3.250000"
+      }
+    },
+    "gif_bytes": 1508685,
+    "mp4_bytes": 101068
+  }
+}
