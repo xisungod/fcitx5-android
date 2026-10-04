@@ -4643,10 +4643,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..c5187b6
+index 0000000..4769087
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,753 @@
+@@ -0,0 +1,762 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4919,7 +4919,16 @@ index 0000000..c5187b6
 +        val rippleBar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
 +        rippleBar.addView(bar.root, FrameLayout.LayoutParams(360, 52))
 +        root.addView(rippleBar, FrameLayout.LayoutParams(360, 52))
-+        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++        // V11 follows the Samsung reference: by default the glow stays on the keyboard.
++        // The candidate-bar reach is now an option; enable it here to keep that path covered.
++        val glowOnBar = org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.pressGlowOnCandidates
++        assertFalse("The candidate-bar glow must be off by default", glowOnBar.getValue())
++        glowOnBar.setValue(true)
++        val keyboard = try {
++            TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++        } finally {
++            glowOnBar.setValue(false)
++        }
 +        root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
 +        rippleBar.keyboard = keyboard
 +        controller.visible()
@@ -4964,7 +4973,7 @@ index 0000000..c5187b6
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500))
 +        layout(root, 360, 312)
 +        val barAfter = render(rippleBar)
-+        assertFalse("A real key press must illuminate the candidate bar", barBefore.sameAs(barAfter))
++        assertFalse("With the option on, a key press must illuminate the candidate bar", barBefore.sameAs(barAfter))
 +        save(render(root), "layout-candidate-ripple")
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1400))
 +        val first = candidates.findViewHolderForAdapterPosition(0)!!
