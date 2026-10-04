@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.fcitx.fcitx5.android.xuancai.black.v15"
+    android:versionCode="812"
+    android:versionName="xuancai-black-v15" >
+
+    <uses-sdk
+        android:minSdkVersion="23"
+        android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- optional, off by default: read verification codes from incoming SMS, on device only -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <queries>
+        <intent>
+            <action android:name="org.fcitx.fcitx5.android.xuancai.black.v15.plugin.MANIFEST" />
+        </intent>
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
+    <permission
+        android:name="org.fcitx.fcitx5.android.xuancai.black.v15.permission.IPC"
+        android:protectionLevel="signature" />
+    <permission
+        android:name="org.fcitx.fcitx5.android.xuancai.black.v15.permission.PLUGIN"
+        android:protectionLevel="signature" />
+
+    <uses-permission android:name="org.fcitx.fcitx5.android.xuancai.black.v15.permission.PLUGIN" />
+
+    <application
+        android:name="org.fcitx.fcitx5.android.FcitxApplication"
+        android:allowBackup="false"
+        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:debuggable="true"
+        android:extractNativeLibs="true"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/app_icon"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/_generated_res_locale_config"
+        android:roundIcon="@mipmap/app_icon_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FcitxAppTheme" >
+        <activity
+            android:name="org.fcitx.fcitx5.android.ui.main.OfflineVoicePermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.DialogTheme" />
+        <activity
+            android:name="org.fcitx.fcitx5.android.ui.setup.SetupActivity"
+            android:exported="false"
+            android:launchMode="singleTask" />
+        <activity
+            android:name="org.fcitx.fcitx5.android.ui.main.LogActivity"
+            android:directBootAware="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:parentActivityName="org.fcitx.fcitx5.android.ui.main.MainActivity" />
+        <activity
+            android:name="org.fcitx.fcitx5.android.ui.main.settings.theme.CustomThemeActivity"
+            android:configChanges="orientation|screenSize"
+            android:exported="false"
+            android:label="@string/edit_theme" />
+        <activity
+            android:name="org.fcitx.fcitx5.android.ui.main.CropImageActivity"
+            android:exported="false" />
+        <activity
+            android:name="org.fcitx.fcitx5.android.ui.main.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="*/*" />
+                <data android:host="*" />
+                <!--
+                  there has to be so many segments:
+                  https://stackoverflow.com/questions/3400072/pathpattern-to-match-file-extension/8599921#8599921
+                -->
+                <data android:pathPattern=".*\\.dict" />
+                <data android:pathPattern=".*\\..*\\.dict" />
+                <data android:pathPattern=".*\\..*\\..*\\.dict" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.dict" />
+                <data android:pathPattern=".*\\.scel" />
+                <data android:pathPattern=".*\\..*\\.scel" />
+                <data android:pathPattern=".*\\..*\\..*\\.scel" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.scel" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.txt" />
+                <!-- pathSuffix works on API 31+ -->
+                <data android:pathSuffix=".dict" />
+                <data android:pathSuffix=".scel" />
+                <data android:pathSuffix=".txt" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="org.fcitx.fcitx5.android.ui.main.ClipboardEditActivity"
+            android:autoRemoveFromRecents="true"
+            android:directBootAware="true"
+            android:excludeFromRecents="true"
+            android:label="@string/edit_clipboard"
+            android:launchMode="singleInstance"
+            android:taskAffinity=".ui.main.ClipboardEditActivity"
+            android:theme="@style/Theme.DialogTheme"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustPan" />
+
+        <service
+            android:name="org.fcitx.fcitx5.android.input.FcitxInputMethodService"
+            android:directBootAware="true"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_INPUT_METHOD" >
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/input_method" />
+        </service>
+        <service
+            android:name="org.fcitx.fcitx5.android.FcitxRemoteService"
+            android:exported="true"
+            android:permission="org.fcitx.fcitx5.android.xuancai.black.v15.permission.IPC" >
+            <intent-filter>
+                <action android:name="org.fcitx.fcitx5.android.xuancai.black.v15.IPC" />
+            </intent-filter>
+        </service>
+
+        <provider
+            android:name="org.fcitx.fcitx5.android.provider.FcitxDataProvider"
+            android:authorities="org.fcitx.fcitx5.android.xuancai.black.v15.provider"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS" >
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="org.fcitx.fcitx5.android.xuancai.black.v15.androidx-startup"
+            android:directBootAware="true"
+            android:exported="false" >
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                android:value="androidx.startup" />
+            <meta-data
+                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+                android:value="androidx.startup" />
+        </provider>
+
+        <service
+            android:name="androidx.room.MultiInstanceInvalidationService"
+            android:directBootAware="true"
+            android:exported="false" />
+
+        <uses-library
+            android:name="androidx.window.extensions"
+            android:required="false" />
+        <uses-library
+            android:name="androidx.window.sidecar"
+            android:required="false" />
+    </application>
+
+</manifest>

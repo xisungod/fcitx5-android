@@ -1,10 +1,22 @@
 -- Correction supplements exact spelling, without taking over short abbreviations or Lua commands.
 local M = {}
 local neighbors = {}
-for _, row in ipairs({'qwertyuiop', 'asdfghjkl', 'zxcvbnm'}) do
-  for i = 1, #row do
-    neighbors[row:sub(i, i)] = row:sub(math.max(1, i - 1), math.min(#row, i + 1))
+local centers = {}
+-- QWERTY rows are staggered, so an adjacent-key slip can cross a row as well
+-- as move left/right. This affects only fallback candidate ranking, never the
+-- raw input or the keyboard's hit regions.
+for y, row in ipairs({'qwertyuiop', 'asdfghjkl', 'zxcvbnm'}) do
+  local offset = ({0, 0.5, 1.5})[y]
+  for i = 1, #row do centers[row:sub(i, i)] = {x = i - 1 + offset, y = y - 1} end
+end
+for key, center in pairs(centers) do
+  local adjacent = {}
+  for other, position in pairs(centers) do
+    local dx, dy = center.x - position.x, center.y - position.y
+    if dx * dx + dy * dy <= 1.3 then adjacent[#adjacent + 1] = other end
   end
+  table.sort(adjacent)
+  neighbors[key] = table.concat(adjacent)
 end
 
 -- Bounded weighted edit distance: adjacent keys cost 1, omissions/transpositions

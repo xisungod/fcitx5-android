@@ -1,0 +1,211 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :build-logic:convention:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:convention:pluginDescriptors UP-TO-DATE
+> Task :build-logic:convention:processResources UP-TO-DATE
+> Task :build-logic:convention:compileKotlin
+> Task :build-logic:convention:compileJava NO-SOURCE
+> Task :build-logic:convention:classes UP-TO-DATE
+> Task :build-logic:convention:jar
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:dataBindingMergeDependencyArtifactsDebug UP-TO-DATE
+> Task :app:generateDebugResValues
+> Task :app:prepareLibraryDefinitionsDebug UP-TO-DATE
+> Task :app:extractDebugSupportedLocales
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:common:preBuild UP-TO-DATE
+> Task :lib:common:preDebugBuild UP-TO-DATE
+> Task :lib:common:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5:preBuild UP-TO-DATE
+> Task :lib:fcitx5:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:preBuild UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5-lua:preBuild UP-TO-DATE
+> Task :lib:fcitx5-lua:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5-lua:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:libime:preBuild UP-TO-DATE
+> Task :lib:libime:preDebugBuild UP-TO-DATE
+> Task :lib:libime:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:generateDebugLocaleConfig UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :lib:common:generateDebugResources UP-TO-DATE
+> Task :lib:common:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5-lua:packageDebugResources UP-TO-DATE
+> Task :lib:libime:generateDebugResources UP-TO-DATE
+> Task :lib:libime:packageDebugResources UP-TO-DATE
+> Task :app:packageDebugResources
+> Task :lib:common:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5-lua:processDebugNavigationResources UP-TO-DATE
+> Task :lib:libime:processDebugNavigationResources UP-TO-DATE
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugResources
+> Task :lib:common:parseDebugLocalResources UP-TO-DATE
+> Task :lib:common:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5-lua:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugRFile UP-TO-DATE
+> Task :lib:libime:parseDebugLocalResources UP-TO-DATE
+> Task :lib:libime:generateDebugRFile UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesDebug UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :codegen:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :codegen:compileKotlin UP-TO-DATE
+> Task :codegen:compileJava NO-SOURCE
+> Task :codegen:processResources UP-TO-DATE
+> Task :codegen:classes UP-TO-DATE
+> Task :codegen:jar UP-TO-DATE
+> Task :lib:common:compileDebugAidl UP-TO-DATE
+> Task :lib:common:compileDebugKotlin UP-TO-DATE
+> Task :lib:common:javaPreCompileDebug UP-TO-DATE
+> Task :lib:common:compileDebugJavaWithJavac UP-TO-DATE
+> Task :lib:common:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5-lua:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5-lua:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:libime:compileDebugKotlin NO-SOURCE
+> Task :lib:libime:javaPreCompileDebug UP-TO-DATE
+> Task :lib:libime:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:libime:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :lib:common:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:fcitx5:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:fcitx5-lua:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:libime:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :lib:common:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:common:processDebugManifest UP-TO-DATE
+> Task :lib:fcitx5:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:fcitx5:processDebugManifest UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:processDebugManifest UP-TO-DATE
+> Task :lib:fcitx5-lua:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:processDebugManifest UP-TO-DATE
+> Task :lib:libime:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:libime:processDebugManifest UP-TO-DATE
+
+> Task :app:processDebugMainManifest
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:17:5-87 Warning:
+	uses-permission#android.permission.INTERNET was tagged at AndroidManifest.xml:17 to remove other declarations but no other declaration present
+
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :lib:common:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:common:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:fcitx5:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:fcitx5:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:fcitx5-lua:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:libime:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:libime:compileDebugLibraryResources UP-TO-DATE
+> Task :app:processDebugResources
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :lib:common:generateDebugAssets UP-TO-DATE
+> Task :lib:common:mergeDebugAssets UP-TO-DATE
+> Task :lib:fcitx5:generateDebugAssets UP-TO-DATE
+> Task :lib:fcitx5:mergeDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:mergeDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-lua:mergeDebugAssets UP-TO-DATE
+> Task :lib:libime:generateDebugAssets UP-TO-DATE
+> Task :lib:libime:mergeDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:packageDebugUnitTestForUnitTest
+
+> Task :app:mergeDebugUnitTestManifest
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:6:5-8:31 Warning:
+	permission#org.fcitx.fcitx5.android.axiang.v1.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION was tagged at AndroidManifest.xml:6 to remove other declarations but no other declaration present
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:10:5-12:31 Warning:
+	uses-permission#org.fcitx.fcitx5.android.axiang.v1.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION was tagged at AndroidManifest.xml:10 to remove other declarations but no other declaration present
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:17:5-87 Warning:
+	uses-permission#android.permission.INTERNET was tagged at AndroidManifest.xml:17 to remove other declarations but no other declaration present
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:23:5-39 Warning:
+	queries was tagged at AndroidManifest.xml:23 to remove other declarations but no other declaration present
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:175:9-177:35 Warning:
+	activity#com.canhub.cropper.CropImageActivity was tagged at AndroidManifest.xml:175 to remove other declarations but no other declaration present
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:179:9-182:35 Warning:
+	provider#com.canhub.cropper.CropFileProvider was tagged at AndroidManifest.xml:179 to remove other declarations but no other declaration present
+/tmp/xuancai-v13-source/app/src/main/AndroidManifest.xml:191:13-194:39 Warning:
+	meta-data#splitties.views.dsl.appcompat.experimental.AppCompatViewInstantiatorInjecter was tagged at AndroidManifest.xml:191 to remove other declarations but no other declaration present
+/tmp/xuancai-v13-source/app/build/intermediates/tmp/manifest/test/debug/tempFile2ProcessTestManifest4448914524869655722.xml:21:5-23:31 Warning:
+	uses-permission#android.permission.INTERNET was tagged at tempFile2ProcessTestManifest4448914524869655722.xml:21 to remove other declarations but no other declaration present
+
+> Task :app:processDebugUnitTestManifest
+> Task :app:generateDebugUnitTestConfig
+> Task :lib:common:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:common:processDebugJavaRes UP-TO-DATE
+> Task :lib:fcitx5:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:fcitx5:processDebugJavaRes NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:processDebugJavaRes NO-SOURCE
+> Task :lib:fcitx5-lua:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:processDebugJavaRes NO-SOURCE
+> Task :lib:libime:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:libime:processDebugJavaRes NO-SOURCE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///tmp/xuancai-v13-source/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt:522:35 Redundant call of conversion method.
+w: file:///tmp/xuancai-v13-source/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt:457:35 No cast needed.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:kspDebugUnitTestKotlin SKIPPED
+> Task :app:processDebugJavaRes UP-TO-DATE
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/HapticStrengthTest.kt:108:77 'static field HAPTIC_FEEDBACK_ENABLED: String' is deprecated. Deprecated in Java.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/HapticStrengthTest.kt:271:29 'static field HAPTIC_FEEDBACK_ENABLED: String' is deprecated. Deprecated in Java.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/IdleGlowDirectionTest.kt:38:13 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt:96:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt:429:78 'field scaledDensity: Float' is deprecated. Deprecated in Java.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt:104:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt:164:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:386:68 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:654:68 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:759:72 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:851:68 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:1020:72 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:1262:72 No cast needed.
+
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :app:testDebugUnitTest
+
+[Incubating] Problems report is available at: file:///tmp/xuancai-v13-source/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 2m 19s
+124 actionable tasks: 26 executed, 98 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.6.1/userguide/configuration_cache_enabling.html

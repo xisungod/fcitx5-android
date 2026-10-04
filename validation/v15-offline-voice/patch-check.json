@@ -1,0 +1,8 @@
+{
+  "baseline": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "source_commit": "b22a860e7492264bc0d5506b83212cfca4c49e11",
+  "patch_sha256": "e5b9b8a560f3f7c4892cd8c7a8478856ca42058f2e88bbb3ff5a1a1efa312cde",
+  "changed_files": 135,
+  "applies_cleanly": true,
+  "mismatches": []
+}

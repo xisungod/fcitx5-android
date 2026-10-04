@@ -1,0 +1,17 @@
+{
+  "name": "阿翔输入法",
+  "version_name": "1.0",
+  "arm64_version_code": 822,
+  "source_commit": "7229c0f2734da3b606182dbe8bc243d054705e85",
+  "baseline_commit": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "release_tag": "axiang-v1.0",
+  "source_branch": "release/axiang-1.0",
+  "patch_sha256": "d52af5647bfef3a8fc619a90e69aea0825fab57578b6deb5c5c79f624ccd9a89",
+  "artifacts": [
+    "axiang-input-1.0-arm64.apk",
+    "axiang-rime-1.0-arm64.apk",
+    "axiang-1.0-rime-data.zip",
+    "SHA256SUMS.txt"
+  ],
+  "status": "205 renamed-source tests passed; APK build in progress; not published"
+}

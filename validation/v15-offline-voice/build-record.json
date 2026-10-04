@@ -1,0 +1,12 @@
+{
+  "source_commit": "b22a860e7492264bc0d5506b83212cfca4c49e11",
+  "patch_sha256": "e5b9b8a560f3f7c4892cd8c7a8478856ca42058f2e88bbb3ff5a1a1efa312cde",
+  "tests": 205,
+  "new_voice_tests": 32,
+  "test_classes": 30,
+  "tested_input_files": 733,
+  "source_matches_applied_patch": true,
+  "apk_built": false,
+  "published": false,
+  "real_device_tested": false
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:26:19.649Z" hostname="566dc45241c0" time="1.056">
+  <properties/>
+  <testcase name="requestStaysChineseAndOfflineWithOnlyOneFinalAlternative" classname="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" time="0.015"/>
+  <testcase name="serviceNetworkErrorsRemainFailuresInsteadOfTriggeringOnlineRetry" classname="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" time="0.01"/>
+  <testcase name="failedSupportQueryNeverFallsThroughToListening" classname="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" time="0.019"/>
+  <testcase name="installedChineseStartsOnDeviceAndReturnsPreviewBeforeExplicitAcceptance" classname="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" time="0.014"/>
+  <testcase name="onlinePendingAndDownloadableChineseNeverStartAudioOrDownloadAModel" classname="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" time="0.009"/>
+  <testcase name="onlyInstalledMainlandSimplifiedChineseMeetsTheModelRequirement" classname="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" time="0.006"/>
+  <testcase name="olderAndroidIsUnavailableRatherThanUsingTheGenericRecognizer" classname="org.fcitx.fcitx5.android.OfflineVoiceAndroidPolicyTest" time="0.914"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

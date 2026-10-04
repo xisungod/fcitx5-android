@@ -54,6 +54,41 @@ assert normal['grammar']['language']=='zh-hans-t-essay-bgw-compact'
 assert normal['xuancai_correction']['enable_correction'] is True
 assert normal['translator']['enable_correction'] is False
 assert 'lua_translator@*xuancai_correction' in normal['engine']['translators']
+assert 'script_translator@xuancai_user' in normal['engine']['translators']
+assert 'xuancai_user' in normal['schema']['dependencies']
+assert normal['xuancai_user']['dictionary']=='xuancai_user'
+dictionary=yaml.safe_load((stage/'rime_ice.dict.yaml').read_text().split('...',1)[0])
+tables=dictionary['import_tables']
+assert tables.index('cn_dicts/8105') < tables.index('cn_dicts/41448')
+assert 'cn_dicts/xuancai_mobile' in tables
+assert (stage/'build/xuancai_user.table.bin').is_file()
+
+# A phone import writes only the small personal dictionary and re-deploys. Check
+# real candidates after both initial import and an update, and prove the large
+# precompiled dictionary is neither rewritten nor copied into the user build.
+personal=work/'personal-user';personal.mkdir(exist_ok=True)
+header=(stage/'xuancai_user.dict.yaml').read_text()
+main_table=stage/'build/rime_ice.table.bin'
+main_before=(main_table.stat().st_mtime_ns,hashlib.sha256(main_table.read_bytes()).hexdigest())
+personal_rows='炫彩个人词条验证\txuan cai ge ren ci tiao yan zheng\t100\n安卓离线部署词典\tan zhuo li xian bu shu ci dian\t100\n'
+personal_dict=personal/'xuancai_user.dict.yaml'
+personal_dict.write_text(header.replace('"2026-10-04"','"native-import-1"')+personal_rows)
+(personal/'build').mkdir(exist_ok=True)
+subprocess.run([str(build/'bin/rime_deployer'),'--build',str(personal),str(stage),str(personal/'build')],check=True)
+personal_result=subprocess.run([str(smoke),str(stage),str(personal),str(stage/'build'),'personal'],check=True,text=True,stdout=subprocess.PIPE)
+(checks/'native-personal-dictionary.txt').write_text(personal_result.stdout)
+print(personal_result.stdout)
+personal_dict.write_text(header.replace('"2026-10-04"','"native-import-2"')+personal_rows+'独立导入词条\tdu li dao ru ci tiao\t100\n')
+subprocess.run([str(build/'bin/rime_deployer'),'--build',str(personal),str(stage),str(personal/'build')],check=True)
+updated_result=subprocess.run([str(smoke),str(stage),str(personal),str(stage/'build'),'personal-update'],check=True,text=True,stdout=subprocess.PIPE)
+with (checks/'native-personal-dictionary.txt').open('a') as output: output.write(updated_result.stdout)
+print(updated_result.stdout)
+assert main_before==(main_table.stat().st_mtime_ns,hashlib.sha256(main_table.read_bytes()).hexdigest()), 'Personal import changed the full dictionary'
+assert not (personal/'build/rime_ice.table.bin').exists(), 'Personal import unnecessarily compiled the full dictionary'
+personal_dict.write_text(header.replace('"2026-10-04"','"native-import-clear"'))
+subprocess.run([str(build/'bin/rime_deployer'),'--build',str(personal),str(stage),str(personal/'build')],check=True)
+assert (personal/'build/xuancai_user.table.bin').is_file(), 'Cleared personal dictionary is not deployable'
+print('Personal dictionary import/update/clear use real candidates and reuse the full precompiled table.')
 manifest={'engine':'1.12.0','plugins':{'lua':'68f9c36','octagram':'dfcc151'},'sources':{name:{'url':url,'sha256':digest} for name,url,digest,_ in sources},'files_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((stage/'build').iterdir()) if p.is_file() and p.name != 'PREBUILT.json'}}
 (stage/'build/PREBUILT.json').write_text(json.dumps(manifest,indent=2)+'\n')
 (checks/'prebuilt.json').write_text(json.dumps(manifest,indent=2)+'\n')

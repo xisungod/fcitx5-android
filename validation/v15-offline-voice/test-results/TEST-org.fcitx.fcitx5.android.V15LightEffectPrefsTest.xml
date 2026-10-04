@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:26:29.045Z" hostname="566dc45241c0" time="0.042">
+  <properties/>
+  <testcase name="newInstallationUsesAVisibleSqueezeAndShortCapExitAboveTheLongerField" classname="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" time="0.013"/>
+  <testcase name="upgradePreservesSavedTimingAndArbitraryUserColoursExactly" classname="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" time="0.012"/>
+  <testcase name="capTimingControlsAllowShortFlashesWhileKeepingLongCustomExits" classname="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

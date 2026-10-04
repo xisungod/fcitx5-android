@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.IdleGlowDirectionTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:26:07.562Z" hostname="566dc45241c0" time="2.402">
+  <properties/>
+  <testcase name="lightStartsAtBothEdgesAndReachesTheCentreBeforeFading" classname="org.fcitx.fcitx5.android.IdleGlowDirectionTest" time="2.3"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

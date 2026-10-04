@@ -1,0 +1,32 @@
+# Rime dictionary
+# encoding: utf-8
+# SPDX-License-Identifier: GPL-3.0-only
+# Xuancai additions: a small, explicitly annotated mobile/computing vocabulary.
+# No proprietary IME corpus is included; existing upstream weights win on duplicates.
+---
+name: xuancai_mobile
+version: "2026-10-04"
+sort: by_weight
+use_preset_vocabulary: false
+...
+大语言模型	da yu yan mo xing	200
+多模态模型	duo mo tai mo xing	200
+检索增强生成	jian suo zeng qiang sheng cheng	200
+向量数据库	xiang liang shu ju ku	200
+知识蒸馏	zhi shi zheng liu	200
+模型量化	mo xing liang hua	200
+提示词工程	ti shi ci gong cheng	200
+上下文窗口	shang xia wen chuang kou	200
+离线部署	li xian bu shu	200
+主副卡切换	zhu fu ka qie huan	200
+触摸反馈	chu mo fan kui	200
+按键震动	an jian zhen dong	200
+波纹特效	bo wen te xiao	200
+滑动选词	hua dong xuan ci	200
+候选词栏	hou xuan ci lan	200
+九宫格数字键盘	jiu gong ge shu zi jian pan	200
+输入容错	shu ru rong cuo	200
+相邻按键	xiang lin an jian	200
+霓虹流光	ni hong liu guang	200
+通知权限	tong zhi quan xian	200
+照片备份	zhao pian bei fen	200

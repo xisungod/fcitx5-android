@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:26:20.706Z" hostname="566dc45241c0" time="0.005">
+  <properties/>
+  <testcase name="disposalIsFinalAndDropsCallbacksTimersAndPendingResult" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.004"/>
+  <testcase name="repeatedReadyAndPartialCallbacksCannotKeepTheMicrophoneOpenForever" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="installedModelCheckPrecedesRecordingAndPrematureResultsAreIgnored" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="errorsClearPreviewAndReleaseServiceWithoutFallback" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="supportStartupAndFinalResultTimeoutsReleaseTheirSessions" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="partialsAreOnlyPreviewAndFinalMustBeExplicitlyAcceptedOnce" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="blankFinalDoesNotPromoteEarlierPartialText" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="replacedSessionCannotWriteIntoTheNewSession" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="stoppingDuringModelCheckCancelsWithoutStartingAudio" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="permissionAndServiceExceptionsFailClosedAndReleaseCreatedBackends" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="absentOnDeviceServiceNeverCreatesARecognizer" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="missingInstalledModelFailsWithoutStartingOrRetrying" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="stopRequestsFinalOnlyOnceAndNeverAcceptsAPartial" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="successfulFinalCancelsAllTimeoutsWhileAwaitingUserConfirmation" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <testcase name="cancellationInvalidatesPendingSupportAndEveryLateResult" classname="org.fcitx.fcitx5.android.OfflineVoiceEngineTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

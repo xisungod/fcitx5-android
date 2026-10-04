@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.OfflineVoiceInputUiTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:26:02.795Z" hostname="566dc45241c0" time="4.028">
+  <properties/>
+  <testcase name="partialAndStoppedPendingResultsCannotReachTheEditor" classname="org.fcitx.fcitx5.android.OfflineVoiceInputUiTest" time="3.041"/>
+  <testcase name="externalDismissalDisposesTheSessionBeforeLateCallbacksCanInsert" classname="org.fcitx.fcitx5.android.OfflineVoiceInputUiTest" time="0.101"/>
+  <testcase name="cancelReleasesRecognitionAndDropsLateResults" classname="org.fcitx.fcitx5.android.OfflineVoiceInputUiTest" time="0.089"/>
+  <testcase name="retryClearsOldTextAndIgnoresThePreviousSessionsCallbacks" classname="org.fcitx.fcitx5.android.OfflineVoiceInputUiTest" time="0.098"/>
+  <testcase name="changedEditorRejectsTheResultAndDisablesInsertionAndRetry" classname="org.fcitx.fcitx5.android.OfflineVoiceInputUiTest" time="0.1"/>
+  <testcase name="aFinalResultRequiresConfirmationAndIsInsertedExactlyOnce" classname="org.fcitx.fcitx5.android.OfflineVoiceInputUiTest" time="0.095"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

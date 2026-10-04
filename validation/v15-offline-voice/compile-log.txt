@@ -1,0 +1,98 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :build-logic:convention:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:convention:compileKotlin UP-TO-DATE
+> Task :build-logic:convention:compileJava NO-SOURCE
+> Task :build-logic:convention:pluginDescriptors UP-TO-DATE
+> Task :build-logic:convention:processResources UP-TO-DATE
+> Task :build-logic:convention:classes UP-TO-DATE
+> Task :build-logic:convention:jar
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:dataBindingMergeDependencyArtifactsDebug UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:prepareLibraryDefinitionsDebug UP-TO-DATE
+> Task :app:extractDebugSupportedLocales
+> Task :app:mapDebugSourceSetPaths
+> Task :lib:common:preBuild UP-TO-DATE
+> Task :lib:common:preDebugBuild UP-TO-DATE
+> Task :lib:common:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5:preBuild UP-TO-DATE
+> Task :lib:fcitx5:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:preBuild UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5-lua:preBuild UP-TO-DATE
+> Task :lib:fcitx5-lua:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5-lua:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:libime:preBuild UP-TO-DATE
+> Task :lib:libime:preDebugBuild UP-TO-DATE
+> Task :lib:libime:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:generateDebugLocaleConfig UP-TO-DATE
+> Task :app:generateDebugResources
+> Task :lib:common:generateDebugResources UP-TO-DATE
+> Task :lib:common:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5-lua:packageDebugResources UP-TO-DATE
+> Task :lib:libime:generateDebugResources UP-TO-DATE
+> Task :lib:libime:packageDebugResources UP-TO-DATE
+> Task :app:packageDebugResources
+> Task :lib:common:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5-lua:processDebugNavigationResources UP-TO-DATE
+> Task :lib:libime:processDebugNavigationResources UP-TO-DATE
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources
+> Task :lib:common:parseDebugLocalResources UP-TO-DATE
+> Task :lib:common:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5-lua:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugRFile UP-TO-DATE
+> Task :lib:libime:parseDebugLocalResources UP-TO-DATE
+> Task :lib:libime:generateDebugRFile UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:mergeDebugResources
+> Task :app:generateDebugRFile
+> Task :app:dataBindingGenBaseClassesDebug
+> Task :codegen:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :codegen:compileKotlin UP-TO-DATE
+> Task :codegen:compileJava NO-SOURCE
+> Task :codegen:processResources UP-TO-DATE
+> Task :codegen:classes UP-TO-DATE
+> Task :codegen:jar UP-TO-DATE
+> Task :lib:common:compileDebugAidl UP-TO-DATE
+> Task :lib:common:compileDebugKotlin UP-TO-DATE
+> Task :lib:common:javaPreCompileDebug UP-TO-DATE
+> Task :lib:common:compileDebugJavaWithJavac UP-TO-DATE
+> Task :lib:common:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5-lua:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5-lua:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:libime:compileDebugKotlin NO-SOURCE
+> Task :lib:libime:javaPreCompileDebug UP-TO-DATE
+> Task :lib:libime:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:libime:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+
+BUILD SUCCESSFUL in 39s
+66 actionable tasks: 13 executed, 53 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.6.1/userguide/configuration_cache_enabling.html

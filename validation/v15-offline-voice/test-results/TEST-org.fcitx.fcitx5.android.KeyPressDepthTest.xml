@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyPressDepthTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:26:10.164Z" hostname="566dc45241c0" time="1.33">
+  <properties/>
+  <testcase name="realMotionOffAndDisabledAnimationsLeaveTheKeyUnchanged" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.951"/>
+  <testcase name="realPressShrinksTheBackgroundAndCharacterTogetherEvenWithAllLightsOff" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.176"/>
+  <testcase name="releaseHasOneBoundedPeakAndAnInterruptedPeakStillSettles" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.011"/>
+  <testcase name="zeroAndTwentyMillisecondTapsFinishTheSqueezeBeforeTheirSingleReturn" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.011"/>
+  <testcase name="realSameKeyPointersReleaseOnlyTheLastFingerAndDetachResetsHeldDepth" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.163"/>
+  <testcase name="repressDuringReleaseIsContinuousAndHeldKeysStopTransitioning" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.012"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -7,6 +7,20 @@
 #include <time.h>
 
 static RimeApi *api;
+static void find_rare_character(RimeSessionId session, const char *keys, const char *expected) {
+    api->clear_composition(session);
+    assert(api->simulate_key_sequence(session, keys));
+    RimeCandidateListIterator it = {0};
+    assert(api->candidate_list_begin(session, &it));
+    int found = 0, count = 0;
+    while (count < 2048 && api->candidate_list_next(&it)) {
+        if (strcmp(it.candidate.text, expected) == 0) { found = 1; break; }
+        ++count;
+    }
+    api->candidate_list_end(&it);
+    printf("Rare-character extension: %s => %s at candidate %d\n", keys, expected, count);
+    assert(found);
+}
 static void whole_phrase(RimeSessionId session, const char *keys, const char *expected) {
     api->clear_composition(session);
     char prefix[128] = {0};
@@ -49,7 +63,7 @@ static void candidates(RimeSessionId session, const char *keys, const char *expe
     assert(count > 0);
 }
 int main(int argc, char **argv) {
-    assert(argc == 4);
+    assert(argc == 4 || (argc == 5 && (strcmp(argv[4], "personal") == 0 || strcmp(argv[4], "personal-update") == 0)));
     api = rime_get_api();
     RIME_STRUCT(RimeTraits, traits);
     traits.shared_data_dir = argv[1]; traits.user_data_dir = argv[2];
@@ -62,6 +76,17 @@ int main(int argc, char **argv) {
     assert(api->select_schema(session, "rime_ice"));
     api->set_option(session, "ascii_mode", False);
     api->set_option(session, "traditionalization", False);
+    if (argc == 5) {
+        if (strcmp(argv[4], "personal-update") == 0) {
+            whole_phrase(session, "dulidaorucitiao", "独立导入词条");
+        } else {
+            whole_phrase(session, "xuancaigerencitiaoyanzheng", "炫彩个人词条验证");
+            whole_phrase(session, "anzhuolixianbushucidian", "安卓离线部署词典");
+        }
+        api->destroy_session(session); api->finalize();
+        puts("Separately deployed personal-dictionary candidates passed.");
+        return 0;
+    }
     candidates(session, "nihao", "你好");
     candidates(session, "zhongguo", "中国");
     candidates(session, "jisuanji", "计算机");
@@ -70,6 +95,14 @@ int main(int argc, char **argv) {
     candidates(session, "nihso", "你好");
     candidates(session, "shuangkashuangdai", "双卡双待");
     candidates(session, "shuagkashuangdai", "双卡双待");
+    candidates(session, "dayuyanmoxing", "大语言模型");
+    candidates(session, "duomotaimoxing", "多模态模型");
+    candidates(session, "xiangliangshujuku", "向量数据库");
+    candidates(session, "houxuancilan", "候选词栏");
+    candidates(session, "jiugonggeshuzijianpan", "九宫格数字键盘");
+    find_rare_character(session, "bing", "靐");
+    find_rare_character(session, "da", "龘");
+    whole_phrase(session, "yihangbailushangqingtiaj", "一行白鹭上青天");
     whole_phrase(session, "lianggehuangkimigcuiliao", "两个黄鹂鸣翠柳");
     whole_phrase(session, "lianggehuanglimingcuiliao", "两个黄鹂鸣翠柳");
     whole_phrase(session, "lianggehuangkimingcuiliu", "两个黄鹂鸣翠柳");

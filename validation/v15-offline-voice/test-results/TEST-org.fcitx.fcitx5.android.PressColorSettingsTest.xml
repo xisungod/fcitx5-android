@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.PressColorSettingsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:26:21.014Z" hostname="566dc45241c0" time="0.475">
+  <properties/>
+  <testcase name="legacyRandomModeKeepsItsSavedNeonCustomPalette" classname="org.fcitx.fcitx5.android.PressColorSettingsTest" time="0.097"/>
+  <testcase name="invalidUserPaletteFallsBackToTheSavedLegacyColours" classname="org.fcitx.fcitx5.android.PressColorSettingsTest" time="0.014"/>
+  <testcase name="rgbTextRoundTripsAndBoundsTheUserPaletteToEightColours" classname="org.fcitx.fcitx5.android.PressColorSettingsTest" time="0.01"/>
+  <testcase name="aMediumGrayUserColourKeepsTheRealPopupCharacterReadable" classname="org.fcitx.fcitx5.android.PressColorSettingsTest" time="0.065"/>
+  <testcase name="aCustomRgbPairIsTheOnlySourceForRealKeysAndTheirBubbles" classname="org.fcitx.fcitx5.android.PressColorSettingsTest" time="0.089"/>
+  <testcase name="anArbitrarySingleRgbPersistsAndSurvivesRebuildingTheRealKeyboard" classname="org.fcitx.fcitx5.android.PressColorSettingsTest" time="0.105"/>
+  <testcase name="randomBreathingAndIndependentBubblesUseTheFullCyberNeonPreset" classname="org.fcitx.fcitx5.android.PressColorSettingsTest" time="0.093"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

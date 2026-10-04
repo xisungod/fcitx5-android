@@ -1,0 +1,13 @@
+# Rime dictionary
+# encoding: utf-8
+# SPDX-License-Identifier: GPL-3.0-only
+# UserDir copy takes precedence. The small import keeps an empty personal list
+# deployable without recompiling the full rime_ice dictionary.
+---
+name: xuancai_user
+version: "2026-10-04"
+sort: by_weight
+use_preset_vocabulary: false
+import_tables:
+  - cn_dicts/xuancai_mobile
+...

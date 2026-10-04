@@ -9,8 +9,8 @@ with open(os.environ['GITHUB_ENV'],'a') as output:
   path=Path(os.environ['RUNNER_TEMP'])/'xuancai-signing.ks'
   path.touch(mode=0o600,exist_ok=False)
   path.write_bytes(base64.b64decode(values[0],validate=True))
-  output.write('SIGN_KEY_FILE='+str(path)+'\nXUANCAI_APP_SUFFIX=.xuancai.black\nXUANCAI_SIGNING_MODE=stable\n')
+  output.write('SIGN_KEY_FILE='+str(path)+'\nXUANCAI_APP_SUFFIX=.axiang\nXUANCAI_SIGNING_MODE=stable\n')
   print('Using the fixed application ID and repository signing key.')
  else:
-  output.write('XUANCAI_APP_SUFFIX=.xuancai.black.v14\nXUANCAI_SIGNING_MODE=isolated\n')
-  print('Signing secrets unavailable: building isolated V14. This is not an in-place update to V12.')
+  output.write('XUANCAI_APP_SUFFIX=.axiang.v1\nXUANCAI_SIGNING_MODE=isolated\n')
+  print('Signing secrets unavailable: building isolated 阿翔输入法 1.0. This is not an in-place update to earlier isolated versions.')

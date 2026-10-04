@@ -1,0 +1,20 @@
+# Rime schema
+# SPDX-License-Identifier: GPL-3.0-only
+# Dependency only, not a separate entry in the user's input-method menu.
+schema:
+  schema_id: xuancai_user
+  name: 炫彩个人词库
+  version: "2026-10-04"
+engine:
+  processors: [speller, selector, express_editor]
+  segmentors: [abc_segmentor]
+  translators: [script_translator]
+speller:
+  alphabet: abcdefghijklmnopqrstuvwxyz
+  delimiter: " '"
+translator:
+  dictionary: xuancai_user
+  enable_completion: false
+  enable_word_completion: false
+  enable_sentence: false
+  enable_user_dict: false

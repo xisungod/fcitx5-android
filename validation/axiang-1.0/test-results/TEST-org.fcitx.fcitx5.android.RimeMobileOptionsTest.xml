@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.RimeMobileOptionsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-04T16:34:36.476Z" hostname="566dc45241c0" time="0.001">
+  <properties/>
+  <testcase name="fuzzyGroupsDefaultOffAndCanBeEnabledIndependently" classname="org.fcitx.fcitx5.android.RimeMobileOptionsTest" time="0.0"/>
+  <testcase name="nativeRimeToggleIsFoundWithoutDependingOnLocalizedTextOrSchemaId" classname="org.fcitx.fcitx5.android.RimeMobileOptionsTest" time="0.001"/>
+  <testcase name="longPressPunctuationUsesEnglishAsciiOrChineseFullWidth" classname="org.fcitx.fcitx5.android.RimeMobileOptionsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
