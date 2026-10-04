@@ -16,5 +16,13 @@
   "candidate_data": "Actual librime 1.12.0 + Lua + octagram, fresh user dictionary; captured in app/src/test/resources/xuancai-typing-candidates.tsv using scripts/capture-xuancai-typing.c",
   "rendering": "Android Views rendered by Robolectric native graphics. Production PressEffect, candidate UI and PopupEntryUi; controlled animation clock. Preview listener reproduces production popup placement and dismisses on release after 99 ms (above the 70 ms minimum). Not a device recording.",
   "gif_sha256": "cbbdb323aad138907a61fcacedf48dfaf4342517e494623dfc2115a2ea2d792e",
-  "published": false
+  "published": false,
+  "final_build_verification": {
+    "source_commit": "1a0de8014ab7dba27b489a82a3399ea5d6059f1a",
+    "run": "https://github.com/xisungod/fcitx5-android/actions/runs/37164286337",
+    "android_tests": 44,
+    "failures": 0,
+    "same_continuous_render_test": "passed",
+    "native_rime_whole_phrase_commit": "passed"
+  }
 }

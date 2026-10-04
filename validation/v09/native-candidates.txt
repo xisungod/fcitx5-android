@@ -6,7 +6,15 @@ mingtianxiawusandianwomenkaihui => 明天下午三点我们开会 明天下午�
 nihso => 你受 你是 你还 你好 👋 模式
 shuangkashuangdai => 双卡双待 双卡双待功能 双卡双待手机 双卡 爽啦 双
 shuagkashuangdai => 双卡双待 双卡双待功能 双卡双待手机 双卡 爽啦 双
-rq => 2026-10-03 2026/10/03 2026.10.03 20261003 2026年10月3日 日期
+Whole phrase: lianggehuangkimigcuiliao => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuanglimingcuiliao => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuangkimingcuiliu => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuanglimigcuiliu => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuanglimingcuiliu => 两个黄鹂鸣翠柳
+Whole phrase: yihangbailushangqingtiam => 一行白鹭上青天
+Whole phrase: lianggehuanglimingcuiliule => 两个黄鹂鸣翠柳了
+Whole phrase: lianggehuanglimingcuiliudezuozhe => 两个黄鹂鸣翠柳的作者
+rq => 2026-10-04 2026/10/04 2026.10.04 20261004 2026年10月4日 日期
 cC1+2 => 3 1+2=3
 English direct commit: hello World!; pending Chinese + English: 你好x; no preedit.
 Full Lua, grammar configuration, correction and mode-switch checks passed.
