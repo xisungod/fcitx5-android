@@ -29,5 +29,41 @@
     "skipped": 0
   },
   "native_rime_checks": "passed",
-  "published": false
+  "published": false,
+  "display_variants": [
+    {
+      "file": "typing-preview.mp4",
+      "format": "H.264 MP4, yuv420p, faststart",
+      "size": [
+        720,
+        624
+      ],
+      "fps": 30,
+      "duration_ms": 5767,
+      "bytes": 372428,
+      "sha256": "e48580c1d997a6c1083f9a0e2d994f939a552defef956667ad4e429bc6e8426a"
+    },
+    {
+      "file": "typing-preview-small.gif",
+      "format": "GIF, 96-colour palette",
+      "size": [
+        360,
+        312
+      ],
+      "fps": 20,
+      "duration_ms": 5750,
+      "bytes": 2067971,
+      "sha256": "0f0c19d76219825b71a61b2f55504aff0c9bc09ede65a47bdd630fafbdbc362c"
+    },
+    {
+      "file": "typing-preview.png",
+      "format": "PNG static frame at 2.70 seconds",
+      "size": [
+        720,
+        624
+      ],
+      "bytes": 95742,
+      "sha256": "52f0de3bee6b2ee38790a3e4d2e9533a8ca230c74b1473c2cffb6a496a3bb8ed"
+    }
+  ]
 }
