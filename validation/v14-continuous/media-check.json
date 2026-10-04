@@ -1,0 +1,113 @@
+[
+  {
+    "name": "v14-continuous-single",
+    "source": "v14-continuous-f-on",
+    "native_fps": 60,
+    "android_frames": 190,
+    "video": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 360,
+          "r_frame_rate": "60/1",
+          "nb_read_frames": "190"
+        }
+      ],
+      "format": {
+        "duration": "3.166667"
+      }
+    },
+    "full_decode": "passed",
+    "gif_fps": 30,
+    "gif_native_sampling": "every second original frame",
+    "gif_frames": 95,
+    "gif_duration_ms": 3160,
+    "current_files": {
+      "v14-continuous-single-60fps.mp4": {
+        "bytes": 120342,
+        "sha256": "d208013489837112f2cc1c6ede41d33a5b76561772062baa516b2b1467e66b22"
+      },
+      "v14-continuous-single-30fps.gif": {
+        "bytes": 1470212,
+        "sha256": "19e10cb869f6f18fa1890eacd83d1b0856b60d910e94d0916ac9d1d339ee140f"
+      }
+    },
+    "final_destination_verified": true,
+    "native_snapshot_byte_match": true
+  },
+  {
+    "name": "v14-continuous-number-off",
+    "source": "v14-continuous-f-off",
+    "native_fps": 60,
+    "android_frames": 190,
+    "video": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 360,
+          "r_frame_rate": "60/1",
+          "nb_read_frames": "190"
+        }
+      ],
+      "format": {
+        "duration": "3.166667"
+      }
+    },
+    "full_decode": "passed",
+    "gif_fps": 30,
+    "gif_native_sampling": "every second original frame",
+    "gif_frames": 95,
+    "gif_duration_ms": 3160,
+    "current_files": {
+      "v14-continuous-number-off-60fps.mp4": {
+        "bytes": 106839,
+        "sha256": "297f4ecfdcd330c642c05c248e76fc9f3f817008148870ac02fced2cbbf7670c"
+      },
+      "v14-continuous-number-off-30fps.gif": {
+        "bytes": 1365787,
+        "sha256": "81b18b5095ce81972acbbb29770973adef1dd77a05d48f97a1e95ccb1b245dac"
+      }
+    },
+    "final_destination_verified": true,
+    "native_snapshot_byte_match": true
+  },
+  {
+    "name": "v14-continuous-typing",
+    "source": "v14-continuous-burst",
+    "native_fps": 60,
+    "android_frames": 235,
+    "video": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 420,
+          "r_frame_rate": "60/1",
+          "nb_read_frames": "235"
+        }
+      ],
+      "format": {
+        "duration": "3.916667"
+      }
+    },
+    "full_decode": "passed",
+    "gif_fps": 30,
+    "gif_native_sampling": "every second original frame",
+    "gif_frames": 118,
+    "gif_duration_ms": 3930,
+    "current_files": {
+      "v14-continuous-typing-60fps.mp4": {
+        "bytes": 250358,
+        "sha256": "d5a2e70c21dad5fcb70a6a94dda362535a091a0f4de30585cfbc2b63035c0887"
+      },
+      "v14-continuous-typing-30fps.gif": {
+        "bytes": 2122224,
+        "sha256": "874f9547c9691cf8fcf64b9a3ca499652320f1267055f3fd4f932f143200d2ef"
+      }
+    },
+    "final_destination_verified": true,
+    "native_snapshot_byte_match": true
+  }
+]

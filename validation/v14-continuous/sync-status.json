@@ -1,0 +1,11 @@
+{
+  "local_parent_commit": "748bdda",
+  "branch": "improve/keyscafe-black-v14",
+  "patch_sha256": "d694c6124363e59f0e8b5b2a0fe495fe0cb1bf0c6ba9c6ad927a227852cc810d",
+  "github_sync": "not_attempted_this_revision",
+  "ci_triggered": false,
+  "release_published": false,
+  "previous_push_review": "blocked: required explicit source/review artifact egress authorization and visual confirmation before publishing",
+  "remote_head_last_known": "914b489694ca52c1496130dad126a2072d66638a",
+  "remote_head_rechecked_this_revision": false
+}

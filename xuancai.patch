@@ -396,7 +396,7 @@ index 93ba4d4..b40dc34 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..7b239ad 100644
+index d3b4948..f025524 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -604,7 +604,7 @@ index d3b4948..7b239ad 100644
 +    )
 +
 +    val pressIgnitionTime = int(
-+        R.string.press_ignition_time, "press_ignition_time", 100, 30, 300, "ms", 10,
++        R.string.press_ignition_time, "press_ignition_time", 40, 30, 300, "ms", 10,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -2902,10 +2902,10 @@ index 89dff00..b083263 100644
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..683549c
+index 0000000..e53f909
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,1031 @@
+@@ -0,0 +1,1050 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -2936,6 +2936,7 @@ index 0000000..683549c
 +import kotlin.math.max
 +import kotlin.math.min
 +import kotlin.math.pow
++import kotlin.math.sqrt
 +import kotlin.random.Random
 +
 +/**
@@ -2964,7 +2965,7 @@ index 0000000..683549c
 +    idleColors: IntArray,
 +    private val clock: () -> Long = SystemClock::uptimeMillis,
 +    randomIdleColors: Boolean = false,
-+    ignitionTimeMs: Int = 100,
++    ignitionTimeMs: Int = 40,
 +    keyHoldTimeMs: Int = 260,
 +    keyRetreatTimeMs: Int = 480,
 +    private val keySurfaceEffects: Boolean = false,
@@ -3440,16 +3441,24 @@ index 0000000..683549c
 +            a * styles[ripple.colorIndex].luminance else 0f
 +    }
 +
-+    /** A short local start stays responsive even with a several-second expansion. */
++    /** A short local start joins the long expansion at a shared, non-zero speed. */
 +    private fun waveProgress(spread: Long): Float {
 +        val elapsed = spread.coerceAtLeast(0L).toFloat()
 +        val localStart = min(160f, expansionDuration * 0.25f)
++        val remaining = expansionDuration - localStart
++        val joiningSpeed = 0.60f * 0.76f / remaining
 +        if (elapsed < localStart) {
 +            val t = (elapsed / localStart).coerceIn(0f, 1f)
-+            return 0.24f * (1f - (1f - t).pow(1.45f))
++            val endTangent = joiningSpeed * localStart / 0.24f
++            // Monotone Hermite: the local response slows into the bulk speed,
++            // rather than stopping and waiting for a second ease-in to restart it.
++            return 0.24f * ((1.45f + endTangent - 2f) * t * t * t +
++                (3f - 2f * 1.45f - endTangent) * t * t + 1.45f * t)
 +        }
-+        val rest = ((elapsed - localStart) / (expansionDuration - localStart)).coerceIn(0f, 1f)
-+        return 0.24f + 0.76f * smoothstep(0f, 1f, rest)
++        val t = ((elapsed - localStart) / remaining).coerceIn(0f, 1f)
++        // The matching 0.60 tangent stays positive until the configured expansion
++        // finishes; only the intentional held shape has zero travel speed.
++        return (0.24f + 0.76f * (0.60f * t + 1.80f * t * t - 1.40f * t * t * t)).coerceIn(0f, 1f)
 +    }
 +
 +    private fun freshLightWeight(r: PressEffectTrail.Ripple): Float {
@@ -3486,6 +3495,15 @@ index 0000000..683549c
 +        return waveAlpha(r) * 0.32f * smoothstep(0.06f, 0.32f, progress) * tail
 +    }
 +
++    private fun boundedLightScale(energy: Float, budget: Float): Float {
++        val difference = budget - energy
++        val shoulder = budget * 0.20f
++        // This smooth maximum is always at least energy and budget. It rounds
++        // off saturation's speed change while still respecting the hard cap.
++        val denominator = (budget + energy + sqrt(difference * difference + shoulder * shoulder)) * 0.5f
++        return budget / denominator
++    }
++
 +    private fun draw(canvas: Canvas, strength: Float) {
 +        // The same envelope serves functional keys, including the release tail of a long hold.
 +        for (i in 0 until keyFaces.size) {
@@ -3504,7 +3522,10 @@ index 0000000..683549c
 +            val r = ripples[i]
 +            freshAttention[i] = attention
 +            val fresh = freshLightWeight(r)
-+            val onset = (waveAlpha(r) / 0.80f).coerceIn(0f, 1f)
++            val spread = (frameTime - r.start - ignitionDuration).toFloat()
++            // New colour is already visible while local priority crosses over a
++            // little more slowly. These weights still share the same hard budget.
++            val onset = min((waveAlpha(r) / 0.80f).coerceIn(0f, 1f), smoothstep(0f, 180f, spread))
 +            attention *= 1f - 0.40f * fresh * onset
 +        }
 +        var freshEnergy = 0f
@@ -3518,10 +3539,8 @@ index 0000000..683549c
 +            oldEnergy += alpha * (1f - fresh) * 1.32f
 +            if (glowOnCandidates) bridgeEnergy += bridgeAlpha(r)
 +        }
-+        val freshScale = if (normalizeOldLight && freshEnergy > FRESH_LIGHT_BUDGET)
-+            FRESH_LIGHT_BUDGET / freshEnergy else 1f
-+        val oldScale = if (normalizeOldLight && oldEnergy > OLD_LIGHT_BUDGET)
-+            OLD_LIGHT_BUDGET / oldEnergy else 1f
++        val freshScale = if (normalizeOldLight) boundedLightScale(freshEnergy, FRESH_LIGHT_BUDGET) else 1f
++        val oldScale = if (normalizeOldLight) boundedLightScale(oldEnergy, OLD_LIGHT_BUDGET) else 1f
 +        val bridgeScale = if (normalizeOldLight && bridgeEnergy > BRIDGE_LIGHT_BUDGET)
 +            BRIDGE_LIGHT_BUDGET / bridgeEnergy else 1f
 +        val textures = Textures.ready
@@ -3703,7 +3722,7 @@ index 0000000..683549c
 +        private const val MAX_RIPPLES = 32
 +        private const val MAX_KEY_FACES = 96
 +        private const val FRESH_LIGHT_BUDGET = 1.50f
-+        private const val OLD_LIGHT_BUDGET = 0.45f
++        private const val OLD_LIGHT_BUDGET = 0.30f
 +        private const val BRIDGE_LIGHT_BUDGET = 0.40f
 +        private const val FLUID_PHASES = 9
 +        private const val FLUID_TEXTURE_SIZE = 128
@@ -5572,10 +5591,10 @@ index 0000000..5d83a4b
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt
 new file mode 100644
-index 0000000..7ad7190
+index 0000000..fdfa7fb
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt
-@@ -0,0 +1,327 @@
+@@ -0,0 +1,331 @@
 +/* SPDX-License-Identifier: LGPL-2.1-or-later */
 +package org.fcitx.fcitx5.android.ui.main.settings.theme
 +
@@ -5646,7 +5665,8 @@ index 0000000..7ad7190
 +    private val colorsBody = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 +    private val palettePreview = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; tag = "effect-palette-preview" }
 +    private val modeSummary = text("", color = subdued)
-+    private val totalLabel = text("", 13f, accent)
++    private val totalLabel = text("", 13f, accent).apply { tag = "effect-total-time" }
++    private val totalDetailLabel = text("", 12f, subdued).apply { tag = "effect-total-detail" }
 +    val durationControls = linkedMapOf<String, EffectRangeControl>()
 +    var activeColorDialog: AlertDialog? = null
 +        private set
@@ -5694,9 +5714,10 @@ index 0000000..7ad7190
 +        section(R.string.light_effect_animation)
 +        val animationCard = card()
 +        animationCard.addView(totalLabel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-+        animationCard.addView(text(context.getString(R.string.light_effect_total_detail, prefs.pressIgnitionTime.getValue()), 12f, subdued),
++        animationCard.addView(totalDetailLabel,
 +            LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
 +        listOf(
++            Range(R.string.press_ignition_time, prefs.pressIgnitionTime, 30, 300, 10),
 +            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
 +            Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 50),
 +            Range(R.string.light_effect_wave_fade, prefs.pressFadeOutTime, 100, 5000, 20),
@@ -5746,9 +5767,11 @@ index 0000000..7ad7190
 +    }
 +
 +    private fun updateTotal() {
++        val ignition = prefs.pressIgnitionTime.getValue()
 +        totalLabel.text = context.getString(R.string.light_effect_total,
-+            prefs.pressIgnitionTime.getValue() + prefs.pressExpansionTime.getValue() +
++            ignition + prefs.pressExpansionTime.getValue() +
 +                prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
++        totalDetailLabel.text = context.getString(R.string.light_effect_total_detail, ignition)
 +    }
 +
 +    private fun renderColors() {
@@ -7569,10 +7592,10 @@ index 0000000..ccfecc9
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt
 new file mode 100644
-index 0000000..b00a06a
+index 0000000..2d0253c
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt
-@@ -0,0 +1,378 @@
+@@ -0,0 +1,401 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.AlertDialog
@@ -7595,6 +7618,7 @@ index 0000000..b00a06a
 +import android.widget.LinearLayout
 +import android.widget.ScrollView
 +import android.widget.Switch
++import android.widget.TextView
 +import androidx.appcompat.app.AppCompatActivity
 +import androidx.navigation.NavController
 +import androidx.navigation.NavDestination.Companion.hasRoute
@@ -7792,6 +7816,28 @@ index 0000000..b00a06a
 +        control.commit()
 +        assertEquals(2000, prefs.pressExpansionTime.getValue())
 +        assertEquals(350, prefs.pressWaveHoldTime.getValue())
++    }
++
++    @Test fun quickerDefaultIgnitionIsAdjustableWithoutOverwritingASavedTiming() {
++        val prefs = ThemeManager.prefs
++        assertTrue(prefs.pressIgnitionTime.sharedPreferences.edit().remove(prefs.pressIgnitionTime.key).commit())
++        assertEquals(40, prefs.pressIgnitionTime.getValue())
++        val ui = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
++        val control = ui.durationControls.getValue(prefs.pressIgnitionTime.key)
++        assertEquals(1, control.slider.progress) // 30 + 1 * 10 = 40ms.
++        assertEquals(ui.context.getString(R.string.light_effect_total, 2690),
++            ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
++        control.slider.progress = 7
++        assertEquals("Dragging does not save before release", 40, prefs.pressIgnitionTime.getValue())
++        control.commit()
++        assertEquals(100, prefs.pressIgnitionTime.getValue())
++        assertEquals(ui.context.getString(R.string.light_effect_total, 2750),
++            ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
++        assertEquals(ui.context.getString(R.string.light_effect_total_detail, 100),
++            ui.root.findViewWithTag<TextView>("effect-total-detail").text.toString())
++        val reopened = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
++        assertEquals("Opening the new page preserves the user's saved 100ms", 100, prefs.pressIgnitionTime.getValue())
++        assertEquals(7, reopened.durationControls.getValue(prefs.pressIgnitionTime.key).slider.progress)
 +    }
 +
 +    @Test fun openingRandomModeDisplaysItsActualLegacyPaletteWithoutChangingPreferences() {
@@ -8755,10 +8801,10 @@ index 0000000..4908b57
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
 new file mode 100644
-index 0000000..0a2f08d
+index 0000000..7739b94
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
-@@ -0,0 +1,1013 @@
+@@ -0,0 +1,1127 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
@@ -9734,6 +9780,120 @@ index 0000000..0a2f08d
 +    }
 +
 +    @Test
++    fun productionExpansionHasPositiveMatchingSpeedThroughTheLocalJoin() {
++        for (expansion in intArrayOf(100, 900, 1400, 4000)) {
++            val h = Harness(press = true, production = true, expansion = expansion,
++                fade = 900, waveHold = 350, idle = false)
++            try {
++                val method = PressEffect::class.java.getDeclaredMethod("waveProgress", Long::class.javaPrimitiveType!!)
++                    .apply { isAccessible = true }
++                fun progress(time: Long) = method.invoke(h.effect, time) as Float
++                val join = minOf(160L, expansion / 4L)
++                val beforeSpeed = progress(join) - progress(join - 1)
++                val afterSpeed = progress(join + 1) - progress(join)
++                assertEquals("The local response joins the same outward front", 0.24f, progress(join), 0.00001f)
++                assertTrue("The front cannot stop before the second part starts", beforeSpeed > 0.00005f && afterSpeed > 0.00005f)
++                assertTrue("Travel speed must join smoothly, rather than restart from zero",
++                    afterSpeed / beforeSpeed in 0.80f..1.25f)
++                var previous = progress(0)
++                for (time in 2L..expansion.toLong() step 2) {
++                    val value = progress(time)
++                    assertTrue("Expansion must remain monotone at every configured speed", value + 0.000001f >= previous)
++                    previous = value
++                }
++                if (expansion >= 1400) {
++                    assertTrue("The 40ms after the join still contains measurable travel",
++                        progress(join + 40) - progress(join) >= if (expansion == 4000) 0.004f else 0.012f)
++                }
++                assertEquals("Only the deliberately held full shape stops expanding", 1f, progress(expansion.toLong()), 0.00001f)
++            } finally { h.finish() }
++        }
++    }
++
++    @Test
++    fun productionNativeFrontKeepsTravellingAcrossTheJoin() {
++        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
++            fade = 900, hold = 120, retreat = 1800, idle = false,
++            palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        fun outsideRadius(image: Bitmap): Double {
++            var energy = 0.0
++            var distance = 0.0
++            for (y in 0 until image.height) for (x in 0 until image.width) {
++                if (x in 262 until 338 && y in 57 until 143) continue
++                val pixel = image.getPixel(x, y)
++                val value = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++                if (value < 30) continue
++                energy += value
++                distance += value * kotlin.math.hypot((x - 300).toDouble(), (y - 100).toDouble())
++            }
++            assertTrue("The measured front must contain a visible exterior field", energy > 10000)
++            return distance / energy
++        }
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0).recycle()
++            h.press(1501, 0, 0)
++            h.now = 50
++            h.effect.onRelease(0)
++            val before = h.render(260)
++            val after = h.render(300)
++            assertTrue("The native exterior light keeps advancing through the old pause",
++                outsideRadius(after) >= outsideRadius(before) + 1.0)
++            save(before, "continuous-front-260ms")
++            save(after, "continuous-front-300ms")
++            assertEquals("Saved 100ms ignition keeps its configured 2750ms wave", 0, peak(h.render(2750)))
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun productionNextPressSharesLightSmoothlyWithoutInterruptingTheOlderWave() {
++        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
++            ignition = 40, fade = 900, hold = 120, retreat = 1800, idle = false,
++            palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0).recycle()
++            val trail = org.robolectric.util.ReflectionHelpers.getField<org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail>(h.effect, "ripples")
++            val alphaMethod = PressEffect::class.java.getDeclaredMethod("waveAlpha",
++                org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail.Ripple::class.java).apply { isAccessible = true }
++            val bridgeMethod = PressEffect::class.java.getDeclaredMethod("bridgeAlpha",
++                org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail.Ripple::class.java).apply { isAccessible = true }
++            h.press(1502, 0, 0, 240)
++            val older = trail[0]
++            h.now = 50
++            h.effect.onRelease(0)
++            h.render(150).recycle()
++            var previousGain = older.lightGain
++            var largestDrop = 0f
++            h.press(1503, 0, 150, 420)
++            for (time in 150L..800L step 25) {
++                if (time == 200L) { h.now = time; h.effect.onRelease(0) }
++                val image = h.render(time)
++                assertEquals("A new key adds a wave instead of cancelling the previous wave", 2, trail.size)
++                assertSame("The old wave retains its original object and clock", older, trail[0])
++                assertEquals(0L, older.start)
++                assertTrue("Reducing old light never makes it relight on a later frame", older.lightGain <= previousGain + 0.00001f)
++                largestDrop = maxOf(largestDrop, previousGain - older.lightGain)
++                previousGain = older.lightGain
++                var localEnergy = 0f
++                var bridgeEnergy = 0f
++                for (i in 0 until trail.size) {
++                    val ripple = trail[i]
++                    localEnergy += (alphaMethod.invoke(h.effect, ripple) as Float) * ripple.lightGain * 1.32f
++                    bridgeEnergy += (bridgeMethod.invoke(h.effect, ripple) as Float) * ripple.bridgeGain
++                }
++                assertTrue("Smooth handoff still stays under the combined 1.50 + 0.30 hard budget", localEnergy <= 1.80001f)
++                assertTrue("The independently visible candidate bridge keeps its own hard budget", bridgeEnergy <= 0.40001f)
++                if (time == 250L || time == 300L || time == 350L) save(image, "continuous-two-key-${time}ms")
++                image.recycle()
++            }
++            assertTrue("Budget saturation must not abruptly cut an older front in one 25ms step (drop=$largestDrop)", largestDrop <= 0.15f)
++            assertTrue("The surviving older front retains visible gain", older.lightGain > 0.20f)
++            assertEquals("40 + 1400 + 350 + 900 ends the newer wave 2690ms after its press", 0, peak(h.render(2840)))
++        } finally { h.finish() }
++    }
++
++    @Test
 +    fun productionArbitraryPalettePreservesEachChosenKeyAndCloudHue() {
 +        val custom = intArrayOf(0xff8d23c2.toInt(), 0xff14a37f.toInt(), 0xffecb119.toInt())
 +        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
@@ -10085,10 +10245,10 @@ index 6b9129f..afa223b 100644
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
 new file mode 100644
-index 0000000..aa8722f
+index 0000000..bf460bd
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
-@@ -0,0 +1,1379 @@
+@@ -0,0 +1,1430 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -10347,7 +10507,8 @@ index 0000000..aa8722f
 +            prefs.pressExpansionTime.getValue().toLong(), prefs.pressWaveHoldTime.getValue().toLong(),
 +            prefs.pressFadeOutTime.getValue().toLong(), prefs.pressKeyHoldTime.getValue().toLong(),
 +            prefs.pressKeyRetreatTime.getValue().toLong())
-+        assertEquals("Use the APK's complete default soft-wave timing", 2750L, timing.waveTotal)
++        assertEquals("Use the APK's faster initial feedback and complete default soft-wave timing", 2690L, timing.waveTotal)
++        assertEquals("The default initial feedback is reduced from 100ms to 40ms", 40L, timing.ignition)
 +        assertEquals(1400L, timing.expansion)
 +        assertEquals(350L, timing.hold)
 +        assertEquals(900L, timing.fade)
@@ -11012,7 +11173,8 @@ index 0000000..aa8722f
 +        prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Single)
 +        prefs.pressSingleColor.setValue(Color.parseColor("#00F0FF"))
 +        val keyframeTimes = setOf(0L, 50L, 150L, 250L, 400L, 700L, 1500L, 1850L, 2400L, 3200L)
-+        val finalFrame = ((timing.completeTail + 450L + 49L) / 50L).toInt()
++        // Keep the existing 3200ms comparison keyframe after reducing ignition.
++        val finalFrame = maxOf(64, ((timing.completeTail + 450L + 49L) / 50L).toInt())
 +        for (numberRow in listOf(true, false)) {
 +            prefs.portraitNumberRow.setValue(numberRow)
 +            val folder = "v14-f-review-${if (numberRow) "on" else "off"}"
@@ -11187,12 +11349,23 @@ index 0000000..aa8722f
 +
 +    @Test
 +    fun stableThirtyFpsPressesKeepActualGlyphCoordinatesAndPopupSizeThroughCompleteTails() {
++        stableNativeSequences(30, listOf(Triple("v14-stable-f-on", "f", true),
++            Triple("v14-stable-f-off", "f", false), Triple("v14-stable-burst", "liangge", true)))
++    }
++
++    @Test
++    fun continuousSixtyFpsPressesUseIrregularRealTouchesAndKeepStableReadableGlyphs() {
++        stableNativeSequences(60, listOf(Triple("v14-continuous-f-on", "f", true),
++            Triple("v14-continuous-f-off", "f", false), Triple("v14-continuous-burst", "liangge", true)),
++            listOf(0L, 105L, 230L, 320L, 440L, 545L, 650L))
++    }
++
++    private fun stableNativeSequences(fps: Int, cases: List<Triple<String, String, Boolean>>,
++                                      burstPressTimes: List<Long>? = null) {
 +        val timing = defaultSoftTiming()
 +        val prefs = ThemeManager.prefs
 +        prefs.idleBreathing.setValue(false)
 +        assertEquals(ThemePrefs.KeyMotionEffect.Off, prefs.keyMotionEffect.getValue())
-+        val cases = listOf(Triple("v14-stable-f-on", "f", true), Triple("v14-stable-f-off", "f", false),
-+            Triple("v14-stable-burst", "liangge", true))
 +        for ((folder, input, numberRow) in cases) {
 +            val burst = input.length > 1
 +            prefs.portraitNumberRow.setValue(numberRow)
@@ -11269,13 +11442,22 @@ index 0000000..aa8722f
 +            }
 +            val candidateStrip = BooleanArray(idlePixels.size) { index -> barHeight > 0 && index / root.width < barHeight / 8 }
 +            val fixedGaps = gaps.copyOf()
-+            keyBounds.values.forEach { exclude(fixedGaps, it, root.width, root.height) }
++            keyBounds.values.forEach { rectangle ->
++                exclude(fixedGaps, rectangle, root.width, root.height)
++                val popupLeft = ((rectangle.left + rectangle.right - root.dp(44)) / 2).coerceIn(0, root.width - root.dp(44))
++                val popupTop = rectangle.bottom - root.dp(100) - root.dp(prefs.keyVerticalMargin.getValue())
++                exclude(fixedGaps, Rect(popupLeft, popupTop, popupLeft + root.dp(44), popupTop + root.dp(52)), root.width, root.height)
++            }
 +            data class Gesture(val time: Long, val index: Int, val action: Int)
-+            val gestures = input.indices.flatMap { index -> listOf(Gesture(index * 150L, index, MotionEvent.ACTION_DOWN),
-+                Gesture(index * 150L + 50L, index, MotionEvent.ACTION_UP)) }
-+            val lastDown = (input.length - 1) * 150L
++            val pressTimes = if (burst && burstPressTimes != null) burstPressTimes else input.indices.map { it * 150L }
++            assertEquals(input.length, pressTimes.size)
++            assertEquals(0L, pressTimes.first())
++            assertTrue("Every real key is released before the next DOWN", pressTimes.zipWithNext().all { it.second - it.first > 50L })
++            val gestures = input.indices.flatMap { index -> listOf(Gesture(pressTimes[index], index, MotionEvent.ACTION_DOWN),
++                Gesture(pressTimes[index] + 50L, index, MotionEvent.ACTION_UP)) }
++            val lastDown = pressTimes.last()
 +            val endTime = lastDown + timing.completeTail + if (burst) 550L else 450L
-+            val finalFrame = ((endTime * 30 + 999L) / 1000L).toInt()
++            val finalFrame = ((endTime * fps + 999L) / 1000L).toInt()
 +            var elapsedNow = 0L
 +            fun advanceTo(target: Long) {
 +                assertTrue(target >= elapsedNow)
@@ -11291,18 +11473,20 @@ index 0000000..aa8722f
 +            val inkRows = ArrayList<String>()
 +            val geometryRows = ArrayList<String>()
 +            val inkColours = ArrayList<Pair<Long, Int>>()
++            val motionRows = ArrayList<String>()
++            var previousPixels: IntArray? = null
 +            var minimumReadablePixels = Int.MAX_VALUE
 +            for (frame in 0..finalFrame) {
-+                // Direct native captures at their true 30fps timestamps. Gesture
-+                // transitions retain exact 0/50/150ms timing between sampled frames.
-+                val elapsed = frame * 1000L / 30L
++                // Direct native captures at their true timestamps. Touch events are
++                // dispatched at their exact times between sampled frames, without interpolation.
++                val elapsed = frame * 1000L / fps
 +                while (nextGesture < gestures.size && gestures[nextGesture].time <= elapsed) {
 +                    val gesture = gestures[nextGesture++]
 +                    advanceTo(gesture.time)
 +                    focus = input[gesture.index].toString()
 +                    val key = touched.getValue(focus)
 +                    val rectangle = bounds(keyboard, key)
-+                    val event = MotionEvent.obtain(start + gesture.index * 150L, reviewTime, gesture.action,
++                    val event = MotionEvent.obtain(start + pressTimes[gesture.index], reviewTime, gesture.action,
 +                        rectangle.exactCenterX(), rectangle.exactCenterY(), 0)
 +                    assertTrue(keyboard.dispatchTouchEvent(event))
 +                    event.recycle()
@@ -11351,6 +11535,25 @@ index 0000000..aa8722f
 +                }
 +                val pixels = IntArray(idlePixels.size)
 +                image.getPixels(pixels, 0, root.width, 0, 0, root.width, root.height)
++                // A fixed exterior ROI measures field continuity independently of new
++                // key-face flashes. Metrics are descriptive; the original visibility
++                // and darkness gates remain unchanged in their dedicated fixtures.
++                previousPixels?.let { previous ->
++                    var channelDifference = 0L
++                    var changedPixels = 0
++                    var eligiblePixels = 0
++                    for (index in pixels.indices) if (fixedGaps[index]) {
++                        val red = abs(Color.red(pixels[index]) - Color.red(previous[index]))
++                        val green = abs(Color.green(pixels[index]) - Color.green(previous[index]))
++                        val blue = abs(Color.blue(pixels[index]) - Color.blue(previous[index]))
++                        channelDifference += red + green + blue
++                        if (maxOf(red, green, blue) > 0) changedPixels++
++                        eligiblePixels++
++                    }
++                    motionRows.add(String.format(Locale.US, "%d,%d,%d,%d,%.5f", frame, elapsed,
++                        eligiblePixels, changedPixels, channelDifference.toDouble() / (eligiblePixels.coerceAtLeast(1) * 3)))
++                }
++                previousPixels = pixels
 +                samples.add(elapsed to VisibilityFrame(frame, lightArea(pixels, mask, root.width),
 +                    lightArea(pixels, candidateMask, root.width), lightArea(pixels, fixedGaps, root.width)))
 +                image.recycle()
@@ -11370,15 +11573,19 @@ index 0000000..aa8722f
 +                "key_tx,key_ty,key_rotation,key_sx,key_sy,text_tx,text_ty,text_rotation,text_sx,text_sy,baseline_x,baseline_y," +
 +                "text_scale_x,text_scale_y,paint_text_size,paint_scale_x,paint_skew_x,paint_text_width,font_top,font_bottom,outline_width\n" +
 +                geometryRows.joinToString("\n") + "\n")
++            File(directory, "motion.csv").writeText("frame,time_ms,fixed_exterior_pixels,changed_pixels,mean_abs_channel_change\n" +
++                motionRows.joinToString("\n") + "\n")
 +            val inkStep = inkColours.zipWithNext().filter { it.first.first >= 100L && !burst }.maxOfOrNull { (before, after) ->
 +                maxOf(abs(Color.red(before.second) - Color.red(after.second)), abs(Color.green(before.second) - Color.green(after.second)),
 +                    abs(Color.blue(before.second) - Color.blue(after.second)))
 +            } ?: 0
 +            File(directory, "preview.txt").writeText("source=Android TextKeyboard/PopupEntryUi${if (burst) "/CandidateUi/RippleBarView" else ""}\n" +
-+                "graphics=Robolectric NATIVE\nframes=${finalFrame + 1}\nfps=30\nframe_time_ms=floor(frame*1000/30)\n" +
-+                "last_frame_ms=${finalFrame * 1000L / 30}\nwidth=600\nheight=$height\ndensity=hdpi\nseed=1401\n" +
++                "graphics=Robolectric NATIVE\nframes=${finalFrame + 1}\nfps=$fps\nframe_time_ms=floor(frame*1000/$fps)\n" +
++                "last_frame_ms=${finalFrame * 1000L / fps}\nwidth=600\nheight=$height\ndensity=hdpi\nseed=1401\n" +
 +                "colour_mode=${prefs.pressColorMode.getValue()}\nrandom_palette=${prefs.pressEffectPalette.getValue()}\n" +
-+                "single_colour=#00F0FF\nportrait_number_row=$numberRow\ninput=$input\nkey_interval_ms=150\ntouch_hold_ms=50\n" +
++                "single_colour=#00F0FF\nportrait_number_row=$numberRow\ninput=$input\n" +
++                "key_interval_ms=${if (burstPressTimes == null || !burst) "150" else "irregular"}\n" +
++                "press_times_ms=${pressTimes.joinToString(",")}\ntouch_hold_ms=50\n" +
 +                "last_down_ms=$lastDown\nlast_up_ms=${lastDown + 50}\nidle_breathing=false\n" + timing.provenance() +
 +                "baseline=mode/case update followed by real measure/layout and initial native draw\n" +
 +                "geometry=actual key/text coordinates, baseline and paint measurements; all fixed in every frame\n" +
@@ -11386,18 +11593,22 @@ index 0000000..aa8722f
 +                "readability=same-time actual canvas comparison with only mainText hidden; includes fixed production outline\n" +
 +                "readable_pixel_threshold=channel contrast>=40 over at least 12 pixels\nminimum_readable_pixels=$minimumReadablePixels\n" +
 +                "release_max_adjacent_ink_channel_step=$inkStep (descriptive metric)\n" +
++                "motion_metrics=fixed baseline black exterior gaps; all touched cells and their possible popup glyph rectangles excluded\n" +
 +                "frames_are_direct_native_draws=true\ninterpolation=false\n" +
 +                if (burst) "candidates=replay of real bundled Rime fixture; not live ARM engine execution\n" else "")
 +            assertEquals(input, typed.toString())
 +            if (burst) assertEquals(recorded.last()[1], adapter.candidates.first().text)
 +            val completeRest = samples.filter { it.first >= lastDown + timing.completeTail + 100L }
-+            assertTrue("The 30fps review retains at least 300ms of complete black rest", completeRest.size >= 9)
++            assertTrue("The ${fps}fps review retains at least 300ms of complete black rest", completeRest.size >= fps * 300 / 1000)
 +            assertTrue("The stable sequence returns completely to black gaps after its tail",
 +                completeRest.all { it.second.gap.meanMaxRgb <= 3.0 && it.second.gap.colour30 == 0 })
 +            if (burst) assertTrue("The stable burst candidate strip returns to black",
 +                completeRest.all { it.second.candidate.meanMaxRgb <= 3.0 && it.second.candidate.colour30 == 0 })
 +            assertTrue("A visible field must survive outside the stable keycaps", samples.maxOf { it.second.gap.colour30 } >= 1000)
-+            assertTrue("The real popup is readable while the first key is held/released", popupAlpha[1] >= 0.75f && popupAlpha[3] > 0f)
++            val popupHeldFrame = samples.indexOfFirst { it.first >= 33L }
++            val popupReleaseFrame = samples.indexOfFirst { it.first >= 100L }
++            assertTrue("The real popup is readable while the first key is held/released",
++                popupAlpha[popupHeldFrame] >= 0.75f && popupAlpha[popupReleaseFrame] > 0f)
 +            assertTrue("The last popup completes its release lifecycle", popupAlpha.last() == 0f)
 +            previews.stop()
 +            keyboard.onDetach()

@@ -1,0 +1,135 @@
+{
+  "counts": {
+    "tests": 120,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "class_counts": {
+    "org.fcitx.fcitx5.android.VerificationCodesTest": 3,
+    "org.fcitx.fcitx5.android.IdleGlowDirectionTest": 1,
+    "org.fcitx.fcitx5.android.PopupPreviewLifecycleTest": 9,
+    "org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest": 7,
+    "org.fcitx.fcitx5.android.PressEffectRenderingTest": 33,
+    "org.fcitx.fcitx5.android.RimeMobileOptionsTest": 3,
+    "org.fcitx.fcitx5.android.StringEscapeTest": 2,
+    "org.fcitx.fcitx5.android.PressEffectMasksTest": 5,
+    "org.fcitx.fcitx5.android.V14PreviewRenderingTest": 8,
+    "org.fcitx.fcitx5.android.KeyboardVisualRegressionTest": 14,
+    "org.fcitx.fcitx5.android.LightEffectSettingsUiTest": 9,
+    "org.fcitx.fcitx5.android.V14TouchRoutingTest": 3,
+    "org.fcitx.fcitx5.android.CandidatePageBufferTest": 2,
+    "org.fcitx.fcitx5.android.PressEffectTrailTest": 3,
+    "org.fcitx.fcitx5.android.KeyLegendInkTest": 2,
+    "org.fcitx.fcitx5.android.PressColorSettingsTest": 6,
+    "org.fcitx.fcitx5.android.IdleBreathingTest": 7,
+    "org.fcitx.fcitx5.android.ThemeSerializationTest": 3
+  },
+  "source_path_count": 103,
+  "source_before_after_mismatches": [],
+  "native_snapshot": "/tmp/xuancai-v14-continuous-final-native",
+  "native": {
+    "v14-continuous-f-on": {
+      "frames": 190,
+      "fps": 60,
+      "ignition_ms": 40,
+      "wave_total_ms": 2690,
+      "geometry_varying_fields": [],
+      "minimum_readable_pixels": 127,
+      "motion_description": "Native adjacent-frame absolute RGB change in fixed exterior ROI; numeric description only, no new gate. Window 120ms to last_down+wave_total excludes the initial field delay and fully black tail.",
+      "motion_window_ms": [
+        120,
+        2690
+      ],
+      "motion_samples": 154,
+      "fixed_exterior_pixels": [
+        60294
+      ],
+      "mean_abs_channel_change_mean": 0.47955590909090906,
+      "mean_abs_channel_change_max": 1.71442,
+      "mean_abs_channel_change_p95": 1.1445489999999998,
+      "changed_pixels_mean": 30430.77922077922,
+      "changed_pixels_max": 58530,
+      "zero_changed_frames_in_window": 33
+    },
+    "v14-continuous-f-off": {
+      "frames": 190,
+      "fps": 60,
+      "ignition_ms": 40,
+      "wave_total_ms": 2690,
+      "geometry_varying_fields": [],
+      "minimum_readable_pixels": 127,
+      "motion_description": "Native adjacent-frame absolute RGB change in fixed exterior ROI; numeric description only, no new gate. Window 120ms to last_down+wave_total excludes the initial field delay and fully black tail.",
+      "motion_window_ms": [
+        120,
+        2690
+      ],
+      "motion_samples": 154,
+      "fixed_exterior_pixels": [
+        54300
+      ],
+      "mean_abs_channel_change_mean": 0.46656188311688307,
+      "mean_abs_channel_change_max": 1.62769,
+      "mean_abs_channel_change_p95": 1.061022,
+      "changed_pixels_mean": 26957.915584415583,
+      "changed_pixels_max": 52377,
+      "zero_changed_frames_in_window": 33
+    },
+    "v14-continuous-burst": {
+      "frames": 235,
+      "fps": 60,
+      "ignition_ms": 40,
+      "wave_total_ms": 2690,
+      "geometry_varying_fields": [],
+      "minimum_readable_pixels": 125,
+      "motion_description": "Native adjacent-frame absolute RGB change in fixed exterior ROI; numeric description only, no new gate. Window 120ms to last_down+wave_total excludes the initial field delay and fully black tail.",
+      "motion_window_ms": [
+        120,
+        3340
+      ],
+      "motion_samples": 193,
+      "fixed_exterior_pixels": [
+        47294
+      ],
+      "mean_abs_channel_change_mean": 0.9284359585492227,
+      "mean_abs_channel_change_max": 3.15648,
+      "mean_abs_channel_change_p95": 2.344608,
+      "changed_pixels_mean": 30361.896373056996,
+      "changed_pixels_max": 47294,
+      "zero_changed_frames_in_window": 36
+    }
+  },
+  "metrics": {
+    "fourline_rows": [
+      56.825,
+      76.03055555555555,
+      85.37222222222222,
+      69.21111111111111
+    ],
+    "fourline_mean": 71.85972222222222,
+    "fourline_gate": 75,
+    "fourline_margin": 3.140277777777783,
+    "gap_mean_maxrgb": {
+      "max": 57.84,
+      "frame": 64
+    },
+    "candidate_mean_maxrgb": {
+      "max": 33.32,
+      "frame": 69
+    },
+    "candidate_peak": {
+      "max": 44.0,
+      "frame": 68
+    },
+    "candidate_colour_gt30": {
+      "max": 2778.0,
+      "frame": 69
+    },
+    "candidate_visible_run": 24
+  },
+  "log": "build-log.txt",
+  "xml_archive": "test-results/",
+  "encoding_performed_by_runner": false,
+  "push_ci_release_performed_by_runner": false,
+  "patch_sha256": "d694c6124363e59f0e8b5b2a0fe495fe0cb1bf0c6ba9c6ad927a227852cc810d"
+}

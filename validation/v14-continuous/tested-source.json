@@ -1,0 +1,522 @@
+{
+  "head": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "path_count": 103,
+  "before_after_mismatches": [],
+  "files": [
+    {
+      "path": "app/build.gradle.kts",
+      "size": 6052,
+      "sha256": "ccddecde24875154f166cf5eab71fe98b507a135e48959af285689f370276c52"
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "size": 7739,
+      "sha256": "dbea0fdc6f865acd186725c15b271d92d06156471dc5f34acc99cd92f858fbaa"
+    },
+    {
+      "path": "app/src/main/cpp/androidkeyboard/androidkeyboard.h",
+      "size": 4512,
+      "sha256": "664c93d2e1ed4805755cc66990dac444b77d8cb2dd0a084c3dc5954dd808e28c"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/core/data/PluginDescriptor.kt",
+      "size": 1407,
+      "sha256": "e2d89cecdfd6fc9cd14c6c8778e0a601696a7a9620c713505e8d580341224052"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/otp/SmsCodeReceiver.kt",
+      "size": 926,
+      "sha256": "e167fe74c5c09ab528aec5c658328d0a4032cdb8371da4c08fa71e9ebcd03a53"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/otp/VerificationCodes.kt",
+      "size": 4073,
+      "sha256": "e541fb3ce9b815afa74621f3a70f90a5b5523f6915a44eceaf3a87b6c408dc41"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt",
+      "size": 17610,
+      "sha256": "7308eb3424eaf4cdd6b6126ef77ecb6b319b06aad93aa364c91f70593acea21d"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/rime/RimeFuzzyConfig.kt",
+      "size": 716,
+      "sha256": "c5b76334e2baff3cf871fc88118e7667b051e0747947ab2b177887d2fa10b4b7"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/theme/PressColorPalette.kt",
+      "size": 938,
+      "sha256": "fa135d1bb9041bae363ff913b391b432ed892f25f3e4c0d35a40e31e4c1aba13"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeManager.kt",
+      "size": 5354,
+      "sha256": "ba9b6dabf6d2687ce84d5cb55406eecd6e440f44e1462a472b13544a99e5a655"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt",
+      "size": 14635,
+      "sha256": "da5eb9ca229bf8bee8cc90545d9d5de64fbf7d9383a143cee1f64ca8eaf41708"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt",
+      "size": 12287,
+      "sha256": "077a16eb392ff25fc41d8c5fed4cb04647cb1aae9d0cbcd1646f4aaa0ed4f1b0"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/AutoScaleTextView.kt",
+      "size": 8503,
+      "sha256": "b284d4bf4edb0448c3b1d0b78eae4ef50764087e48f770120b46e1f478e1c12c"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/FcitxInputMethodService.kt",
+      "size": 48933,
+      "sha256": "bf0e0e1450b2dd7955c48b3c10e28e7618ea6892090a3e546e8bb1ea772a5801"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt",
+      "size": 24530,
+      "sha256": "29f95bdda9172edee9b36977340faa7543e0427046b833637fdb9beccb5c2b72"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/bar/RippleBarView.kt",
+      "size": 1330,
+      "sha256": "4eb35b9a9c584d6e1076224fe851ed1b8ef12913d972d06e75ee7348abe18199"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/CandidateUi.kt",
+      "size": 1344,
+      "sha256": "0688a5a51b18878a7ff992cc9efdc4878dd594776dbd5328de0f24d9304b52df"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/IdleUi.kt",
+      "size": 9029,
+      "sha256": "d00a5316c64b55b54a6b3bea91fdbcdb2ad4e39299a8fc93c2fc574829caf376"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/bar/ui/idle/ButtonsBarUi.kt",
+      "size": 2081,
+      "sha256": "7b0213ba00e3b8d789d0fdfd66a3b5c62b8e7f94a9980dc215b840dc40e1042d"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/CandidateItemUi.kt",
+      "size": 2140,
+      "sha256": "cb8e8c6c8253db96826999e46c32d161f1257d42819dae57904480acb3ffe3db"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/CandidatesPagingSource.kt",
+      "size": 1466,
+      "sha256": "6b0a00881ccd1c2989c3ed8238613f8c34a83ce041c0e94838133d8c06762969"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/GridPagingCandidateViewAdapter.kt",
+      "size": 1672,
+      "sha256": "ea883a7324b899876f128965163516e5a7f2ed202fee686a2b8575aefe3436fc"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/BaseExpandedCandidateWindow.kt",
+      "size": 8488,
+      "sha256": "58727cf4a03bbe0ee30348a5233b0d1711ec3c61d0c4d3346bfd50b7fabcee17"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/expanded/window/FlexboxExpandedCandidateWindow.kt",
+      "size": 4360,
+      "sha256": "1c3c2900e1c46ddedf7062bd800db301d1467f91ce909bd9740e47578dcda877"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/CandidatePageBuffer.kt",
+      "size": 1474,
+      "sha256": "cd6e165cc46abdb1cb8f108b95a52696f218b6b7247dc231b1e9f11a7c8c3cd1"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateComponent.kt",
+      "size": 6434,
+      "sha256": "32a3496dcb8eebdce22dcce5f740c93705457864f1d56864c9700a23e4d55420"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/candidates/horizontal/HorizontalCandidateViewAdapter.kt",
+      "size": 2149,
+      "sha256": "9b9e824a80fbe89120a599a2109f0feb0dc58e7001eacac3a57e6df4d98050e3"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/editing/TextEditingUi.kt",
+      "size": 7072,
+      "sha256": "8691fb705201982d96c6f17cfcb29f214d37a542949736b922456ee9a502d1d3"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/editing/TextEditingWindow.kt",
+      "size": 5158,
+      "sha256": "9f5efc46aaff91e1c38184e8edf790ddaeed1433210177eee9039df7f136669f"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt",
+      "size": 36984,
+      "sha256": "121173e758d3f0dfa9746ff5eac187d1a0d1874855e6d78f3d1c23190528064b"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CommonKeyActionListener.kt",
+      "size": 8748,
+      "sha256": "7f67b2e302eaded6214e40cbb9849ea0f4690cd6547cad2975cdd7cbeab16a9c"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/CustomGestureView.kt",
+      "size": 10835,
+      "sha256": "db2632b1d1b9d962f137d0b52da39c23437a1f291caeaff1986e6dff416beda8"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleBreathing.kt",
+      "size": 3053,
+      "sha256": "6706c5b0e56fb5f7e558b2cf5b1cadda0fa06b9fec377f93feeef8bea06cf14d"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/IdleGlowPainter.kt",
+      "size": 1604,
+      "sha256": "cc55e23cef378f4be01d929fa3c96d4d31160bdba6734dde793f794f5153aa80"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyDefPreset.kt",
+      "size": 8135,
+      "sha256": "3f5fefa40dae0a53ec189e81b3ef7db89b84dc5cea8cdd8750c909c46f294bb7"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyLegendInk.kt",
+      "size": 907,
+      "sha256": "1f4f9579c9bda2e594e242c84c07685f95a51217872d3d8b5c588f2647cce622"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt",
+      "size": 18080,
+      "sha256": "93dbf33ae5cb904494cba65e604e72bd61227a9b142ac171c215c809328fd0f9"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardGridLayout.kt",
+      "size": 4426,
+      "sha256": "512c2dfa884abd396e1b9684f4db951cbe63280f667a34c268ef7515b65b0708"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyboardWindow.kt",
+      "size": 8080,
+      "sha256": "76f8b56be479092fcc786abea07ce696095aabde7d1dfc081f6e44840ccb372e"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/NumberKeyboard.kt",
+      "size": 3806,
+      "sha256": "5703660438d5f18da7ebd6859496723fb33680fff5e126e44217103b3e219e34"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt",
+      "size": 50681,
+      "sha256": "2a8daa54da95e97818ac4b921f5db6483b27665e05c923df63dce23d4f7d9c03"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt",
+      "size": 2917,
+      "sha256": "0423f132b9be1bbbc10927047604464dc7deeef7bcb2d942a499c69d179a1ea3"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PunctuationMode.kt",
+      "size": 364,
+      "sha256": "9e4fbfbdcf95c5aa02d431e110b65d446c104cb7543f2342ac94b3a5fd37c7dc"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/RimeActions.kt",
+      "size": 746,
+      "sha256": "1645aef3ad961adaf57328aebad2b61fe44aae7c85b5fc1d83adc86d451d8634"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/SpaceLongPressBehavior.kt",
+      "size": 612,
+      "sha256": "62defd1e910ef7ef03972dc2d0698faf1dde73292746568b2cf07fadf42232a8"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/SymbolKeyboard.kt",
+      "size": 6289,
+      "sha256": "92145b80a20b9b25c671b49c322d51f5de16b8d1f8d6fce5dfc33ce94227a74f"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/SymbolKeyboardState.kt",
+      "size": 4065,
+      "sha256": "962b9415e88f0dddc91562003ad41c4907e441530f13e6a70f9b54a8f7d02dc1"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/TextKeyboard.kt",
+      "size": 11430,
+      "sha256": "689f64410c8f728779c2de3d641195382513a5987e9a3d15297a2ee5b63b6293"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerData.kt",
+      "size": 32305,
+      "sha256": "0f6bed288131584828712bda563268b2f8844c4c8953f5d380aae962225610d6"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/picker/PickerWindow.kt",
+      "size": 7286,
+      "sha256": "6894126412b0d053dbd45c598eed092f76a1f868e4088aca8ff867c65dd20aef"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt",
+      "size": 9954,
+      "sha256": "81f3618daafa43e524a3cf84e770c3664f8e968fc9c862c08c08f6b5de3b24dc"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt",
+      "size": 2961,
+      "sha256": "292d57c88ff93e421c82dc88f70ea2f11cced80581320bd9e705bb043e78d868"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupKeyboardUi.kt",
+      "size": 8452,
+      "sha256": "feed73b986cc1998f7be78459704d16bdeef45fcbbca13518b0a1b8c24115bf5"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupMenuUi.kt",
+      "size": 4415,
+      "sha256": "8222e14af15aa976800f4c96305f8feddcde7b2e99b2d8fe0b3b416e03052bf7"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupPreviewLifecycle.kt",
+      "size": 4527,
+      "sha256": "5d54575fc98fc6240ea1a4c1c3a378b475982464f29d6d0f3020e8db8bad3b4e"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/status/StatusAreaEntry.kt",
+      "size": 2447,
+      "sha256": "a4a7683337f0be75b1c465fb5ce223fdab21d3b7f19a2dc202bac3ff8e1354c3"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/input/status/StatusAreaWindow.kt",
+      "size": 9652,
+      "sha256": "baf6f702c3f557deb557e63cf916e602a0b18ffccfe8f564955de1534fe8f0aa"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainActivity.kt",
+      "size": 8156,
+      "sha256": "f4afb5200b039ff150f1a02a23e6dd6d7b9aeb02aa80c129a286aeb6843c90a3"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainFragment.kt",
+      "size": 4860,
+      "sha256": "cedd0ccae57ad13e4e0e777efc08eae951b42d429cc60c51d54f8fcb3f6bb32a"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/SettingsRoute.kt",
+      "size": 9746,
+      "sha256": "06f0ea7b3c66df6050648821661cde01ff4ba98953e456e94520bc5c8840f504"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt",
+      "size": 3506,
+      "sha256": "a8cae1b1382262372d76dbb168ba94a83b57c4f4f934d849a8e7e78776da3d06"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/EffectColorEditor.kt",
+      "size": 5601,
+      "sha256": "a8e107a9858132188a0d9e61273a907513804051831ebb9b9f3dbb047eb0e169"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/KeyboardPreviewUi.kt",
+      "size": 7462,
+      "sha256": "5623eab2969144feb0ab680f5d34e98955194d0bdde7458144c72f7baf4b847a"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsFragment.kt",
+      "size": 1074,
+      "sha256": "a40717897452b38fc9684a0e29a19de274803ff7d42a145a004cee0f8227fc62"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt",
+      "size": 17539,
+      "sha256": "2146026c898a14ea1187a86b0ab9ef664836ed66cd2cee1d4164f4f843de1b60"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt",
+      "size": 2670,
+      "sha256": "b7184b7ffc9b0036a60770bf9d12b107417fc975d7cf26b4d5f61f33ee0cb55a"
+    },
+    {
+      "path": "app/src/main/java/org/fcitx/fcitx5/android/utils/AppUtil.kt",
+      "size": 3613,
+      "sha256": "2910d286655127a5c43a4f03be41a20484cc558c71e3374c6a9edfcf9f0dcc5a"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_keyboard_backspace_outline.xml",
+      "size": 461,
+      "sha256": "278afa24f4531ef584184a6ec6312011ed001474f46532a3cb5e6ab1fc9b68da"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_keyboard_space_outline.xml",
+      "size": 427,
+      "sha256": "6857b251fe3a2bf00ee8cebd7a11552444231b18bb57b1f1416dd404f1b3c2e7"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_keyboard_tools_24.xml",
+      "size": 407,
+      "sha256": "703fd473c42f4299fd55f4ec371c6a030ee6de15e7472ae3a11e027f782bb417"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_symbol_lock.xml",
+      "size": 377,
+      "sha256": "f3ad9cd3b69f238f3175ee0b95f501892ef03e3707730adcbe247881761acedd"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_symbol_unlock.xml",
+      "size": 372,
+      "sha256": "9b3b97b53c64a300b3b7db866ebb1233156f1fb258aa7de8fe5b76af9b7701e4"
+    },
+    {
+      "path": "app/src/main/res/values-zh-rCN/light_effect_settings.xml",
+      "size": 2870,
+      "sha256": "889b6c96afad4a8d245577ffc576b1dd85757b7f1c10a8998ad218d6b9110e9e"
+    },
+    {
+      "path": "app/src/main/res/values-zh-rCN/strings.xml",
+      "size": 28636,
+      "sha256": "f97da331f531c1080f0ff54fa819c3d1d798dafc51ad5c60b1eb0f3b7232a2a8"
+    },
+    {
+      "path": "app/src/main/res/values-zh-rTW/light_effect_settings.xml",
+      "size": 2870,
+      "sha256": "63a94b5c85f96f8c7194d849658fa3f2eb1d0bdf6f50c1b46b85ac4fc42f44b2"
+    },
+    {
+      "path": "app/src/main/res/values-zh-rTW/strings.xml",
+      "size": 28461,
+      "sha256": "fe86db1e1eb342075f2c1b4e082fe5adb5ff6ab4f310634b052155fb57d33af3"
+    },
+    {
+      "path": "app/src/main/res/values/light_effect_settings.xml",
+      "size": 2947,
+      "sha256": "e3e4c79d8110da599aeab0752eb122b60056a91275a0d13473d4d73ac6b37ca7"
+    },
+    {
+      "path": "app/src/main/res/values/strings.xml",
+      "size": 29560,
+      "sha256": "5f50bca65b3b135c42cd77fcdcc9c3028240c8800be75ea99c8850d434948a5a"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt",
+      "size": 1687,
+      "sha256": "0e4f683661438afa487aa755b6c8aa6dc3041ebe6c515e2595833166f1875cdd"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/IdleBreathingTest.kt",
+      "size": 4048,
+      "sha256": "e9efc310c4c7ddc59472e4269a222823144cc8f84711be6c7dd05f3628e516bd"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/IdleGlowDirectionTest.kt",
+      "size": 1776,
+      "sha256": "caadf479e3114cf2344195e1ef1dbce91db92b2b31dbf749a3bb184b9df134dc"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/KeyLegendInkTest.kt",
+      "size": 3443,
+      "sha256": "6014f3136f8335247e60e53b16ed49535b9041c28566b2c824680e0de7177415"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt",
+      "size": 41785,
+      "sha256": "58a3e21fe0cda2d367fc67bfb6c504b51543ee27aa245a006367031071a7518b"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt",
+      "size": 21866,
+      "sha256": "06d78b4549bbc1dacd1e6039b288eb474caf606cbd9a257bfbde9ce7655a9675"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/PopupPreviewLifecycleTest.kt",
+      "size": 12834,
+      "sha256": "784638deb2ad2fd1962194c67b25108eb59ce99573afc1de3c4f00f338ed6070"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/PressColorSettingsTest.kt",
+      "size": 17598,
+      "sha256": "172e24dbfa67a2fabd1ecc112df56afacd1280c4ce9afa229a75d26d135cef60"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt",
+      "size": 5008,
+      "sha256": "5462ecf617b8216e75615c983b307025df9aca3f93ac8a4a618908c7623d3e84"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt",
+      "size": 55837,
+      "sha256": "83a8a8379f6cf93de3791cc37c8fffe687eb920976f1d6b8a6bfd7d00bfca81b"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/PressEffectTrailTest.kt",
+      "size": 2064,
+      "sha256": "930c3fbefa343e350881f15566ded0f69128ab64208db5fbf4b0d24281161535"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/RimeMobileOptionsTest.kt",
+      "size": 1889,
+      "sha256": "e1455d1dadaa88107007ba31b75276916342f1be7baf1639ed34be1b525f3e3b"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/SamsungSymbolKeyboardTest.kt",
+      "size": 9003,
+      "sha256": "08bcc6af610dae8f0b9ecdad480082bdc7a9cad0a0af7e6fa2b1db8d3bfaf3e7"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/ThemeSerializationTest.kt",
+      "size": 4202,
+      "sha256": "b1a8c0e08b120c4a1212928ea4237ced565fc3271f81ed4deca2c50a4818022a"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt",
+      "size": 85707,
+      "sha256": "d755d9258ba4c86b03ba77f37dfbc07f89103fa404264e4169436fe6e7db2506"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/V14TouchRoutingTest.kt",
+      "size": 12128,
+      "sha256": "979af164d0540847f177894e113e76eca040f8b03158cacef4f0088e4f7f2c91"
+    },
+    {
+      "path": "app/src/test/java/org/fcitx/fcitx5/android/VerificationCodesTest.kt",
+      "size": 1961,
+      "sha256": "3789c5123d85aebb52cb8fcc370f178f80c7ef5211fd1a16b84bb940e19966bc"
+    },
+    {
+      "path": "app/src/test/resources/xuancai-typing-candidates.tsv",
+      "size": 1335,
+      "sha256": "706595126b394049414bd8c16d1edf179b6000d37cc3c27ed33f1f95baaaf25f"
+    },
+    {
+      "path": "build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt",
+      "size": 7184,
+      "sha256": "b97764e032b4921cbaa7f2bf26f5cdf768b132307c3bd6ff5833ebea40976a5d"
+    },
+    {
+      "path": "build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt",
+      "size": 2231,
+      "sha256": "aef68cf2b8ba0e0227070785b9cb543f15fdd53bde95ce28a9be77817c67774c"
+    },
+    {
+      "path": "build-logic/convention/src/main/kotlin/Versions.kt",
+      "size": 971,
+      "sha256": "29336208d525f4be71063d4661f4a0dc105b339b403e1e83246f92de94df725c"
+    },
+    {
+      "path": "lib/plugin-base/src/debug/AndroidManifest.xml",
+      "size": 1202,
+      "sha256": "df6752a12b2278887f46f8ff1286672afa5a2379ca5533a561f3b4b646590818"
+    },
+    {
+      "path": "plugin/rime/build.gradle.kts",
+      "size": 1403,
+      "sha256": "2706565d81c23da440288ac8b9280289d2fd439610202a121ec6324a8ce70775"
+    },
+    {
+      "path": "plugin/rime/src/main/cpp/CMakeLists.txt",
+      "size": 4458,
+      "sha256": "35c43270205f07c6eaa092ff843b3b842dc6a185cd100d7ad65c86b91ac9fbbd"
+    },
+    {
+      "path": "plugin/rime/src/main/cpp/default.yaml",
+      "size": 1191,
+      "sha256": "60007bba43ced70d3d39b5e359a63d8f992c84e34b9b1d2af8500d9cd44689e5"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "baseline": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "patch_sha256": "d694c6124363e59f0e8b5b2a0fe495fe0cb1bf0c6ba9c6ad927a227852cc810d",
+  "files_compared": 103,
+  "mismatches": [],
+  "clean_apply_check": "passed",
+  "byte_comparison": "passed",
+  "source_staged": true,
+  "tested_source_manifest_sha256": "4a520c67cb2f1ca32de86806f1f7c4876b72073b24c686862143eba837cc863a",
+  "tested_source_vs_current": "passed",
+  "tested_source_vs_fresh_apply": "passed",
+  "source_before_after_mismatches": []
+}
