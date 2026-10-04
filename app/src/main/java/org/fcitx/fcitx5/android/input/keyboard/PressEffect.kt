@@ -478,7 +478,7 @@ internal class PressEffect(
         if (ripples.size > 0 || keyFaces.size > 0) draw(canvas, underStrength)
     }
 
-    /** Mist faces rest while held; a visible liquid surface continues its local flow. */
+    /** Mist faces rest while held; a visible liquid rim continues its local flow. */
     fun drawOver(canvas: Canvas) {
         if (!canDraw() || !animatorsEnabled()) return
         var changing = glowStrength > 0f && ripples.size > 0
@@ -569,8 +569,6 @@ internal class PressEffect(
     }
 
     private val borderRect = android.graphics.RectF()
-    private val liquidClip = Path()
-    private val liquidSurface = Path()
     private val liquidRim = Path()
 
     /** the real rounded keycap in one colour, lit from behind; shrinks only for the shrink exit */
@@ -581,12 +579,10 @@ internal class PressEffect(
         val h = r.flashHeight + (spot - r.flashHeight) * retreat
         val radius = keyCornerRadius + (spot / 2f - keyCornerRadius) * retreat
         borderRect.set(-w / 2f, -h / 2f, w / 2f, h / 2f)
-        style.solidPaint.alpha = (alpha * (if (liquidKeyFaces) 0.62f else 1f) * 255f).toInt()
+        // Every shape floats as one completely coloured cap. A ripple choice
+        // must never turn its upper half into a dim "water level" or shadow.
+        style.solidPaint.alpha = (alpha * 255f).toInt()
         canvas.drawRoundRect(borderRect, radius, radius, style.solidPaint)
-        if (liquidKeyFaces) {
-            drawLiquidSurface(canvas, r, style, alpha, w, h, radius, elapsed)
-            return
-        }
         // backlight hot spot near the top centre
         val saved = canvas.save()
         canvas.translate(0f, -h * 0.14f)
@@ -594,43 +590,31 @@ internal class PressEffect(
         style.highlightPaint.alpha = (alpha * 0.08f * 255f).toInt()
         canvas.drawCircle(0f, 0f, 1f, style.highlightPaint)
         canvas.restoreToCount(saved)
+        if (liquidKeyFaces) drawLiquidEdge(canvas, r, style, alpha, w, h, radius, elapsed)
     }
 
-    /** A plainly visible flowing meniscus inside the real cap, always below its glyph. */
-    private fun drawLiquidSurface(canvas: Canvas, r: PressEffectTrail.Ripple, style: RipplePaints,
+    /** A small same-colour glint stays at the rim; the cap interior remains uniform. */
+    private fun drawLiquidEdge(canvas: Canvas, r: PressEffectTrail.Ripple, style: RipplePaints,
         alpha: Float, width: Float, height: Float, radius: Float, elapsed: Long) {
-        val phase = elapsed.toFloat() / 260f + r.shape * 0.67f
-        val leftY = height * (-0.08f + 0.17f * kotlin.math.sin(phase))
-        val middleY = height * (0.06f + 0.15f * kotlin.math.sin(phase * 0.83f + 1.1f))
-        val rightY = height * (-0.05f + 0.17f * cos(phase * 0.91f + 0.4f))
-        val left = -width / 2f
-        val right = width / 2f
+        val available = width - 2f * (radius + 2f * density)
+        if (available < 6f * density) return
+        val phase = elapsed.toFloat() / 380f + r.shape * 0.67f
+        val length = available * 0.45f
+        val left = -available / 2f + (available - length) * (0.5f + 0.5f * kotlin.math.sin(phase))
+        val right = left + length
+        val top = -height / 2f + 2f * density
         liquidRim.rewind()
-        liquidRim.moveTo(left, leftY)
-        liquidRim.cubicTo(left * 0.65f, leftY - height * 0.19f,
-            left * 0.30f, middleY + height * 0.18f, 0f, middleY)
-        liquidRim.cubicTo(right * 0.32f, middleY - height * 0.20f,
-            right * 0.72f, rightY + height * 0.17f, right, rightY)
-        liquidSurface.set(liquidRim)
-        liquidSurface.lineTo(right, height / 2f)
-        liquidSurface.lineTo(left, height / 2f)
-        liquidSurface.close()
-        liquidClip.rewind()
-        liquidClip.addRoundRect(borderRect, radius, radius, Path.Direction.CW)
-        val saved = canvas.save()
-        canvas.clipPath(liquidClip)
-        // Compositing the pool over its darker base reaches the original face
-        // alpha exactly. The selected colour and complete key outline remain.
-        val base = alpha * 0.62f
-        style.solidPaint.alpha = (((alpha - base) / (1f - base)) * 255f).toInt()
-        canvas.drawPath(liquidSurface, style.solidPaint)
-        style.liquidRimPaint.strokeWidth = density * 3.5f
-        style.liquidRimPaint.alpha = (alpha * 0.12f * 255f).toInt()
+        liquidRim.moveTo(left, top + 0.20f * density * kotlin.math.sin(phase))
+        liquidRim.quadTo((left + right) / 2f, top - 0.25f * density,
+            right, top + 0.20f * density * cos(phase * 0.8f))
+        // Even the soft stroke stays within the upper four dp and clear of the
+        // rounded corners. Nothing is filled below or drawn across the glyph.
+        style.liquidRimPaint.strokeWidth = density * 3f
+        style.liquidRimPaint.alpha = (alpha * 0.10f * 255f).toInt()
         canvas.drawPath(liquidRim, style.liquidRimPaint)
-        style.liquidRimPaint.strokeWidth = density * 1.2f
-        style.liquidRimPaint.alpha = (alpha * 0.55f * 255f).toInt()
+        style.liquidRimPaint.strokeWidth = density
+        style.liquidRimPaint.alpha = (alpha * 0.35f * 255f).toInt()
         canvas.drawPath(liquidRim, style.liquidRimPaint)
-        canvas.restoreToCount(saved)
     }
 
     /** neon outline around the pressed key: soft outer glow, brighter halo, crisp line */
@@ -701,11 +685,15 @@ internal class PressEffect(
         val end = fadeEnvelope(r)
         // Keep the outward front readable during expansion. Once its configured
         // fade begins, gradually unload overlapping sources before their common
-        // exposure ceiling can hold them at a bright plateau. Cubing the smooth
-        // envelope preserves zero endpoint velocity and the full chosen lifetime;
-        // each source still fades independently of subsequent key presses.
-        return if (sharedFieldEnabled) 0.80f * ignition * end * end * end
-            else 0.80f * ignition * (1f - 0.35f * smoothstep(0.55f, 1f, progress)) * end
+        // exposure ceiling can hold them at a bright plateau. Mist keeps a more
+        // visible quadratic tail; liquid retains its cubic exit. Both preserve
+        // zero endpoint velocity and the exact configured lifetime, independently
+        // of subsequent key presses and without increasing the peak exposure.
+        return if (sharedFieldEnabled) {
+            val tail = 0.80f * ignition * end * end
+            if (rippleShape == org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.SoftMist) tail
+            else tail * end
+        } else 0.80f * ignition * (1f - 0.35f * smoothstep(0.55f, 1f, progress)) * end
     }
 
     private fun bridgeAlpha(r: PressEffectTrail.Ripple): Float {

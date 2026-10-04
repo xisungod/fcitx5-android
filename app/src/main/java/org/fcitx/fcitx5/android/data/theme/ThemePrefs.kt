@@ -267,7 +267,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     )
 
     val pressFadeOutTime = int(
-        R.string.press_fade_out_time, "press_fade_out_time", 520, 100, 5000, "ms", 50,
+        // Unset timings receive the longer tail; saved 520ms and custom values stay intact.
+        R.string.press_fade_out_time, "press_fade_out_time", 900, 100, 5000, "ms", 50,
         enableUiOn = { pressEffect.getValue() }
     )
 

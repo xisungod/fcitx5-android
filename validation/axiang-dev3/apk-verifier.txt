@@ -1,0 +1,5 @@
+Single APK host verified: org.fcitx.fcitx5.android.axiang.dev.controls; label, version 1.1-dev.3, versionCode 822, arm64-v8a, no network permission or speech service, explicit microphone permission for local dictation, cloud backup disabled.
+APK signing certificate SHA-256: 795e8f2363872acd449d6f9f0ce827a9dd4c84a7a00de66476bafacd5dc17281
+Bundled native Rime, addon registration, OpenCC link, licenses and 151 descriptor file hashes verified.
+Offline speech CPU runtime, Chinese streaming ASR, local punctuation and 22 source/license checksums verified.
+Packaged full Lua, grammar, all dictionary sources, rare-character/mobile extensions, personal dictionary, nine-key schemas and precompiled tables verified.

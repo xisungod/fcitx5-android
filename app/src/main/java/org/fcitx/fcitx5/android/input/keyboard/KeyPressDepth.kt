@@ -22,10 +22,10 @@ internal class KeyPressDepth(private val clock: () -> Long = SystemClock::uptime
     private var active = false
 
     // Our design values, not measurements of another keyboard. DOWN starts with
-    // a small visible lift, then rises quickly. UP floats down over 400–500ms.
+    // a visible lift, then rises quickly. UP floats down and settles in 800–900ms.
     // Critical damping never introduces a second bounce below the keyboard.
     private val pressFrequency = 48.0
-    private val releaseFrequency = 16.0
+    private val releaseFrequency = 10.0
     private val positionTolerance = 0.003
     private val velocityTolerance = 0.05 // normalised elevation per second
 
@@ -70,7 +70,7 @@ internal class KeyPressDepth(private val clock: () -> Long = SystemClock::uptime
         sample(now)
         // An idle key responds in the first drawn frame. A returning key keeps
         // its exact position and speed, so repeated taps cannot kick it around.
-        if (pressed && !active && position == 0.0) position = 0.35
+        if (pressed && !active && position == 0.0) position = 0.45
         origin = position
         originVelocity = velocity
         if (!pressed) releaseOrigin = position.coerceAtLeast(0.001)

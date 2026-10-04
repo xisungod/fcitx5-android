@@ -50,7 +50,7 @@ class V15LightEffectPrefsTest {
         .getSharedPreferences(name, Context.MODE_PRIVATE).also { it.edit().clear().commit() }
 
     @Test
-    fun newInstallationUsesAVisibleSqueezeAndShortCapExitAboveTheLongerField() {
+    fun newInstallationUsesFloatingMotionAboveTheLongerMistTail() {
         val stored = storage("v15-neon-defaults")
         val prefs = ThemePrefs(stored)
         assertEquals(ThemePrefs.PressColorMode.Random, prefs.pressColorMode.getValue())
@@ -61,8 +61,8 @@ class V15LightEffectPrefsTest {
         assertEquals(100, prefs.pressKeyRetreatTime.getValue())
         assertEquals(400, prefs.pressExpansionTime.getValue())
         assertEquals(40, prefs.pressWaveHoldTime.getValue())
-        assertEquals(520, prefs.pressFadeOutTime.getValue())
-        assertEquals(1000, prefs.pressIgnitionTime.getValue() + prefs.pressExpansionTime.getValue() +
+        assertEquals(900, prefs.pressFadeOutTime.getValue())
+        assertEquals(1380, prefs.pressIgnitionTime.getValue() + prefs.pressExpansionTime.getValue() +
             prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
         assertTrue("Defaults must not turn into an implicit settings migration", stored.all.isEmpty())
         assertTrue(prefs.previewSameColor.getValue())
@@ -75,6 +75,8 @@ class V15LightEffectPrefsTest {
         val before = stored.all.toMap()
         assertEquals("An existing install without a saved timing gets the new default",
             100, ThemePrefs(stored).pressKeyRetreatTime.getValue())
+        assertEquals("An existing install without a saved wave fade gets the longer tail",
+            900, ThemePrefs(stored).pressFadeOutTime.getValue())
         assertEquals("Loading the new default does not rewrite stored preferences", before, stored.all)
 
         stored.edit().putInt("press_key_retreat_time", 30).commit()
@@ -82,6 +84,14 @@ class V15LightEffectPrefsTest {
         assertEquals("An explicitly selected 30ms must not be mistaken for the old default",
             30, ThemePrefs(stored).pressKeyRetreatTime.getValue())
         assertEquals(explicit, stored.all)
+
+        for (savedFade in intArrayOf(520, 2300)) {
+            stored.edit().putInt("press_fade_out_time", savedFade).commit()
+            val saved = stored.all.toMap()
+            assertEquals("Saved legacy and longer custom fades must never be migrated",
+                savedFade, ThemePrefs(stored).pressFadeOutTime.getValue())
+            assertEquals("Reading the newer version must not change any saved setting", saved, stored.all)
+        }
     }
 
     @Test

@@ -36,7 +36,7 @@ import kotlin.math.abs
 @LooperMode(LooperMode.Mode.PAUSED)
 class RippleShapeRenderingTest {
     private class Harness(shape: ThemePrefs.RippleShape? = null, expansion: Int = 400,
-        hold: Int = 40, brightness: Int = 100) {
+        hold: Int = 40, brightness: Int = 100, fade: Int = 520) {
         private val controller = Robolectric.buildActivity(Activity::class.java).setup()
         private val activity = controller.get()
         private val host = View(activity)
@@ -44,13 +44,13 @@ class RippleShapeRenderingTest {
         // A single colour deliberately rules out a palette change as the source
         // of the visible difference. Null exercises the actual constructor default.
         val effect = if (shape == null) PressEffect(host, intArrayOf(0xff00eaff.toInt()), true,
-            100, expansion, 520, 0, true, false, IdleBreathing(), intArrayOf(Color.CYAN),
+            100, expansion, fade, 0, true, false, IdleBreathing(), intArrayOf(Color.CYAN),
             clock = { now }, ignitionTimeMs = 40, keyHoldTimeMs = 50, keyRetreatTimeMs = 100,
             keySurfaceEffects = true, exactKeyShape = true, holdWhilePressed = true, dimExit = true,
             keyCornerRadius = 5f, animationsAllowed = { true }, glowBrightnessPercent = brightness,
             waveHoldTimeMs = hold)
         else PressEffect(host, intArrayOf(0xff00eaff.toInt()), true,
-            100, expansion, 520, 0, true, false, IdleBreathing(), intArrayOf(Color.CYAN),
+            100, expansion, fade, 0, true, false, IdleBreathing(), intArrayOf(Color.CYAN),
             clock = { now }, ignitionTimeMs = 40, keyHoldTimeMs = 50, keyRetreatTimeMs = 100,
             keySurfaceEffects = true, exactKeyShape = true, holdWhilePressed = true, dimExit = true,
             keyCornerRadius = 5f, animationsAllowed = { true }, glowBrightnessPercent = brightness,
@@ -202,22 +202,36 @@ class RippleShapeRenderingTest {
     }
 
     @Test
-    fun liquidSurfaceIsVisibleInsideTheCapAndBothModesRespectBrightnessAndTheirFinalFade() {
+    fun fluidKeepsTheWholeCapNormallyColouredWithoutAnUpperShadowAndBothModesFinishTheirFade() {
         val mist = Harness(ThemePrefs.RippleShape.SoftMist)
         val fluid = Harness(ThemePrefs.RippleShape.IrregularFluid)
         val dark = Harness(ThemePrefs.RippleShape.IrregularFluid, brightness = 0)
         try {
             mist.press(); fluid.press(); dark.press()
-            for (time in longArrayOf(50, 100, 150)) {
+            val inset = (4f * RuntimeEnvironment.getApplication().resources.displayMetrics.density).toInt() + 2
+            for (time in longArrayOf(0, 50, 100, 150)) {
                 val a = mist.face(time)
                 val b = fluid.face(time)
-                if (time < 150) {
-                    assertTrue("Liquid is visibly distinct on the actual cap, even when narrow gaps hide the base field",
-                        difference(a, b) > 2.0)
-                    val repeated = fluid.face(time)
-                    assertTrue("The local liquid surface cannot randomly jump between draws", b.sameAs(repeated))
-                    repeated.recycle()
-                } else assertTrue("Both face styles finish their configured release", a.sameAs(b))
+                for (y in inset until b.height - inset) for (x in inset until b.width - inset) {
+                    assertEquals("Fluid must use the same full-colour interior as mist at ${time}ms; its glint stays at the rim",
+                        a.getPixel(x, y), b.getPixel(x, y))
+                }
+                val upper = b.getPixel(b.width / 2, b.height / 4)
+                val lower = b.getPixel(b.width / 2, b.height * 3 / 4)
+                val halfDifference = maxOf(abs(Color.red(upper) - Color.red(lower)),
+                    abs(Color.green(upper) - Color.green(lower)), abs(Color.blue(upper) - Color.blue(lower)))
+                // The shared subtle top hot spot is allowed; a half-dark water
+                // level formerly differed by over 70 RGB levels and is not.
+                assertTrue("Upper and lower cap interiors must have comparable colour at ${time}ms", halfDifference <= 16)
+                if (time <= 50) {
+                    assertTrue("The upper half immediately receives the normal full key colour", intensity(upper) > 220)
+                    assertTrue("The lower half has the same normal brightness", intensity(lower) > 220)
+                }
+                if (time == 150L) assertTrue("Both face styles finish their configured release", a.sameAs(b))
+                val repeated = fluid.face(time)
+                assertTrue("The small rim glint must not randomly jump between draws", b.sameAs(repeated))
+                repeated.recycle()
+                if (time == 0L) save(b, "fluid-full-colour-cap")
                 a.recycle(); b.recycle()
             }
             for ((h, time) in listOf(mist to 1000L, fluid to 1000L, dark to 300L)) {
@@ -227,5 +241,39 @@ class RippleShapeRenderingTest {
                 frame.recycle()
             }
         } finally { mist.finish(); fluid.finish(); dark.finish() }
+    }
+
+    @Test
+    fun mistHasAVisibleLateTailForSavedAndNewFadeTimesWithoutChangingItsPeakOrEnd() {
+        // Cover an explicitly saved V2 value as well as the new V3 default.
+        // The samples are actual pixels, not a duplicate of the envelope formula.
+        for (fade in intArrayOf(520, 900)) {
+            val h = Harness(ThemePrefs.RippleShape.SoftMist, fade = fade)
+            try {
+                h.press()
+                val fadeStart = 40L + 400L + 40L
+                val start = h.field(fadeStart)
+                val late = h.field(fadeStart + fade * 3L / 5L)
+                val done = h.field(fadeStart + fade)
+                var startPeak = 0
+                var latePeak = 0
+                var visibleTailPixels = 0
+                for (y in 0 until start.height) for (x in 0 until start.width) {
+                    val a = intensity(start.getPixel(x, y))
+                    val b = intensity(late.getPixel(x, y))
+                    startPeak = maxOf(startPeak, a)
+                    latePeak = maxOf(latePeak, b)
+                    if (b >= 12) visibleTailPixels++
+                    assertTrue("The longer visible mist tail respects the existing exposure ceiling", a <= 225 && b <= 225)
+                    assertEquals("The field is black at its exact ${fadeStart + fade}ms endpoint", 0, intensity(done.getPixel(x, y)))
+                }
+                assertTrue("The fixture must first show a visible single-key mist", startPeak > 90)
+                assertTrue("Mist must not disappear halfway through its chosen ${fade}ms fade",
+                    latePeak >= 25 && latePeak > startPeak * 0.18f && visibleTailPixels > 300)
+                assertTrue("The longer tail still fades instead of retaining peak brightness", latePeak < startPeak)
+                save(late, "soft-mist-tail-${fade}ms")
+                listOf(start, late, done).forEach(Bitmap::recycle)
+            } finally { h.finish() }
+        }
     }
 }

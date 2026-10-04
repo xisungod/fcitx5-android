@@ -87,7 +87,7 @@ class KeyPressDepthTest {
         var now = 0L
         val zero = KeyPressDepth { now }
         zero.pressed()
-        assertTrue("DOWN visibly lifts before the first scheduled animation frame", zero.currentLift() > 0.2f)
+        assertEquals("DOWN visibly lifts before the first scheduled animation frame", 0.45f, zero.currentLift(), 0f)
         assertEquals(1f, zero.currentFaceOpacity(), 0f)
         val immediateLift = zero.currentLift()
         zero.released()
@@ -95,8 +95,10 @@ class KeyPressDepthTest {
         assertEquals(1f, zero.currentFaceOpacity(), 0f)
         now = 100
         assertTrue(zero.currentLift() in 0f..immediateLift)
-        assertTrue("A quick tap must not flash out after 30/100ms", zero.currentFaceOpacity() > 0.5f)
-        now = 600
+        assertTrue("A quick tap must not flash out after 30/100ms", zero.currentFaceOpacity() > 0.8f)
+        now = 400
+        assertTrue("Even an immediate release leaves a visible colour tail at 400ms", zero.currentFaceOpacity() > 0.28f)
+        now = 900
         assertEquals(0f, zero.currentLift(), 0f)
         assertEquals(0f, zero.currentFaceOpacity(), 0f)
         assertFalse(zero.isTransitioning())
@@ -113,12 +115,16 @@ class KeyPressDepthTest {
             assertEquals("UP keeps the displayed elevation", lift, released.currentLift(), 0f)
             assertEquals("UP keeps momentum instead of restarting at rest", velocity, released.currentVelocity(), 0f)
             assertEquals("Release begins at the held colour without an alpha jump", 1f, released.currentFaceOpacity(), 0f)
-            now = upTime + 35
-            assertTrue("UP changes the target immediately instead of finishing a queued rise",
-                released.currentLift() < held.currentLift() - 0.05f)
+            now = upTime + 1
+            assertTrue("UP decelerates immediately instead of finishing a queued rise",
+                released.currentVelocity() < held.currentVelocity())
             now = upTime + 70
+            assertTrue("The released key has separated from a still-held rise within 70ms",
+                released.currentLift() < held.currentLift() - 0.05f)
             assertTrue("The small upward momentum must already have turned downward", released.currentVelocity() < 0f)
-            now = upTime + 600
+            now = upTime + 400
+            assertTrue("A short touch keeps its own visible tail at 400ms", released.currentFaceOpacity() > 0.35f)
+            now = upTime + 900
             assertEquals(1f, released.currentScale(), 0f)
             assertEquals(0f, released.currentFaceOpacity(), 0f)
             assertFalse(released.isTransitioning())
@@ -168,20 +174,26 @@ class KeyPressDepthTest {
         assertEquals(1f, depth.currentLift(), 0f)
         depth.released()
         now = 300
-        assertTrue("The key must still be visibly elevated after 100ms", depth.currentLift() in 0.4f..0.65f)
-        assertTrue("The red block is still present after the old fade deadline", depth.currentFaceOpacity() > 0.65f)
+        assertTrue("The key must retain most of its elevation after 100ms", depth.currentLift() in 0.70f..0.78f)
+        assertTrue("The red block is still present after the old fade deadline", depth.currentFaceOpacity() > 0.8f)
         now = 400
-        assertTrue("The main descent is gradual, not a one-frame release", depth.currentLift() in 0.10f..0.25f)
-        assertTrue(depth.currentFaceOpacity() > 0.3f)
+        assertTrue("The main descent is gradual, not a one-frame release", depth.currentLift() in 0.38f..0.44f)
+        assertTrue(depth.currentFaceOpacity() > 0.6f)
         now = 500
-        assertTrue("At 300ms a faint coloured cap still links into the next key", depth.currentFaceOpacity() > 0.15f)
+        assertTrue("At 300ms a coloured cap still links into the next key", depth.currentFaceOpacity() > 0.4f)
         var previous = depth.currentLift()
-        for (elapsed in 301L..650L) {
+        for (elapsed in 301L..900L) {
             now = 200 + elapsed
             val lift = depth.currentLift()
             assertTrue("The soft landing must never turn into a repeated bounce", lift <= previous)
             assertTrue("The face never dives below its resting plane", lift >= 0f)
             assertTrue(depth.currentVelocity() <= 0f)
+            if (elapsed == 550L) {
+                assertTrue("The last visible colour fades gradually beyond half a second", depth.currentFaceOpacity() > 0.1f)
+            }
+            if (elapsed == 750L) {
+                assertTrue("The small physical remainder lands after the visible tail", depth.isTransitioning())
+            }
             previous = lift
         }
         assertEquals(1f, depth.currentScale(), 0f)
@@ -218,7 +230,7 @@ class KeyPressDepthTest {
         assertTrue("Both independent faces remain visible during consecutive typing", left.currentFaceOpacity() > 0.5f)
         assertTrue(next.currentLift() > 0.9f)
         next.released()
-        now = 1000
+        now = 1440
         assertEquals(1f, left.currentScale(), 0f)
         assertEquals(1f, next.currentScale(), 0f)
         assertFalse(left.isTransitioning())
@@ -231,7 +243,8 @@ class KeyPressDepthTest {
         lights: Boolean = false,
         savedRetreat: Int = 100,
         shape: ThemePrefs.RippleShape = ThemePrefs.RippleShape.SoftMist,
-        singleColor: Int = 0xFFFF243F.toInt()
+        singleColor: Int = 0xFFFF243F.toInt(),
+        waveFade: Int = 520
     ) {
         init {
             ShadowChoreographer.setPaused(true)
@@ -255,7 +268,7 @@ class KeyPressDepthTest {
             setting(p.pressIgnitionTime, 40)
             setting(p.pressExpansionTime, 400)
             setting(p.pressWaveHoldTime, 40)
-            setting(p.pressFadeOutTime, 520)
+            setting(p.pressFadeOutTime, waveFade)
             setting(p.keyColorStyle, ThemePrefs.KeyColorStyle.Fill)
             setting(p.keyExitStyle, ThemePrefs.KeyExitStyle.Dim)
             setting(p.keyMotionEffect, mode)
@@ -484,11 +497,11 @@ class KeyPressDepthTest {
             val reboundCanvas = GlyphRecordingCanvas(rebound, "A").apply { drawColor(Color.BLACK) }
             key.draw(reboundCanvas)
             val releaseScale = h.depth(key).currentScale()
-            assertTrue("At 200ms the actual cap still floats during its soft descent", releaseScale in 1.002f..1.008f)
+            assertTrue("At 200ms the actual cap still floats during its soft descent", releaseScale in 1.009f..1.012f)
             assertEquals(releaseScale, reboundCanvas.glyphScaleX, 0.00001f)
             assertEquals(releaseScale, reboundCanvas.glyphScaleY, 0.00001f)
             assertFixedGeometry(h, key, outer, anchor)
-            h.advance(450)
+            h.advance(700)
             assertEquals(1f, h.depth(key).currentScale(), 0f)
             assertTrue("The finished release must return the whole key to its original pixels", before.sameAs(h.render(key)))
             assertFixedGeometry(h, key, outer, anchor)
@@ -529,7 +542,7 @@ class KeyPressDepthTest {
                     assertTrue(pixels > 50)
                     return red.toFloat() / pixels
                 }
-                val stripTimes = listOf(0, 100, 200, 300, 400, 550, 750, 1400)
+                val stripTimes = listOf(0, 100, 200, 300, 400, 550, 900, 1400)
                 val strip = Bitmap.createBitmap(1200, 4 * 484, Bitmap.Config.ARGB_8888)
                 val stripCanvas = Canvas(strip).apply { drawColor(0xFF0B1018.toInt()) }
                 val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 18f }
@@ -589,6 +602,10 @@ class KeyPressDepthTest {
                         assertTrue("The new L press cannot cancel A's colour tail", h.depth(next).currentFaceOpacity() > 0.2f)
                         assertTrue("The retouched L also keeps its own release", leftRed > 0.6f)
                     }
+                    if (time == 550) {
+                        assertTrue("A retains a visible coloured cap 400ms after its real UP", h.depth(next).currentFaceOpacity() > 0.35f)
+                        assertTrue("The retouched L independently stays coloured during its slower landing", h.depth(left).currentFaceOpacity() > 0.4f)
+                    }
                     for ((key, fixed) in geometry) assertFixedGeometry(h, key, fixed.first, fixed.second)
                     val stripIndex = stripTimes.indexOf(time)
                     if (stripIndex >= 0) {
@@ -601,8 +618,8 @@ class KeyPressDepthTest {
                             200 -> "L and A have independent tails"
                             300 -> "L retouched; A still descending"
                             400 -> "Soft landing and coloured afterglow"
-                            550 -> "Independent faint tails"
-                            750 -> "Faces at rest; field finishes"
+                            550 -> "Both coloured caps are still descending"
+                            900 -> "Final soft tails approach rest"
                             else -> "Exact resting keyboard"
                         }, x + 12f, y + 24f, labelPaint)
                     }
@@ -647,7 +664,7 @@ class KeyPressDepthTest {
             h.advance(180)
             assertEquals("The remaining finger must keep a shared key floating", 1.025f, h.depth(key).currentScale(), 0.00001f)
             h.event(MotionEvent.ACTION_UP, 23 to "A")
-            h.advance(650)
+            h.advance(900)
             assertEquals(1f, h.depth(key).currentScale(), 0f)
             assertTrue(baseline.sameAs(h.render(key)))
             h.event(MotionEvent.ACTION_DOWN, 23 to "A")
@@ -699,7 +716,7 @@ class KeyPressDepthTest {
 
     @Test
     fun actualTextKeyboardShowsDifferentFluidBoundariesForTheSavedShapeWithTheSameColourAndTouches() {
-        val reviewTimes = setOf(150, 300, 450, 600, 800, 1000, 1500)
+        val reviewTimes = setOf(150, 300, 450, 600, 800, 1000, 1400, 1800)
         data class Recording(val baseline: Bitmap, val frames: Map<Int, Bitmap>,
             val gapSamples: Map<Int, ByteArray>, val gapIndices: IntArray)
         fun save(image: Bitmap, name: String) {
@@ -708,7 +725,7 @@ class KeyPressDepthTest {
             file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
         fun record(shape: ThemePrefs.RippleShape): Recording {
-            val h = Harness(lights = true, shape = shape)
+            val h = Harness(lights = true, shape = shape, waveFade = 900)
             try {
                 val effect = ReflectionHelpers.getField<PressEffect>(h.keyboard, "pressEffectLayer")
                 assertEquals("The actual BaseKeyboard must read the persisted shape into its renderer", shape,
@@ -732,7 +749,7 @@ class KeyPressDepthTest {
                 val samples = linkedMapOf<Int, ByteArray>()
                 val frames = linkedMapOf<Int, Bitmap>()
                 val folder = if (shape == ThemePrefs.RippleShape.SoftMist) "keyboard-mist" else "keyboard-fluid"
-                for (time in 0..1500 step 25) {
+                for (time in 0..1800 step 25) {
                     when (time) {
                         0 -> h.event(MotionEvent.ACTION_DOWN, 7 to "G")
                         50 -> h.event(MotionEvent.ACTION_UP, 7 to "G")
@@ -753,9 +770,9 @@ class KeyPressDepthTest {
                             brightness(image.getPixel(x, y)) < 45)
                     }
                     if (time == 350) assertEquals("Changing geometry must not change typing", listOf("g", "h", "j"), h.typed)
-                    if (time == 1500) assertTrue("Both real keyboard modes must finish at their exact resting pixels", baseline.sameAs(image))
+                    if (time == 1800) assertTrue("Both real keyboard modes must finish at their exact resting pixels", baseline.sameAs(image))
                     if (time in reviewTimes) frames[time] = image else image.recycle()
-                    if (time < 1500) h.advance(25)
+                    if (time < 1800) h.advance(25)
                 }
                 return Recording(baseline, frames, samples, gaps)
             } finally { h.finish() }
@@ -820,7 +837,7 @@ class KeyPressDepthTest {
             // rendered glyph to the same-time surface with only that glyph hidden;
             // old white-pixel locations are invalid while its cap is floating.
             val cyan = Harness(lights = true, shape = ThemePrefs.RippleShape.IrregularFluid,
-                singleColor = 0xFF00EFFF.toInt())
+                singleColor = 0xFF00EFFF.toInt(), waveFade = 900)
             try {
                 val key = cyan.key("G")
                 val bounds = cyan.outerBounds(key)
@@ -846,7 +863,7 @@ class KeyPressDepthTest {
             } finally { cyan.finish() }
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 18f }
             for ((name, times) in listOf("keyboard-shapes-early" to listOf(150, 300, 450, 600),
-                "keyboard-shapes-tail" to listOf(800, 1000, 1500))) {
+                "keyboard-shapes-tail" to listOf(800, 1000, 1400, 1800))) {
                 val strip = Bitmap.createBitmap(1200, times.size * 484, Bitmap.Config.ARGB_8888)
                 Canvas(strip).apply {
                     drawColor(0xFF0B1018.toInt())
@@ -864,8 +881,8 @@ class KeyPressDepthTest {
             File("build/outputs/ripple-shape-checks/keyboard-geometry.csv").writeText(metrics.joinToString("\n") + "\n")
             File("build/outputs/ripple-shape-checks/keyboard-provenance.txt").writeText(
                 "source=actual TextKeyboard via persisted ThemePrefs and MotionEvent\n" +
-                    "graphics=Robolectric NATIVE\nframes_per_mode=61\nfps=40\nseed=1401\n" +
-                    "single_colour=#FF243F\nevents=G down0 up50; H down150 up200; J down300 up350\n" +
+                    "graphics=Robolectric NATIVE\nframes_per_mode=73\nfps=40\nseed=1401\n" +
+                    "single_colour=#FF243F\nwave_fade_ms=900\nevents=G down0 up50; H down150 up200; J down300 up350\n" +
                     "geometry_measurement=fixed actual black key gaps, all touched cells excluded\n" +
                     "normalised_boundary_changed_max=$maximumBoundaryChanges\nnormalised_boundary_fraction_max=$maximumBoundaryFraction\n" +
                     "shape_residual_after_gain_fit=$maximumShapeResidual\nflow_400_to_650_ms=$flowing\nmaximum_25ms_step=$singleFrame\n" +

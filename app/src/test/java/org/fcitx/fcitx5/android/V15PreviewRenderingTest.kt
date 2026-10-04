@@ -263,11 +263,11 @@ class V15PreviewRenderingTest {
             prefs.pressExpansionTime.getValue().toLong(), prefs.pressWaveHoldTime.getValue().toLong(),
             prefs.pressFadeOutTime.getValue().toLong(), prefs.pressKeyHoldTime.getValue().toLong(),
             prefs.pressKeyRetreatTime.getValue().toLong())
-        assertEquals("Use the APK's earlier default wave exit", 1000L, timing.waveTotal)
-        assertEquals("The default initial feedback is reduced from 100ms to 40ms", 40L, timing.ignition)
+        assertEquals("Use the APK's current extended default wave tail", 1380L, timing.waveTotal)
+        assertEquals("The default initial feedback remains immediate", 40L, timing.ignition)
         assertEquals(400L, timing.expansion)
         assertEquals(40L, timing.hold)
-        assertEquals(520L, timing.fade)
+        assertEquals(900L, timing.fade)
         assertEquals(50L, timing.keyHold)
         assertEquals(100L, timing.keyRetreat)
         return timing
@@ -708,7 +708,7 @@ class V15PreviewRenderingTest {
                 "random_palette=${ThemeManager.prefs.pressEffectPalette.getValue()}\n" +
                 "input=G\ndown_ms=0\nup_ms=50\npopup=absent (isolated key surface and travelling light)\n" +
                 "idle_breathing=false (isolated press-wave review)\n" + timing.provenance() + "\n" + csv)
-        assertTrue("The key retains visible colour on UP before its short fade, using the actual drawn cap", earlyDistance > 50)
+        assertTrue("The key retains visible colour on UP before its floating return, using the actual drawn cap", earlyDistance > 50)
         assertTrue("The released key colour returns towards its original dark background",
             finalDistance < earlyDistance / 3)
         assertTrue("The softer default keeps external light visible beyond the old short wave",
@@ -1427,7 +1427,7 @@ class V15PreviewRenderingTest {
                 "last_down_ms=$lastDown\nlast_up_ms=${lastDown + 50}\nidle_breathing=false\n" + timing.provenance() +
                 "baseline=mode/case update followed by real measure/layout and initial native draw\n" +
                 "geometry=actual view/key/text coordinates, baseline and paint measurements remain fixed; the appearance Canvas lifts and grows by at most 2.5% within its existing margins\n" +
-                "key_depth=per-key analytic critical damping; idle DOWN immediately seeds 0.35 normalised lift then rises at 48 rad/s; UP preserves position/velocity and settles at 16 rad/s over about 400-500ms; full face colour follows that same state instead of the saved legacy cap timer; retouch preserves velocity; our design parameters, not Samsung internals\n" +
+                "key_depth=per-key analytic critical damping; idle DOWN immediately seeds 0.45 normalised lift then rises at 48 rad/s; UP preserves position/velocity and settles at 10 rad/s over about 800-900ms; full face colour follows that same state instead of the saved legacy cap timer; retouch preserves velocity; our design parameters, not Samsung internals\n" +
                 "popup_scale=1 throughout actual production alpha lifecycle\n" +
                 "readability=same-time actual canvas comparison with only mainText hidden; includes fixed production outline\n" +
                 "readable_pixel_threshold=channel contrast>=40 over at least 12 pixels\nminimum_readable_pixels=$minimumReadablePixels\n" +
@@ -1447,8 +1447,8 @@ class V15PreviewRenderingTest {
             val lastUp = lastDown + 50L
             assertTrue("The default field leaves a gentle visible tail after the last release",
                 samples.any { it.first in lastUp + 350L..lastUp + 600L && it.second.gap.colour30 >= 500 })
-            assertTrue("The default field clears within one second of the last release",
-                samples.filter { it.first >= lastUp + 1000L }.all {
+            assertTrue("The default field clears at its configured lifetime after the last press",
+                samples.filter { it.first >= lastDown + timing.waveTotal }.all {
                     it.second.gap.colour30 == 0 && it.second.candidate.colour30 == 0
                 })
             val popupHeldFrame = samples.indexOfFirst { it.first >= 33L }

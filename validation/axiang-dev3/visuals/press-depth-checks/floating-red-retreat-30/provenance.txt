@@ -1,0 +1,12 @@
+source=actual TextKeyboard, KeyView and PressEffect via MotionEvent
+graphics=Robolectric NATIVE
+frames=57
+fps=40
+frame_interval_ms=25
+single_colour=#FF243F
+saved_legacy_retreat_ms=30
+events=L down0 up50; A down100 up150; L down225 up275
+view_and_hit_geometry=fixed
+colour_and_lift=shared per-key motion
+frames_are_direct_native_draws=true
+interpolation=false

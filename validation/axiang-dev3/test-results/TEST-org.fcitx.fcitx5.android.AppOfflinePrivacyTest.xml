@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.AppOfflinePrivacyTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:56:25.362Z" hostname="566dc45241c0" time="1.104">
+  <properties/>
+  <testcase name="mergedManifestDoesNotQuerySpeechRecognitionServices" classname="org.fcitx.fcitx5.android.AppOfflinePrivacyTest" time="0.989"/>
+  <testcase name="mergedApplicationDisablesAutomaticBackupOfInputData" classname="org.fcitx.fcitx5.android.AppOfflinePrivacyTest" time="0.019"/>
+  <testcase name="localDictationCanRequestMicrophoneButCannotUseTheNetwork" classname="org.fcitx.fcitx5.android.AppOfflinePrivacyTest" time="0.029"/>
+  <testcase name="cloudBackupRulesExcludeAllCredentialAndDeviceProtectedInputStorage" classname="org.fcitx.fcitx5.android.AppOfflinePrivacyTest" time="0.015"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
