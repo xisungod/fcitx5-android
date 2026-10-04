@@ -57,13 +57,13 @@
     },
     {
       "file": "typing-preview.png",
-      "format": "PNG static frame at 2.70 seconds",
+      "format": "PNG static frame at 3.40 seconds, full phrase candidate visible",
       "size": [
         720,
         624
       ],
-      "bytes": 95742,
-      "sha256": "52f0de3bee6b2ee38790a3e4d2e9533a8ca230c74b1473c2cffb6a496a3bb8ed"
+      "bytes": 97744,
+      "sha256": "ed758d8eabc9ebda898dff83c530e5a7ed941cdc9f0b2f4a5558ed9c3cdc0c44"
     }
   ]
 }

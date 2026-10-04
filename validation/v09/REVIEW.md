@@ -33,7 +33,7 @@
 
 - `10-samsung-key-surfaces.gif`：这次调整后的连续输入动图，同样每 132 ms 一键；键面更亮、外围叠加更淡，字符预览下半部透明。来源与参数见 `key-surfaces-preview.json`。`09` 保留为上一版对照。
 
-- 手机端展示补充：`typing-preview.mp4` 为约 370 KB 的 H.264 视频，`typing-preview-small.gif` 为 360×312、20 fps 的小版动图，`typing-preview.png` 为 2.70 秒处静态帧。均转自 `10-samsung-key-surfaces.gif`，没有调整播放速度或修改动画代码。
+- 手机端展示补充：`typing-preview.mp4` 为约 370 KB 的 H.264 视频，`typing-preview-small.gif` 为 360×312、20 fps 的小版动图，`typing-preview.png` 为 3.40 秒处完整诗句候选的静态帧。均转自 `10-samsung-key-surfaces.gif`，没有调整播放速度或修改动画代码。
 
 ## 验证
 
