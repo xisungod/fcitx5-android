@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 53f1eb8..8155028 100644
+index 53f1eb8..9d78656 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -33,6 +33,23 @@ android {
@@ -31,11 +31,11 @@ index 53f1eb8..8155028 100644
          }
          debug {
 +            // Install alongside the original debug APK: its CI signing key is ephemeral.
-+            applicationIdSuffix = ".xuancai.black.v12"
++            applicationIdSuffix = ".xuancai.black.v13"
              resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
              resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "炫彩·曜黑 V12")
++            resValue("string", "app_name", "炫彩·曜黑 V13")
          }
      }
  
@@ -364,7 +364,7 @@ index 93ba4d4..b40dc34 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..000bdfc 100644
+index d3b4948..673182c 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -388,11 +388,12 @@ index d3b4948..000bdfc 100644
  
      val keyBorderStroke = switch(
          R.string.key_border_stroke, "key_border_stroke", false,
-@@ -43,6 +46,173 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -43,6 +46,185 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
  
 +    enum class PressEffectPalette(override val stringRes: Int) : ManagedPreferenceEnum {
++        SamsungCool(R.string.press_effect_palette_samsung),
 +        Cyberpunk(R.string.press_effect_palette_cyberpunk),
 +        Cool(R.string.press_effect_palette_cool),
 +        Rainbow(R.string.press_effect_palette_rainbow),
@@ -406,6 +407,12 @@ index d3b4948..000bdfc 100644
 +        Fill(R.string.key_color_style_fill),
 +        Border(R.string.key_color_style_border),
 +        Off(R.string.key_color_style_off);
++    }
++
++    /** how a released key leaves: dim in place (Samsung dark theme) or shrink to a spot (light theme) */
++    enum class KeyExitStyle(override val stringRes: Int) : ManagedPreferenceEnum {
++        Dim(R.string.key_exit_dim),
++        Shrink(R.string.key_exit_shrink);
 +    }
 +
 +    /** how the pressed key moves (Keys Cafe "key motion effect") */
@@ -484,7 +491,7 @@ index d3b4948..000bdfc 100644
 +    val pressEffectPalette = enumList(
 +        R.string.press_effect_palette,
 +        "press_effect_palette",
-+        PressEffectPalette.Cyberpunk,
++        PressEffectPalette.SamsungCool,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -504,6 +511,11 @@ index d3b4948..000bdfc 100644
 +    )
 +
 +    val keyMotionEffect = enumList(R.string.key_motion_effect, "key_motion_effect", KeyMotionEffect.Off)
++
++    val keyExitStyle = enumList(
++        R.string.key_exit_style, "key_exit_style", KeyExitStyle.Dim,
++        enableUiOn = { pressEffect.getValue() }
++    )
 +
 +    val coloredPreview = switch(
 +        R.string.colored_preview, "colored_preview", true, R.string.colored_preview_summary
@@ -535,12 +547,12 @@ index d3b4948..000bdfc 100644
 +    )
 +
 +    val pressKeyHoldTime = int(
-+        R.string.press_key_hold_time, "press_key_hold_time", 420, 100, 1000, "ms", 20,
++        R.string.press_key_hold_time, "press_key_hold_time", 120, 100, 1000, "ms", 20,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
 +    val pressKeyRetreatTime = int(
-+        R.string.press_key_retreat_time, "press_key_retreat_time", 480, 100, 1500, "ms", 20,
++        R.string.press_key_retreat_time, "press_key_retreat_time", 1400, 100, 3000, "ms", 20,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -555,14 +567,14 @@ index d3b4948..000bdfc 100644
 +    )
 +
 +    val pressEffectOverKeys = int(
-+        R.string.press_effect_over_keys, "press_effect_over_keys", 25, 0, 100, "%", 5,
++        R.string.press_effect_over_keys, "press_effect_over_keys", 0, 0, 100, "%", 5,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
-@@ -71,10 +241,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -71,10 +253,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_vertical_margin,
              R.string.portrait,
              "key_vertical_margin",
@@ -575,7 +587,7 @@ index d3b4948..000bdfc 100644
              0,
              24,
              "dp"
-@@ -83,7 +253,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -83,7 +265,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
          keyVerticalMarginLandscape = secondary
      }
  
@@ -584,7 +596,7 @@ index d3b4948..000bdfc 100644
  
      val textEditingButtonRadius =
          int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
-@@ -93,6 +263,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -93,6 +275,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
          None(R.string.punctuation_pos_none),
@@ -592,7 +604,7 @@ index d3b4948..000bdfc 100644
          Bottom(R.string.punctuation_pos_bottom),
          TopRight(R.string.punctuation_pos_top_right);
      }
-@@ -100,7 +271,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -100,7 +283,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val punctuationPosition = enumList(
          R.string.punctuation_position,
          "punctuation_position",
@@ -601,7 +613,7 @@ index d3b4948..000bdfc 100644
      )
  
      enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-@@ -136,14 +307,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -136,14 +319,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val followSystemDayNightTheme = switch(
          R.string.follow_system_day_night_theme,
          "follow_system_dark_mode",
@@ -618,7 +630,7 @@ index d3b4948..000bdfc 100644
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
-@@ -151,7 +322,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -151,7 +334,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val darkModeTheme = themePreference(
          R.string.dark_mode_theme,
          "dark_mode_theme",
@@ -628,7 +640,7 @@ index d3b4948..000bdfc 100644
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..730734f 100644
+index 239e22c..6f877b0 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
@@ -637,7 +649,7 @@ index 239e22c..730734f 100644
  
 +    /** Separate dark keycaps; translucent faces admit the light behind them. */
 +    val XuancaiBlackV09 = Theme.Builtin(
-+        name = "炫彩·曜黑 V12",
++        name = "炫彩·曜黑 V13",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
@@ -1534,7 +1546,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..2cd6a4c 100644
+index 5c2fef9..5fcef7d 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1557,7 +1569,7 @@ index 5c2fef9..2cd6a4c 100644
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
  import org.fcitx.fcitx5.android.input.popup.PopupAction
-@@ -48,23 +52,98 @@ abstract class BaseKeyboard(
+@@ -48,23 +52,106 @@ abstract class BaseKeyboard(
  ) : ConstraintLayout(context) {
  
      var keyActionListener: KeyActionListener? = null
@@ -1576,6 +1588,7 @@ index 5c2fef9..2cd6a4c 100644
 +        else PressEffect(
 +            this,
 +            when (p.pressEffectPalette.getValue()) {
++                ThemePrefs.PressEffectPalette.SamsungCool -> PressEffect.SAMSUNG_COOL
 +                ThemePrefs.PressEffectPalette.Cyberpunk -> PressEffect.CYBERPUNK
 +                ThemePrefs.PressEffectPalette.Cool -> PressEffect.COOL
 +                ThemePrefs.PressEffectPalette.Rainbow -> PressEffect.RAINBOW
@@ -1614,7 +1627,14 @@ index 5c2fef9..2cd6a4c 100644
 +            keyColorStyle = p.keyColorStyle.getValue().ordinal,
 +            keyCornerRadius = p.keyRadius.getValue() * resources.displayMetrics.density,
 +            glowReachPercent = p.pressGlowReach.getValue(),
-+            glowOnCandidates = p.pressGlowOnCandidates.getValue()
++            glowOnCandidates = p.pressGlowOnCandidates.getValue(),
++            holdWhilePressed = true,
++            dimExit = p.keyExitStyle.getValue() == ThemePrefs.KeyExitStyle.Dim,
++            ringWave = true,
++            sequentialColors = p.pressEffectPalette.getValue() == ThemePrefs.PressEffectPalette.SamsungCool,
++            exactKeyShape = true,
++            normalizeOldLight = true,
++            extensionStrength = 0.5f
 +        )
 +    }
 +
@@ -1658,7 +1678,7 @@ index 5c2fef9..2cd6a4c 100644
      private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
  
      var popupActionListener: PopupActionListener? = null
-@@ -135,6 +214,11 @@ abstract class BaseKeyboard(
+@@ -135,6 +222,23 @@ abstract class BaseKeyboard(
              })
          }
          spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
@@ -1667,10 +1687,22 @@ index 5c2fef9..2cd6a4c 100644
 +            // Invalidate child display lists as well as the parent light layer.
 +            for (i in surfaceKeys.indices) surfaceKeys[i].invalidateKeySurface()
 +        }
++    }
++
++    private val originalLegendInk = android.util.SparseIntArray()
++    private val darkLegend = android.util.SparseBooleanArray()
++
++    /** keep characters readable above bright key light (changes only on transitions) */
++    private fun updateLegendInk(key: KeyView, dark: Boolean) {
++        val text = (key as? TextKeyView)?.mainText ?: return
++        if (darkLegend.get(key.id, false) == dark) return
++        if (originalLegendInk.indexOfKey(key.id) < 0) originalLegendInk.put(key.id, text.currentTextColor)
++        darkLegend.put(key.id, dark)
++        text.setTextColor(if (dark) 0xFF161A1E.toInt() else originalLegendInk.get(key.id))
      }
  
      private fun createKeyView(def: KeyDef): KeyView {
-@@ -144,6 +228,13 @@ abstract class BaseKeyboard(
+@@ -144,6 +248,13 @@ abstract class BaseKeyboard(
              is KeyDef.Appearance.Text -> TextKeyView(context, theme, def.appearance)
              is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
          }.apply {
@@ -1678,13 +1710,13 @@ index 5c2fef9..2cd6a4c 100644
 +            pressEffectLayer?.let { effect ->
 +                surfaceKeys.add(this)
 +                keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
-+                    effect.drawKeySurface(canvas, id, width, height)
++                    updateLegendInk(this, effect.drawKeySurface(canvas, id, width, height) > 0.5f)
 +                }
 +            }
              soundEffect = when (def) {
                  is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
                  is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
-@@ -153,7 +244,7 @@ abstract class BaseKeyboard(
+@@ -153,7 +264,7 @@ abstract class BaseKeyboard(
              }
              if (def is SpaceKey) {
                  spaceKeys.add(this)
@@ -1693,7 +1725,7 @@ index 5c2fef9..2cd6a4c 100644
                  swipeRepeatEnabled = true
                  swipeThresholdX = selectionSwipeThreshold
                  swipeThresholdY = disabledSwipeThreshold
-@@ -356,6 +447,7 @@ abstract class BaseKeyboard(
+@@ -356,6 +467,7 @@ abstract class BaseKeyboard(
              onPopupAction(PopupAction.DismissAction(keyView.id))
          }
          touchTargets.clear()
@@ -1701,7 +1733,7 @@ index 5c2fef9..2cd6a4c 100644
      }
  
      private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-@@ -392,16 +484,144 @@ abstract class BaseKeyboard(
+@@ -392,16 +504,144 @@ abstract class BaseKeyboard(
              event.deviceId, event.edgeFlags
          )
          target.view.dispatchTouchEvent(e)
@@ -1848,7 +1880,7 @@ index 5c2fef9..2cd6a4c 100644
              when (event.actionMasked) {
                  MotionEvent.ACTION_DOWN -> {
                      releaseAllTouchTargets()
-@@ -423,6 +643,18 @@ abstract class BaseKeyboard(
+@@ -423,6 +663,18 @@ abstract class BaseKeyboard(
                      for (i in 0 until event.pointerCount) {
                          val pid = event.getPointerId(i)
                          val target = touchTargets[pid] ?: continue
@@ -1867,7 +1899,7 @@ index 5c2fef9..2cd6a4c 100644
                          dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                      }
                      return true
-@@ -431,7 +663,7 @@ abstract class BaseKeyboard(
+@@ -431,7 +683,7 @@ abstract class BaseKeyboard(
                      val i = event.actionIndex
                      val pid = event.getPointerId(i)
                      val target = touchTargets[pid] ?: return true
@@ -1876,7 +1908,7 @@ index 5c2fef9..2cd6a4c 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -442,7 +674,7 @@ abstract class BaseKeyboard(
+@@ -442,7 +694,7 @@ abstract class BaseKeyboard(
                          releaseAllTouchTargets()
                          return true
                      }
@@ -1885,7 +1917,7 @@ index 5c2fef9..2cd6a4c 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -465,6 +697,12 @@ abstract class BaseKeyboard(
+@@ -465,6 +717,12 @@ abstract class BaseKeyboard(
  
      @CallSuper
      protected open fun onPopupAction(action: PopupAction) {
@@ -1898,7 +1930,7 @@ index 5c2fef9..2cd6a4c 100644
          popupActionListener?.onPopupAction(action)
      }
  
-@@ -484,8 +722,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +742,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1933,7 +1965,7 @@ index 5c2fef9..2cd6a4c 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +765,8 @@ abstract class BaseKeyboard(
+@@ -502,6 +785,8 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -2391,10 +2423,10 @@ index 26dcded..9273fac 100644
              it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..4e3aee9
+index 0000000..937e7a2
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,652 @@
+@@ -0,0 +1,788 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -2463,6 +2495,19 @@ index 0000000..4e3aee9
 +    /** 100 = the V09 reach; the Samsung reference keeps the coloured light around neighbouring keys */
 +    glowReachPercent: Int = 100,
 +    private val glowOnCandidates: Boolean = true,
++    /** V13: key colour follows the finger (full while held, tail starts on release) */
++    private val holdWhilePressed: Boolean = false,
++    /** V13: the released key keeps its exact shape and dims (dark-theme Samsung trail) instead of shrinking */
++    private val dimExit: Boolean = false,
++    /** V13: clean ring that visibly travels out of the key instead of a cloud texture */
++    private val ringWave: Boolean = false,
++    /** V13: colours walk through the palette in typing order instead of jumping randomly */
++    private val sequentialColors: Boolean = false,
++    /** V13: fill the real rounded keycap, with a backlight hot spot and a faint outer halo */
++    private val exactKeyShape: Boolean = false,
++    /** V13: older waves share one brightness budget so the newest press stays in front */
++    private val normalizeOldLight: Boolean = false,
++    private val extensionStrength: Float = 1f,
 +    private val animationsAllowed: () -> Boolean = {
 +        !AppPrefs.getInstance().advanced.disableAnimation.getValue() &&
 +            (!org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
@@ -2484,11 +2529,42 @@ index 0000000..4e3aee9
 +    private val ignitionDuration = ignitionTimeMs.coerceIn(30, 300).toLong()
 +    private val waveDuration = ignitionDuration + expansionDuration + fadeOutTimeMs.coerceIn(100, 2000)
 +    private val keyHoldDuration = keyHoldTimeMs.coerceIn(100, 1000).toLong()
-+    private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(100, 1500).toLong()
++    private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(100, 3000).toLong()
 +    private val duration = max(waveDuration, keyHoldDuration + keyRetreatDuration)
 +    private val keyFlashTextures = KEY_FLASH_TEXTURES
 +    private val underStrength = if (isDark) 1f else 0.9f
 +    private val overStrength = overKeysPercent.coerceIn(0, 100) / 100f * (if (isDark) 1f else 0.8f)
++
++    /** returns (alpha, retreat 0..1) of the key face, or null once the face is gone */
++    private fun keyEnvelope(r: PressEffectTrail.Ripple, now: Long): Float? {
++        val elapsed = (now - r.start).coerceAtLeast(0L)
++        if (!holdWhilePressed) {
++            val retreat = smoothstep(keyHoldDuration.toFloat(), (keyHoldDuration + keyRetreatDuration).toFloat(), elapsed.toFloat())
++            envelopeRetreat = retreat
++            return if (elapsed >= duration) null else 0.92f * (1f - smoothstep(0.60f, 1f, retreat))
++        }
++        envelopeRetreat = 0f
++        if (r.releasedAt < 0L) return 0.92f
++        val tailStart = max(r.releasedAt, r.start + keyHoldDuration)
++        if (now < tailStart) return 0.92f
++        val p = ((now - tailStart).toFloat() / keyRetreatDuration).coerceIn(0f, 1f)
++        if (p >= 1f) return null
++        envelopeRetreat = if (dimExit) 0f else smoothstep(0f, 1f, p)
++        // ease-out dimming: quick first drop, long soft tail = visible typing trail
++        return 0.92f * (1f - p).pow(if (dimExit) 1.7f else 1f)
++    }
++    private var envelopeRetreat = 0f
++
++    private fun waveDone(r: PressEffectTrail.Ripple, now: Long) = now - r.start >= waveDuration
++
++    private fun rippleDone(r: PressEffectTrail.Ripple, now: Long): Boolean =
++        if (!holdWhilePressed) now - r.start >= duration
++        else waveDone(r, now) && (!r.keyFill || keyEnvelope(r, now) == null) &&
++            (r.keyFill || r.releasedAt >= 0L && now - r.start >= keyHoldDuration + keyRetreatDuration)
++
++    private fun expire(now: Long) {
++        if (holdWhilePressed) ripples.expireWhile { rippleDone(it, now) } else ripples.expire(now, duration)
++    }
 +
 +    private val random = Random(SystemClock.uptimeMillis())
 +    private val ripples = PressEffectTrail(MAX_RIPPLES)
@@ -2535,6 +2611,8 @@ index 0000000..4e3aee9
 +
 +    fun onRelease() {
 +        if (!canDraw()) return
++        val now = clock()
++        for (i in 0 until ripples.size) ripples[i].let { if (it.releasedAt < 0L) it.releasedAt = now }
 +        breathing.activity(clock(), held = false)
 +        host.removeCallbacks(frameCallback)
 +        host.postInvalidateOnAnimation()
@@ -2557,6 +2635,20 @@ index 0000000..4e3aee9
 +            colorFilter = PorterDuffColorFilter(mix(color, Color.WHITE, 0.12f), PorterDuff.Mode.SRC_IN)
 +        }
 +        // Immediate feedback even while the first set of textures is warming up.
++        val luminance = (0.299f * Color.red(color) + 0.587f * Color.green(color) + 0.114f * Color.blue(color)) / 255f
++        val solidPaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
++            it.style = Paint.Style.FILL
++            it.color = color
++        }
++        val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
++            it.shader = RadialGradient(0f, 0f, 1f, intArrayOf(0xCCFFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
++        }
++        /** soft ring: transparent centre, the colour at ~84 % radius, feathered outer edge */
++        val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
++            it.shader = RadialGradient(0f, 0f, 1f,
++                intArrayOf(color and 0x00ffffff, color and 0x00ffffff, color, color and 0x00ffffff),
++                floatArrayOf(0f, 0.6f, 0.84f, 1f), Shader.TileMode.CLAMP)
++        }
 +        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
 +            it.style = Paint.Style.STROKE
 +            it.color = color
@@ -2585,16 +2677,19 @@ index 0000000..4e3aee9
 +        invalidateExtension?.invoke()
 +        if (!pressEnabled) return
 +        if (Textures.ready == null) Textures.ensure()
-+        var index = random.nextInt(colors.size)
-+        if (colors.size > 1 && index == lastColorIndex) {
++        var index = if (sequentialColors) (lastColorIndex + 1).mod(colors.size) else random.nextInt(colors.size)
++        if (!sequentialColors && colors.size > 1 && index == lastColorIndex) {
 +            index = (index + 1 + random.nextInt(colors.size - 1)) % colors.size
 +        }
 +        lastColorIndex = index
 +        lastPressColor = colors[index]
 +        val shapes = PressEffectMasks.SHAPES
 +        val selectedShape = random.nextInt(shapes)
-+        ripples.expire(now, duration)
++        expire(now)
++        // a new press (or sliding to another key) ends the hold of the previous one
++        for (i in 0 until ripples.size) ripples[i].let { if (it.releasedAt < 0L) it.releasedAt = now }
 +        ripples.obtain(now).apply {
++            releasedAt = -1L
 +            keyFill = highlightKey && keyBounds != null
 +            this.keyId = keyId
 +            x = if (keyFill) keyBounds!!.exactCenterX() else pressX
@@ -2626,7 +2721,7 @@ index 0000000..4e3aee9
 +        // IME views can be attached while an ancestor/window is still hidden. A later
 +        // visible draw is authoritative even if the earlier callback could not start it.
 +        if (idleEnabled && !breathing.running) breathing.resume(frameTime)
-+        ripples.expire(frameTime, duration)
++        expire(frameTime)
 +        val idleAlpha = if (idleEnabled) breathing.alpha(frameTime) else 0f
 +        if (idleAlpha > 0.001f) drawBreathing(canvas, idleAlpha)
 +        if (ripples.size > 0) draw(canvas, underStrength)
@@ -2663,7 +2758,7 @@ index 0000000..4e3aee9
 +        if (!glowOnCandidates) return
 +        if (!canDraw() || !animatorsEnabled()) return
 +        frameTime = clock()
-+        if (ripples.size > 0) draw(canvas, underStrength + overStrength)
++        if (ripples.size > 0) draw(canvas, (underStrength + overStrength) * extensionStrength)
 +    }
 +
 +    private fun drawKeyFlash(canvas: Canvas, r: PressEffectTrail.Ripple, style: RipplePaints,
@@ -2671,14 +2766,16 @@ index 0000000..4e3aee9
 +        // Give the pressed key its own colour first; no expansion until ignition finishes.
 +        // Hold the key colour while later presses light up; then shrink its coloured
 +        // area from a rounded key face to a soft round spot independently of the wave.
-+        val retreat = smoothstep(keyHoldDuration.toFloat(),
-+            (keyHoldDuration + keyRetreatDuration).toFloat(), elapsed.toFloat())
-+        val keyAlpha = 0.92f * (1f - smoothstep(0.60f, 1f, retreat)) * strength
++        val envelope = keyEnvelope(r, r.start + elapsed) ?: return
++        val retreat = envelopeRetreat
++        val keyAlpha = envelope * strength
 +        if (keyAlpha > 0.004f) {
 +            val saved = canvas.save()
 +            canvas.translate(centerX, centerY)
 +            if (r.keyFill && keyColorStyle == KEY_STYLE_BORDER) {
-+                drawBorderGlow(canvas, r, style, (0.95f * (1f - retreat) * strength).coerceIn(0f, 1f))
++                drawBorderGlow(canvas, r, style, (keyAlpha * (1f - retreat)).coerceIn(0f, 1f))
++            } else if (r.keyFill && exactKeyShape) {
++                drawExactKey(canvas, r, style, keyAlpha.coerceIn(0f, 1f), retreat)
 +            } else if (r.keyFill) {
 +                val spotSize = min(r.flashWidth, r.flashHeight) * 0.18f
 +                val width = r.flashWidth + (spotSize - r.flashWidth) * retreat
@@ -2706,6 +2803,30 @@ index 0000000..4e3aee9
 +
 +    private val borderRect = android.graphics.RectF()
 +
++    /** the real rounded keycap in one colour, lit from behind; shrinks only for the shrink exit */
++    private fun drawExactKey(canvas: Canvas, r: PressEffectTrail.Ripple, style: RipplePaints, alpha: Float, retreat: Float) {
++        val spot = min(r.flashWidth, r.flashHeight) * 0.22f
++        val w = r.flashWidth + (spot - r.flashWidth) * retreat
++        val h = r.flashHeight + (spot - r.flashHeight) * retreat
++        val radius = keyCornerRadius + (spot / 2f - keyCornerRadius) * retreat
++        // faint halo just outside the keycap, visible in the gaps
++        val halo = 2.5f * density
++        borderRect.set(-w / 2f - halo / 2f, -h / 2f - halo / 2f, w / 2f + halo / 2f, h / 2f + halo / 2f)
++        style.strokePaint.strokeWidth = halo
++        style.strokePaint.alpha = (alpha * 0.30f * 255f).toInt()
++        canvas.drawRoundRect(borderRect, radius + halo / 2f, radius + halo / 2f, style.strokePaint)
++        borderRect.set(-w / 2f, -h / 2f, w / 2f, h / 2f)
++        style.solidPaint.alpha = (alpha * 255f).toInt()
++        canvas.drawRoundRect(borderRect, radius, radius, style.solidPaint)
++        // backlight hot spot near the top centre
++        val saved = canvas.save()
++        canvas.translate(0f, -h * 0.14f)
++        canvas.scale(w * 0.42f, h * 0.36f)
++        style.highlightPaint.alpha = (alpha * 0.5f * 255f).toInt()
++        canvas.drawCircle(0f, 0f, 1f, style.highlightPaint)
++        canvas.restoreToCount(saved)
++    }
++
 +    /** neon outline around the pressed key: soft outer glow, brighter halo, crisp line */
 +    private fun drawBorderGlow(canvas: Canvas, r: PressEffectTrail.Ripple, style: RipplePaints, alpha: Float) {
 +        if (alpha <= 0.004f) return
@@ -2722,26 +2843,40 @@ index 0000000..4e3aee9
 +    }
 +
 +    /** Invoked by the key face after its dark background, before its character. */
-+    fun drawKeySurface(canvas: Canvas, keyId: Int, width: Int, height: Int) {
-+        if (!keySurfaceEffects || keyColorStyle == KEY_STYLE_OFF || !canDraw() || !animatorsEnabled()) return
++    /** returns how bright the key face is right now (0..1), so the legend can switch to dark ink */
++    fun drawKeySurface(canvas: Canvas, keyId: Int, width: Int, height: Int): Float {
++        if (!keySurfaceEffects || keyColorStyle == KEY_STYLE_OFF || !canDraw() || !animatorsEnabled()) return 0f
 +        val now = clock()
++        var brightness = 0f
 +        for (i in 0 until ripples.size) {
 +            val ripple = ripples[i]
 +            val elapsed = (now - ripple.start).coerceAtLeast(0L)
-+            if (ripple.keyFill && ripple.keyId == keyId && elapsed < duration) {
++            if (ripple.keyFill && ripple.keyId == keyId) {
++                val a = keyEnvelope(ripple, now) ?: continue
 +                drawKeyFlash(canvas, ripple, styles[ripple.colorIndex], elapsed, 1f, width / 2f, height / 2f)
++                if (keyColorStyle != KEY_STYLE_BORDER && envelopeRetreat < 0.5f) {
++                    brightness = max(brightness, a * styles[ripple.colorIndex].luminance)
++                }
 +            }
 +        }
++        return brightness
 +    }
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
 +        val textures = Textures.ready
++        // one brightness budget for all travelling waves: the newest press stays in front
++        var activeWaves = 0
++        if (normalizeOldLight) for (i in 0 until ripples.size) {
++            val e = frameTime - ripples[i].start
++            if (e >= ignitionDuration && e < waveDuration) activeWaves++
++        }
++        val olderShare = if (activeWaves > 1) 1f / kotlin.math.sqrt(activeWaves.toFloat()) else 1f
 +        for (i in 0 until ripples.size) {
 +            val r = ripples[i]
 +            val style = styles[r.colorIndex]
 +            val elapsed = (frameTime - r.start).coerceAtLeast(0L)
 +            val t = elapsed.toFloat() / duration
-+            if (t >= 1f) continue
++            if (!holdWhilePressed && t >= 1f) continue
 +            if (!keySurfaceEffects || !r.keyFill || r.keyId < 0) {
 +                drawKeyFlash(canvas, r, style, elapsed, strength, r.x, r.y)
 +            }
@@ -2756,7 +2891,34 @@ index 0000000..4e3aee9
 +            // Diffuse colour loses energy as it spreads. Old wide waves must not
 +            // blanket the keyboard or hide the independent, brighter key faces.
 +            val bodyAlpha = 0.46f * (1f - 0.72f * e) * ramp(spreadElapsed.toFloat(), 0f, 45f) *
-+                (1f - smoothstep((ignitionDuration + expansionDuration).toFloat(), waveDuration.toFloat(), elapsed.toFloat()))
++                (1f - smoothstep((ignitionDuration + expansionDuration).toFloat(), waveDuration.toFloat(), elapsed.toFloat())) *
++                (if (normalizeOldLight && i < ripples.size - 1) olderShare else 1f)
++            if (ringWave) {
++                // a clean ring leaves the key edge and travels outwards, with a faint inner glow
++                val start = max(r.flashWidth, r.flashHeight) * 0.55f
++                val ring = start + (maxRadius * r.size - start) * e
++                val save = canvas.save()
++                canvas.translate(r.x, r.y)
++                canvas.scale(ring, ring)
++                style.ringPaint.alpha = (255f * strength * bodyAlpha * 1.3f).coerceIn(0f, 255f).toInt()
++                canvas.drawCircle(0f, 0f, 1f, style.ringPaint)
++                style.fallbackPaint.alpha = (255f * strength * bodyAlpha * 0.35f).coerceIn(0f, 255f).toInt()
++                canvas.drawCircle(0f, 0f, 1f, style.fallbackPaint)
++                canvas.restoreToCount(save)
++                // a weaker echo ring a moment later
++                val t2 = (elapsed - ignitionDuration - expansionDuration * 0.25f) / expansionDuration
++                if (t2 > 0f && t2 < 1f) {
++                    val e2 = smoothstep(0f, 1f, t2)
++                    val ring2 = start + (maxRadius * r.size * 0.8f - start) * e2
++                    val save2 = canvas.save()
++                    canvas.translate(r.x, r.y)
++                    canvas.scale(ring2, ring2)
++                    style.ringPaint.alpha = (255f * strength * bodyAlpha * 0.5f * (1f - e2)).coerceIn(0f, 255f).toInt()
++                    canvas.drawCircle(0f, 0f, 1f, style.ringPaint)
++                    canvas.restoreToCount(save2)
++                }
++                continue
++            }
 +            if (textures == null) {
 +                val save = canvas.save()
 +                canvas.translate(x, y)
@@ -2859,6 +3021,12 @@ index 0000000..4e3aee9
 +        private const val MAX_RIPPLES = 10
 +
 +        /** Ten neon tones: cyan/blue/violet/pink with acid yellow, green and mint accents. */
++        /** lit-key colours measured in the Samsung Keys Cafe dark reference: cyan, sky, aqua, azure, ocean, lavender */
++        val SAMSUNG_COOL = intArrayOf(
++            0xFF1CE0E0.toInt(), 0xFF2CD8ED.toInt(), 0xFF31DFC8.toInt(),
++            0xFF2EA4E9.toInt(), 0xFF1AA6DC.toInt(), 0xFFA2A2EB.toInt()
++        )
++
 +        val CYBERPUNK = intArrayOf(
 +            0xFF00F0FF.toInt(), 0xFF4DB8FF.toInt(), 0xFF386BFF.toInt(), 0xFF805BFF.toInt(),
 +            0xFFBE38FF.toInt(), 0xFFFF2BD6.toInt(), 0xFFFF438E.toInt(), 0xFFE9FF48.toInt(),
@@ -3049,10 +3217,10 @@ index 0000000..4e3aee9
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
 new file mode 100644
-index 0000000..bdd9dc3
+index 0000000..a520207
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,67 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -3079,6 +3247,8 @@ index 0000000..bdd9dc3
 +        var driftX = 0f
 +        var driftY = 0f
 +        var start = 0L
++        /** when the finger left this key; -1 while it is still held */
++        var releasedAt = -1L
 +    }
 +
 +    init { require(capacity > 0) }
@@ -3100,6 +3270,14 @@ index 0000000..bdd9dc3
 +
 +    fun expire(now: Long, duration: Long) {
 +        while (size > 0 && now - slots[head].start >= duration) {
++            head = (head + 1) % slots.size
++            size--
++        }
++    }
++
++    /** drop finished ripples from the oldest end (held keys stay until released) */
++    fun expireWhile(done: (Ripple) -> Boolean) {
++        while (size > 0 && done(slots[head])) {
 +            head = (head + 1) % slots.size
 +            size--
 +        }
@@ -3511,7 +3689,7 @@ index 20ccfba..3d38c05 100644
              it.keyActionListener = keyActionListener
          }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
-index daa13c4..92797f1 100644
+index daa13c4..0696123 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
 @@ -5,6 +5,7 @@
@@ -3561,7 +3739,7 @@ index daa13c4..92797f1 100644
              addOnLayoutChangeListener { v, left, top, right, bottom, _, _, _, _ ->
                  val (x, y) = rootLocation.also { v.getLocationInWindow(it) }
                  val width = right - left
-@@ -80,34 +89,57 @@ class PopupComponent :
+@@ -80,34 +89,59 @@ class PopupComponent :
          }
      }
  
@@ -3573,13 +3751,8 @@ index daa13c4..92797f1 100644
 +        if (!prefs.coloredPreview.getValue()) return null
 +        val pressed = org.fcitx.fcitx5.android.input.keyboard.PressEffect.lastPressColor
 +        if (prefs.previewSameColor.getValue() && pressed != 0) {
-+            // same hue as the key; slightly deeper, like the bubble in the Samsung reference
-+            val k = 0.18f
-+            return android.graphics.Color.rgb(
-+                (android.graphics.Color.red(pressed) * (1 - k)).toInt(),
-+                (android.graphics.Color.green(pressed) * (1 - k)).toInt(),
-+                (android.graphics.Color.blue(pressed) * (1 - k)).toInt()
-+            )
++            // exactly the colour of this press: key face, bubble and wave share it
++            return pressed
 +        }
 +        val colors = org.fcitx.fcitx5.android.data.theme.ThemePrefs.NeonColor.entries
 +        var i = kotlin.random.Random.nextInt(colors.size)
@@ -3598,6 +3771,8 @@ index daa13c4..92797f1 100644
 -            lastShowTime = System.currentTimeMillis()
 +            lastShowTime = SystemClock.uptimeMillis()
              setText(content)
++            // repeated presses on the same key must refresh the colour too
++            tint(nextPreviewColor())
              return
          }
          val popup = (freeEntryUi.poll()
@@ -3629,10 +3804,15 @@ index daa13c4..92797f1 100644
 +        popup.root.translationX = ((bounds.left + bounds.right - popupWidth) / 2 - rootBounds.left)
 +            .coerceIn(0, (container.width - popupWidth).coerceAtLeast(0)).toFloat()
 +        popup.root.visibility = View.VISIBLE
++        // ease the bubble in instead of popping it
++        popup.root.alpha = 0f
++        popup.root.scaleX = 0.92f
++        popup.root.scaleY = 0.92f
++        popup.root.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(80L).start()
          showingEntryUi[viewId] = popup
      }
  
-@@ -185,8 +217,9 @@ class PopupComponent :
+@@ -185,8 +219,9 @@ class PopupComponent :
  
      private fun dismissPopup(viewId: Int) {
          dismissPopupContainer(viewId)
@@ -3643,7 +3823,7 @@ index daa13c4..92797f1 100644
              if (timeLeft <= 0L) {
                  dismissPopupEntry(viewId, it)
              } else {
-@@ -207,8 +240,11 @@ class PopupComponent :
+@@ -207,8 +242,11 @@ class PopupComponent :
      }
  
      private fun dismissPopupEntry(viewId: Int, popup: PopupEntryUi) {
@@ -3656,7 +3836,7 @@ index daa13c4..92797f1 100644
          freeEntryUi.add(popup)
      }
  
-@@ -225,7 +261,7 @@ class PopupComponent :
+@@ -225,7 +263,7 @@ class PopupComponent :
          showingContainerUi.clear()
          // too too
          showingEntryUi.forEach { (_, entry) ->
@@ -4142,7 +4322,7 @@ index 0000000..28fcdba
 +        android:pathData="M4,4h6v6h-6z M14,4h6v6h-6z M4,14h6v6h-6z M14,14h6v6h-6z" />
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..2f59b0c 100644
+index 40ef2c9..cb50b16 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -4171,7 +4351,7 @@ index 40ef2c9..2f59b0c 100644
      <string name="expand_toolbar_by_default">默认展开工具栏</string>
      <string name="popup_on_key_press">按键时弹出显示字符</string>
      <string name="disable_animation">禁用动画</string>
-@@ -321,4 +333,74 @@
+@@ -321,4 +333,78 @@
      <string name="keyboard_height_percent_base">键盘高度百分比</string>
      <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
      <string name="real_size">真实尺寸 (Display.getRealSize)</string>
@@ -4245,9 +4425,13 @@ index 40ef2c9..2f59b0c 100644
 +    <string name="press_glow_on_candidates">光晕延伸到候选栏</string>
 +    <string name="preview_same_color">气泡与按键同色</string>
 +    <string name="preview_same_color_summary">每次按键只取一种颜色，键面、气泡和波澜统一使用</string>
++    <string name="press_effect_palette_samsung">三星冷色光</string>
++    <string name="key_exit_style">松手后的按键</string>
++    <string name="key_exit_dim">原地渐暗（留下光迹）</string>
++    <string name="key_exit_shrink">收成光点</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..6c6cb0f 100644
+index fa9bc4e..94491bb 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -4276,7 +4460,7 @@ index fa9bc4e..6c6cb0f 100644
      <string name="expand_toolbar_by_default">預設展開工具列</string>
      <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
      <string name="disable_animation">停用動畫</string>
-@@ -316,4 +328,74 @@
+@@ -316,4 +328,78 @@
      <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
      <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
      <string name="preferred_voice_input">首選語音輸入</string>
@@ -4350,9 +4534,13 @@ index fa9bc4e..6c6cb0f 100644
 +    <string name="press_glow_on_candidates">光暈延伸到候選列</string>
 +    <string name="preview_same_color">氣泡與按鍵同色</string>
 +    <string name="preview_same_color_summary">每次按鍵只取一種顏色，鍵面、氣泡和波瀾統一使用</string>
++    <string name="press_effect_palette_samsung">三星冷色光</string>
++    <string name="key_exit_style">放開後的按鍵</string>
++    <string name="key_exit_dim">原地漸暗（留下光跡）</string>
++    <string name="key_exit_shrink">收成光點</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..8897a4e 100644
+index fe1fd3a..06d5061 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -4381,7 +4569,7 @@ index fe1fd3a..8897a4e 100644
      <string name="expand_toolbar_by_default">Expand toolbar by default</string>
      <string name="popup_on_key_press">Popup on key press</string>
      <string name="disable_animation">Disable animation</string>
-@@ -321,4 +333,74 @@
+@@ -321,4 +333,78 @@
      <string name="keyboard_height_percent_base">Keyboard height percent base</string>
      <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
      <string name="real_size">Real size (Display.getRealSize)</string>
@@ -4455,6 +4643,10 @@ index fe1fd3a..8897a4e 100644
 +    <string name="press_glow_on_candidates">Let the glow reach the candidate bar</string>
 +    <string name="preview_same_color">Bubble matches the key colour</string>
 +    <string name="preview_same_color_summary">Each press uses one colour for the key, its bubble and its ripple</string>
++    <string name="press_effect_palette_samsung">Samsung cool light</string>
++    <string name="key_exit_style">Released key</string>
++    <string name="key_exit_dim">Dims in place (trail)</string>
++    <string name="key_exit_shrink">Shrinks to a spot</string>
  </resources>
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt
 new file mode 100644
@@ -5993,7 +6185,7 @@ index 0000000..204900b
 +lianggehuangkimigcuilia	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦啊	两个黄看	两个光
 +lianggehuangkimigcuiliao	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦死	两个黄看	两个光
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-index b99ab3e..7709937 100644
+index b99ab3e..1599472 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 @@ -47,7 +47,8 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
@@ -6001,13 +6193,13 @@ index b99ab3e..7709937 100644
                  }
                  debug {
 -                    applicationIdSuffix = ".debug"
-+                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v12"
++                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v13"
 +                    signingConfigs.fromProjectEnv(target)?.let { signingConfig = it }
                  }
                  all {
                      // remove META-INF/version-control-info.textproto
 diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-index 8a19dd2..0de99dc 100644
+index 8a19dd2..bb0385b 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 @@ -15,6 +15,8 @@ import org.gradle.kotlin.dsl.configure
@@ -6015,7 +6207,7 @@ index 8a19dd2..0de99dc 100644
  
      override fun apply(target: Project) {
 +        val mainApplicationId = "org.fcitx.fcitx5.android" +
-+            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v12")
++            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v13")
          target.extensions.configure<ApplicationExtension> {
              buildFeatures {
                  buildConfig = true
@@ -6080,7 +6272,7 @@ index d1d4123..241bf2a 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
-index 1733282..64eacc3 100644
+index 1733282..92df3a9 100644
 --- a/plugin/rime/build.gradle.kts
 +++ b/plugin/rime/build.gradle.kts
 @@ -33,7 +33,7 @@ android {
@@ -6088,7 +6280,7 @@ index 1733282..64eacc3 100644
          }
          debug {
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "曜黑 Rime V12")
++            resValue("string", "app_name", "曜黑 Rime V13")
          }
      }
  
