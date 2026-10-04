@@ -1,0 +1,33 @@
+{
+  "render_source_commit": "8c9baa554a144da88a8cd89733ec1a1b18b6543c",
+  "render_run": "https://github.com/xisungod/fcitx5-android/actions/runs/37166511898",
+  "render_test": "continuousTypingRendersRealKeyColoursPopupsAndRecordedRimeCandidates",
+  "render_test_result": "passed",
+  "input": "lianggehuangkimigcuiliao",
+  "final_first_candidate": "两个黄鹂鸣翠柳",
+  "source_frames": 141,
+  "gif_frames_after_duplicate_merge": 134,
+  "frame_interval_ms": 33,
+  "key_interval_ms": 132,
+  "key_hold_ms": 99,
+  "ripple_radius_factor": 0.85,
+  "key_colour_hold_ms": 260,
+  "key_colour_retreat_ms": 480,
+  "wave_peak_alpha": 0.3,
+  "wave_full_expansion_alpha_before_fade": 0.048,
+  "key_paint_order": "key background, coloured key surface, character",
+  "character_preview": "Background surrounds only the 52 dp upper character box. Lower preview area is transparent; original anchors and long-press menus unchanged.",
+  "gif_duration_ms": 5770,
+  "rendering": "Actual Android Views with Robolectric native graphics; production PressEffect, PopupEntryUi and candidate UI. Controlled animation clock. Not a device recording.",
+  "candidate_data": "Actual librime 1.12.0 + Lua + octagram, fresh user dictionary; replayed from app/src/test/resources/xuancai-typing-candidates.tsv.",
+  "reference": "https://www.douyin.com/video/6934910357269908769",
+  "gif_sha256": "60d2450871e65612457c37933dcfad21eedbfd1195ef752b276a51ef73d85934",
+  "android_tests": {
+    "tests": 46,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "native_rime_checks": "passed",
+  "published": false
+}

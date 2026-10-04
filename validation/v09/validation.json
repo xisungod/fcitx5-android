@@ -1,9 +1,9 @@
 {
-  "source_commit": "1a0de8014ab7dba27b489a82a3399ea5d6059f1a",
-  "run": "37164286337",
-  "run_url": "https://github.com/xisungod/fcitx5-android/actions/runs/37164286337",
+  "source_commit": "8c9baa554a144da88a8cd89733ec1a1b18b6543c",
+  "run": "37166511898",
+  "run_url": "https://github.com/xisungod/fcitx5-android/actions/runs/37166511898",
   "android_tests": {
-    "tests": 44,
+    "tests": 46,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -32,7 +32,7 @@
     },
     {
       "name": "org.fcitx.fcitx5.android.KeyboardVisualRegressionTest",
-      "tests": 13,
+      "tests": 14,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -46,7 +46,7 @@
     },
     {
       "name": "org.fcitx.fcitx5.android.PressEffectRenderingTest",
-      "tests": 9,
+      "tests": 10,
       "failures": 0,
       "errors": 0,
       "skipped": 0
@@ -88,25 +88,25 @@
     {
       "file": "SHA256SUMS.txt",
       "bytes": 291,
-      "sha256": "c77ca6373daf00c9db24b77c026890698d6f7988fd5f98781b08800cd32ef8d1"
+      "sha256": "2b3f74de34a25ef55b98044395297c0b58046628b168f54ad4c90156427013db"
     },
     {
       "file": "fcitx5-rime-black-v09-arm64.apk",
-      "bytes": 95742229,
-      "sha256": "2e622bb205f1fd2d11ebbdba35cf12f895b026f01ac500cfc91f46abdc9b039e"
+      "bytes": 95742222,
+      "sha256": "a04aca63620a72c9e456de775a8a3c2cabcf8057a9a17c7e1025692c7986105a"
     },
     {
       "file": "fcitx5-xuancai-black-v09-arm64.apk",
-      "bytes": 69621965,
-      "sha256": "77d69061766d88d4c3030b0544b59b64f597fd9ee30536c74359f02582213d3c"
+      "bytes": 69623864,
+      "sha256": "eb966bdb23fd86901a0a4d921d34a10dd16ae975acd6acba125e5fb30c60c395"
     },
     {
       "file": "xuancai-v09-rime-data.zip",
       "bytes": 51020931,
-      "sha256": "367dd609b2f6b5459003a23100930b186c60811b82cb06f4b5e12b5bd017bf40"
+      "sha256": "e2dd2cd0ad7d5a9650a7a17a13a92868461ef6fd598ca01ee1bd96ca82f54ddf"
     }
   ],
-  "signing_certificate_sha256": "7ddc7a02d95772be2c2f8c6373999ff067a3ac3fa7a9a8dc6476319ad0feaca6",
+  "signing_certificate_sha256": "04c51457f94801a71d49bd84ababed0afccc93a8c80a571cd1f15fb8f0e6fd5c",
   "package_mode": "isolated .xuancai.black.v09; paired main and plugin share the same certificate",
-  "continuous_preview_provenance": "continuous-preview.json"
+  "continuous_preview_provenance": "key-surfaces-preview.json"
 }
