@@ -1168,7 +1168,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..200f31a 100644
+index 5c2fef9..3b16e0e 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1307,7 +1307,7 @@ index 5c2fef9..200f31a 100644
      }
  
      private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-@@ -392,16 +463,87 @@ abstract class BaseKeyboard(
+@@ -392,16 +463,91 @@ abstract class BaseKeyboard(
              event.deviceId, event.edgeFlags
          )
          target.view.dispatchTouchEvent(e)
@@ -1370,11 +1370,15 @@ index 5c2fef9..200f31a 100644
 +                val i = ev.actionIndex
 +                val target = findTouchTarget(ev, i)
 +                illuminateKey(ev, i, target)
-+            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-+                it.onRelease()
 +            }
 +        }
-+        return super.dispatchTouchEvent(ev)
++        val handled = super.dispatchTouchEvent(ev)
++        // Final-UP retargeting can illuminate a new key inside onTouchEvent.
++        // Release afterwards so it cannot leave idle breathing in the held state.
++        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
++            pressEffectLayer?.onRelease()
++        }
++        return handled
 +    }
 +
 +    override fun dispatchDraw(canvas: Canvas) {
@@ -1397,7 +1401,7 @@ index 5c2fef9..200f31a 100644
              when (event.actionMasked) {
                  MotionEvent.ACTION_DOWN -> {
                      releaseAllTouchTargets()
-@@ -423,6 +565,18 @@ abstract class BaseKeyboard(
+@@ -423,6 +569,18 @@ abstract class BaseKeyboard(
                      for (i in 0 until event.pointerCount) {
                          val pid = event.getPointerId(i)
                          val target = touchTargets[pid] ?: continue
@@ -1416,7 +1420,7 @@ index 5c2fef9..200f31a 100644
                          dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                      }
                      return true
-@@ -431,7 +585,7 @@ abstract class BaseKeyboard(
+@@ -431,7 +589,7 @@ abstract class BaseKeyboard(
                      val i = event.actionIndex
                      val pid = event.getPointerId(i)
                      val target = touchTargets[pid] ?: return true
@@ -1425,7 +1429,7 @@ index 5c2fef9..200f31a 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -442,7 +596,7 @@ abstract class BaseKeyboard(
+@@ -442,7 +600,7 @@ abstract class BaseKeyboard(
                          releaseAllTouchTargets()
                          return true
                      }
@@ -1434,7 +1438,7 @@ index 5c2fef9..200f31a 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -465,6 +619,12 @@ abstract class BaseKeyboard(
+@@ -465,6 +623,12 @@ abstract class BaseKeyboard(
  
      @CallSuper
      protected open fun onPopupAction(action: PopupAction) {
@@ -1447,7 +1451,7 @@ index 5c2fef9..200f31a 100644
          popupActionListener?.onPopupAction(action)
      }
  
-@@ -484,8 +644,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +648,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1482,7 +1486,7 @@ index 5c2fef9..200f31a 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +687,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +691,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -3840,10 +3844,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..6596f4f
+index 0000000..e9900d3
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,685 @@
+@@ -0,0 +1,689 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4474,6 +4478,10 @@ index 0000000..6596f4f
 +        touch(MotionEvent.ACTION_UP, key("H"))
 +        assertEquals(1, actions.size)
 +        assertEquals("h", (actions.single() as KeyAction.FcitxKeyAction).act)
++        val effect = ReflectionHelpers.getField<Any>(keyboard, "pressEffectLayer")
++        val breathing = ReflectionHelpers.getField<Any>(effect, "breathing")
++        assertFalse("Lift-off retargeting must release the breathing envelope",
++            ReflectionHelpers.getField<Boolean>(breathing, "touching"))
 +        actions.clear()
 +        touch(MotionEvent.ACTION_DOWN, key("G"))
 +        touch(MotionEvent.ACTION_UP, keyboard.lang)
