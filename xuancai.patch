@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 53f1eb8..1a059d8 100644
+index 53f1eb8..8155028 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -33,6 +33,23 @@ android {
@@ -31,11 +31,11 @@ index 53f1eb8..1a059d8 100644
          }
          debug {
 +            // Install alongside the original debug APK: its CI signing key is ephemeral.
-+            applicationIdSuffix = ".xuancai.black.v11"
++            applicationIdSuffix = ".xuancai.black.v12"
              resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
              resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "炫彩·曜黑 V11")
++            resValue("string", "app_name", "炫彩·曜黑 V12")
          }
      }
  
@@ -364,7 +364,7 @@ index 93ba4d4..b40dc34 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..9bcff18 100644
+index d3b4948..564751c 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -388,7 +388,7 @@ index d3b4948..9bcff18 100644
  
      val keyBorderStroke = switch(
          R.string.key_border_stroke, "key_border_stroke", false,
-@@ -43,6 +46,167 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -43,6 +46,173 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
  
@@ -509,12 +509,18 @@ index d3b4948..9bcff18 100644
 +        R.string.colored_preview, "colored_preview", true, R.string.colored_preview_summary
 +    )
 +
++    /** one colour per press: key face, bubble and ripple share it */
++    val previewSameColor = switch(
++        R.string.preview_same_color, "preview_same_color", true, R.string.preview_same_color_summary,
++        enableUiOn = { coloredPreview.getValue() }
++    )
++
 +    val pressGlowReach = int(
-+        R.string.press_glow_reach, "press_glow_reach", 55, 20, 100, "%", 5,
++        R.string.press_glow_reach, "press_glow_reach", 100, 20, 100, "%", 5,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +    val pressGlowOnCandidates = switch(
-+        R.string.press_glow_on_candidates, "press_glow_on_candidates", false,
++        R.string.press_glow_on_candidates, "press_glow_on_candidates", true,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -529,7 +535,7 @@ index d3b4948..9bcff18 100644
 +    )
 +
 +    val pressKeyHoldTime = int(
-+        R.string.press_key_hold_time, "press_key_hold_time", 260, 100, 1000, "ms", 20,
++        R.string.press_key_hold_time, "press_key_hold_time", 420, 100, 1000, "ms", 20,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
@@ -549,14 +555,14 @@ index d3b4948..9bcff18 100644
 +    )
 +
 +    val pressEffectOverKeys = int(
-+        R.string.press_effect_over_keys, "press_effect_over_keys", 0, 0, 100, "%", 5,
++        R.string.press_effect_over_keys, "press_effect_over_keys", 30, 0, 100, "%", 5,
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
-@@ -71,10 +235,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -71,10 +241,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_vertical_margin,
              R.string.portrait,
              "key_vertical_margin",
@@ -569,7 +575,7 @@ index d3b4948..9bcff18 100644
              0,
              24,
              "dp"
-@@ -83,7 +247,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -83,7 +253,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
          keyVerticalMarginLandscape = secondary
      }
  
@@ -578,7 +584,7 @@ index d3b4948..9bcff18 100644
  
      val textEditingButtonRadius =
          int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
-@@ -93,6 +257,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -93,6 +263,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
          None(R.string.punctuation_pos_none),
@@ -586,7 +592,7 @@ index d3b4948..9bcff18 100644
          Bottom(R.string.punctuation_pos_bottom),
          TopRight(R.string.punctuation_pos_top_right);
      }
-@@ -100,7 +265,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -100,7 +271,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val punctuationPosition = enumList(
          R.string.punctuation_position,
          "punctuation_position",
@@ -595,7 +601,7 @@ index d3b4948..9bcff18 100644
      )
  
      enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-@@ -136,14 +301,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -136,14 +307,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val followSystemDayNightTheme = switch(
          R.string.follow_system_day_night_theme,
          "follow_system_dark_mode",
@@ -612,7 +618,7 @@ index d3b4948..9bcff18 100644
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
-@@ -151,7 +316,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -151,7 +322,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val darkModeTheme = themePreference(
          R.string.dark_mode_theme,
          "dark_mode_theme",
@@ -622,7 +628,7 @@ index d3b4948..9bcff18 100644
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..2ef9067 100644
+index 239e22c..730734f 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
@@ -631,7 +637,7 @@ index 239e22c..2ef9067 100644
  
 +    /** Separate dark keycaps; translucent faces admit the light behind them. */
 +    val XuancaiBlackV09 = Theme.Builtin(
-+        name = "炫彩·曜黑 V11",
++        name = "炫彩·曜黑 V12",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
@@ -2385,10 +2391,10 @@ index 26dcded..9273fac 100644
              it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..73ace4e
+index 0000000..992102d
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,648 @@
+@@ -0,0 +1,652 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -2584,6 +2590,7 @@ index 0000000..73ace4e
 +            index = (index + 1 + random.nextInt(colors.size - 1)) % colors.size
 +        }
 +        lastColorIndex = index
++        lastPressColor = colors[index]
 +        val shapes = PressEffectMasks.SHAPES
 +        val selectedShape = random.nextInt(shapes)
 +        ripples.expire(now, duration)
@@ -2748,7 +2755,7 @@ index 0000000..73ace4e
 +            val radius = flashRadius + (maxRadius * r.size - flashRadius) * e
 +            // Diffuse colour loses energy as it spreads. Old wide waves must not
 +            // blanket the keyboard or hide the independent, brighter key faces.
-+            val bodyAlpha = 0.30f * (1f - 0.84f * e) * ramp(spreadElapsed.toFloat(), 0f, 45f) *
++            val bodyAlpha = 0.55f * (1f - 0.7f * e) * ramp(spreadElapsed.toFloat(), 0f, 45f) *
 +                (1f - smoothstep((ignitionDuration + expansionDuration).toFloat(), waveDuration.toFloat(), elapsed.toFloat()))
 +            if (textures == null) {
 +                val save = canvas.save()
@@ -2833,6 +2840,9 @@ index 0000000..73ace4e
 +    }
 +
 +    companion object {
++        /** colour chosen by the most recent key press (0 = none yet); read by the character bubble */
++        @Volatile
++        var lastPressColor: Int = 0
 +        const val KEY_STYLE_BORDER = 1
 +        const val KEY_STYLE_OFF = 2
 +        private val BORDER_LAYERS = arrayOf(7f to 0.16f, 4f to 0.32f, 1.8f to 1f)
@@ -2971,7 +2981,7 @@ index 0000000..73ace4e
 +            val ny = abs(y - center) / center
 +            val power = 6f - 4f * roundness.coerceIn(0f, 1f)
 +            val distance = (nx.pow(power) + ny.pow(power)).pow(1f / power)
-+            val alpha = 1f - PressEffect.smoothstep(0.68f, 1f, distance)
++            val alpha = 1f - PressEffect.smoothstep(0.9f, 1f, distance)
 +            pixels[y * size + x] = ((alpha * 255f + 0.5f).toInt() shl 24) or 0xffffff
 +        }
 +        return pixels
@@ -3501,7 +3511,7 @@ index 20ccfba..3d38c05 100644
              it.keyActionListener = keyActionListener
          }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
-index daa13c4..699d3a1 100644
+index daa13c4..92797f1 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupComponent.kt
 @@ -5,6 +5,7 @@
@@ -3551,7 +3561,7 @@ index daa13c4..699d3a1 100644
              addOnLayoutChangeListener { v, left, top, right, bottom, _, _, _, _ ->
                  val (x, y) = rootLocation.also { v.getLocationInWindow(it) }
                  val width = right - left
-@@ -80,34 +89,47 @@ class PopupComponent :
+@@ -80,34 +89,57 @@ class PopupComponent :
          }
      }
  
@@ -3561,6 +3571,16 @@ index daa13c4..699d3a1 100644
 +    private fun nextPreviewColor(): Int? {
 +        val prefs = org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs
 +        if (!prefs.coloredPreview.getValue()) return null
++        val pressed = org.fcitx.fcitx5.android.input.keyboard.PressEffect.lastPressColor
++        if (prefs.previewSameColor.getValue() && pressed != 0) {
++            // same hue as the key; slightly deeper, like the bubble in the Samsung reference
++            val k = 0.18f
++            return android.graphics.Color.rgb(
++                (android.graphics.Color.red(pressed) * (1 - k)).toInt(),
++                (android.graphics.Color.green(pressed) * (1 - k)).toInt(),
++                (android.graphics.Color.blue(pressed) * (1 - k)).toInt()
++            )
++        }
 +        val colors = org.fcitx.fcitx5.android.data.theme.ThemePrefs.NeonColor.entries
 +        var i = kotlin.random.Random.nextInt(colors.size)
 +        if (i == lastPreviewColor) i = (i + 1 + kotlin.random.Random.nextInt(colors.size - 1)) % colors.size
@@ -3612,7 +3632,7 @@ index daa13c4..699d3a1 100644
          showingEntryUi[viewId] = popup
      }
  
-@@ -185,8 +207,9 @@ class PopupComponent :
+@@ -185,8 +217,9 @@ class PopupComponent :
  
      private fun dismissPopup(viewId: Int) {
          dismissPopupContainer(viewId)
@@ -3623,7 +3643,7 @@ index daa13c4..699d3a1 100644
              if (timeLeft <= 0L) {
                  dismissPopupEntry(viewId, it)
              } else {
-@@ -207,8 +230,11 @@ class PopupComponent :
+@@ -207,8 +240,11 @@ class PopupComponent :
      }
  
      private fun dismissPopupEntry(viewId: Int, popup: PopupEntryUi) {
@@ -3636,7 +3656,7 @@ index daa13c4..699d3a1 100644
          freeEntryUi.add(popup)
      }
  
-@@ -225,7 +251,7 @@ class PopupComponent :
+@@ -225,7 +261,7 @@ class PopupComponent :
          showingContainerUi.clear()
          // too too
          showingEntryUi.forEach { (_, entry) ->
@@ -4122,7 +4142,7 @@ index 0000000..28fcdba
 +        android:pathData="M4,4h6v6h-6z M14,4h6v6h-6z M4,14h6v6h-6z M14,14h6v6h-6z" />
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..31c1bc2 100644
+index 40ef2c9..2f59b0c 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -4151,7 +4171,7 @@ index 40ef2c9..31c1bc2 100644
      <string name="expand_toolbar_by_default">默认展开工具栏</string>
      <string name="popup_on_key_press">按键时弹出显示字符</string>
      <string name="disable_animation">禁用动画</string>
-@@ -321,4 +333,72 @@
+@@ -321,4 +333,74 @@
      <string name="keyboard_height_percent_base">键盘高度百分比</string>
      <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
      <string name="real_size">真实尺寸 (Display.getRealSize)</string>
@@ -4223,9 +4243,11 @@ index 40ef2c9..31c1bc2 100644
 +    <string name="colored_preview_summary">按键弹出的字符气泡随机使用一种霓虹色，与三星 Keys Cafe 一致</string>
 +    <string name="press_glow_reach">光晕扩散范围</string>
 +    <string name="press_glow_on_candidates">光晕延伸到候选栏</string>
++    <string name="preview_same_color">气泡与按键同色</string>
++    <string name="preview_same_color_summary">每次按键只取一种颜色，键面、气泡和波澜统一使用</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..f23f912 100644
+index fa9bc4e..6c6cb0f 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -4254,7 +4276,7 @@ index fa9bc4e..f23f912 100644
      <string name="expand_toolbar_by_default">預設展開工具列</string>
      <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
      <string name="disable_animation">停用動畫</string>
-@@ -316,4 +328,72 @@
+@@ -316,4 +328,74 @@
      <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
      <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
      <string name="preferred_voice_input">首選語音輸入</string>
@@ -4326,9 +4348,11 @@ index fa9bc4e..f23f912 100644
 +    <string name="colored_preview_summary">按鍵彈出的字元氣泡隨機使用一種霓虹色，與三星 Keys Cafe 一致</string>
 +    <string name="press_glow_reach">光暈擴散範圍</string>
 +    <string name="press_glow_on_candidates">光暈延伸到候選列</string>
++    <string name="preview_same_color">氣泡與按鍵同色</string>
++    <string name="preview_same_color_summary">每次按鍵只取一種顏色，鍵面、氣泡和波瀾統一使用</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..e7fccf4 100644
+index fe1fd3a..8897a4e 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -4357,7 +4381,7 @@ index fe1fd3a..e7fccf4 100644
      <string name="expand_toolbar_by_default">Expand toolbar by default</string>
      <string name="popup_on_key_press">Popup on key press</string>
      <string name="disable_animation">Disable animation</string>
-@@ -321,4 +333,72 @@
+@@ -321,4 +333,74 @@
      <string name="keyboard_height_percent_base">Keyboard height percent base</string>
      <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
      <string name="real_size">Real size (Display.getRealSize)</string>
@@ -4429,6 +4453,8 @@ index fe1fd3a..e7fccf4 100644
 +    <string name="colored_preview_summary">Each key preview bubble takes its own random neon colour, as in Keys Cafe</string>
 +    <string name="press_glow_reach">Glow reach</string>
 +    <string name="press_glow_on_candidates">Let the glow reach the candidate bar</string>
++    <string name="preview_same_color">Bubble matches the key colour</string>
++    <string name="preview_same_color_summary">Each press uses one colour for the key, its bubble and its ripple</string>
  </resources>
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt
 new file mode 100644
@@ -4643,10 +4669,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..4769087
+index 0000000..cc900af
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,762 @@
+@@ -0,0 +1,755 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4919,16 +4945,9 @@ index 0000000..4769087
 +        val rippleBar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
 +        rippleBar.addView(bar.root, FrameLayout.LayoutParams(360, 52))
 +        root.addView(rippleBar, FrameLayout.LayoutParams(360, 52))
-+        // V11 follows the Samsung reference: by default the glow stays on the keyboard.
-+        // The candidate-bar reach is now an option; enable it here to keep that path covered.
 +        val glowOnBar = org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.pressGlowOnCandidates
-+        assertFalse("The candidate-bar glow must be off by default", glowOnBar.getValue())
-+        glowOnBar.setValue(true)
-+        val keyboard = try {
-+            TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
-+        } finally {
-+            glowOnBar.setValue(false)
-+        }
++        assertTrue("V12: the ripple reaches the candidate bar by default", glowOnBar.getValue())
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
 +        root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
 +        rippleBar.keyboard = keyboard
 +        controller.visible()
@@ -5974,7 +5993,7 @@ index 0000000..204900b
 +lianggehuangkimigcuilia	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦啊	两个黄看	两个光
 +lianggehuangkimigcuiliao	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦死	两个黄看	两个光
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-index b99ab3e..61ac81c 100644
+index b99ab3e..7709937 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 @@ -47,7 +47,8 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
@@ -5982,13 +6001,13 @@ index b99ab3e..61ac81c 100644
                  }
                  debug {
 -                    applicationIdSuffix = ".debug"
-+                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v11"
++                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v12"
 +                    signingConfigs.fromProjectEnv(target)?.let { signingConfig = it }
                  }
                  all {
                      // remove META-INF/version-control-info.textproto
 diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-index 8a19dd2..0384345 100644
+index 8a19dd2..0de99dc 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 @@ -15,6 +15,8 @@ import org.gradle.kotlin.dsl.configure
@@ -5996,7 +6015,7 @@ index 8a19dd2..0384345 100644
  
      override fun apply(target: Project) {
 +        val mainApplicationId = "org.fcitx.fcitx5.android" +
-+            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v11")
++            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v12")
          target.extensions.configure<ApplicationExtension> {
              buildFeatures {
                  buildConfig = true
@@ -6061,7 +6080,7 @@ index d1d4123..241bf2a 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
-index 1733282..bd94d4f 100644
+index 1733282..64eacc3 100644
 --- a/plugin/rime/build.gradle.kts
 +++ b/plugin/rime/build.gradle.kts
 @@ -33,7 +33,7 @@ android {
@@ -6069,7 +6088,7 @@ index 1733282..bd94d4f 100644
          }
          debug {
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "曜黑 Rime V11")
++            resValue("string", "app_name", "曜黑 Rime V12")
          }
      }
  
