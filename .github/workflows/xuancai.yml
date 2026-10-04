@@ -1,4 +1,4 @@
-name: 曜黑 V09 与 Rime 构建
+name: 曜黑 V10 与 Rime 构建
 
 on:
   workflow_dispatch:
@@ -8,11 +8,11 @@ on:
         type: boolean
         default: false
   push:
-    branches: ["improve/keyscafe-black-v09"]
+    branches: ["improve/keyscafe-black-v10"]
     paths: ["xuancai.patch", "scripts/**", ".github/workflows/xuancai.yml"]
 
 concurrency:
-  group: xuancai-v09-${{ github.ref }}
+  group: xuancai-v10-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -29,13 +29,13 @@ jobs:
       - name: 切到已验证版本并应用补丁
         run: |
           cp xuancai.patch /tmp/xuancai.patch
-          cp XUANCAI-V09.md /tmp/XUANCAI-V09.md
-          cp -r scripts /tmp/xuancai-v09-scripts
+          cp XUANCAI-V10.md /tmp/XUANCAI-V10.md
+          cp -r scripts /tmp/xuancai-v10-scripts
           git -c advice.detachedHead=false checkout e6199a2801b0c76e1baeff7a48f6b18e910e9dd7
           git submodule update --init --recursive
           git apply --whitespace=nowarn /tmp/xuancai.patch
       - name: 准备完整雾凇与固定语法模型
-        run: python3 /tmp/xuancai-v09-scripts/prepare-xuancai-rime.py --zip /tmp/xuancai-v09-rime-data.zip
+        run: python3 /tmp/xuancai-v10-scripts/prepare-xuancai-rime.py --zip /tmp/xuancai-v10-rime-data.zip
       - name: 准备 Java
         uses: actions/setup-java@v5
         with:
@@ -53,13 +53,13 @@ jobs:
           XUANCAI_SIGN_KEY_BASE64: ${{ secrets.XUANCAI_SIGN_KEY_BASE64 }}
           XUANCAI_SIGN_KEY_PWD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
           XUANCAI_SIGN_KEY_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
-        run: python3 /tmp/xuancai-v09-scripts/prepare-xuancai-signing.py
+        run: python3 /tmp/xuancai-v10-scripts/prepare-xuancai-signing.py
       - name: 准备 Gradle
         uses: gradle/actions/setup-gradle@v6
       - name: 编译主程序并运行界面测试
         env:
           BUILD_ABI: arm64-v8a
-          BUILD_VERSION_NAME: xuancai-black-v09
+          BUILD_VERSION_NAME: xuancai-black-v10
           SIGN_KEY_PWD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
           SIGN_KEY_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest
@@ -67,17 +67,17 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: xuancai-v09-ui-checks
+          name: xuancai-v10-ui-checks
           path: |
             app/build/outputs/effect-checks/
             app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
       - name: 预编译词典并验证真实 Rime 候选
-        run: python3 /tmp/xuancai-v09-scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/xuancai-rime-host"
+        run: python3 /tmp/xuancai-v10-scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/xuancai-rime-host"
       - name: 编译配套 Rime 插件
         env:
           BUILD_ABI: arm64-v8a
-          BUILD_VERSION_NAME: xuancai-black-v09
+          BUILD_VERSION_NAME: xuancai-black-v10
           SIGN_KEY_PWD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
           SIGN_KEY_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
         run: ./gradlew :plugin:rime:assembleDebug
@@ -85,7 +85,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: xuancai-v09-checks
+          name: xuancai-v10-checks
           path: |
             app/build/outputs/effect-checks/
             app/build/test-results/testDebugUnitTest/
@@ -93,31 +93,31 @@ jobs:
           if-no-files-found: ignore
       - name: 整理并校验安装包
         run: |
-          mkdir -p /tmp/xuancai-v09
-          cp app/build/outputs/apk/debug/*.apk /tmp/xuancai-v09/fcitx5-xuancai-black-v09-arm64.apk
-          cp plugin/rime/build/outputs/apk/debug/*.apk /tmp/xuancai-v09/fcitx5-rime-black-v09-arm64.apk
-          cp /tmp/xuancai-v09-rime-data.zip /tmp/xuancai-v09/
+          mkdir -p /tmp/xuancai-v10
+          cp app/build/outputs/apk/debug/*.apk /tmp/xuancai-v10/fcitx5-xuancai-black-v10-arm64.apk
+          cp plugin/rime/build/outputs/apk/debug/*.apk /tmp/xuancai-v10/fcitx5-rime-black-v10-arm64.apk
+          cp /tmp/xuancai-v10-rime-data.zip /tmp/xuancai-v10/
           SDK_TOOLS="$ANDROID_HOME/build-tools/36.1.0"
-          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v09/fcitx5-xuancai-black-v09-arm64.apk
-          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v09/fcitx5-rime-black-v09-arm64.apk
-          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v09/fcitx5-xuancai-black-v09-arm64.apk > /tmp/app-badging.txt
+          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v10/fcitx5-xuancai-black-v10-arm64.apk
+          "$SDK_TOOLS/apksigner" verify --verbose /tmp/xuancai-v10/fcitx5-rime-black-v10-arm64.apk
+          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v10/fcitx5-xuancai-black-v10-arm64.apk > /tmp/app-badging.txt
           sed -n '1,6p' /tmp/app-badging.txt
-          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v09/fcitx5-rime-black-v09-arm64.apk > /tmp/rime-badging.txt
+          "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v10/fcitx5-rime-black-v10-arm64.apk > /tmp/rime-badging.txt
           sed -n '1,6p' /tmp/rime-badging.txt
-          python3 /tmp/xuancai-v09-scripts/verify-xuancai-rime-package.py /tmp/xuancai-v09/fcitx5-rime-black-v09-arm64.apk
-          cd /tmp/xuancai-v09
+          python3 /tmp/xuancai-v10-scripts/verify-xuancai-rime-package.py /tmp/xuancai-v10/fcitx5-rime-black-v10-arm64.apk
+          cd /tmp/xuancai-v10
           sha256sum *.apk *.zip > SHA256SUMS.txt
       - name: 上传安装包
         uses: actions/upload-artifact@v7
         with:
-          name: fcitx5-xuancai-black-v09-and-rime-arm64
-          path: /tmp/xuancai-v09/*
+          name: fcitx5-xuancai-black-v10-and-rime-arm64
+          path: /tmp/xuancai-v10/*
       - name: 发布（允许同提交重跑）
         if: github.event_name == 'workflow_dispatch' && inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: bash /tmp/xuancai-v09-scripts/publish-xuancai-v09.sh
+        run: bash /tmp/xuancai-v10-scripts/publish-xuancai-v10.sh
       - name: 清理临时签名文件
         if: always()
         run: rm -f "$RUNNER_TEMP/xuancai-signing.ks"

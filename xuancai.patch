@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 53f1eb8..5c0b671 100644
+index 53f1eb8..d006ecf 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -33,6 +33,23 @@ android {
@@ -31,11 +31,11 @@ index 53f1eb8..5c0b671 100644
          }
          debug {
 +            // Install alongside the original debug APK: its CI signing key is ephemeral.
-+            applicationIdSuffix = ".xuancai.black.v09"
++            applicationIdSuffix = ".xuancai.black.v10"
              resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
              resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "炫彩·曜黑 V09")
++            resValue("string", "app_name", "炫彩·曜黑 V10")
          }
      }
  
@@ -47,6 +47,19 @@ index 53f1eb8..5c0b671 100644
      androidTestImplementation(libs.androidx.test.runner)
      androidTestImplementation(libs.androidx.test.rules)
      androidTestImplementation(libs.androidx.lifecycle.testing)
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index fcc089b..02fd0ed 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -12,6 +12,8 @@
+         tools:node="remove" />
+ 
+     <uses-permission android:name="android.permission.VIBRATE" />
++    <!-- optional, off by default: read verification codes from incoming SMS, on device only -->
++    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+ 
+     <!-- remove intent queries merged from library manifest (namely Android-Image-Cropper) -->
 diff --git a/app/src/main/cpp/androidkeyboard/androidkeyboard.h b/app/src/main/cpp/androidkeyboard/androidkeyboard.h
 index b365ac5..43e41fc 100644
 --- a/app/src/main/cpp/androidkeyboard/androidkeyboard.h
@@ -86,8 +99,138 @@ index cec9078..8da5e41 100644
 -}
 \ No newline at end of file
 +}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/otp/SmsCodeReceiver.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/otp/SmsCodeReceiver.kt
+new file mode 100644
+index 0000000..7a664f3
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/otp/SmsCodeReceiver.kt
+@@ -0,0 +1,23 @@
++/*
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
++ */
++package org.fcitx.fcitx5.android.data.otp
++
++import android.content.BroadcastReceiver
++import android.content.Context
++import android.content.Intent
++import android.provider.Telephony
++
++/** Registered by the input method only while the user has enabled it and granted RECEIVE_SMS. */
++class SmsCodeReceiver : BroadcastReceiver() {
++    override fun onReceive(context: Context, intent: Intent) {
++        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
++        val body = runCatching {
++            Telephony.Sms.Intents.getMessagesFromIntent(intent)
++                ?.joinToString("") { it?.messageBody.orEmpty() }
++        }.getOrNull() ?: return
++        val code = VerificationCodes.extract(body) ?: return
++        VerificationCodes.publish(code, VerificationCodes.Source.Sms)
++    }
++}
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/otp/VerificationCodes.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/otp/VerificationCodes.kt
+new file mode 100644
+index 0000000..11a71a4
+--- /dev/null
++++ b/app/src/main/java/org/fcitx/fcitx5/android/data/otp/VerificationCodes.kt
+@@ -0,0 +1,95 @@
++/*
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
++ */
++package org.fcitx.fcitx5.android.data.otp
++
++import kotlin.math.abs
++
++/**
++ * Finds one-time verification codes in SMS bodies or copied text and keeps the latest one
++ * in memory only (never persisted, never sent anywhere; the app has no network permission).
++ */
++object VerificationCodes {
++
++    enum class Source { Clipboard, Sms }
++
++    data class Code(val code: String, val source: Source, val timestamp: Long)
++
++    fun interface Listener {
++        fun onCode(code: Code)
++    }
++
++    /** codes older than this are not offered any more */
++    const val TTL_MS = 5 * 60 * 1000L
++
++    private const val MAX_TEXT = 500
++
++    private val keyword = Regex(
++        "验证码|校验码|校驗碼|驗證碼|动态码|動態碼|动态密码|确认码|確認碼|激活码|安全码|随机码|短信码|认证码|授权码|登录码|" +
++            "verification code|security code|one[- ]time|passcode|\\bcode\\b|\\botp\\b|\\bpin\\b",
++        RegexOption.IGNORE_CASE
++    )
++
++    /** 4–8 digits not glued to other digits/letters; also 4–8 char codes like A1B2C3 */
++    private val digits = Regex("(?<![0-9A-Za-z])[0-9]{4,8}(?![0-9A-Za-z])")
++    private val alnum = Regex("(?<![0-9A-Za-z])(?=[A-Za-z0-9]*[0-9])(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{4,8}(?![0-9A-Za-z])")
++
++    /** money, dates and times next to a number are never the code */
++    private val unitAfter = Regex("^\\s*(元|块|万|分钟|分|秒|小时|天|年|月|日|号|%|位|次|个|岁|kg|km|mb|gb)", RegexOption.IGNORE_CASE)
++    private val unitBefore = Regex("(¥|￥|\\$|尾号|尾號|账号|帳號|卡号|卡號|手机|手機|电话|電話)\\s*$")
++
++    fun extract(text: CharSequence?): String? {
++        if (text.isNullOrBlank() || text.length > MAX_TEXT) return null
++        val s = text.toString()
++        val keys = keyword.findAll(s).toList()
++        if (keys.isEmpty()) return null
++        val candidates = (digits.findAll(s) + alnum.findAll(s))
++            .filter { m ->
++                val after = s.substring(m.range.last + 1, minOf(s.length, m.range.last + 6))
++                val before = s.substring(maxOf(0, m.range.first - 4), m.range.first)
++                !unitAfter.containsMatchIn(after) && !unitBefore.containsMatchIn(before) &&
++                    !(m.value.length == 4 && m.value.toIntOrNull()?.let { it in 1990..2099 } == true &&
++                        Regex("^\\s*[-/年.]").containsMatchIn(after))
++            }
++            .distinctBy { it.range.first }
++            .toList()
++        if (candidates.isEmpty()) return null
++        // the candidate closest to a keyword wins; digits beat letters, codes after the keyword beat codes before
++        return candidates.minByOrNull { m ->
++            val distance = keys.minOf { k ->
++                when {
++                    m.range.first > k.range.last -> m.range.first - k.range.last
++                    m.range.last < k.range.first -> (k.range.first - m.range.last) * 2 + 4
++                    else -> abs(m.range.first - k.range.first)
++                }
++            }
++            distance * 4 + (if (m.value.all(Char::isDigit)) 0 else 3)
++        }?.value
++    }
++
++    @Volatile
++    var latest: Code? = null
++        private set
++
++    // weak: input views come and go; each keeps its own listener field alive
++    private val listeners: MutableSet<Listener> = java.util.Collections.newSetFromMap(java.util.WeakHashMap())
++
++    fun addListener(l: Listener) = synchronized(listeners) { listeners.add(l) }
++
++    fun removeListener(l: Listener) = synchronized(listeners) { listeners.remove(l) }
++
++    fun publish(code: String, source: Source, now: Long = System.currentTimeMillis()) {
++        val c = Code(code, source, now)
++        latest = c
++        val copy = synchronized(listeners) { listeners.toList() }
++        copy.forEach { it.onCode(c) }
++    }
++
++    fun fresh(now: Long = System.currentTimeMillis()): Code? =
++        latest?.takeIf { now - it.timestamp in 0..TTL_MS }
++
++    fun consume() {
++        latest = null
++    }
++}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
-index bed1cbf..ae14682 100644
+index bed1cbf..91246fb 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/prefs/AppPrefs.kt
 @@ -59,6 +59,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
@@ -149,7 +292,22 @@ index bed1cbf..ae14682 100644
                  R.string.landscape,
                  "keyboard_height_percent_landscape",
                  49,
-@@ -442,4 +446,4 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+@@ -355,6 +359,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
+         val clipboardMaskSensitive = switch(
+             R.string.clipboard_mask_sensitive, "clipboard_mask_sensitive", true
+         ) { clipboardListening.getValue() }
++        val verificationCodeFromClipboard = switch(
++            R.string.verification_code_clipboard, "verification_code_clipboard", true,
++            R.string.verification_code_clipboard_summary
++        ) { clipboardListening.getValue() && clipboardSuggestion.getValue() }
++        val verificationCodeFromSms = switch(
++            R.string.verification_code_sms, "verification_code_sms", false,
++            R.string.verification_code_sms_summary
++        )
+     }
+ 
+     inner class Symbols : ManagedPreferenceCategory(R.string.emoji_and_symbols, sharedPreferences) {
+@@ -442,4 +454,4 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
  
          fun getInstance() = instance!!
      }
@@ -206,7 +364,7 @@ index 93ba4d4..b40dc34 100644
 \ No newline at end of file
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
-index d3b4948..64ae0eb 100644
+index d3b4948..97370e5 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePrefs.kt
 @@ -9,7 +9,6 @@ import android.content.SharedPreferences
@@ -230,7 +388,7 @@ index d3b4948..64ae0eb 100644
  
      val keyBorderStroke = switch(
          R.string.key_border_stroke, "key_border_stroke", false,
-@@ -43,6 +46,120 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -43,6 +46,154 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
  
@@ -239,7 +397,24 @@ index d3b4948..64ae0eb 100644
 +        Cool(R.string.press_effect_palette_cool),
 +        Rainbow(R.string.press_effect_palette_rainbow),
 +        Berry(R.string.press_effect_palette_berry),
-+        Accent(R.string.press_effect_palette_accent);
++        Accent(R.string.press_effect_palette_accent),
++        Custom(R.string.press_effect_palette_custom);
++    }
++
++    /** how the pressed key itself shows its colour (Keys Cafe "key colour effect") */
++    enum class KeyColorStyle(override val stringRes: Int) : ManagedPreferenceEnum {
++        Fill(R.string.key_color_style_fill),
++        Border(R.string.key_color_style_border),
++        Off(R.string.key_color_style_off);
++    }
++
++    /** how the pressed key moves (Keys Cafe "key motion effect") */
++    enum class KeyMotionEffect(override val stringRes: Int) : ManagedPreferenceEnum {
++        Off(R.string.key_motion_off),
++        Shrink(R.string.key_motion_shrink),
++        Bounce(R.string.key_motion_bounce),
++        Tilt(R.string.key_motion_tilt),
++        Press(R.string.key_motion_press);
 +    }
 +
 +    val pressEffect = switch(
@@ -313,6 +488,23 @@ index d3b4948..64ae0eb 100644
 +        enableUiOn = { pressEffect.getValue() }
 +    )
 +
++    private val customPaletteUi = { pressEffect.getValue() && pressEffectPalette.getValue() == PressEffectPalette.Custom }
++    val pressCustomColorCount = int(
++        R.string.press_custom_color_count, "press_custom_color_count", 3, 1, 4, "", 1,
++        enableUiOn = customPaletteUi
++    )
++    val pressCustomColor1 = enumList(R.string.press_custom_color_1, "press_custom_color_1", NeonColor.Cyan, enableUiOn = customPaletteUi)
++    val pressCustomColor2 = enumList(R.string.press_custom_color_2, "press_custom_color_2", NeonColor.Magenta, enableUiOn = customPaletteUi)
++    val pressCustomColor3 = enumList(R.string.press_custom_color_3, "press_custom_color_3", NeonColor.Yellow, enableUiOn = customPaletteUi)
++    val pressCustomColor4 = enumList(R.string.press_custom_color_4, "press_custom_color_4", NeonColor.Purple, enableUiOn = customPaletteUi)
++
++    val keyColorStyle = enumList(
++        R.string.key_color_style, "key_color_style", KeyColorStyle.Fill,
++        enableUiOn = { pressEffect.getValue() }
++    )
++
++    val keyMotionEffect = enumList(R.string.key_motion_effect, "key_motion_effect", KeyMotionEffect.Shrink)
++
 +    val pressEffectSize = int(
 +        R.string.press_effect_size, "press_effect_size", 100, 40, 200, "%", 10,
 +        enableUiOn = { pressEffect.getValue() }
@@ -351,7 +543,7 @@ index d3b4948..64ae0eb 100644
      val keyHorizontalMargin: ManagedPreference.PInt
      val keyHorizontalMarginLandscape: ManagedPreference.PInt
  
-@@ -71,10 +188,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -71,10 +222,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
              R.string.key_vertical_margin,
              R.string.portrait,
              "key_vertical_margin",
@@ -364,7 +556,7 @@ index d3b4948..64ae0eb 100644
              0,
              24,
              "dp"
-@@ -83,7 +200,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -83,7 +234,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
          keyVerticalMarginLandscape = secondary
      }
  
@@ -373,7 +565,7 @@ index d3b4948..64ae0eb 100644
  
      val textEditingButtonRadius =
          int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")
-@@ -93,6 +210,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -93,6 +244,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
  
      enum class PunctuationPosition(override val stringRes: Int) : ManagedPreferenceEnum {
          None(R.string.punctuation_pos_none),
@@ -381,7 +573,7 @@ index d3b4948..64ae0eb 100644
          Bottom(R.string.punctuation_pos_bottom),
          TopRight(R.string.punctuation_pos_top_right);
      }
-@@ -100,7 +218,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -100,7 +252,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val punctuationPosition = enumList(
          R.string.punctuation_position,
          "punctuation_position",
@@ -390,7 +582,7 @@ index d3b4948..64ae0eb 100644
      )
  
      enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-@@ -136,14 +254,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -136,14 +288,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val followSystemDayNightTheme = switch(
          R.string.follow_system_day_night_theme,
          "follow_system_dark_mode",
@@ -407,7 +599,7 @@ index d3b4948..64ae0eb 100644
          enableUiOn = {
              followSystemDayNightTheme.getValue()
          })
-@@ -151,7 +269,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
+@@ -151,7 +303,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
      val darkModeTheme = themePreference(
          R.string.dark_mode_theme,
          "dark_mode_theme",
@@ -417,7 +609,7 @@ index d3b4948..64ae0eb 100644
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..f21296f 100644
+index 239e22c..066ed0a 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
@@ -426,7 +618,7 @@ index 239e22c..f21296f 100644
  
 +    /** Separate dark keycaps; translucent faces admit the light behind them. */
 +    val XuancaiBlackV09 = Theme.Builtin(
-+        name = "炫彩·曜黑 V09",
++        name = "炫彩·曜黑 V10",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
@@ -454,8 +646,62 @@ index 239e22c..f21296f 100644
      val MaterialLight = Theme.Builtin(
          name = "MaterialLight",
          isDark = false,
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/FcitxInputMethodService.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/FcitxInputMethodService.kt
+index f18e3f7..c9bbd20 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/input/FcitxInputMethodService.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/input/FcitxInputMethodService.kt
+@@ -202,7 +202,32 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
+         return job
+     }
+ 
++    private var smsCodeReceiver: org.fcitx.fcitx5.android.data.otp.SmsCodeReceiver? = null
++
++    /** listen for SMS codes only while the user wants it and has granted RECEIVE_SMS */
++    private fun updateSmsCodeReceiver() {
++        val wanted = AppPrefs.getInstance().clipboard.verificationCodeFromSms.getValue() &&
++            androidx.core.content.ContextCompat.checkSelfPermission(
++                this, android.Manifest.permission.RECEIVE_SMS
++            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
++        val current = smsCodeReceiver
++        if (wanted && current == null) {
++            val receiver = org.fcitx.fcitx5.android.data.otp.SmsCodeReceiver()
++            runCatching {
++                androidx.core.content.ContextCompat.registerReceiver(
++                    this, receiver,
++                    android.content.IntentFilter(android.provider.Telephony.Sms.Intents.SMS_RECEIVED_ACTION),
++                    androidx.core.content.ContextCompat.RECEIVER_EXPORTED
++                )
++            }.onSuccess { smsCodeReceiver = receiver }
++        } else if (!wanted && current != null) {
++            runCatching { unregisterReceiver(current) }
++            smsCodeReceiver = null
++        }
++    }
++
+     override fun onCreate() {
++        updateSmsCodeReceiver()
+         fcitx = FcitxDaemon.connect(javaClass.name)
+         lifecycleScope.launch {
+             jobs.consumeEach { it.join() }
+@@ -731,6 +756,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
+         // right cursor position, try to workaround this would simply introduce more bugs.
+         selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
+         resetComposingState()
++        updateSmsCodeReceiver()
+         val flags = CapabilityFlags.fromEditorInfo(attribute)
+         capabilityFlags = flags
+         // EditorInfo may change between onStartInput and onStartInputView
+@@ -1084,6 +1110,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
+     }
+ 
+     override fun onDestroy() {
++        smsCodeReceiver?.let { runCatching { unregisterReceiver(it) } }
++        smsCodeReceiver = null
+         recreateInputViewPrefs.forEach {
+             it.unregisterOnChangeListener(recreateInputViewListener)
+         }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
-index fe90eda..4e9da5b 100644
+index fe90eda..b06e81f 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/bar/KawaiiBarComponent.kt
 @@ -5,6 +5,7 @@
@@ -474,7 +720,78 @@ index fe90eda..4e9da5b 100644
  import org.fcitx.fcitx5.android.input.popup.PopupComponent
  import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
  import org.fcitx.fcitx5.android.input.wm.InputWindow
-@@ -264,24 +266,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+@@ -78,6 +80,7 @@ import splitties.views.dsl.core.lParams
+ import splitties.views.dsl.core.matchParent
+ import java.util.concurrent.Executor
+ import kotlin.coroutines.resume
++import org.fcitx.fcitx5.android.data.otp.VerificationCodes
+ import kotlin.math.PI
+ import kotlin.math.abs
+ import kotlin.math.atan2
+@@ -126,10 +129,17 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+                 if (it.text.isEmpty()) {
+                     isClipboardFresh = false
+                 } else {
+-                    idleUi.clipboardUi.text.text = if (it.sensitive && clipboardMaskSensitive) {
+-                        ClipboardEntry.BULLET.repeat(min(42, it.text.length))
+-                    } else {
+-                        it.text.take(42)
++                    val code = if (codeFromClipboard.getValue()) VerificationCodes.extract(it.text) else null
++                    chipCode = code
++                    chipFromSms = false
++                    val masked = it.sensitive && clipboardMaskSensitive
++                    idleUi.clipboardUi.text.text = when {
++                        code != null -> context.getString(
++                            R.string.verification_code_chip,
++                            if (masked) ClipboardEntry.BULLET.repeat(code.length) else code
++                        )
++                        masked -> ClipboardEntry.BULLET.repeat(min(42, it.text.length))
++                        else -> it.text.take(42)
+                     }
+                     isClipboardFresh = true
+                     launchClipboardTimeoutJob()
+@@ -138,6 +148,40 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+             }
+         }
+ 
++    private val codeFromClipboard = prefs.clipboard.verificationCodeFromClipboard
++    private val codeFromSms = prefs.clipboard.verificationCodeFromSms
++
++    /** verification code currently offered in the clipboard chip; tapping pastes just the code */
++    private var chipCode: String? = null
++    private var chipFromSms = false
++
++    private fun showSmsCode(code: VerificationCodes.Code) {
++        if (!codeFromSms.getValue() || code.source != VerificationCodes.Source.Sms) return
++        chipCode = code.code
++        chipFromSms = true
++        idleUi.clipboardUi.text.text = context.getString(R.string.verification_code_sms_chip, code.code)
++        isClipboardFresh = true
++        // an SMS code stays offered for its whole validity window, independent of the clipboard timeout
++        clipboardTimeoutJob?.cancel()
++        val left = VerificationCodes.TTL_MS - (System.currentTimeMillis() - code.timestamp)
++        clipboardTimeoutJob = service.lifecycleScope.launch {
++            delay(left.coerceAtLeast(0L))
++            if (chipFromSms) {
++                isClipboardFresh = false
++                chipCode = null
++                chipFromSms = false
++                evalIdleUiState()
++            }
++            clipboardTimeoutJob = null
++        }
++        evalIdleUiState()
++    }
++
++    @Keep
++    private val onVerificationCodeListener = VerificationCodes.Listener { code ->
++        service.lifecycleScope.launch { showSmsCode(code) }
++    }
++
+     @Keep
+     private val onClipboardSuggestionUpdateListener =
+         ManagedPreference.OnChangeListener<Boolean> { _, it ->
+@@ -264,24 +308,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
      private val idleUi: IdleUi by lazy {
          IdleUi(context, theme, popup, commonKeyActionListener).apply {
              menuButton.setOnClickListener {
@@ -500,7 +817,7 @@ index fe90eda..4e9da5b 100644
              }
              hideKeyboardButton.apply {
                  setOnClickListener(hideKeyboardCallback)
-@@ -291,21 +276,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+@@ -291,34 +318,40 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                  onGestureListener = swipeHideKeyboardCallback
              }
              buttonsUi.apply {
@@ -527,7 +844,28 @@ index fe90eda..4e9da5b 100644
              }
              clipboardUi.suggestionView.apply {
                  setOnClickListener {
-@@ -407,8 +392,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+-                    ClipboardManager.lastEntry?.let {
++                    val code = chipCode
++                    if (code != null) {
++                        service.commitText(code)
++                        if (chipFromSms) VerificationCodes.consume()
++                    } else ClipboardManager.lastEntry?.let {
+                         service.commitText(it.text)
+                     }
++                    chipCode = null
++                    chipFromSms = false
+                     clipboardTimeoutJob?.cancel()
+                     clipboardTimeoutJob = null
+                     isClipboardFresh = false
+                     evalIdleUiState()
+                 }
+                 setOnLongClickListener {
+-                    ClipboardManager.lastEntry?.let {
++                    if (!chipFromSms) ClipboardManager.lastEntry?.let {
+                         AppUtil.launchClipboardEdit(context, it.id, true)
+                     }
+                     true
+@@ -407,8 +440,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
          view.displayedChild = index
      }
  
@@ -539,7 +877,16 @@ index fe90eda..4e9da5b 100644
              backgroundColor =
                  if (ThemeManager.prefs.keyBorder.getValue()) Color.TRANSPARENT
                  else theme.barColor
-@@ -537,7 +524,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+@@ -427,6 +462,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
+             }
+         }
+         ClipboardManager.addOnUpdateListener(onClipboardUpdateListener)
++        VerificationCodes.addListener(onVerificationCodeListener)
++        VerificationCodes.fresh()?.let { showSmsCode(it) }
+         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
+         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
+     }
+@@ -537,7 +574,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
      }
  
      companion object {
@@ -1168,7 +1515,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..085d51d 100644
+index 5c2fef9..0315e75 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1191,7 +1538,7 @@ index 5c2fef9..085d51d 100644
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
  import org.fcitx.fcitx5.android.input.popup.PopupAction
-@@ -48,23 +52,90 @@ abstract class BaseKeyboard(
+@@ -48,23 +52,96 @@ abstract class BaseKeyboard(
  ) : ConstraintLayout(context) {
  
      var keyActionListener: KeyActionListener? = null
@@ -1218,6 +1565,10 @@ index 5c2fef9..085d51d 100644
 +                    theme.accentKeyBackgroundColor.takeIf { it ushr 24 != 0 }
 +                        ?: 0xFF76B5FF.toInt()
 +                )
++                ThemePrefs.PressEffectPalette.Custom -> listOf(
++                    p.pressCustomColor1, p.pressCustomColor2, p.pressCustomColor3, p.pressCustomColor4
++                ).take(p.pressCustomColorCount.getValue().coerceIn(1, 4))
++                    .map { it.getValue().argb }.toIntArray()
 +            },
 +            theme.isDark,
 +            p.pressEffectSize.getValue(),
@@ -1240,7 +1591,9 @@ index 5c2fef9..085d51d 100644
 +            ignitionTimeMs = p.pressIgnitionTime.getValue(),
 +            keyHoldTimeMs = p.pressKeyHoldTime.getValue(),
 +            keyRetreatTimeMs = p.pressKeyRetreatTime.getValue(),
-+            keySurfaceEffects = true
++            keySurfaceEffects = true,
++            keyColorStyle = p.keyColorStyle.getValue().ordinal,
++            keyCornerRadius = p.keyRadius.getValue() * resources.displayMetrics.density
 +        )
 +    }
 +
@@ -1284,7 +1637,7 @@ index 5c2fef9..085d51d 100644
      private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
  
      var popupActionListener: PopupActionListener? = null
-@@ -135,6 +206,11 @@ abstract class BaseKeyboard(
+@@ -135,6 +212,11 @@ abstract class BaseKeyboard(
              })
          }
          spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
@@ -1296,7 +1649,7 @@ index 5c2fef9..085d51d 100644
      }
  
      private fun createKeyView(def: KeyDef): KeyView {
-@@ -144,6 +220,13 @@ abstract class BaseKeyboard(
+@@ -144,6 +226,13 @@ abstract class BaseKeyboard(
              is KeyDef.Appearance.Text -> TextKeyView(context, theme, def.appearance)
              is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
          }.apply {
@@ -1310,7 +1663,7 @@ index 5c2fef9..085d51d 100644
              soundEffect = when (def) {
                  is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
                  is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
-@@ -153,7 +236,7 @@ abstract class BaseKeyboard(
+@@ -153,7 +242,7 @@ abstract class BaseKeyboard(
              }
              if (def is SpaceKey) {
                  spaceKeys.add(this)
@@ -1319,7 +1672,7 @@ index 5c2fef9..085d51d 100644
                  swipeRepeatEnabled = true
                  swipeThresholdX = selectionSwipeThreshold
                  swipeThresholdY = disabledSwipeThreshold
-@@ -356,6 +439,7 @@ abstract class BaseKeyboard(
+@@ -356,6 +445,7 @@ abstract class BaseKeyboard(
              onPopupAction(PopupAction.DismissAction(keyView.id))
          }
          touchTargets.clear()
@@ -1327,7 +1680,7 @@ index 5c2fef9..085d51d 100644
      }
  
      private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-@@ -392,16 +476,91 @@ abstract class BaseKeyboard(
+@@ -392,16 +482,144 @@ abstract class BaseKeyboard(
              event.deviceId, event.edgeFlags
          )
          target.view.dispatchTouchEvent(e)
@@ -1369,7 +1722,57 @@ index 5c2fef9..085d51d 100644
 +        } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, target)
 +    }
 +
++    private val keyMotion = ThemeManager.prefs.keyMotionEffect.getValue()
++    private val motionViews = android.util.SparseArray<View>()
++    private val motionRandom = java.util.Random()
++
++    private fun motionPress(pointerId: Int, view: View?) {
++        if (keyMotion == ThemePrefs.KeyMotionEffect.Off) return
++        val old = motionViews.get(pointerId)
++        if (old === view) return
++        if (old != null) motionRelease(old)
++        if (view == null) {
++            motionViews.remove(pointerId)
++            return
++        }
++        motionViews.put(pointerId, view)
++        val a = view.animate().setDuration(70L).setInterpolator(android.view.animation.DecelerateInterpolator())
++        val density = resources.displayMetrics.density
++        when (keyMotion) {
++            ThemePrefs.KeyMotionEffect.Shrink -> a.scaleX(0.86f).scaleY(0.86f)
++            ThemePrefs.KeyMotionEffect.Bounce -> a.scaleX(0.9f).scaleY(0.9f)
++            ThemePrefs.KeyMotionEffect.Tilt ->
++                a.rotation(if (motionRandom.nextBoolean()) 7f else -7f).scaleX(0.95f).scaleY(0.95f)
++            ThemePrefs.KeyMotionEffect.Press -> a.translationY(3f * density).scaleX(0.97f).scaleY(0.97f)
++            ThemePrefs.KeyMotionEffect.Off -> {}
++        }
++        a.start()
++    }
++
++    private fun motionRelease(view: View) {
++        val a = view.animate().scaleX(1f).scaleY(1f).rotation(0f).translationY(0f)
++        when (keyMotion) {
++            ThemePrefs.KeyMotionEffect.Bounce ->
++                a.setDuration(320L).setInterpolator(android.view.animation.OvershootInterpolator(3.2f))
++            ThemePrefs.KeyMotionEffect.Tilt ->
++                a.setDuration(260L).setInterpolator(android.view.animation.OvershootInterpolator(2f))
++            else -> a.setDuration(140L).setInterpolator(android.view.animation.DecelerateInterpolator())
++        }
++        a.start()
++    }
++
++    private fun motionReleasePointer(pointerId: Int) {
++        motionViews.get(pointerId)?.let(::motionRelease)
++        motionViews.remove(pointerId)
++    }
++
++    private fun motionReleaseAll() {
++        for (i in 0 until motionViews.size()) motionRelease(motionViews.valueAt(i))
++        motionViews.clear()
++    }
++
 +    private fun illuminateKey(event: MotionEvent, index: Int, target: TouchTarget?) {
++        motionPress(event.getPointerId(index), target?.view)
 +        pressEffectLayer?.let { effect ->
 +            val bounds = target?.view?.let { key ->
 +                getLocationInWindow(effectHostLocation)
@@ -1384,7 +1787,7 @@ index 5c2fef9..085d51d 100644
 +    }
 +
 +    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-+        pressEffectLayer?.let {
++        if (pressEffectLayer != null || keyMotion != ThemePrefs.KeyMotionEffect.Off) {
 +            val action = ev.actionMasked
 +            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
 +                val i = ev.actionIndex
@@ -1397,6 +1800,9 @@ index 5c2fef9..085d51d 100644
 +        // Release afterwards so it cannot leave idle breathing in the held state.
 +        if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
 +            pressEffectLayer?.onRelease()
++            motionReleaseAll()
++        } else if (ev.actionMasked == MotionEvent.ACTION_POINTER_UP) {
++            motionReleasePointer(ev.getPointerId(ev.actionIndex))
 +        }
 +        return handled
 +    }
@@ -1421,7 +1827,7 @@ index 5c2fef9..085d51d 100644
              when (event.actionMasked) {
                  MotionEvent.ACTION_DOWN -> {
                      releaseAllTouchTargets()
-@@ -423,6 +582,18 @@ abstract class BaseKeyboard(
+@@ -423,6 +641,18 @@ abstract class BaseKeyboard(
                      for (i in 0 until event.pointerCount) {
                          val pid = event.getPointerId(i)
                          val target = touchTargets[pid] ?: continue
@@ -1440,7 +1846,7 @@ index 5c2fef9..085d51d 100644
                          dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                      }
                      return true
-@@ -431,7 +602,7 @@ abstract class BaseKeyboard(
+@@ -431,7 +661,7 @@ abstract class BaseKeyboard(
                      val i = event.actionIndex
                      val pid = event.getPointerId(i)
                      val target = touchTargets[pid] ?: return true
@@ -1449,7 +1855,7 @@ index 5c2fef9..085d51d 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -442,7 +613,7 @@ abstract class BaseKeyboard(
+@@ -442,7 +672,7 @@ abstract class BaseKeyboard(
                          releaseAllTouchTargets()
                          return true
                      }
@@ -1458,7 +1864,7 @@ index 5c2fef9..085d51d 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -465,6 +636,12 @@ abstract class BaseKeyboard(
+@@ -465,6 +695,12 @@ abstract class BaseKeyboard(
  
      @CallSuper
      protected open fun onPopupAction(action: PopupAction) {
@@ -1471,7 +1877,7 @@ index 5c2fef9..085d51d 100644
          popupActionListener?.onPopupAction(action)
      }
  
-@@ -484,8 +661,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +720,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1506,11 +1912,12 @@ index 5c2fef9..085d51d 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +704,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +763,8 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
 +        pressEffectLayer?.setActive(false)
++        motionReleaseAll()
      }
  
 -}
@@ -1967,10 +2374,10 @@ index 26dcded..1a33534 100644
              it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..4aa75e6
+index 0000000..fa4b0df
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,614 @@
+@@ -0,0 +1,643 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -2033,6 +2440,9 @@ index 0000000..4aa75e6
 +    keyHoldTimeMs: Int = 260,
 +    keyRetreatTimeMs: Int = 480,
 +    private val keySurfaceEffects: Boolean = false,
++    /** 0 = colour fills the key, 1 = glowing border, 2 = no key colour (only the spreading light) */
++    private val keyColorStyle: Int = 0,
++    private val keyCornerRadius: Float = 0f,
 +    private val animationsAllowed: () -> Boolean = {
 +        !AppPrefs.getInstance().advanced.disableAnimation.getValue() &&
 +            (!org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
@@ -2126,6 +2536,10 @@ index 0000000..4aa75e6
 +            colorFilter = PorterDuffColorFilter(mix(color, Color.WHITE, 0.12f), PorterDuff.Mode.SRC_IN)
 +        }
 +        // Immediate feedback even while the first set of textures is warming up.
++        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
++            it.style = Paint.Style.STROKE
++            it.color = color
++        }
 +        val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 +            shader = RadialGradient(
 +                0f, 0f, 1f,
@@ -2240,7 +2654,9 @@ index 0000000..4aa75e6
 +        if (keyAlpha > 0.004f) {
 +            val saved = canvas.save()
 +            canvas.translate(centerX, centerY)
-+            if (r.keyFill) {
++            if (r.keyFill && keyColorStyle == KEY_STYLE_BORDER) {
++                drawBorderGlow(canvas, r, style, (0.95f * (1f - retreat) * strength).coerceIn(0f, 1f))
++            } else if (r.keyFill) {
 +                val spotSize = min(r.flashWidth, r.flashHeight) * 0.18f
 +                val width = r.flashWidth + (spotSize - r.flashWidth) * retreat
 +                val height = r.flashHeight + (spotSize - r.flashHeight) * retreat
@@ -2265,9 +2681,26 @@ index 0000000..4aa75e6
 +        }
 +    }
 +
++    private val borderRect = android.graphics.RectF()
++
++    /** neon outline around the pressed key: soft outer glow, brighter halo, crisp line */
++    private fun drawBorderGlow(canvas: Canvas, r: PressEffectTrail.Ripple, style: RipplePaints, alpha: Float) {
++        if (alpha <= 0.004f) return
++        val paint = style.strokePaint
++        for ((widthDp, layerAlpha) in BORDER_LAYERS) {
++            val w = widthDp * density
++            borderRect.set(-r.flashWidth / 2f + w / 2f, -r.flashHeight / 2f + w / 2f,
++                r.flashWidth / 2f - w / 2f, r.flashHeight / 2f - w / 2f)
++            paint.strokeWidth = w
++            paint.alpha = (alpha * layerAlpha * 255f).coerceIn(0f, 255f).toInt()
++            val radius = (keyCornerRadius - w / 2f).coerceAtLeast(0f)
++            canvas.drawRoundRect(borderRect, radius, radius, paint)
++        }
++    }
++
 +    /** Invoked by the key face after its dark background, before its character. */
 +    fun drawKeySurface(canvas: Canvas, keyId: Int, width: Int, height: Int) {
-+        if (!keySurfaceEffects || !canDraw() || !animatorsEnabled()) return
++        if (!keySurfaceEffects || keyColorStyle == KEY_STYLE_OFF || !canDraw() || !animatorsEnabled()) return
 +        val now = clock()
 +        for (i in 0 until ripples.size) {
 +            val ripple = ripples[i]
@@ -2384,6 +2817,9 @@ index 0000000..4aa75e6
 +    }
 +
 +    companion object {
++        const val KEY_STYLE_BORDER = 1
++        const val KEY_STYLE_OFF = 2
++        private val BORDER_LAYERS = arrayOf(7f to 0.16f, 4f to 0.32f, 1.8f to 1f)
 +        private const val BASE_RADIUS_DP = 200f
 +        private const val FLASH_RADIUS_DP = 19f
 +        private const val KEY_FLASH_SIZE = 64
@@ -3352,6 +3788,63 @@ index 5e0c372..7a05c53 100644
                      }
                  }
              }
+diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainActivity.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainActivity.kt
+index b7a8ee1..0d7dd02 100644
+--- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainActivity.kt
++++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/MainActivity.kt
+@@ -11,6 +11,7 @@ import android.os.Build
+ import android.os.Bundle
+ import android.view.ViewGroup
+ import androidx.activity.enableEdgeToEdge
++import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.activity.viewModels
+ import androidx.appcompat.app.AlertDialog
+ import androidx.appcompat.app.AppCompatActivity
+@@ -24,6 +25,7 @@ import androidx.navigation.fragment.NavHostFragment
+ import org.fcitx.fcitx5.android.BuildConfig
+ import org.fcitx.fcitx5.android.R
+ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
++import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+ import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
+ import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+ import org.fcitx.fcitx5.android.ui.setup.SetupActivity
+@@ -35,12 +37,36 @@ import splitties.views.topPadding
+ 
+ class MainActivity : AppCompatActivity() {
+ 
++    /** SMS verification codes are opt-in: ask for RECEIVE_SMS only when the user turns them on */
++    private val smsPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
++        if (!granted) AppPrefs.getInstance().clipboard.verificationCodeFromSms.setValue(false)
++    }
++
++    private val smsCodePrefListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
++        if (enabled) requestSmsPermissionIfNeeded()
++    }
++
++    private fun requestSmsPermissionIfNeeded() {
++        if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
++            smsPermission.launch(Manifest.permission.RECEIVE_SMS)
++        }
++    }
++
++    override fun onDestroy() {
++        AppPrefs.getInstance().clipboard.verificationCodeFromSms.unregisterOnChangeListener(smsCodePrefListener)
++        super.onDestroy()
++    }
++
+     private val viewModel: MainViewModel by viewModels()
+ 
+     private lateinit var navController: NavController
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
++        AppPrefs.getInstance().clipboard.verificationCodeFromSms.let {
++            it.registerOnChangeListener(smsCodePrefListener)
++            if (it.getValue()) requestSmsPermissionIfNeeded()
++        }
+         enableEdgeToEdge()
+         val binding = ActivityMainBinding.inflate(layoutInflater)
+         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt
 index f8f2778..9ab8223 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/behavior/KeyboardSettingsFragment.kt
@@ -3492,7 +3985,7 @@ index 0000000..28fcdba
 +        android:pathData="M4,4h6v6h-6z M14,4h6v6h-6z M4,14h6v6h-6z M14,14h6v6h-6z" />
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index 40ef2c9..dc9c7c4 100644
+index 40ef2c9..d4fd1cd 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -104,6 +104,17 @@
@@ -3521,7 +4014,7 @@ index 40ef2c9..dc9c7c4 100644
      <string name="expand_toolbar_by_default">默认展开工具栏</string>
      <string name="popup_on_key_press">按键时弹出显示字符</string>
      <string name="disable_animation">禁用动画</string>
-@@ -321,4 +333,46 @@
+@@ -321,4 +333,68 @@
      <string name="keyboard_height_percent_base">键盘高度百分比</string>
      <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
      <string name="real_size">真实尺寸 (Display.getRealSize)</string>
@@ -3567,9 +4060,31 @@ index 40ef2c9..dc9c7c4 100644
 +    <string name="press_ignition_time">按键先亮时长</string>
 +    <string name="press_key_hold_time">键面颜色 · 停留时间</string>
 +    <string name="press_key_retreat_time">键面颜色 · 收缩淡出时间</string>
++    <string name="verification_code_clipboard">识别复制内容中的验证码</string>
++    <string name="verification_code_clipboard_summary">复制整条短信后，工具栏只显示验证码，点一下即可粘贴</string>
++    <string name="verification_code_sms">读取短信验证码</string>
++    <string name="verification_code_sms_summary">默认关闭。需要短信权限；仅在本机识别，验证码只在内存中保留 5 分钟</string>
++    <string name="verification_code_chip">验证码 %1$s</string>
++    <string name="verification_code_sms_chip">短信验证码 %1$s</string>
++    <string name="press_effect_palette_custom">自选颜色</string>
++    <string name="press_custom_color_count">自选颜色数量</string>
++    <string name="press_custom_color_1">自选颜色 1</string>
++    <string name="press_custom_color_2">自选颜色 2</string>
++    <string name="press_custom_color_3">自选颜色 3</string>
++    <string name="press_custom_color_4">自选颜色 4</string>
++    <string name="key_color_style">按键颜色效果</string>
++    <string name="key_color_style_fill">键面填色</string>
++    <string name="key_color_style_border">边框发光</string>
++    <string name="key_color_style_off">关闭（只保留扩散光）</string>
++    <string name="key_motion_effect">按键动作效果</string>
++    <string name="key_motion_off">关闭</string>
++    <string name="key_motion_shrink">缩放</string>
++    <string name="key_motion_bounce">弹跳</string>
++    <string name="key_motion_tilt">倾斜</string>
++    <string name="key_motion_press">下压</string>
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
-index fa9bc4e..ded0f1e 100644
+index fa9bc4e..743c22e 100644
 --- a/app/src/main/res/values-zh-rTW/strings.xml
 +++ b/app/src/main/res/values-zh-rTW/strings.xml
 @@ -104,6 +104,17 @@
@@ -3598,7 +4113,7 @@ index fa9bc4e..ded0f1e 100644
      <string name="expand_toolbar_by_default">預設展開工具列</string>
      <string name="popup_on_key_press">按鍵時彈出顯示字元</string>
      <string name="disable_animation">停用動畫</string>
-@@ -316,4 +328,46 @@
+@@ -316,4 +328,68 @@
      <string name="emoji_skin_tone_type_6">🏿 深膚色 (Type-6)</string>
      <string name="hide_unsupported_emojis">隱藏不支援的表情</string>
      <string name="preferred_voice_input">首選語音輸入</string>
@@ -3644,9 +4159,31 @@ index fa9bc4e..ded0f1e 100644
 +    <string name="press_ignition_time">按鍵先亮時長</string>
 +    <string name="press_key_hold_time">鍵面顏色 · 停留時間</string>
 +    <string name="press_key_retreat_time">鍵面顏色 · 收縮淡出時間</string>
++    <string name="verification_code_clipboard">辨識複製內容中的驗證碼</string>
++    <string name="verification_code_clipboard_summary">複製整則簡訊後，工具列只顯示驗證碼，點一下即可貼上</string>
++    <string name="verification_code_sms">讀取簡訊驗證碼</string>
++    <string name="verification_code_sms_summary">預設關閉。需要簡訊權限；僅在本機辨識，驗證碼只在記憶體中保留 5 分鐘</string>
++    <string name="verification_code_chip">驗證碼 %1$s</string>
++    <string name="verification_code_sms_chip">簡訊驗證碼 %1$s</string>
++    <string name="press_effect_palette_custom">自選顏色</string>
++    <string name="press_custom_color_count">自選顏色數量</string>
++    <string name="press_custom_color_1">自選顏色 1</string>
++    <string name="press_custom_color_2">自選顏色 2</string>
++    <string name="press_custom_color_3">自選顏色 3</string>
++    <string name="press_custom_color_4">自選顏色 4</string>
++    <string name="key_color_style">按鍵顏色效果</string>
++    <string name="key_color_style_fill">鍵面填色</string>
++    <string name="key_color_style_border">邊框發光</string>
++    <string name="key_color_style_off">關閉（只保留擴散光）</string>
++    <string name="key_motion_effect">按鍵動作效果</string>
++    <string name="key_motion_off">關閉</string>
++    <string name="key_motion_shrink">縮放</string>
++    <string name="key_motion_bounce">彈跳</string>
++    <string name="key_motion_tilt">傾斜</string>
++    <string name="key_motion_press">下壓</string>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index fe1fd3a..570a99c 100644
+index fe1fd3a..541d729 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -104,6 +104,17 @@
@@ -3675,7 +4212,7 @@ index fe1fd3a..570a99c 100644
      <string name="expand_toolbar_by_default">Expand toolbar by default</string>
      <string name="popup_on_key_press">Popup on key press</string>
      <string name="disable_animation">Disable animation</string>
-@@ -321,4 +333,46 @@
+@@ -321,4 +333,68 @@
      <string name="keyboard_height_percent_base">Keyboard height percent base</string>
      <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
      <string name="real_size">Real size (Display.getRealSize)</string>
@@ -3721,6 +4258,28 @@ index fe1fd3a..570a99c 100644
 +    <string name="press_ignition_time">Key colour lead-in time</string>
 +    <string name="press_key_hold_time">Key colour · hold duration</string>
 +    <string name="press_key_retreat_time">Key colour · shrink and fade duration</string>
++    <string name="verification_code_clipboard">Detect verification codes in copied text</string>
++    <string name="verification_code_clipboard_summary">Copied messages show just the code in the toolbar; tap to paste it</string>
++    <string name="verification_code_sms">Read verification codes from SMS</string>
++    <string name="verification_code_sms_summary">Off by default. Needs SMS permission; codes are found on this device only and kept in memory for 5 minutes</string>
++    <string name="verification_code_chip">Code %1$s</string>
++    <string name="verification_code_sms_chip">SMS code %1$s</string>
++    <string name="press_effect_palette_custom">Custom colours</string>
++    <string name="press_custom_color_count">Number of custom colours</string>
++    <string name="press_custom_color_1">Custom colour 1</string>
++    <string name="press_custom_color_2">Custom colour 2</string>
++    <string name="press_custom_color_3">Custom colour 3</string>
++    <string name="press_custom_color_4">Custom colour 4</string>
++    <string name="key_color_style">Key colour effect</string>
++    <string name="key_color_style_fill">Fill the key</string>
++    <string name="key_color_style_border">Glowing border</string>
++    <string name="key_color_style_off">Off (spreading light only)</string>
++    <string name="key_motion_effect">Key motion effect</string>
++    <string name="key_motion_off">Off</string>
++    <string name="key_motion_shrink">Shrink</string>
++    <string name="key_motion_bounce">Bounce</string>
++    <string name="key_motion_tilt">Tilt</string>
++    <string name="key_motion_press">Press down</string>
  </resources>
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/CandidatePageBufferTest.kt
 new file mode 100644
@@ -5138,6 +5697,45 @@ index 6b9129f..afa223b 100644
 -}
 \ No newline at end of file
 +}
+diff --git a/app/src/test/java/org/fcitx/fcitx5/android/VerificationCodesTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/VerificationCodesTest.kt
+new file mode 100644
+index 0000000..0e25df4
+--- /dev/null
++++ b/app/src/test/java/org/fcitx/fcitx5/android/VerificationCodesTest.kt
+@@ -0,0 +1,33 @@
++package org.fcitx.fcitx5.android
++
++import org.fcitx.fcitx5.android.data.otp.VerificationCodes
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Test
++
++class VerificationCodesTest {
++    @Test fun findsCodesInRealStyleMessages() {
++        assertEquals("482913", VerificationCodes.extract("【招商银行】您的验证码为 482913，5分钟内有效，请勿泄露。"))
++        assertEquals("8361", VerificationCodes.extract("验证码：8361。您正在登录，如非本人操作请忽略"))
++        assertEquals("325087", VerificationCodes.extract("【美团】325087（登录验证码）。工作人员不会向你索要，请勿向任何人泄露。"))
++        assertEquals("920431", VerificationCodes.extract("Your verification code is 920431. It expires in 10 minutes."))
++        assertEquals("582913", VerificationCodes.extract("G-582913 is your Google verification code."))
++        assertEquals("667788", VerificationCodes.extract("您尾号1234的卡消费120元，验证码 667788，2026年10月4日"))
++        assertEquals("A7K9Q2", VerificationCodes.extract("【京东】验证码 A7K9Q2，用于身份验证"))
++        assertEquals("90123456", VerificationCodes.extract("动态密码：90123456（10分钟有效）"))
++    }
++
++    @Test fun ignoresTextWithoutACode() {
++        assertNull(VerificationCodes.extract("今天下午3点开会，地址A座1203"))
++        assertNull(VerificationCodes.extract("您的订单已发货，单号 SF1234567890"))
++        assertNull(VerificationCodes.extract(""))
++    }
++
++    @Test fun keepsOnlyFreshCodes() {
++        VerificationCodes.publish("123456", VerificationCodes.Source.Sms, now = 1_000L)
++        assertEquals("123456", VerificationCodes.fresh(now = 1_000L + 60_000L)?.code)
++        assertNull(VerificationCodes.fresh(now = 1_000L + VerificationCodes.TTL_MS + 1))
++        VerificationCodes.consume()
++        assertNull(VerificationCodes.fresh(now = 1_001L))
++    }
++}
 diff --git a/app/src/test/resources/xuancai-typing-candidates.tsv b/app/src/test/resources/xuancai-typing-candidates.tsv
 new file mode 100644
 index 0000000..204900b
@@ -5169,7 +5767,7 @@ index 0000000..204900b
 +lianggehuangkimigcuilia	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦啊	两个黄看	两个光
 +lianggehuangkimigcuiliao	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦死	两个黄看	两个光
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
-index b99ab3e..d66636f 100644
+index b99ab3e..a51b34b 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 @@ -47,7 +47,8 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
@@ -5177,13 +5775,13 @@ index b99ab3e..d66636f 100644
                  }
                  debug {
 -                    applicationIdSuffix = ".debug"
-+                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v09"
++                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v10"
 +                    signingConfigs.fromProjectEnv(target)?.let { signingConfig = it }
                  }
                  all {
                      // remove META-INF/version-control-info.textproto
 diff --git a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
-index 8a19dd2..bfc59ce 100644
+index 8a19dd2..7e8b2b9 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 +++ b/build-logic/convention/src/main/kotlin/AndroidPluginAppConventionPlugin.kt
 @@ -15,6 +15,8 @@ import org.gradle.kotlin.dsl.configure
@@ -5191,7 +5789,7 @@ index 8a19dd2..bfc59ce 100644
  
      override fun apply(target: Project) {
 +        val mainApplicationId = "org.fcitx.fcitx5.android" +
-+            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v09")
++            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".xuancai.black.v10")
          target.extensions.configure<ApplicationExtension> {
              buildFeatures {
                  buildConfig = true
@@ -5256,7 +5854,7 @@ index d1d4123..241bf2a 100644
 \ No newline at end of file
 +</manifest>
 diff --git a/plugin/rime/build.gradle.kts b/plugin/rime/build.gradle.kts
-index 1733282..eae8d42 100644
+index 1733282..6b48169 100644
 --- a/plugin/rime/build.gradle.kts
 +++ b/plugin/rime/build.gradle.kts
 @@ -33,7 +33,7 @@ android {
@@ -5264,7 +5862,7 @@ index 1733282..eae8d42 100644
          }
          debug {
 -            resValue("string", "app_name", "@string/app_name_debug")
-+            resValue("string", "app_name", "曜黑 Rime V09")
++            resValue("string", "app_name", "曜黑 Rime V10")
          }
      }
  

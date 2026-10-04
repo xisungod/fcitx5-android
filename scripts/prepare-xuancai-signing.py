@@ -12,5 +12,5 @@ with open(os.environ['GITHUB_ENV'],'a') as output:
   output.write('SIGN_KEY_FILE='+str(path)+'\nXUANCAI_APP_SUFFIX=.xuancai.black\nXUANCAI_SIGNING_MODE=stable\n')
   print('Using the fixed application ID and repository signing key.')
  else:
-  output.write('XUANCAI_APP_SUFFIX=.xuancai.black.v09\nXUANCAI_SIGNING_MODE=isolated\n')
-  print('Signing secrets unavailable: building isolated V09. This is not an in-place update to V08.')
+  output.write('XUANCAI_APP_SUFFIX=.xuancai.black.v10\nXUANCAI_SIGNING_MODE=isolated\n')
+  print('Signing secrets unavailable: building isolated V10. This is not an in-place update to V09.')
