@@ -1,0 +1,10 @@
+{
+  "source_commit": "5ecb7a6b5d161fb90d4195c7210853fe7857589e",
+  "remote_branch": "improve/keyscafe-black-v14",
+  "remote_head_at_check": "914b489694ca52c1496130dad126a2072d66638a",
+  "push_status": "blocked_by_automatic_approval_review",
+  "reason": "The reviewer required explicit authorization for this source and review-artifact egress, and cited the requirement to confirm visuals before publishing.",
+  "release_published": false,
+  "local_tests": "110 passed; zero failures/errors/skips",
+  "preview_media_validation": "passed"
+}
