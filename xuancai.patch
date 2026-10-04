@@ -712,34 +712,34 @@ index d3b4948..7b239ad 100644
              followSystemDayNightTheme.getValue()
          })
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
-index 239e22c..b9962e3 100644
+index 239e22c..b973cee 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/data/theme/ThemePreset.kt
 @@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
  
  object ThemePreset {
  
-+    /** Separate dark keycaps; translucent faces admit the light behind them. */
++    /** Deep keycaps preserve the bright grid of the light travelling underneath. */
 +    val XuancaiBlackV09 = Theme.Builtin(
 +        name = "炫彩·曜黑 V14",
 +        isDark = true,
 +        backgroundColor = 0xff000000,
 +        barColor = 0xff000000,
 +        keyboardColor = 0xff000000,
-+        keyBackgroundColor = 0x80505660,
++        keyBackgroundColor = 0xEB15171D.toInt(),
 +        keyTextColor = 0xfff5f5f7,
 +        candidateTextColor = 0xfff5f5f7,
 +        candidateLabelColor = 0xffb8b8c0,
 +        candidateCommentColor = 0xffa4a4ae,
-+        altKeyBackgroundColor = 0x902b2d34,
++        altKeyBackgroundColor = 0xEE101217.toInt(),
 +        altKeyTextColor = 0xffdedee4,
-+        accentKeyBackgroundColor = 0x902b2d34,
++        accentKeyBackgroundColor = 0xEE101217.toInt(),
 +        accentKeyTextColor = 0xfff5f5f7,
 +        keyPressHighlightColor = 0x00000000,
 +        keyShadowColor = 0x00000000,
 +        popupBackgroundColor = 0xff202026,
 +        popupTextColor = 0xfff5f5f7,
-+        spaceBarColor = 0x80505660,
++        spaceBarColor = 0xEB15171D.toInt(),
 +        dividerColor = 0xff202024,
 +        clipboardEntryColor = 0xff242426,
 +        genericActiveBackgroundColor = 0xff3d4c66,
@@ -2824,10 +2824,10 @@ index 89dff00..b083263 100644
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..32fa390
+index 0000000..aaddad6
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,1018 @@
+@@ -0,0 +1,1021 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -3450,16 +3450,16 @@ index 0000000..32fa390
 +            val spread = (frameTime - r.start - ignitionDuration).coerceAtLeast(0L)
 +            val progress = waveProgress(spread)
 +            val travel = maxRadius * r.size * progress
-+            // Keep the visible local cloud near neighbouring keys. The much weaker
-+            // far shoulder below retains its original reach into the candidate strip.
-+            val localTravel = travel * 0.76f
++            // Concentrate the visible front near neighbouring keys and give that
++            // smaller field more contrast. The weak far shoulder keeps its reach.
++            val localTravel = travel * 0.68f
 +            val width = r.flashWidth + 2f * localTravel * r.stretchX
 +            val height = r.flashHeight + 2f * localTravel * r.stretchY
 +            val saved = canvas.save()
 +            canvas.translate(r.x + r.driftX * progress, r.y + r.driftY * progress)
 +            // Keep the new front vivid and let its older, broader local cloud retreat.
 +            // The weak, wider candidate bridge retains its independently fading strength.
-+            val localAlpha = alpha * (0.66f + 0.28f * fresh)
++            val localAlpha = alpha * (0.66f + 0.28f * fresh) * 1.20f
 +            // The first glow follows the real rounded key edge, without a circular wave front.
 +            val edgeAlpha = localAlpha * (1f - smoothstep(0.02f, 0.25f, progress))
 +            if (edgeAlpha > 0.003f) drawKeyEdgeMist(canvas, r, styles[r.colorIndex], edgeAlpha, travel)
@@ -3734,7 +3734,7 @@ index 0000000..32fa390
 +        return pixels
 +    }
 +
-+    /** No hollow band: a keyed footprint dissolves continuously into an irregular cloud. */
++    /** A filled rounded front travels under the key grid, without a hollow ring. */
 +    fun fluid(noise: Noise, seed: Int, phase: Float, size: Int = 128): IntArray {
 +        val p = phase.coerceIn(0f, 1f)
 +        val g = Random(seed)
@@ -3752,21 +3752,24 @@ index 0000000..32fa390
 +            val advectX = p * 0.55f * cos(phases[3])
 +            val advectY = p * 0.45f * kotlin.math.sin(phases[3])
 +            val warp = (noise.fbm(nx * 1.7f + ox + advectX, ny * 1.7f + oy + advectY) - 0.5f)
-+            val lobes = 1f + p * (0.13f * cos(2f * theta + phases[0] + p * 0.8f) +
-+                0.10f * cos(3f * theta + phases[1] - p * 0.6f) + 0.06f * cos(5f * theta + phases[2] + p))
-+            val power = 8f - 5.5f * p
++            val lobes = 1f + p * (0.055f * cos(2f * theta + phases[0] + p * 0.8f) +
++                0.035f * cos(3f * theta + phases[1] - p * 0.6f) + 0.025f * cos(5f * theta + phases[2] + p))
++            // Retain rounded rectangular corners as the front advances. A low
++            // late power would turn the field into a round, floating fog spot.
++            val power = 8f - 2f * p
 +            val footprint = (abs(nx).pow(power) + abs(ny).pow(power)).pow(1f / power)
 +            // Warping may move a point inside the source footprint. Negative distance
 +            // cannot enter a fractional power: it would create NaN/transparent holes.
-+            val distance = ((footprint + warp * 0.13f * p) / lobes).coerceAtLeast(0f)
-+            val core = exp(-(distance / (0.73f - 0.04f * p)).pow(2.2f))
-+            // A wide irregular shoulder makes the travelling edge visible, while the
-+            // filled centre and broad feathering prevent a hollow or hard-edged ring.
-+            val shoulder = 0.28f * exp(-((distance - (0.48f + 0.10f * p)) / 0.22f).pow(2))
-+            val feather = 1f - PressEffect.smoothstep(0.58f, 1.02f, distance)
-+            val texture = 1f - p * 0.18f + p * 0.24f * noise.fbm(nx * 1.1f + oy + advectY, ny * 1.1f + ox + advectX)
++            val distance = ((footprint + warp * 0.045f * p) / lobes).coerceAtLeast(0f)
++            // A broad, almost level body makes neighbouring gaps one connected
++            // colour field. The front remains soft; the long Gaussian outskirts
++            // are gone rather than being made brighter across the entire board.
++            val body = 1f - PressEffect.smoothstep(0.40f, 0.90f, distance)
++            val texture = 0.98f + p * 0.035f * (noise.fbm(nx * 1.1f + oy + advectY, ny * 1.1f + ox + advectX) - 0.5f)
 +            val outer = 1f - PressEffect.smoothstep(0.86f, 1f, max(abs(nx), abs(ny)))
-+            val alpha = ((0.88f * core + shoulder) * feather * texture * outer).coerceIn(0f, 1f)
++            // Balance the squarer late footprint without changing the light
++            // budgets, its configured duration, or its maximum travel distance.
++            val alpha = (0.98f * (1f - 0.12f * p) * body * texture * outer).coerceIn(0f, 1f)
 +            pixels[y * size + x] = ((alpha * 255f + 0.5f).toInt() shl 24) or 0xffffff
 +        }
 +        return pixels
@@ -4674,20 +4677,21 @@ index daa13c4..4b23759 100644
          }
          showingEntryUi.clear()
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
-index ed6a05f..22fa3ea 100644
+index ed6a05f..149649d 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
-@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.input.popup
+@@ -6,8 +6,9 @@ package org.fcitx.fcitx5.android.input.popup
  
  import android.content.Context
  import android.graphics.drawable.GradientDrawable
 +import android.view.View
  import android.view.ViewOutlineProvider
 -import android.widget.TextView
++import androidx.core.graphics.ColorUtils
  import org.fcitx.fcitx5.android.data.theme.Theme
  import org.fcitx.fcitx5.android.input.AutoScaleTextView
  import splitties.dimensions.dp
-@@ -23,28 +23,52 @@ import splitties.views.gravityCenter
+@@ -23,28 +24,54 @@ import splitties.views.gravityCenter
  
  class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radius: Float) : Ui {
  
@@ -4737,9 +4741,11 @@ index ed6a05f..22fa3ea 100644
 +        } else {
 +            bg.setColor(color)
 +            bg.setStroke(0, 0)
-+            val luminance = (0.299 * android.graphics.Color.red(color) + 0.587 * android.graphics.Color.green(color) +
-+                0.114 * android.graphics.Color.blue(color)) / 255.0
-+            textView.setTextColor(if (luminance > 0.6) 0xFF111111.toInt() else 0xFFFFFFFF.toInt())
++            val darkInk = 0xFF111111.toInt()
++            val lightInk = 0xFFFFFFFF.toInt()
++            val opaqueBackground = color or 0xFF000000.toInt()
++            textView.setTextColor(if (ColorUtils.calculateContrast(darkInk, opaqueBackground) >=
++                ColorUtils.calculateContrast(lightInk, opaqueBackground)) darkInk else lightInk)
 +        }
 +    }
 +
@@ -5439,10 +5445,10 @@ index b8c048c..bbc9139 100644
      }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsFragment.kt
 new file mode 100644
-index 0000000..258d9ee
+index 0000000..5d83a4b
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsFragment.kt
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,32 @@
 +/* SPDX-License-Identifier: LGPL-2.1-or-later */
 +package org.fcitx.fcitx5.android.ui.main.settings.theme
 +
@@ -5452,6 +5458,7 @@ index 0000000..258d9ee
 +import android.view.ViewGroup
 +import androidx.fragment.app.Fragment
 +import org.fcitx.fcitx5.android.data.prefs.AppPrefs
++import org.fcitx.fcitx5.android.data.theme.ThemeManager
 +
 +/** Directly reachable from the keyboard's palette tool button. */
 +class LightEffectSettingsFragment : Fragment() {
@@ -5467,16 +5474,19 @@ index 0000000..258d9ee
 +    }
 +
 +    override fun onStop() {
-+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) AppPrefs.getInstance().syncToDeviceEncryptedStorage()
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
++            AppPrefs.getInstance().syncToDeviceEncryptedStorage()
++            ThemeManager.syncToDeviceEncryptedStorage()
++        }
 +        super.onStop()
 +    }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt
 new file mode 100644
-index 0000000..6746d1b
+index 0000000..7ad7190
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/LightEffectSettingsUi.kt
-@@ -0,0 +1,324 @@
+@@ -0,0 +1,327 @@
 +/* SPDX-License-Identifier: LGPL-2.1-or-later */
 +package org.fcitx.fcitx5.android.ui.main.settings.theme
 +
@@ -5557,6 +5567,9 @@ index 0000000..6746d1b
 +        body.addView(text(context.getString(R.string.light_effect_saved), 13f, subdued),
 +            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(22) })
 +        addSwitch(R.string.light_effect_enable, prefs.pressEffect)
++        section(R.string.keyboard_layout_section)
++        addSwitch(R.string.keyboard_show_number_row, prefs.portraitNumberRow)
++        body.addView(text(context.getString(R.string.keyboard_show_number_row_summary), 12f, subdued))
 +        section(R.string.light_effect_palette)
 +        val modeRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
 +        listOf(ThemePrefs.PressColorMode.Random to R.string.press_color_mode_random,
@@ -5802,10 +5815,10 @@ index 0000000..6746d1b
 +    fun commit() { pref.setValue((min + slider.progress * step).coerceIn(min, max)); afterCommit() }
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt
-index 73858d4..5dd9a34 100644
+index 73858d4..881e080 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/ui/main/settings/theme/ThemeSettingsFragment.kt
-@@ -6,12 +6,28 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
+@@ -6,12 +6,33 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
  
  import android.os.Bundle
  import androidx.preference.SwitchPreference
@@ -5821,6 +5834,11 @@ index 73858d4..5dd9a34 100644
  class ThemeSettingsFragment : ManagedPreferenceFragment(ThemeManager.prefs) {
  
 +    override fun onPreferenceUiCreated(screen: PreferenceScreen) {
++        screen.findPreference<SwitchPreference>(ThemeManager.prefs.portraitNumberRow.key)?.apply {
++            setTitle(R.string.keyboard_show_number_row)
++            setSummary(R.string.keyboard_show_number_row_summary)
++            order = 0
++        }
 +        screen.addPreference(Preference(requireContext()).apply {
 +            key = "detailed_light_effect_settings"
 +            setTitle(R.string.light_effect_settings)
@@ -5907,12 +5925,15 @@ index 0000000..e448d62
 +</vector>
 diff --git a/app/src/main/res/values-zh-rCN/light_effect_settings.xml b/app/src/main/res/values-zh-rCN/light_effect_settings.xml
 new file mode 100644
-index 0000000..c0890a0
+index 0000000..5d607e4
 --- /dev/null
 +++ b/app/src/main/res/values-zh-rCN/light_effect_settings.xml
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,40 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<resources>
++    <string name="keyboard_layout_section">键盘布局</string>
++    <string name="keyboard_show_number_row">显示顶部数字行</string>
++    <string name="keyboard_show_number_row_summary">竖屏显示独立 1–0 数字行；关闭后字母按键自动增高。</string>
 +    <string name="press_color_mode">按键配色模式</string>
 +    <string name="press_color_mode_random">随机多彩</string>
 +    <string name="press_color_mode_single">任意单色</string>
@@ -6060,12 +6081,15 @@ index 40ef2c9..d3fc0cf 100644
  </resources>
 diff --git a/app/src/main/res/values-zh-rTW/light_effect_settings.xml b/app/src/main/res/values-zh-rTW/light_effect_settings.xml
 new file mode 100644
-index 0000000..c608fe6
+index 0000000..296eec2
 --- /dev/null
 +++ b/app/src/main/res/values-zh-rTW/light_effect_settings.xml
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,40 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<resources>
++    <string name="keyboard_layout_section">鍵盤佈局</string>
++    <string name="keyboard_show_number_row">顯示頂部數字列</string>
++    <string name="keyboard_show_number_row_summary">直向顯示獨立 1–0 數字列；關閉後字母按鍵自動增高。</string>
 +    <string name="press_color_mode">按鍵配色模式</string>
 +    <string name="press_color_mode_random">隨機多彩</string>
 +    <string name="press_color_mode_single">任意單色</string>
@@ -6213,12 +6237,15 @@ index fa9bc4e..cdc5df8 100644
  </resources>
 diff --git a/app/src/main/res/values/light_effect_settings.xml b/app/src/main/res/values/light_effect_settings.xml
 new file mode 100644
-index 0000000..f4a8bf6
+index 0000000..5e13435
 --- /dev/null
 +++ b/app/src/main/res/values/light_effect_settings.xml
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,40 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<resources>
++    <string name="keyboard_layout_section">Keyboard layout</string>
++    <string name="keyboard_show_number_row">Show number row above letters</string>
++    <string name="keyboard_show_number_row_summary">In portrait, show a separate 1–0 row. Hiding it gives letter keys more height.</string>
 +    <string name="press_color_mode">Press colour mode</string>
 +    <string name="press_color_mode_random">Random colours</string>
 +    <string name="press_color_mode_single">Single colour</string>
@@ -7369,10 +7396,10 @@ index 0000000..ccfecc9
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt
 new file mode 100644
-index 0000000..894a5bf
+index 0000000..b00a06a
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,378 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.AlertDialog
@@ -7386,12 +7413,15 @@ index 0000000..894a5bf
 +import android.graphics.Rect
 +import android.graphics.drawable.GradientDrawable
 +import android.os.Looper
++import android.os.SystemClock
++import android.view.MotionEvent
 +import android.view.View
 +import android.view.ViewGroup
 +import android.widget.Button
 +import android.widget.EditText
 +import android.widget.LinearLayout
 +import android.widget.ScrollView
++import android.widget.Switch
 +import androidx.appcompat.app.AppCompatActivity
 +import androidx.navigation.NavController
 +import androidx.navigation.NavDestination.Companion.hasRoute
@@ -7403,6 +7433,10 @@ index 0000000..894a5bf
 +import org.fcitx.fcitx5.android.data.theme.ThemePreset
 +import org.fcitx.fcitx5.android.input.bar.ui.idle.ButtonsBarUi
 +import org.fcitx.fcitx5.android.input.keyboard.PressEffect
++import org.fcitx.fcitx5.android.input.keyboard.KeyAction
++import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
++import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
++import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 +import org.fcitx.fcitx5.android.ui.main.MainActivity
 +import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 +import org.fcitx.fcitx5.android.ui.main.settings.theme.LightEffectSettingsFragment
@@ -7437,6 +7471,7 @@ index 0000000..894a5bf
 +        val prefs = ThemeManager.prefs
 +        prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Random)
 +        prefs.pressEffectPalette.setValue(ThemePrefs.PressEffectPalette.Cyberpunk)
++        prefs.portraitNumberRow.setValue(true)
 +        prefs.pressEffect.setValue(true)
 +        prefs.pressSingleColor.setValue(0xFF00E8FF.toInt())
 +        prefs.pressUserColors.setValue("#18FFC1,#D96EFF,#FF8A32")
@@ -7624,6 +7659,82 @@ index 0000000..894a5bf
 +        assertEquals("light-effect-settings", fragment.requireView().tag)
 +        assertNotNull(fragment.requireView().findViewWithTag<View>("effect-mode-Single"))
 +        controller.pause().stop().destroy()
++    }
++
++    @Test fun numberRowSwitchChangesTheRealKeyboardAndItsTouchGeometry() {
++        val controller = activity()
++        val activity = controller.get()
++        val prefs = ThemeManager.prefs
++        assertTrue("Keep the existing default of a visible number row", prefs.portraitNumberRow.defaultValue)
++        ThemeManager.init(activity.resources.configuration)
++        var themeNotifications = 0
++        val listener = ThemeManager.OnThemeChangeListener { themeNotifications++ }
++        ThemeManager.addOnChangedListener(listener)
++        val keyboards = mutableListOf<TextKeyboard>()
++        try {
++            val ui = LightEffectSettingsUi(activity)
++            activity.setContentView(ui.root)
++            val toggle = ui.root.findViewWithTag<Switch>(prefs.portraitNumberRow.key)
++            assertTrue(toggle.isChecked)
++            val withNumbers = TextKeyboard(activity, ThemePreset.XuancaiBlackV09).also {
++                keyboards.add(it); layout(it, 600, 450)
++            }
++            assertEquals(5, withNumbers.childCount)
++            val digits = withNumbers.getChildAt(0) as ViewGroup
++            assertEquals("1234567890", (0 until digits.childCount).joinToString("") {
++                (digits.getChildAt(it) as TextKeyView).mainText.text.toString()
++            })
++            val previousLetterHeight = withNumbers.getChildAt(1).height
++            save(withNumbers, "keyboard-number-row-on")
++
++            toggle.performClick()
++            shadowOf(Looper.getMainLooper()).idle()
++            assertFalse(prefs.portraitNumberRow.getValue())
++            assertTrue("The service's theme listener must be notified to rebuild the keyboard", themeNotifications > 0)
++            val withoutNumbers = TextKeyboard(activity, ThemePreset.XuancaiBlackV09).also {
++                keyboards.add(it); layout(it, 600, 450)
++            }
++            assertEquals(4, withoutNumbers.childCount)
++            val letters = withoutNumbers.getChildAt(0) as ViewGroup
++            assertEquals(0, letters.top)
++            assertTrue("Removing the number row must enlarge the actual letter keys", letters.height > previousLetterHeight)
++            assertEquals("Q", (letters.getChildAt(0) as TextKeyView).mainText.text.toString())
++            for (row in 0 until withoutNumbers.childCount - 1) {
++                assertEquals("No blank strip between remaining rows", withoutNumbers.getChildAt(row).bottom,
++                    withoutNumbers.getChildAt(row + 1).top)
++            }
++            assertEquals(withoutNumbers.height, withoutNumbers.getChildAt(3).bottom)
++            save(withoutNumbers, "keyboard-number-row-off")
++            // A returning keyboard lives below the activity's real ViewTreeLifecycleOwner.
++            activity.setContentView(withoutNumbers)
++            controller.visible()
++            shadowOf(Looper.getMainLooper()).idle()
++            layout(withoutNumbers, 600, 450)
++            var typed: KeyAction? = null
++            withoutNumbers.keyActionListener = KeyActionListener { action, _ -> typed = action }
++            val q = letters.getChildAt(0)
++            val now = SystemClock.uptimeMillis()
++            listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP).forEach { action ->
++                val event = MotionEvent.obtain(now, now, action, q.left + q.width / 2f,
++                    letters.top + letters.height / 2f, 0)
++                try { assertTrue(withoutNumbers.dispatchTouchEvent(event)) } finally { event.recycle() }
++            }
++            assertTrue(typed is KeyAction.FcitxKeyAction)
++            assertEquals("q", (typed as KeyAction.FcitxKeyAction).act)
++
++            activity.setContentView(ui.root)
++            toggle.performClick()
++            assertTrue(prefs.portraitNumberRow.getValue())
++            val restored = TextKeyboard(activity, ThemePreset.XuancaiBlackV09).also {
++                keyboards.add(it); layout(it, 600, 450)
++            }
++            assertEquals(5, restored.childCount)
++        } finally {
++            keyboards.forEach { it.onDetach() }
++            ThemeManager.removeOnChangedListener(listener)
++            prefs.portraitNumberRow.setValue(true)
++            controller.pause().stop().destroy()
++        }
 +    }
 +
 +    @Test fun renderTheActualSettingsScreenAndNativeColourEditor() {
@@ -7940,10 +8051,10 @@ index 0000000..990d955
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressColorSettingsTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressColorSettingsTest.kt
 new file mode 100644
-index 0000000..b8565ad
+index 0000000..e4bba8f
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressColorSettingsTest.kt
-@@ -0,0 +1,347 @@
+@@ -0,0 +1,367 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -7964,6 +8075,7 @@ index 0000000..b8565ad
 +import android.view.ViewGroup
 +import android.widget.FrameLayout
 +import androidx.activity.ComponentActivity
++import androidx.core.graphics.ColorUtils
 +import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 +import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 +import org.fcitx.fcitx5.android.data.theme.PressColorPalette
@@ -8175,6 +8287,8 @@ index 0000000..b8565ad
 +            }
 +        }
 +
++        fun previewTextColour(): Int = preview.textView.currentTextColor
++
 +        private fun advance(milliseconds: Long) {
 +            var remaining = milliseconds
 +            while (remaining > 0) {
@@ -8241,6 +8355,23 @@ index 0000000..b8565ad
 +    }
 +
 +    @Test
++    fun aMediumGrayUserColourKeepsTheRealPopupCharacterReadable() {
++        val gray = 0xff989898.toInt()
++        val h = Harness()
++        try {
++            h.setting(h.prefs.pressColorMode, ThemePrefs.PressColorMode.Single)
++            h.setting(h.prefs.pressSingleColor, gray)
++            h.rebuild()
++            assertEquals(gray, h.pressAndCheck())
++            val actualInk = h.previewTextColour()
++            val contrast = ColorUtils.calculateContrast(actualInk, gray)
++            assertTrue("The actual popup character needs readable contrast on a user-picked gray", contrast >= 4.5)
++            assertTrue("The real popup must select the more readable of its two existing inks",
++                contrast >= ColorUtils.calculateContrast(Color.WHITE, gray))
++        } finally { h.finish() }
++    }
++
++    @Test
 +    fun legacyRandomModeKeepsItsSavedNeonCustomPalette() {
 +        val expected = setOf(ThemePrefs.NeonColor.IceBlue.argb, ThemePrefs.NeonColor.Magenta.argb)
 +        val h = Harness()
@@ -8293,10 +8424,10 @@ index 0000000..b8565ad
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
 new file mode 100644
-index 0000000..a34c98f
+index 0000000..4908b57
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,110 @@
 +package org.fcitx.fcitx5.android
 +
 +import org.fcitx.fcitx5.android.input.keyboard.PressEffectMasks
@@ -8379,17 +8510,45 @@ index 0000000..a34c98f
 +        assertTrue("The travelling shoulder must not disappear into a nearly transparent edge", total.toDouble() / samples >= 45.0)
 +    }
 +
++    @Test
++    fun lateFluidKeepsAConnectedRoundedRectangleBodyInsteadOfRoundFog() {
++        val noise = PressEffectMasks.Noise(20261004)
++        val size = 128
++        var diagonalBody = 0L
++        var centreTotal = 0L
++        var diagonalFront = 0L
++        var sideFront = 0L
++        fun at(pixels: IntArray, x: Float, y: Float): Int {
++            val px = ((x + 1f) * (size - 1) / 2f).toInt()
++            val py = ((y + 1f) * (size - 1) / 2f).toInt()
++            return pixels[py * size + px] ushr 24
++        }
++        repeat(PressEffectMasks.SHAPES) { shape ->
++            val pixels = PressEffectMasks.fluid(noise, PressEffectMasks.bodySeed(shape), 1f, size)
++            val centre = at(pixels, 0f, 0f)
++            for (sx in intArrayOf(-1, 1)) for (sy in intArrayOf(-1, 1)) {
++                diagonalBody += at(pixels, sx * 0.40f, sy * 0.40f)
++                centreTotal += centre
++                diagonalFront += at(pixels, sx * 0.55f, sy * 0.55f)
++                sideFront += at(pixels, sx * 0.55f, 0f)
++            }
++        }
++        assertTrue("The interior colour must be one almost level connected body", diagonalBody.toDouble() / centreTotal >= 0.90)
++        assertTrue("The late front retains rounded rectangular corners", diagonalFront.toDouble() / sideFront >= 0.70)
++    }
++
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
 new file mode 100644
-index 0000000..0375df4
+index 0000000..c0e3cf3
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
-@@ -0,0 +1,861 @@
+@@ -0,0 +1,939 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
 +import android.app.Application
++import android.content.Context
 +import android.graphics.Bitmap
 +import android.graphics.Canvas
 +import android.graphics.Color
@@ -8398,6 +8557,13 @@ index 0000000..0375df4
 +import android.widget.FrameLayout
 +import org.fcitx.fcitx5.android.input.keyboard.IdleBreathing
 +import org.fcitx.fcitx5.android.input.keyboard.PressEffect
++import org.fcitx.fcitx5.android.input.keyboard.KeyDef
++import org.fcitx.fcitx5.android.input.keyboard.KeyView
++import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
++import org.fcitx.fcitx5.android.data.prefs.AppPrefs
++import org.fcitx.fcitx5.android.data.theme.Theme
++import org.fcitx.fcitx5.android.data.theme.ThemeManager
++import org.fcitx.fcitx5.android.data.theme.ThemePreset
 +import org.junit.Assert.*
 +import org.junit.Test
 +import org.junit.runner.RunWith
@@ -9209,6 +9375,76 @@ index 0000000..0375df4
 +    }
 +
 +    @Test
++    fun productionDeepCapsKeepUnpressedKeysDarkAndConnectedGapsBright() {
++        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
++            fade = 900, hold = 120, retreat = 1800, idle = false,
++            palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        AppPrefs.init(h.activity.getSharedPreferences("press-effect-key-caps", Context.MODE_PRIVATE))
++        val prefs = ThemeManager.prefs
++        val previousBorder = prefs.keyBorder.getValue()
++        val previousStroke = prefs.keyBorderStroke.getValue()
++        val previousHorizontal = prefs.keyHorizontalMargin.getValue()
++        val previousVertical = prefs.keyVerticalMargin.getValue()
++        val previousRadius = prefs.keyRadius.getValue()
++        prefs.keyBorder.setValue(true)
++        prefs.keyBorderStroke.setValue(false)
++        prefs.keyHorizontalMargin.setValue(3)
++        prefs.keyVerticalMargin.setValue(4)
++        prefs.keyRadius.setValue(5)
++        fun caps(theme: Theme.Builtin, time: Long): Bitmap {
++            val image = h.render(time)
++            val canvas = Canvas(image)
++            repeat(3) { i ->
++                val keyId = 1301 + i
++                val key = TextKeyView(h.activity, theme, KeyDef.Appearance.Text(
++                    arrayOf("f", "g", "h")[i], 24f, viewId = keyId))
++                key.keySurfacePainter = KeyView.KeySurfacePainter { target, width, height ->
++                    h.effect.drawKeySurface(target, keyId, width, height)
++                }
++                key.measure(View.MeasureSpec.makeMeasureSpec(60, View.MeasureSpec.EXACTLY),
++                    View.MeasureSpec.makeMeasureSpec(70, View.MeasureSpec.EXACTLY))
++                key.layout(0, 0, 60, 70)
++                val saveCount = canvas.save()
++                canvas.translate(210f + i * 60f, 65f)
++                key.draw(canvas)
++                canvas.restoreToCount(saveCount)
++            }
++            return image
++        }
++        fun maximum(image: Bitmap, x: Int, y: Int): Int {
++            val p = image.getPixel(x, y)
++            return maxOf(Color.red(p), Color.green(p), Color.blue(p))
++        }
++        try {
++            h.effect.prepareTexturesForTest()
++            val rest = caps(ThemePreset.XuancaiBlackV09, 0)
++            h.now = 0
++            h.effect.onPress(300f, 100f, android.graphics.Rect(273, 69, 327, 131), true, 1302, 0)
++            h.now = 50
++            h.effect.onRelease(0)
++            val lit = caps(ThemePreset.XuancaiBlackV09, 400)
++            val previous = caps(ThemePreset.XuancaiBlackV09.copy(keyBackgroundColor = 0x80505660.toInt()), 400)
++            assertTrue("The unpressed key remains visible on black at rest", maximum(rest, 258, 83) in 11..35)
++            assertTrue("The neighbouring face stays dark instead of becoming a coloured tile", maximum(lit, 258, 83) < 45)
++            assertTrue("The deeper actual key background admits much less adjacent field colour",
++                maximum(previous, 258, 83) > maximum(lit, 258, 83) + 25)
++            assertTrue("The connected gap field must be much brighter than the dark neighbour",
++                maximum(lit, 270, 83) > maximum(lit, 258, 83) + 70)
++            assertTrue("The current exact key face still fills with its selected colour", maximum(lit, 311, 74) > 120)
++            save(rest, "grid-key-caps-rest")
++            save(lit, "grid-field-real-key-caps-400ms")
++            save(previous, "grid-field-old-translucent-caps-400ms")
++        } finally {
++            prefs.keyBorder.setValue(previousBorder)
++            prefs.keyBorderStroke.setValue(previousStroke)
++            prefs.keyHorizontalMargin.setValue(previousHorizontal)
++            prefs.keyVerticalMargin.setValue(previousVertical)
++            prefs.keyRadius.setValue(previousRadius)
++            h.finish()
++        }
++    }
++
++    @Test
 +    fun productionArbitraryPalettePreservesEachChosenKeyAndCloudHue() {
 +        val custom = intArrayOf(0xff8d23c2.toInt(), 0xff14a37f.toInt(), 0xffecb119.toInt())
 +        val h = Harness(press = true, production = true, expansion = 1400, waveHold = 350,
@@ -9560,10 +9796,10 @@ index 6b9129f..afa223b 100644
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
 new file mode 100644
-index 0000000..b444d57
+index 0000000..c0de9f6
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
-@@ -0,0 +1,800 @@
+@@ -0,0 +1,1087 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -10107,7 +10343,7 @@ index 0000000..b444d57
 +                "colour_mode=${ThemeManager.prefs.pressColorMode.getValue()}\n" +
 +                "random_palette=${ThemeManager.prefs.pressEffectPalette.getValue()}\n" +
 +                timing.provenance() +
-+                "key_interval_ms=150\nkey_hold_ms=50\ninput=$input\n" +
++                "key_interval_ms=150\ntouch_hold_ms=50\ninput=$input\n" +
 +                "candidates=replay of real bundled Rime fixture; not live native execution in this UI test\n" +
 +                "measurement=actual KeyView bounds; baseline black gaps; active key cells and popup glyph bounds excluded\n" +
 +                "coloured_pixel=maxRGB>30/60 and channel spread>=15\n" + summary + "\n" + csv)
@@ -10299,6 +10535,293 @@ index 0000000..b444d57
 +            controller.pause().stop().destroy()
 +        }
 +        File("build/outputs/effect-checks/v14-soft-palettes/preview.txt").writeText(provenance.toString())
++    }
++
++    @Test
++    fun shortTypingBurstRendersTheMergedFieldAndCompleteReleaseTail() {
++        val timing = defaultSoftTiming()
++        val prefs = ThemeManager.prefs
++        prefs.idleBreathing.setValue(false)
++        assertEquals(ThemePrefs.PressColorMode.Random, prefs.pressColorMode.getValue())
++        assertEquals(ThemePrefs.PressEffectPalette.Cyberpunk, prefs.pressEffectPalette.getValue())
++        assertTrue(prefs.portraitNumberRow.getValue())
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val root = FrameLayout(activity)
++        activity.setContentView(root)
++        val theme = ThemePreset.XuancaiBlackV09
++        val adapter = HorizontalCandidateViewAdapter(theme)
++        val list = RecyclerView(activity).apply {
++            layoutManager = LinearLayoutManager(activity, RecyclerView.HORIZONTAL, false)
++            this.adapter = adapter
++            itemAnimator = null
++        }
++        val candidates = CandidateUi(activity, theme, list)
++        val bar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
++        bar.addView(candidates.root, FrameLayout.LayoutParams(600, 60))
++        root.addView(bar, FrameLayout.LayoutParams(600, 60))
++        val keyboard = TextKeyboard(activity, theme)
++        root.addView(keyboard, FrameLayout.LayoutParams(600, 360).apply { topMargin = 60 })
++        bar.keyboard = keyboard
++        val previews = PreviewHost(root)
++        keyboard.popupActionListener = previews.listener
++        controller.visible()
++        advance(32)
++        layout(root)
++        assertTrue(keyboard.isAttachedToWindow && keyboard.isShown)
++        keyboard.onInputMethodUpdate(english(false))
++        val effect = ReflectionHelpers.getField<PressEffect>(keyboard, "pressEffectLayer")
++        effect.prepareTexturesForTest()
++        ReflectionHelpers.setField(effect, "random", Random(1401))
++        var reviewTime = SystemClock.uptimeMillis()
++        ReflectionHelpers.setField(effect, "clock", { reviewTime } as () -> Long)
++        val start = reviewTime
++        val input = "liangge" // Seven presses across the letter rows, completing in 950ms.
++        val recorded = javaClass.getResourceAsStream("/xuancai-typing-candidates.tsv")!!
++            .bufferedReader().use { it.readLines().take(input.length).map { row -> row.split('\t') } }
++        val typed = StringBuilder()
++        keyboard.keyActionListener = KeyActionListener { action, _ ->
++            if (action is KeyAction.FcitxKeyAction) {
++                typed.append(action.act)
++                val row = recorded[typed.length - 1]
++                assertEquals(row[0], typed.toString())
++                val words = row.drop(1).map { CandidateWord("", it, "") }.toTypedArray()
++                adapter.updateCandidates(words, words.size)
++            }
++        }
++        val idle = render(root)
++        save(idle, "v14-reference-burst/rest")
++        val idlePixels = IntArray(root.width * root.height).also {
++            idle.getPixels(it, 0, root.width, 0, 0, root.width, root.height)
++        }
++        idle.recycle()
++        val keyboardRectangle = screenBoundsIn(keyboard, root)!!
++        val barRectangle = screenBoundsIn(bar, root)!!
++        val gaps = BooleanArray(idlePixels.size) { index ->
++            keyboardRectangle.contains(index % root.width, index / root.width) &&
++                maxOf(Color.red(idlePixels[index]), Color.green(idlePixels[index]), Color.blue(idlePixels[index])) <= 3
++        }
++        val candidateStrip = BooleanArray(idlePixels.size) { index ->
++            val y = index / root.width
++            barRectangle.contains(index % root.width, y) && y < barRectangle.top + barRectangle.height() / 8
++        }
++        val keyRectangles = keys(keyboard).associate { it.id to screenBoundsIn(it, root)!! }
++        val fixedGapMask = gaps.copyOf()
++        keys(keyboard).filter { (it.def as? KeyDef.Appearance.Text)?.displayText?.lowercase() in input.map(Char::toString) }
++            .forEach { key ->
++                val rectangle = keyRectangles.getValue(key.id)
++                exclude(fixedGapMask, rectangle, root.width, root.height)
++                val preview = Rect(
++                    ((rectangle.left + rectangle.right - root.dp(44)) / 2).coerceIn(0, root.width - root.dp(44)),
++                    rectangle.bottom - root.dp(100) - root.dp(prefs.keyVerticalMargin.getValue()), 0, 0)
++                preview.right = preview.left + root.dp(44)
++                preview.bottom = preview.top + root.dp(52)
++                exclude(fixedGapMask, preview, root.width, root.height)
++            }
++        val lastPressTimes = mutableMapOf<Int, Long>()
++        val lastDown = (input.length - 1) * 150L
++        val lastUp = lastDown + 50L
++        val finalFrame = ((lastDown + timing.completeTail + 550L + 49L) / 50L).toInt()
++        val samples = ArrayList<VisibilityFrame>()
++        val keyframes = setOf(0L, 150L, 450L, 750L, 950L, 1200L, 1500L, 2400L, 3650L, 4200L)
++        for (frame in 0..finalFrame) {
++            val elapsed = frame * 50L
++            reviewTime = start + elapsed
++            val index = frame / 3
++            if (index < input.length && frame % 3 < 2) {
++                val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == input[index].uppercase() }
++                val rectangle = bounds(keyboard, key)
++                val action = if (frame % 3 == 0) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_UP
++                if (action == MotionEvent.ACTION_DOWN) lastPressTimes[key.id] = reviewTime
++                val event = MotionEvent.obtain(start + index * 150L, reviewTime, action,
++                    rectangle.exactCenterX(), rectangle.exactCenterY(), 0)
++                assertTrue(keyboard.dispatchTouchEvent(event))
++                event.recycle()
++                if (action == MotionEvent.ACTION_DOWN) {
++                    val popup = previews.entry(key.id)!!
++                    assertEquals(PressEffect.colorForKey(key.id),
++                        (popup.textView.background as GradientDrawable).color?.defaultColor)
++                }
++            }
++            layout(root)
++            render(root).recycle()
++            val image = render(root)
++            save(image, "v14-reference-burst/frame-%03d".format(frame))
++            if (elapsed in keyframes) save(image, "v14-reference-burst/keyframes/%04d-ms".format(elapsed))
++            val gapMask = gaps.copyOf()
++            val candidateMask = candidateStrip.copyOf()
++            lastPressTimes.forEach { (id, pressedAt) ->
++                if (reviewTime - pressedAt <= timing.releasedKeyTotal) exclude(gapMask, keyRectangles.getValue(id), root.width, root.height)
++            }
++            previews.visibleCharacterBounds().forEach {
++                exclude(gapMask, it, root.width, root.height)
++                exclude(candidateMask, it, root.width, root.height)
++            }
++            val pixels = IntArray(idlePixels.size)
++            image.getPixels(pixels, 0, root.width, 0, 0, root.width, root.height)
++            samples.add(VisibilityFrame(frame, lightArea(pixels, gapMask, root.width),
++                lightArea(pixels, candidateMask, root.width), lightArea(pixels, fixedGapMask, root.width)))
++            image.recycle()
++            advance(50)
++        }
++        val active = samples.filter { it.frame * 50L <= lastUp }
++        val tail = samples.filter { it.frame * 50L > lastUp }
++        val summary = String.format(Locale.US,
++            "active_fixed_gap_peak_mean=%.2f\ntail_fixed_gap_peak_mean=%.2f\n" +
++                "external_colour60_peak_area=%d\ncandidate_colour30_peak_area=%d\n",
++            active.maxOf { it.fixedGap.meanMaxRgb }, tail.maxOf { it.fixedGap.meanMaxRgb },
++            samples.maxOf { it.gap.colour60 }, samples.maxOf { it.candidate.colour30 })
++        val csv = "frame,time_ms,gap_pixels,gap_mean_maxrgb,gap_peak,gap_colour_gt30,gap_colour_gt60," +
++            "gap_centre_x,gap_centre_y,candidate_strip_pixels,candidate_mean_maxrgb,candidate_peak," +
++            "candidate_colour_gt30,candidate_colour_gt60,fixed_gap_mean_maxrgb\n" +
++            samples.joinToString("\n") { it.csv() } + "\n"
++        File("build/outputs/effect-checks/v14-reference-burst/visibility.csv").writeText(csv)
++        File("build/outputs/effect-checks/v14-reference-burst/preview.txt").writeText(
++            "source=Android TextKeyboard/CandidateUi/RippleBarView/PopupEntryUi\ngraphics=Robolectric NATIVE\n" +
++                "frames=${finalFrame + 1}\nfps=20\nlast_frame_ms=${finalFrame * 50}\n" +
++                "width=600\nheight=420\ndensity=hdpi\nlogical_width_dp=400\nseed=1401\n" +
++                "colour_mode=${prefs.pressColorMode.getValue()}\nrandom_palette=${prefs.pressEffectPalette.getValue()}\n" +
++                "portrait_number_row=${prefs.portraitNumberRow.getValue()}\ninput=$input\n" +
++                "press_count=${input.length}\nkey_interval_ms=150\ntouch_hold_ms=50\nlast_down_ms=$lastDown\nlast_up_ms=$lastUp\n" +
++                "idle_breathing=false (isolated merged press-field review)\n" + timing.provenance() +
++                "candidates=replay of real bundled Rime fixture; not live native execution in this UI test\n" +
++                "measurement=baseline black gaps; active key cells and visible popup glyph bounds excluded\n" +
++                "motion_metrics=descriptive only; no invented Samsung brightness or timing threshold\n" + summary + "\n" + csv)
++        assertEquals(input, typed.toString())
++        assertEquals(recorded.last()[1], adapter.candidates.first().text)
++        val completeRest = samples.filter { it.frame * 50L >= lastDown + timing.completeTail + 100L }
++        assertTrue("The short burst must retain at least 300ms after its complete configured tail", completeRest.size >= 6)
++        assertTrue("The merged field returns to the actual black-gap baseline",
++            completeRest.all { it.gap.meanMaxRgb <= 3.0 && it.gap.colour30 == 0 })
++        assertTrue("The actual candidate strip returns to its black baseline after the burst",
++            completeRest.all { it.candidate.meanMaxRgb <= 3.0 && it.candidate.colour30 == 0 })
++        previews.stop()
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
++    }
++
++    @Test
++    fun fPressShowsTheRealSoftFieldWithTheNumberRowBothEnabledAndDisabled() {
++        val timing = defaultSoftTiming()
++        val prefs = ThemeManager.prefs
++        prefs.idleBreathing.setValue(false)
++        // Hold hue constant so only the real number-row geometry changes between the two clips.
++        prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Single)
++        prefs.pressSingleColor.setValue(Color.parseColor("#00F0FF"))
++        val keyframeTimes = setOf(0L, 50L, 150L, 250L, 400L, 700L, 1500L, 1850L, 2400L, 3200L)
++        val finalFrame = ((timing.completeTail + 450L + 49L) / 50L).toInt()
++        for (numberRow in listOf(true, false)) {
++            prefs.portraitNumberRow.setValue(numberRow)
++            val folder = "v14-f-review-${if (numberRow) "on" else "off"}"
++            val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++            val activity = controller.get()
++            activity.setTheme(R.style.Theme_InputViewTheme)
++            val root = FrameLayout(activity)
++            activity.setContentView(root)
++            val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++            root.addView(keyboard, FrameLayout.LayoutParams(600, 360))
++            val previews = PreviewHost(root)
++            keyboard.popupActionListener = previews.listener
++            val typed = StringBuilder()
++            keyboard.keyActionListener = KeyActionListener { action, _ ->
++                if (action is KeyAction.FcitxKeyAction) typed.append(action.act)
++            }
++            controller.visible()
++            advance(32)
++            layout(root, 600, 360)
++            assertTrue(keyboard.isAttachedToWindow && keyboard.isShown)
++            keyboard.onInputMethodUpdate(english(true))
++            assertEquals(if (numberRow) 5 else 4, keyboard.childCount)
++            assertEquals(if (numberRow) 10 else 0, keys(keyboard).count {
++                val label = (it.def as? KeyDef.Appearance.Text)?.displayText
++                label?.length == 1 && label[0].isDigit()
++            })
++            val effect = ReflectionHelpers.getField<PressEffect>(keyboard, "pressEffectLayer")
++            effect.prepareTexturesForTest()
++            ReflectionHelpers.setField(effect, "random", Random(1401))
++            var reviewTime = SystemClock.uptimeMillis()
++            ReflectionHelpers.setField(effect, "clock", { reviewTime } as () -> Long)
++            val start = reviewTime
++            val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == "F" }
++            val rectangle = bounds(keyboard, key)
++            val rest = render(root)
++            save(rest, "$folder/rest")
++            val idlePixels = IntArray(root.width * root.height).also {
++                rest.getPixels(it, 0, root.width, 0, 0, root.width, root.height)
++            }
++            rest.recycle()
++            val gaps = BooleanArray(idlePixels.size) { index ->
++                maxOf(Color.red(idlePixels[index]), Color.green(idlePixels[index]), Color.blue(idlePixels[index])) <= 3
++            }
++            exclude(gaps, rectangle, root.width, root.height)
++            val visibility = ArrayList<LightArea>()
++            val popupAlpha = ArrayList<Float>()
++            for (frame in 0..finalFrame) {
++                val elapsed = frame * 50L
++                reviewTime = start + elapsed
++                if (frame < 2) {
++                    val event = MotionEvent.obtain(start, reviewTime,
++                        if (frame == 0) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_UP,
++                        rectangle.exactCenterX(), rectangle.exactCenterY(), 0)
++                    assertTrue(keyboard.dispatchTouchEvent(event))
++                    event.recycle()
++                    val popup = previews.entry(key.id)!!
++                    assertEquals("f", popup.textView.text.toString())
++                    assertEquals(prefs.pressSingleColor.getValue(), PressEffect.colorForKey(key.id))
++                    assertEquals(PressEffect.colorForKey(key.id),
++                        (popup.textView.background as GradientDrawable).color?.defaultColor)
++                }
++                layout(root, 600, 360)
++                render(root).recycle()
++                val image = render(root)
++                save(image, "$folder/frame-%03d".format(frame))
++                if (elapsed in keyframeTimes) save(image, "$folder/keyframes/%04d-ms".format(elapsed))
++                val mask = gaps.copyOf()
++                previews.visibleCharacterBounds().forEach { exclude(mask, it, root.width, root.height) }
++                val pixels = IntArray(idlePixels.size)
++                image.getPixels(pixels, 0, root.width, 0, 0, root.width, root.height)
++                visibility.add(lightArea(pixels, mask, root.width))
++                popupAlpha.add(previews.entry(key.id)?.root?.alpha ?: 0f)
++                image.recycle()
++                advance(50)
++            }
++            val csv = "frame,time_ms,gap_pixels,gap_mean_maxrgb,gap_peak,gap_colour_gt30,gap_colour_gt60,popup_alpha\n" +
++                visibility.mapIndexed { frame, area -> String.format(Locale.US, "%d,%d,%d,%.2f,%d,%d,%d,%.3f",
++                    frame, frame * 50, area.pixels, area.meanMaxRgb, area.peak, area.colour30, area.colour60,
++                    popupAlpha[frame]) }.joinToString("\n") + "\n"
++            File("build/outputs/effect-checks/$folder/visibility.csv").writeText(csv)
++            File("build/outputs/effect-checks/$folder/preview.txt").writeText(
++                "source=Android TextKeyboard/PopupEntryUi\ngraphics=Robolectric NATIVE\n" +
++                    "frames=${finalFrame + 1}\nfps=20\nlast_frame_ms=${finalFrame * 50}\n" +
++                    "width=600\nheight=360\ndensity=hdpi\nlogical_width_dp=400\nseed=1401\n" +
++                    "colour_mode=${prefs.pressColorMode.getValue()}\ncolour=#00F0FF (same hue for both layout comparisons)\n" +
++                    "portrait_number_row=$numberRow\nkeyboard_rows=${keyboard.childCount}\n" +
++                    "input=F\ndown_ms=0\nup_ms=50\ntyped=f\n" +
++                    "key_bounds_px=${rectangle.flattenToString()}\n" +
++                    "popup=production PopupEntryUi and PopupPreviewLifecycle; per-frame alpha in visibility.csv\n" +
++                    "idle_breathing=false (isolated press-wave review)\n" + timing.provenance() +
++                    "keyframes_ms=${keyframeTimes.joinToString(",")}\n" +
++                    "measurement=baseline black gaps; F touch cell and visible popup glyph bounds excluded\n" +
++                    "coloured_pixel=maxRGB>30/60 and channel spread>=15\n\n" + csv)
++            assertEquals("The real down/up route must commit exactly one English F", "f", typed.toString())
++            assertTrue("The real F press must produce a visible field outside its key and popup",
++                visibility.filterIndexed { frame, _ -> frame * 50L in 150L..300L }.any { it.colour30 >= 1000 })
++            assertTrue("The soft F field must remain visible beyond the old short wave",
++                visibility.filterIndexed { frame, _ -> frame * 50L in 1550L..2000L }.any { it.colour30 >= 500 })
++            assertTrue("The F comparison keeps a dark base surrounding its local light",
++                visibility.maxOf { it.meanMaxRgb } < 75.0)
++            assertTrue("The F popup remains readable at and just after key release",
++                popupAlpha[1] >= 0.75f && popupAlpha[2] > 0f)
++            assertTrue("The real popup release lifecycle completes rather than sticking to the key",
++                popupAlpha.drop(5).all { it == 0f })
++            assertTrue("Both F layouts return to black after the complete configured tail",
++                visibility.filterIndexed { frame, _ -> frame * 50L >= timing.completeTail + 100L }
++                    .all { it.meanMaxRgb <= 3.0 && it.colour30 == 0 })
++            previews.stop()
++            keyboard.onDetach()
++            controller.pause().stop().destroy()
++        }
 +    }
 +
 +    @Test
