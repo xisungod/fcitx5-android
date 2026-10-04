@@ -3646,7 +3646,7 @@ index daa13c4..699d3a1 100644
          }
          showingEntryUi.clear()
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
-index ed6a05f..67cc933 100644
+index ed6a05f..57b0e05 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt
 @@ -26,25 +26,48 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
@@ -3688,7 +3688,7 @@ index ed6a05f..67cc933 100644
 +        val bg = textView.background as? GradientDrawable ?: return
 +        if (color == null) {
 +            bg.setColor(defaultBackground)
-+            bg.setStroke(dp(1), defaultStroke)
++            bg.setStroke(textView.dp(1), defaultStroke)
 +            textView.setTextColor(defaultText)
 +        } else {
 +            bg.setColor(color)
