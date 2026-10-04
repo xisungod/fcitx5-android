@@ -31,6 +31,30 @@ local function distance(a, b, limit)
   return previous[#b]
 end
 
+local function phrase_heads(input, seg, env)
+  local key = tostring(seg.start) .. ':' .. input
+  if env.heads[key] then return env.heads[key] end
+  local heads = {}
+  local translation = env.translator:query(input, seg)
+  if translation then
+    local count = 0
+    for candidate in translation:iter() do
+      count = count + 1
+      if candidate.type == 'phrase' then
+        heads[#heads + 1] = {text = candidate.text, comment = candidate.comment,
+          preedit = candidate.preedit, _end = candidate._end, quality = candidate.quality}
+      end
+      if count >= 8 then break end
+    end
+  end
+  -- Fixed dictionary only: retain small value snapshots, never native candidate
+  -- objects or user-data results. Consecutive keystrokes reuse the suffix probes.
+  env.heads[key] = heads
+  env.head_order[#env.head_order + 1] = key
+  if #env.head_order > 12 then env.heads[table.remove(env.head_order, 1)] = nil end
+  return heads
+end
+
 local function phrase_repair(input, seg, env)
   if #input < 16 or #input > 64 then return end
   -- A complete dictionary phrase wins. The normal translator's learned phrases
@@ -48,12 +72,8 @@ local function phrase_repair(input, seg, env)
   -- lengths and eight candidates each; no dictionary scan on the typing path.
   for trim = 0, 4 do
     local query = input:sub(1, #input - trim)
-    local translation = env.translator:query(query, seg)
-    if translation then
-      local count = 0
-      for candidate in translation:iter() do
-        count = count + 1
-        if candidate.type == 'phrase' and (utf8.len(candidate.text) or 0) >= 6 then
+      for _, candidate in ipairs(phrase_heads(query, seg, env)) do
+        if (utf8.len(candidate.text) or 0) >= 6 then
           local spelling = candidate.comment
           local code = spelling:gsub(' ', '')
           if code:match('^[a-z]+$') and #code >= 16 and #code <= 64 then
@@ -74,9 +94,7 @@ local function phrase_repair(input, seg, env)
             end
           end
         end
-        if count >= 8 then break end
       end
-    end
   end
   local ranked = {}
   for text, candidate in pairs(matches) do
@@ -101,6 +119,7 @@ end
 function M.init(env)
   env.translator = Component.Translator(env.engine, '', 'script_translator@xuancai_correction')
   env.exact = Component.Translator(env.engine, '', 'script_translator@xuancai_exact')
+  env.heads, env.head_order = {}, {}
   env.commands = {}
   for _, key in ipairs({'date', 'time', 'week', 'datetime', 'timestamp'}) do
     local command = env.engine.schema.config:get_string('date_translator/' .. key)
@@ -116,5 +135,6 @@ end
 function M.fini(env)
   env.translator = nil
   env.exact = nil
+  env.heads, env.head_order = nil, nil
 end
 return M

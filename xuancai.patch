@@ -3840,10 +3840,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..968b8b4
+index 0000000..9487cb3
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,595 @@
+@@ -0,0 +1,684 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4204,6 +4204,95 @@ index 0000000..968b8b4
 +        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1300))
 +        layout(root, 360, 312)
 +        save(render(root), "layout-glow-inward")
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
++    }
++
++    @Test
++    fun continuousTypingRendersRealKeyColoursPopupsAndRecordedRimeCandidates() {
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val root = FrameLayout(activity)
++        activity.setContentView(root)
++        val theme = ThemePreset.XuancaiBlackV09
++        val adapter = HorizontalCandidateViewAdapter(theme)
++        val candidates = RecyclerView(activity).apply {
++            layoutManager = LinearLayoutManager(activity, RecyclerView.HORIZONTAL, false)
++            this.adapter = adapter
++            itemAnimator = null
++        }
++        val bar = CandidateUi(activity, theme, candidates)
++        val rippleBar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
++        rippleBar.addView(bar.root, FrameLayout.LayoutParams(360, 52))
++        root.addView(rippleBar, FrameLayout.LayoutParams(360, 52))
++        val keyboard = TextKeyboard(activity, theme)
++        root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
++        rippleBar.keyboard = keyboard
++        val popup = org.fcitx.fcitx5.android.input.popup.PopupEntryUi(activity, theme, 52, 12f)
++        popup.root.visibility = View.INVISIBLE
++        root.addView(popup.root, FrameLayout.LayoutParams(44, 100))
++        val location = IntArray(2)
++        keyboard.popupActionListener = org.fcitx.fcitx5.android.input.popup.PopupActionListener { action ->
++            when (action) {
++                is org.fcitx.fcitx5.android.input.popup.PopupAction.PreviewAction -> {
++                    root.getLocationInWindow(location)
++                    popup.setText(action.content)
++                    popup.root.translationX = ((action.bounds.left + action.bounds.right - 44) / 2 - location[0])
++                        .coerceIn(0, 316).toFloat()
++                    popup.root.translationY = (action.bounds.bottom - 100 - 4 - location[1]).toFloat()
++                    popup.root.visibility = View.VISIBLE
++                }
++                is org.fcitx.fcitx5.android.input.popup.PopupAction.DismissAction -> popup.root.visibility = View.INVISIBLE
++                else -> {}
++            }
++        }
++        // Captured from the same real librime/Lua/model with a fresh user dictionary.
++        val recorded = javaClass.getResourceAsStream("/xuancai-typing-candidates.tsv")!!
++            .bufferedReader().use { it.readLines().map { row -> row.split('\t') } }
++        val input = "lianggehuangkimigcuiliao"
++        assertEquals(input.length, recorded.size)
++        val typed = StringBuilder()
++        keyboard.keyActionListener = KeyActionListener { action, _ ->
++            if (action is KeyAction.FcitxKeyAction) {
++                typed.append(action.act)
++                val row = recorded[typed.length - 1]
++                assertEquals(row[0], typed.toString())
++                val words = row.drop(1).map { CandidateWord("", it, "") }.toTypedArray()
++                adapter.updateCandidates(words, words.size)
++            }
++        }
++        controller.visible()
++        layout(root, 360, 312)
++        keyboard.onInputMethodUpdate(ime(false))
++        val effect = ReflectionHelpers.getField<Any>(keyboard, "pressEffectLayer")
++        val start = SystemClock.uptimeMillis()
++        var reviewTime = start
++        val reviewClock: () -> Long = { reviewTime }
++        ReflectionHelpers.setField(effect, "clock", reviewClock)
++        save(render(root), "continuous/rest")
++        for (frame in 0..140) {
++            reviewTime = start + frame * 33L
++            layout(root, 360, 312)
++            val index = frame / 4
++            if (index < input.length && (frame % 4 == 0 || frame % 4 == 3)) {
++                val label = input[index].uppercase()
++                val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == label }
++                val bounds = Rect()
++                key.getDrawingRect(bounds)
++                keyboard.offsetDescendantRectToMyCoords(key, bounds)
++                val action = if (frame % 4 == 0) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_UP
++                val event = MotionEvent.obtain(start + index * 132L, reviewTime, action,
++                    bounds.exactCenterX(), bounds.exactCenterY(), 0)
++                keyboard.dispatchTouchEvent(event)
++                event.recycle()
++            }
++            layout(root, 360, 312)
++            save(render(root), "continuous/typing-%03d".format(frame))
++            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(33))
++        }
++        assertEquals(input, typed.toString())
++        assertEquals("两个黄鹂鸣翠柳", recorded.last()[1])
 +        keyboard.onDetach()
 +        controller.pause().stop().destroy()
 +    }
@@ -4865,6 +4954,36 @@ index 6b9129f..afa223b 100644
 -}
 \ No newline at end of file
 +}
+diff --git a/app/src/test/resources/xuancai-typing-candidates.tsv b/app/src/test/resources/xuancai-typing-candidates.tsv
+new file mode 100644
+index 0000000..204900b
+--- /dev/null
++++ b/app/src/test/resources/xuancai-typing-candidates.tsv
+@@ -0,0 +1,24 @@
++l	来	里	老	啦
++li	里	力	理	李
++lia	俩	开	老	靠
++lian	连	脸	联	立案
++liang	两	量	亮	里昂
++liangg	两个	✌️	两国	两根
++liangge	两个	✌️	两格	两盒
++lianggeh	两个号	两个好	两个环	两个二货
++lianggehu	两个户	𢨯	𢨳	两个虎
++lianggehua	两个家	两个瓜	㼌	两个话
++lianggehuan	两个环	两个键	两个件	两个見
++lianggehuang	两个光	两个黄	两个户	𢨯
++lianggehuangk	两个黄看	两个将看	两个光	两个耳光
++lianggehuangki	两个将里	两个黄看	两个光	两个耳光
++lianggehuangkim	两个黄金	两个黄看	两个光	两个耳光
++lianggehuangkimi	两个黄金哦	两个黄看	两个光	两个耳光
++lianggehuangkimig	两个将囧	两个黄看	两个光	两个耳光
++lianggehuangkimigc	两个惶恐名称	两个黄看	两个光	两个耳光
++lianggehuangkimigcu	两个惶恐名词	两个黄看	两个光	两个耳光
++lianggehuangkimigcui	两个黄黎明错	两个黄看	两个光	两个耳光
++lianggehuangkimigcuil	两个黄鹂鸣翠柳	两个黄看	两个光	两个耳光
++lianggehuangkimigcuili	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦	两个黄看	两个光
++lianggehuangkimigcuilia	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦啊	两个黄看	两个光
++lianggehuangkimigcuiliao	两个黄鹂鸣翠柳	两个黄鹂鸣翠柳哦死	两个黄看	两个光
 diff --git a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt b/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
 index b99ab3e..d66636f 100644
 --- a/build-logic/convention/src/main/kotlin/AndroidAppConventionPlugin.kt
