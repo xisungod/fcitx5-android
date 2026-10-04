@@ -62,7 +62,31 @@ jobs:
           BUILD_VERSION_NAME: xuancai-black-v11
           SIGN_KEY_PWD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
           SIGN_KEY_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest 2>&1 | tee /tmp/app-build.log
+      - name: 报告编译与测试错误
+        if: failure()
+        run: |
+          # Kotlin compiler errors -> annotations (readable through the API)
+          grep -E '^e: ' /tmp/app-build.log | head -20 | while IFS= read -r line; do
+            echo "::error title=kotlin::${line:0:900}"
+          done
+          # failed unit tests -> annotations with the assertion message
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          n = 0
+          for f in glob.glob('app/build/test-results/**/*.xml', recursive=True):
+              for case in ET.parse(f).getroot().iter('testcase'):
+                  for bad in list(case.findall('failure')) + list(case.findall('error')):
+                      msg = (bad.get('message') or bad.text or '').replace('\n', ' ')[:700]
+                      print(f"::error title=test::{case.get('classname')}.{case.get('name')}: {msg}")
+                      n += 1
+          print('failed tests:', n)
+          PY
+          grep -E 'FAILURE|What went wrong' -A4 /tmp/app-build.log | head -30 | while IFS= read -r line; do
+            echo "::warning title=gradle::${line:0:500}"
+          done
       - name: 优先保留界面确认图
         if: always()
         uses: actions/upload-artifact@v7
