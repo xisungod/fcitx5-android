@@ -2738,10 +2738,10 @@ index 89dff00..b083263 100644
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..217205a
+index 0000000..17b53da
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,913 @@
+@@ -0,0 +1,928 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -3182,7 +3182,7 @@ index 0000000..217205a
 +                val spotSize = min(r.flashWidth, r.flashHeight) * 0.18f
 +                val width = r.flashWidth + (spotSize - r.flashWidth) * retreat
 +                val height = r.flashHeight + (spotSize - r.flashHeight) * retreat
-+                canvas.scale(width / KEY_FLASH_SIZE, height / KEY_FLASH_SIZE)
++                borderRect.set(-width / 2f, -height / 2f, width / 2f, height / 2f)
 +                val phase = retreat * (keyFlashTextures.size - 1)
 +                val lower = phase.toInt().coerceAtMost(keyFlashTextures.lastIndex - 1)
 +                val blend = phase - lower
@@ -3190,9 +3190,9 @@ index 0000000..217205a
 +                // creating bitmaps, paths or shaders while typing.
 +                val firstAlpha = (keyAlpha * (1f - blend)).coerceIn(0f, 0.999f)
 +                style.flashPaint.alpha = (firstAlpha * 255f).toInt()
-+                canvas.drawBitmap(keyFlashTextures[lower], -KEY_FLASH_SIZE / 2f, -KEY_FLASH_SIZE / 2f, style.flashPaint)
++                canvas.drawBitmap(keyFlashTextures[lower], null, borderRect, style.flashPaint)
 +                style.flashPaint.alpha = (keyAlpha * blend / (1f - firstAlpha) * 255f).coerceIn(0f, 255f).toInt()
-+                canvas.drawBitmap(keyFlashTextures[lower + 1], -KEY_FLASH_SIZE / 2f, -KEY_FLASH_SIZE / 2f, style.flashPaint)
++                canvas.drawBitmap(keyFlashTextures[lower + 1], null, borderRect, style.flashPaint)
 +            } else {
 +                // Functional keys keep a feathered round flash, never a solid rectangle.
 +                style.fallbackPaint.alpha = (keyAlpha.coerceIn(0f, 1f) * 255f).toInt()
@@ -3322,11 +3322,13 @@ index 0000000..217205a
 +        val phase = progress * (FLUID_PHASES - 1)
 +        val lower = phase.toInt().coerceAtMost(FLUID_PHASES - 2)
 +        val blend = phase - lower
-+        canvas.scale(width / FLUID_TEXTURE_SIZE, height / FLUID_TEXTURE_SIZE)
++        // Geometry is expressed entirely in keyboard pixels. An explicit target rect
++        // also makes drawBitmap immune to a cached mask's display-density metadata.
++        borderRect.set(-width / 2f, -height / 2f, width / 2f, height / 2f)
 +        style.paint.alpha = (alpha * (1f - blend) * 255f).toInt()
-+        canvas.drawBitmap(textures.fluid[r.shape][lower], -FLUID_TEXTURE_SIZE / 2f, -FLUID_TEXTURE_SIZE / 2f, style.paint)
++        canvas.drawBitmap(textures.fluid[r.shape][lower], null, borderRect, style.paint)
 +        style.paint.alpha = (alpha * blend * 255f).toInt()
-+        canvas.drawBitmap(textures.fluid[r.shape][lower + 1], -FLUID_TEXTURE_SIZE / 2f, -FLUID_TEXTURE_SIZE / 2f, style.paint)
++        canvas.drawBitmap(textures.fluid[r.shape][lower + 1], null, borderRect, style.paint)
 +        canvas.restoreToCount(saved)
 +    }
 +
@@ -3386,7 +3388,10 @@ index 0000000..217205a
 +                val fluid = Array(PressEffectMasks.SHAPES) { shape ->
 +                    Array(FLUID_PHASES) { phase ->
 +                        val pixels = PressEffectMasks.fluid(noise, PressEffectMasks.bodySeed(shape), phase.toFloat() / (FLUID_PHASES - 1), FLUID_TEXTURE_SIZE)
-+                        Bitmap.createBitmap(pixels, FLUID_TEXTURE_SIZE, FLUID_TEXTURE_SIZE, Bitmap.Config.ARGB_8888).apply { prepareToDraw() }
++                        Bitmap.createBitmap(pixels, FLUID_TEXTURE_SIZE, FLUID_TEXTURE_SIZE, Bitmap.Config.ARGB_8888).apply {
++                            density = Bitmap.DENSITY_NONE
++                            prepareToDraw()
++                        }
 +                    }
 +                }
 +                ready = Textures(fluid)
@@ -3396,6 +3401,13 @@ index 0000000..217205a
 +
 +    /** Deterministic preparation for actual renderer previews; production warms on a worker. */
 +    internal fun prepareTexturesForTest() { Textures.prepare() }
++
++    /** Exercise metadata changes independently of the explicitly sized cached masks. */
++    internal fun setTextureDensityForTest(value: Int) {
++        val textures = Textures.ready
++        if (textures != null) for (shape in textures.fluid) for (mask in shape) mask.density = value
++        for (mask in keyFlashTextures) mask.density = value
++    }
 +
 +    companion object {
 +        /** colour chosen by the most recent key press (0 = none yet); read by the character bubble */
@@ -3427,7 +3439,10 @@ index 0000000..217205a
 +        private val KEY_FLASH_TEXTURES by lazy {
 +            Array(9) { phase ->
 +                Bitmap.createBitmap(PressEffectMasks.keycap(KEY_FLASH_SIZE, phase / 8f), KEY_FLASH_SIZE,
-+                    KEY_FLASH_SIZE, Bitmap.Config.ARGB_8888).apply { prepareToDraw() }
++                    KEY_FLASH_SIZE, Bitmap.Config.ARGB_8888).apply {
++                    density = Bitmap.DENSITY_NONE
++                    prepareToDraw()
++                }
 +            }
 +        }
 +        private const val MAX_RIPPLES = 32
@@ -6784,10 +6799,10 @@ index 0000000..21039f4
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
 new file mode 100644
-index 0000000..6077bd1
+index 0000000..6697338
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
-@@ -0,0 +1,457 @@
+@@ -0,0 +1,498 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
@@ -7230,7 +7245,10 @@ index 0000000..6077bd1
 +        }
 +        fun outsidePeak(image: Bitmap): Int {
 +            var maximum = 0
-+            for (y in 50..160) for (x in 345..440) {
++            // An irregular field can favour any direction. Sample the whole periphery
++            // instead of assuming that a randomly warped shape must be bright on the right.
++            for (y in 0 until image.height) for (x in 0 until image.width) {
++                if (x in 270 until 330 && y in 65 until 135) continue
 +                val pixel = image.getPixel(x, y)
 +                maximum = maxOf(maximum, Color.red(pixel), Color.green(pixel), Color.blue(pixel))
 +            }
@@ -7242,6 +7260,44 @@ index 0000000..6077bd1
 +        assertTrue("100 percent keeps visible travelling light outside the key (peak=$peripheral)", peripheral > 10)
 +        assertEquals("0 percent removes the travelling field", 0, outsidePeak(off.first))
 +        assertTrue("Brightness affects glow only, preserving full key colour", peak(off.second) > 150)
++    }
++
++    @Test
++    fun productionMaskDensityCannotMoveOrRescaleTheKeyAndItsLight() {
++        fun pixels(image: Bitmap): IntArray = IntArray(image.width * image.height).also {
++            image.getPixels(it, 0, image.width, 0, 0, image.width, image.height)
++        }
++        val h = Harness(press = true, production = true, hold = 120, retreat = 1400,
++            palette = intArrayOf(0xff00ffff.toInt()))
++        try {
++            h.effect.prepareTexturesForTest()
++            h.effect.setTextureDensityForTest(Bitmap.DENSITY_NONE)
++            h.render(0)
++            h.press(301, 0, 0)
++            val expectedField = pixels(h.render(450))
++            val expectedFace = pixels(h.surface(301, 450).first)
++            h.effect.setTextureDensityForTest(160)
++            assertArrayEquals("mdpi metadata must not alter cloud position or footprint", expectedField, pixels(h.render(450)))
++            assertArrayEquals(expectedFace, pixels(h.surface(301, 450).first))
++            h.effect.setTextureDensityForTest(320)
++            assertArrayEquals("xhdpi metadata must not apply a second transform to cached masks", expectedField, pixels(h.render(450)))
++            assertArrayEquals(expectedFace, pixels(h.surface(301, 450).first))
++        } finally {
++            h.effect.setTextureDensityForTest(Bitmap.DENSITY_NONE)
++            h.finish()
++        }
++        // The compatibility shrink-mask path obeys the same pixel geometry contract.
++        val legacy = Harness(press = true, production = false, palette = intArrayOf(0xff00ffff.toInt()))
++        try {
++            legacy.render(0)
++            legacy.press(302, 0, 0)
++            val expected = pixels(legacy.render(40))
++            legacy.effect.setTextureDensityForTest(320)
++            assertArrayEquals("Legacy cached key masks must also retain their exact key bounds", expected, pixels(legacy.render(40)))
++        } finally {
++            legacy.effect.setTextureDensityForTest(Bitmap.DENSITY_NONE)
++            legacy.finish()
++        }
 +    }
 +
 +}
