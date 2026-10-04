@@ -1168,7 +1168,7 @@ index 78e1725..282dd7f 100644
                  windowManager.attachWindow(ClipboardWindow())
              }
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
-index 5c2fef9..3b16e0e 100644
+index 5c2fef9..085d51d 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt
 @@ -5,8 +5,10 @@
@@ -1191,7 +1191,7 @@ index 5c2fef9..3b16e0e 100644
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
  import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
  import org.fcitx.fcitx5.android.input.popup.PopupAction
-@@ -48,23 +52,88 @@ abstract class BaseKeyboard(
+@@ -48,23 +52,90 @@ abstract class BaseKeyboard(
  ) : ConstraintLayout(context) {
  
      var keyActionListener: KeyActionListener? = null
@@ -1239,7 +1239,8 @@ index 5c2fef9..3b16e0e 100644
 +            randomIdleColors = p.idleRandomColors.getValue(),
 +            ignitionTimeMs = p.pressIgnitionTime.getValue(),
 +            keyHoldTimeMs = p.pressKeyHoldTime.getValue(),
-+            keyRetreatTimeMs = p.pressKeyRetreatTime.getValue()
++            keyRetreatTimeMs = p.pressKeyRetreatTime.getValue(),
++            keySurfaceEffects = true
 +        )
 +    }
 +
@@ -1255,6 +1256,7 @@ index 5c2fef9..3b16e0e 100644
 +    private val spaceLongPressBehavior = prefs.keyboard.spaceKeyLongPressBehavior
      private val spaceKeys = mutableListOf<KeyView>()
 -    private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
++    private val surfaceKeys = mutableListOf<KeyView>()
 +    private fun updateSpaceGestures() {
 +        val trackpad = spaceLongPressBehavior.getValue() == SpaceLongPressBehavior.MoveCursor
          spaceKeys.forEach {
@@ -1282,15 +1284,33 @@ index 5c2fef9..3b16e0e 100644
      private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
  
      var popupActionListener: PopupActionListener? = null
-@@ -135,6 +204,7 @@ abstract class BaseKeyboard(
+@@ -135,6 +206,11 @@ abstract class BaseKeyboard(
              })
          }
          spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
 +        spaceLongPressBehavior.registerOnChangeListener(spaceLongPressChangeListener)
++        pressEffectLayer?.invalidateKeySurfaces = {
++            // Invalidate child display lists as well as the parent light layer.
++            for (i in surfaceKeys.indices) surfaceKeys[i].invalidateKeySurface()
++        }
      }
  
      private fun createKeyView(def: KeyDef): KeyView {
-@@ -153,7 +223,7 @@ abstract class BaseKeyboard(
+@@ -144,6 +220,13 @@ abstract class BaseKeyboard(
+             is KeyDef.Appearance.Text -> TextKeyView(context, theme, def.appearance)
+             is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
+         }.apply {
++            if (id == View.NO_ID) id = View.generateViewId()
++            pressEffectLayer?.let { effect ->
++                surfaceKeys.add(this)
++                keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
++                    effect.drawKeySurface(canvas, id, width, height)
++                }
++            }
+             soundEffect = when (def) {
+                 is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
+                 is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
+@@ -153,7 +236,7 @@ abstract class BaseKeyboard(
              }
              if (def is SpaceKey) {
                  spaceKeys.add(this)
@@ -1299,7 +1319,7 @@ index 5c2fef9..3b16e0e 100644
                  swipeRepeatEnabled = true
                  swipeThresholdX = selectionSwipeThreshold
                  swipeThresholdY = disabledSwipeThreshold
-@@ -356,6 +426,7 @@ abstract class BaseKeyboard(
+@@ -356,6 +439,7 @@ abstract class BaseKeyboard(
              onPopupAction(PopupAction.DismissAction(keyView.id))
          }
          touchTargets.clear()
@@ -1307,7 +1327,7 @@ index 5c2fef9..3b16e0e 100644
      }
  
      private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-@@ -392,16 +463,91 @@ abstract class BaseKeyboard(
+@@ -392,16 +476,91 @@ abstract class BaseKeyboard(
              event.deviceId, event.edgeFlags
          )
          target.view.dispatchTouchEvent(e)
@@ -1359,7 +1379,7 @@ index 5c2fef9..3b16e0e 100644
 +                effectKeyBounds
 +            }
 +            effect.onPress(event.getX(index), event.getY(index), bounds,
-+                target?.view?.let(::canSlideSelect) == true)
++                target?.view?.let(::canSlideSelect) == true, target?.view?.id ?: View.NO_ID)
 +        }
 +    }
 +
@@ -1401,7 +1421,7 @@ index 5c2fef9..3b16e0e 100644
              when (event.actionMasked) {
                  MotionEvent.ACTION_DOWN -> {
                      releaseAllTouchTargets()
-@@ -423,6 +569,18 @@ abstract class BaseKeyboard(
+@@ -423,6 +582,18 @@ abstract class BaseKeyboard(
                      for (i in 0 until event.pointerCount) {
                          val pid = event.getPointerId(i)
                          val target = touchTargets[pid] ?: continue
@@ -1420,7 +1440,7 @@ index 5c2fef9..3b16e0e 100644
                          dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                      }
                      return true
-@@ -431,7 +589,7 @@ abstract class BaseKeyboard(
+@@ -431,7 +602,7 @@ abstract class BaseKeyboard(
                      val i = event.actionIndex
                      val pid = event.getPointerId(i)
                      val target = touchTargets[pid] ?: return true
@@ -1429,7 +1449,7 @@ index 5c2fef9..3b16e0e 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -442,7 +600,7 @@ abstract class BaseKeyboard(
+@@ -442,7 +613,7 @@ abstract class BaseKeyboard(
                          releaseAllTouchTargets()
                          return true
                      }
@@ -1438,7 +1458,7 @@ index 5c2fef9..3b16e0e 100644
                      touchTargets.remove(pid)
                      return true
                  }
-@@ -465,6 +623,12 @@ abstract class BaseKeyboard(
+@@ -465,6 +636,12 @@ abstract class BaseKeyboard(
  
      @CallSuper
      protected open fun onPopupAction(action: PopupAction) {
@@ -1451,7 +1471,7 @@ index 5c2fef9..3b16e0e 100644
          popupActionListener?.onPopupAction(action)
      }
  
-@@ -484,8 +648,33 @@ abstract class BaseKeyboard(
+@@ -484,8 +661,33 @@ abstract class BaseKeyboard(
          return true
      }
  
@@ -1486,7 +1506,7 @@ index 5c2fef9..3b16e0e 100644
      }
  
      open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
-@@ -502,6 +691,7 @@ abstract class BaseKeyboard(
+@@ -502,6 +704,7 @@ abstract class BaseKeyboard(
  
      open fun onDetach() {
          releaseAllTouchTargets()
@@ -1841,10 +1861,46 @@ index c331341..454bb61 100644
  
  class ImageLayoutSwitchKey(
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
-index 9bfc478..fbb6f25 100644
+index 9bfc478..4736beb 100644
 --- a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt
-@@ -146,6 +146,11 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
+@@ -9,6 +9,7 @@ import android.content.Context
+ import android.content.res.ColorStateList
+ import android.content.res.Configuration
+ import android.graphics.Color
++import android.graphics.Canvas
+ import android.graphics.Rect
+ import android.graphics.Typeface
+ import android.graphics.drawable.ColorDrawable
+@@ -61,6 +62,12 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
+     val hMargin: Int
+     val vMargin: Int
+ 
++    internal fun interface KeySurfacePainter {
++        fun draw(canvas: Canvas, width: Int, height: Int)
++    }
++    internal var keySurfacePainter: KeySurfacePainter? = null
++    internal fun invalidateKeySurface() { appearanceView.invalidate() }
++
+     init {
+         val prefs = ThemeManager.prefs
+         bordered = prefs.keyBorder.getValue()
+@@ -104,7 +111,13 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
+      * `AppearanceView` in the inner [ConstraintLayout], it can be smaller than its parent,
+      * and holds the [bounds] for popup.
+      */
+-    protected val appearanceView = constraintLayout {
++    protected val appearanceView = object : ConstraintLayout(ctx) {
++        override fun dispatchDraw(canvas: Canvas) {
++            // Draw after the key background but before the character views.
++            keySurfacePainter?.draw(canvas, width, height)
++            super.dispatchDraw(canvas)
++        }
++    }.apply {
+         // sync any state from parent
+         isDuplicateParentStateEnabled = true
+     }
+@@ -146,6 +159,11 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
      }
  
      private fun setupPressHighlight(mask: Drawable? = null) {
@@ -1856,7 +1912,7 @@ index 9bfc478..fbb6f25 100644
          appearanceView.foreground = if (rippled) {
              RippleDrawable(
                  ColorStateList.valueOf(theme.keyPressHighlightColor), null,
-@@ -357,7 +362,17 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
+@@ -357,7 +375,17 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
      }
  
      private fun applyLayout(orientation: Int) {
@@ -1911,10 +1967,10 @@ index 26dcded..1a33534 100644
              it.popupActionListener = null
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..6951a1a
+index 0000000..4aa75e6
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,586 @@
+@@ -0,0 +1,614 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -1952,9 +2008,9 @@ index 0000000..6951a1a
 + * every press releases a soft, feathered water ripple of a random palette colour
 + * with a random irregular shape, which spreads over the neighbouring keys and fades out.
 + *
-+ * It is drawn by the keyboard itself: [drawUnder] before the keys (light leaks through the
-+ * gaps and translucent keys, labels stay crisp) and [drawOver] after them with reduced
-+ * strength so the colour also washes over the key caps.
++ * The diffuse wave is drawn across the keyboard. Individual key faces draw their
++ * own colour between their background and character, so the key stays bright and
++ * its label remains crisp without covering the whole keyboard in colour.
 + *
 + * Textures are generated procedurally once per process on a background thread, as white
 + * alpha masks, and tinted per ripple, so any number of colours costs no extra memory.
@@ -1976,6 +2032,7 @@ index 0000000..6951a1a
 +    ignitionTimeMs: Int = 100,
 +    keyHoldTimeMs: Int = 260,
 +    keyRetreatTimeMs: Int = 480,
++    private val keySurfaceEffects: Boolean = false,
 +    private val animationsAllowed: () -> Boolean = {
 +        !AppPrefs.getInstance().advanced.disableAnimation.getValue() &&
 +            (!org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
@@ -2016,8 +2073,10 @@ index 0000000..6951a1a
 +    private var idleStyleIndex = random.nextInt(idleStyles.size)
 +    private var previousIdlePhase = 1f
 +    var invalidateExtension: (() -> Unit)? = null
++    var invalidateKeySurfaces: (() -> Unit)? = null
 +    private fun invalidateBoth() {
 +        host.invalidate()
++        invalidateKeySurfaces?.invoke()
 +        invalidateExtension?.invoke()
 +    }
 +    private val frameCallback = Runnable {
@@ -2048,6 +2107,7 @@ index 0000000..6951a1a
 +        breathing.activity(clock(), held = false)
 +        host.removeCallbacks(frameCallback)
 +        host.postInvalidateOnAnimation()
++        invalidateKeySurfaces?.invoke()
 +        invalidateExtension?.invoke()
 +    }
 +
@@ -2079,13 +2139,14 @@ index 0000000..6951a1a
 +        if (pressEnabled) Textures.ensure()
 +    }
 +
-+    fun onPress(pressX: Float, pressY: Float, keyBounds: Rect? = null, highlightKey: Boolean = false) {
++    fun onPress(pressX: Float, pressY: Float, keyBounds: Rect? = null, highlightKey: Boolean = false, keyId: Int = -1) {
 +        if (!canDraw() || !animatorsEnabled()) return
 +        val now = clock()
 +        if (idleEnabled && !breathing.running) breathing.resume(now)
 +        breathing.activity(now, held = true)
 +        host.removeCallbacks(frameCallback)
 +        host.postInvalidateOnAnimation()
++        invalidateKeySurfaces?.invoke()
 +        invalidateExtension?.invoke()
 +        if (!pressEnabled) return
 +        if (Textures.ready == null) Textures.ensure()
@@ -2099,6 +2160,7 @@ index 0000000..6951a1a
 +        ripples.expire(now, duration)
 +        ripples.obtain(now).apply {
 +            keyFill = highlightKey && keyBounds != null
++            this.keyId = keyId
 +            x = if (keyFill) keyBounds!!.exactCenterX() else pressX
 +            y = if (keyFill) keyBounds!!.exactCenterY() else pressY
 +            flashWidth = if (keyFill) max(density, keyBounds!!.width().toFloat()) else flashRadius * 2f
@@ -2167,6 +2229,55 @@ index 0000000..6951a1a
 +        if (ripples.size > 0) draw(canvas, underStrength + overStrength)
 +    }
 +
++    private fun drawKeyFlash(canvas: Canvas, r: PressEffectTrail.Ripple, style: RipplePaints,
++        elapsed: Long, strength: Float, centerX: Float, centerY: Float) {
++        // Give the pressed key its own colour first; no expansion until ignition finishes.
++        // Hold the key colour while later presses light up; then shrink its coloured
++        // area from a rounded key face to a soft round spot independently of the wave.
++        val retreat = smoothstep(keyHoldDuration.toFloat(),
++            (keyHoldDuration + keyRetreatDuration).toFloat(), elapsed.toFloat())
++        val keyAlpha = 0.92f * (1f - smoothstep(0.60f, 1f, retreat)) * strength
++        if (keyAlpha > 0.004f) {
++            val saved = canvas.save()
++            canvas.translate(centerX, centerY)
++            if (r.keyFill) {
++                val spotSize = min(r.flashWidth, r.flashHeight) * 0.18f
++                val width = r.flashWidth + (spotSize - r.flashWidth) * retreat
++                val height = r.flashHeight + (spotSize - r.flashHeight) * retreat
++                canvas.scale(width / KEY_FLASH_SIZE, height / KEY_FLASH_SIZE)
++                val phase = retreat * (keyFlashTextures.size - 1)
++                val lower = phase.toInt().coerceAtMost(keyFlashTextures.lastIndex - 1)
++                val blend = phase - lower
++                // Two cached masks interpolate the corners continuously, without
++                // creating bitmaps, paths or shaders while typing.
++                val firstAlpha = (keyAlpha * (1f - blend)).coerceIn(0f, 0.999f)
++                style.flashPaint.alpha = (firstAlpha * 255f).toInt()
++                canvas.drawBitmap(keyFlashTextures[lower], -KEY_FLASH_SIZE / 2f, -KEY_FLASH_SIZE / 2f, style.flashPaint)
++                style.flashPaint.alpha = (keyAlpha * blend / (1f - firstAlpha) * 255f).coerceIn(0f, 255f).toInt()
++                canvas.drawBitmap(keyFlashTextures[lower + 1], -KEY_FLASH_SIZE / 2f, -KEY_FLASH_SIZE / 2f, style.flashPaint)
++            } else {
++                // Functional keys keep a feathered round flash, never a solid rectangle.
++                style.fallbackPaint.alpha = (keyAlpha.coerceIn(0f, 1f) * 255f).toInt()
++                canvas.scale(r.flashWidth / 2f, r.flashHeight / 2f)
++                canvas.drawCircle(0f, 0f, 1f, style.fallbackPaint)
++            }
++            canvas.restoreToCount(saved)
++        }
++    }
++
++    /** Invoked by the key face after its dark background, before its character. */
++    fun drawKeySurface(canvas: Canvas, keyId: Int, width: Int, height: Int) {
++        if (!keySurfaceEffects || !canDraw() || !animatorsEnabled()) return
++        val now = clock()
++        for (i in 0 until ripples.size) {
++            val ripple = ripples[i]
++            val elapsed = (now - ripple.start).coerceAtLeast(0L)
++            if (ripple.keyFill && ripple.keyId == keyId && elapsed < duration) {
++                drawKeyFlash(canvas, ripple, styles[ripple.colorIndex], elapsed, 1f, width / 2f, height / 2f)
++            }
++        }
++    }
++
 +    private fun draw(canvas: Canvas, strength: Float) {
 +        val textures = Textures.ready
 +        for (i in 0 until ripples.size) {
@@ -2175,37 +2286,8 @@ index 0000000..6951a1a
 +            val elapsed = (frameTime - r.start).coerceAtLeast(0L)
 +            val t = elapsed.toFloat() / duration
 +            if (t >= 1f) continue
-+            // Give the pressed key its own colour first; no expansion until ignition finishes.
-+            // Hold the key colour while later presses light up; then shrink its coloured
-+            // area from a rounded key face to a soft round spot independently of the wave.
-+            val retreat = smoothstep(keyHoldDuration.toFloat(),
-+                (keyHoldDuration + keyRetreatDuration).toFloat(), elapsed.toFloat())
-+            val keyAlpha = 0.92f * (1f - smoothstep(0.60f, 1f, retreat)) * strength
-+            if (keyAlpha > 0.004f) {
-+                val saved = canvas.save()
-+                canvas.translate(r.x, r.y)
-+                if (r.keyFill) {
-+                    val spotSize = min(r.flashWidth, r.flashHeight) * 0.18f
-+                    val width = r.flashWidth + (spotSize - r.flashWidth) * retreat
-+                    val height = r.flashHeight + (spotSize - r.flashHeight) * retreat
-+                    canvas.scale(width / KEY_FLASH_SIZE, height / KEY_FLASH_SIZE)
-+                    val phase = retreat * (keyFlashTextures.size - 1)
-+                    val lower = phase.toInt().coerceAtMost(keyFlashTextures.lastIndex - 1)
-+                    val blend = phase - lower
-+                    // Two cached masks interpolate the corners continuously, without
-+                    // creating bitmaps, paths or shaders while typing.
-+                    val firstAlpha = (keyAlpha * (1f - blend)).coerceIn(0f, 0.999f)
-+                    style.flashPaint.alpha = (firstAlpha * 255f).toInt()
-+                    canvas.drawBitmap(keyFlashTextures[lower], -KEY_FLASH_SIZE / 2f, -KEY_FLASH_SIZE / 2f, style.flashPaint)
-+                    style.flashPaint.alpha = (keyAlpha * blend / (1f - firstAlpha) * 255f).coerceIn(0f, 255f).toInt()
-+                    canvas.drawBitmap(keyFlashTextures[lower + 1], -KEY_FLASH_SIZE / 2f, -KEY_FLASH_SIZE / 2f, style.flashPaint)
-+                } else {
-+                    // Functional keys keep a feathered round flash, never a solid rectangle.
-+                    style.fallbackPaint.alpha = (keyAlpha.coerceIn(0f, 1f) * 255f).toInt()
-+                    canvas.scale(r.flashWidth / 2f, r.flashHeight / 2f)
-+                    canvas.drawCircle(0f, 0f, 1f, style.fallbackPaint)
-+                }
-+                canvas.restoreToCount(saved)
++            if (!keySurfaceEffects || !r.keyFill || r.keyId < 0) {
++                drawKeyFlash(canvas, r, style, elapsed, strength, r.x, r.y)
 +            }
 +            val spreadElapsed = elapsed - ignitionDuration
 +            if (spreadElapsed < 0L || elapsed >= waveDuration) continue
@@ -2215,7 +2297,9 @@ index 0000000..6951a1a
 +            val x = r.x + r.driftX * e
 +            val y = r.y + r.driftY * e
 +            val radius = flashRadius + (maxRadius * r.size - flashRadius) * e
-+            val bodyAlpha = 0.65f * ramp(spreadElapsed.toFloat(), 0f, 45f) *
++            // Diffuse colour loses energy as it spreads. Old wide waves must not
++            // blanket the keyboard or hide the independent, brighter key faces.
++            val bodyAlpha = 0.30f * (1f - 0.84f * e) * ramp(spreadElapsed.toFloat(), 0f, 45f) *
 +                (1f - smoothstep((ignitionDuration + expansionDuration).toFloat(), waveDuration.toFloat(), elapsed.toFloat()))
 +            if (textures == null) {
 +                val save = canvas.save()
@@ -2234,7 +2318,7 @@ index 0000000..6951a1a
 +            val t2 = (t - ECHO_DELAY) / (1f - ECHO_DELAY)
 +            if (t2 > 0f && i >= ripples.size - 3) {
 +                val radius2 = maxRadius * r.size * (0.12f + 0.70f * smoothstep(0f, 1f, t2))
-+                val echoAlpha = 0.18f * ramp(t2, 0f, 0.1f) * (1f - smoothstep(0.3f, 1f, t2))
++                val echoAlpha = 0.07f * ramp(t2, 0f, 0.1f) * (1f - smoothstep(0.3f, 1f, t2))
 +                drawTexture(canvas, textures.rings[r.echoShape], 0f, 0f, radius2, -angle * 0.6f, style.paint, echoAlpha * strength)
 +            }
 +            canvas.restoreToCount(save)
@@ -2503,10 +2587,10 @@ index 0000000..6951a1a
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
 new file mode 100644
-index 0000000..9d3051f
+index 0000000..bdd9dc3
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,57 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -2521,6 +2605,7 @@ index 0000000..9d3051f
 +        var flashWidth = 0f
 +        var flashHeight = 0f
 +        var keyFill = false
++        var keyId = -1
 +        var colorIndex = 0
 +        var shape = 0
 +        var echoShape = 0
@@ -3844,10 +3929,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..e9900d3
+index 0000000..e0c470f
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,689 @@
+@@ -0,0 +1,742 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -4213,6 +4298,47 @@ index 0000000..e9900d3
 +    }
 +
 +    @Test
++    fun keyColourIsAboveItsBackgroundAndBelowTheWhiteCharacter() {
++        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
++        val activity = controller.get()
++        activity.setTheme(R.style.Theme_InputViewTheme)
++        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
++        activity.setContentView(keyboard)
++        controller.visible()
++        layout(keyboard, 360, 260)
++        val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == "G" }
++        val bounds = Rect()
++        key.getDrawingRect(bounds)
++        keyboard.offsetDescendantRectToMyCoords(key, bounds)
++        val effect = ReflectionHelpers.getField<Any>(keyboard, "pressEffectLayer")
++        val now = SystemClock.uptimeMillis()
++        val clock: () -> Long = { now }
++        ReflectionHelpers.setField(effect, "clock", clock)
++        val before = render(keyboard)
++        val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY(), 0)
++        keyboard.dispatchTouchEvent(down)
++        down.recycle()
++        val lit = render(keyboard)
++        val face = lit.getPixel(bounds.left + 10, bounds.top + 10)
++        assertTrue("A bright key face must not be dimmed by its own dark background",
++            maxOf(Color.red(face), Color.green(face), Color.blue(face)) > 190)
++        var whitePixels = 0
++        for (y in bounds.top until bounds.bottom) for (x in bounds.left until bounds.right) {
++            val old = before.getPixel(x, y)
++            if (minOf(Color.red(old), Color.green(old), Color.blue(old)) >= 242) {
++                whitePixels++
++                val pixel = lit.getPixel(x, y)
++                assertTrue("The colour must not paint over the character",
++                    minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) >= 235)
++            }
++        }
++        assertTrue(whitePixels > 5)
++        save(lit, "key-surface-before-character")
++        keyboard.onDetach()
++        controller.pause().stop().destroy()
++    }
++
++    @Test
 +    fun continuousTypingRendersRealKeyColoursPopupsAndRecordedRimeCandidates() {
 +        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
 +        val activity = controller.get()
@@ -4293,6 +4419,18 @@ index 0000000..e9900d3
 +            }
 +            layout(root, 360, 312)
 +            save(render(root), "continuous/typing-%03d".format(frame))
++            if (frame == 75) {
++                val burst = render(keyboard)
++                var light = 0L
++                var samples = 0
++                for (row in 1..4) for (x in 0 until 360) {
++                    val pixel = burst.getPixel(x, row * 52)
++                    light += maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++                    samples++
++                }
++                assertTrue("Sustained typing must preserve dark gaps instead of a full bright wash: ${light / samples}",
++                    light.toDouble() / samples < 75)
++            }
 +            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(33))
 +        }
 +        assertEquals(input, typed.toString())
@@ -4582,10 +4720,10 @@ index 0000000..a640055
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
 new file mode 100644
-index 0000000..3d2b3c8
+index 0000000..4b15243
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
-@@ -0,0 +1,255 @@
+@@ -0,0 +1,275 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
@@ -4753,6 +4891,26 @@ index 0000000..3d2b3c8
 +            assertEquals(0, peak(h.render(61000)))
 +            assertEquals(0, peak(h.render(120000)))
 +            assertNull(h.envelope.nextFrameDelay(120000))
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun animationInvalidatesChildSurfacesAsWellAsTheHostDisplayList() {
++        val h = Harness(press = true)
++        var surfaces = 0
++        h.effect.invalidateKeySurfaces = { surfaces++ }
++        try {
++            h.render(0)
++            h.effect.onPress(300f, 100f)
++            assertTrue(surfaces > 0)
++            h.render(0)
++            val before = surfaces
++            h.now = 50
++            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(50))
++            assertTrue("Hardware-cached key faces must be invalidated on animation frames", surfaces > before)
++            val pressed = surfaces
++            h.effect.onRelease()
++            assertTrue(surfaces > pressed)
 +        } finally { h.finish() }
 +    }
 +
