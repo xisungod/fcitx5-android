@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.ThemeSerializationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-04T10:18:52.812Z" hostname="566dc45241c0" time="0.057">
+  <properties/>
+  <testcase name="version1" classname="org.fcitx.fcitx5.android.ThemeSerializationTest" time="0.054"/>
+  <testcase name="version2" classname="org.fcitx.fcitx5.android.ThemeSerializationTest" time="0.002"/>
+  <testcase name="preservation" classname="org.fcitx.fcitx5.android.ThemeSerializationTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

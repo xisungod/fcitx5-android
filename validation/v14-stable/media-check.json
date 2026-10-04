@@ -1,0 +1,98 @@
+[
+  {
+    "name": "v14-stable-single",
+    "source": "v14-stable-f-on",
+    "android_frames": 97,
+    "fps": 30,
+    "gif_frames": 97,
+    "gif_duration_ms": 3230,
+    "video": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 360,
+          "nb_read_frames": "97"
+        }
+      ],
+      "format": {
+        "duration": "3.233333"
+      }
+    },
+    "full_decode": "passed",
+    "current_files": {
+      "v14-stable-single.gif": {
+        "bytes": 1439466,
+        "sha256": "eeb350afce9093b1e6ac9b7691202f4498e5fe325c2868ed7eeb5f09dc24a3f3"
+      },
+      "v14-stable-single.mp4": {
+        "bytes": 96353,
+        "sha256": "1a7b9df5ba43e73c07ac9ff9bea08b25f1716080f608b57d05b95218f3be6eb3"
+      }
+    }
+  },
+  {
+    "name": "v14-stable-number-off",
+    "source": "v14-stable-f-off",
+    "android_frames": 97,
+    "fps": 30,
+    "gif_frames": 97,
+    "gif_duration_ms": 3230,
+    "video": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 360,
+          "nb_read_frames": "97"
+        }
+      ],
+      "format": {
+        "duration": "3.233333"
+      }
+    },
+    "full_decode": "passed",
+    "current_files": {
+      "v14-stable-number-off.gif": {
+        "bytes": 1340345,
+        "sha256": "ec581ffb93718ccb963f6345f5b78301d55d0f466200f80d4421d2a1e2f3c951"
+      },
+      "v14-stable-number-off.mp4": {
+        "bytes": 84959,
+        "sha256": "f7391211dc22db7f6a6277b010fa05623353cafb7bf1834d1da87d410d57620d"
+      }
+    }
+  },
+  {
+    "name": "v14-stable-typing",
+    "source": "v14-stable-burst",
+    "android_frames": 127,
+    "fps": 30,
+    "gif_frames": 127,
+    "gif_duration_ms": 4230,
+    "video": {
+      "programs": [],
+      "streams": [
+        {
+          "width": 600,
+          "height": 420,
+          "nb_read_frames": "127"
+        }
+      ],
+      "format": {
+        "duration": "4.233333"
+      }
+    },
+    "full_decode": "passed",
+    "current_files": {
+      "v14-stable-typing.gif": {
+        "bytes": 2237780,
+        "sha256": "bb880c314bc94575bc555d3bd1c3b70790daf19edb7c6f257241dd4ea2967031"
+      },
+      "v14-stable-typing.mp4": {
+        "bytes": 225394,
+        "sha256": "218bded2792eedd916de3a2c3242f4019003a6e785f2d097a661a620b2e267be"
+      }
+    }
+  }
+]

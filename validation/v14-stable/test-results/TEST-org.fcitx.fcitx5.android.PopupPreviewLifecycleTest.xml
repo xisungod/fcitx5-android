@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-04T10:18:25.937Z" hostname="566dc45241c0" time="0.244">
+  <properties/>
+  <testcase name="aTwentyMillisecondTapRemainsReadableThenFinishesItsExit" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.037"/>
+  <testcase name="duplicateReleaseCompletesOnceWithoutRestartingTheExit" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.026"/>
+  <testcase name="disabledAnimationsShowAndHideImmediatelyWithNoOldCompletion" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.025"/>
+  <testcase name="immediateDismissResetsTheViewAndCannotLaterHideItsReuse" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.024"/>
+  <testcase name="slidingFromOneKeyToAnotherLetsTheOldPreviewExitIndependently" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.027"/>
+  <testcase name="aHeldKeyKeepsItsPreviewUntilItIsReleased" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.036"/>
+  <testcase name="aQuickTapFadesWithoutChangingThePreviewBoundsOnAnyFrame" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.023"/>
+  <testcase name="pressColourMatchingRequiresAColourFromAnEnabledPressEffect" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.009"/>
+  <testcase name="pressingTheSameKeyDuringItsExitCancelsTheOldHide" classname="org.fcitx.fcitx5.android.PopupPreviewLifecycleTest" time="0.034"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

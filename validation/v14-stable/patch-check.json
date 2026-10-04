@@ -1,0 +1,9 @@
+{
+  "baseline": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "patch_sha256": "563e0ced999fd6606833d0a45e5e1de21085254f963279f10e69a4fed65bad16",
+  "files_compared": 103,
+  "mismatches": [],
+  "clean_apply_check": "passed",
+  "byte_comparison": "passed",
+  "source_staged": true
+}
