@@ -2738,10 +2738,10 @@ index 89dff00..b083263 100644
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
 new file mode 100644
-index 0000000..17b53da
+index 0000000..fb799d2
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt
-@@ -0,0 +1,928 @@
+@@ -0,0 +1,972 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -3051,6 +3051,9 @@ index 0000000..17b53da
 +            index = (index + 1 + random.nextInt(colors.size - 1)) % colors.size
 +        }
 +        lastColorIndex = index
++        // Retire the old face before publishing this press's colour. A delayed
++        // draw must not let an expired face remove the new preview tint.
++        expire(now)
 +        lastPressColor = colors[index]
 +        if (keyId >= 0) {
 +            val colorNow = SystemClock.uptimeMillis()
@@ -3065,12 +3068,12 @@ index 0000000..17b53da
 +        var selectedShape = random.nextInt(shapes)
 +        if (shapes > 1 && selectedShape == lastShapeIndex) selectedShape = (selectedShape + 1 + random.nextInt(shapes - 1)) % shapes
 +        lastShapeIndex = selectedShape
-+        expire(now)
 +        // Sliding retargets only this finger; another finger can keep its own key held.
 +        releasePointer(pointerId, now)
 +        val wave = ripples.obtain(now).apply {
 +            this.pointerId = pointerId
 +            releasedAt = -1L
++            lightGain = 1f
 +            keyFill = highlightKey && keyBounds != null
 +            this.keyId = keyId
 +            x = keyBounds?.exactCenterX() ?: pressX
@@ -3259,15 +3262,27 @@ index 0000000..17b53da
 +            a * styles[ripple.colorIndex].luminance else 0f
 +    }
 +
++    /** The front starts moving promptly, while the configured total expansion time stays intact. */
++    private fun waveProgress(spread: Long): Float {
++        val t = (spread.toFloat() / expansionDuration).coerceIn(0f, 1f)
++        return 1f - (1f - t).pow(1.45f)
++    }
++
++    private fun freshLightWeight(r: PressEffectTrail.Ripple): Float {
++        val age = (frameTime - r.start).coerceAtLeast(0L).toFloat()
++        return 1f - smoothstep(250f, 650f, age)
++    }
++
 +    private fun waveAlpha(r: PressEffectTrail.Ripple): Float {
 +        val elapsed = (frameTime - r.start).coerceAtLeast(0L)
 +        val spread = elapsed - ignitionDuration
 +        if (spread < 0L || elapsed >= waveDuration) return 0f
-+        val progress = smoothstep(0f, 1f, spread.toFloat() / expansionDuration)
-+        val ignition = smoothstep(0f, 70f, spread.toFloat())
++        val progress = waveProgress(spread)
++        val ignition = smoothstep(0f, 45f, spread.toFloat())
 +        val end = 1f - smoothstep((ignitionDuration + expansionDuration).toFloat(), waveDuration.toFloat(), elapsed.toFloat())
-+        // A broad but modest light field: new local light leads, old light keeps continuity.
-+        return 0.46f * ignition * (1f - 0.72f * progress) * end
++        // Keep the outward front readable instead of draining most energy before it
++        // reaches a neighbour. The late fade still supplies a soft, bounded tail.
++        return 0.80f * ignition * (1f - 0.35f * smoothstep(0.55f, 1f, progress)) * end
 +    }
 +
 +    private fun draw(canvas: Canvas, strength: Float) {
@@ -3279,30 +3294,48 @@ index 0000000..17b53da
 +                    strength, face.x, face.y)
 +            }
 +        }
-+        var totalAlpha = 0f
-+        for (i in 0 until ripples.size) totalAlpha += waveAlpha(ripples[i])
-+        // A continuous energy cap, rather than a step when the number of waves changes.
-+        val energy = totalAlpha * 1.5f
-+        val budget = if (normalizeOldLight && energy > LIGHT_BUDGET) LIGHT_BUDGET / energy else 1f
++        var freshEnergy = 0f
++        var oldEnergy = 0f
++        for (i in 0 until ripples.size) {
++            val r = ripples[i]
++            val alpha = waveAlpha(r)
++            val fresh = freshLightWeight(r)
++            freshEnergy += alpha * fresh * 1.32f
++            oldEnergy += alpha * (1f - fresh) * 1.32f
++        }
++        val freshScale = if (normalizeOldLight && freshEnergy > FRESH_LIGHT_BUDGET)
++            FRESH_LIGHT_BUDGET / freshEnergy else 1f
++        val oldScale = if (normalizeOldLight && oldEnergy > OLD_LIGHT_BUDGET)
++            OLD_LIGHT_BUDGET / oldEnergy else 1f
 +        val textures = Textures.ready
 +        for (i in 0 until ripples.size) {
 +            val r = ripples[i]
-+            val alpha = waveAlpha(r) * budget * strength * glowStrength
++            val fresh = freshLightWeight(r)
++            val proposedGain = fresh * freshScale + (1f - fresh) * oldScale
++            if (normalizeOldLight) r.lightGain = min(r.lightGain, proposedGain)
++            val alpha = waveAlpha(r) * r.lightGain * strength * glowStrength
 +            if (alpha <= 0.003f) continue
 +            val spread = (frameTime - r.start - ignitionDuration).coerceAtLeast(0L)
-+            val progress = smoothstep(0f, 1f, spread.toFloat() / expansionDuration)
++            val progress = waveProgress(spread)
 +            val travel = maxRadius * r.size * progress
-+            val width = r.flashWidth + 2f * travel * r.stretchX
-+            val height = r.flashHeight + 2f * travel * r.stretchY
++            // Keep the visible local cloud near neighbouring keys. The much weaker
++            // far shoulder below retains its original reach into the candidate strip.
++            val localTravel = travel * 0.76f
++            val width = r.flashWidth + 2f * localTravel * r.stretchX
++            val height = r.flashHeight + 2f * localTravel * r.stretchY
 +            val saved = canvas.save()
 +            canvas.translate(r.x + r.driftX * progress, r.y + r.driftY * progress)
++            // Keep the new front vivid and let its older, broader local cloud retreat.
++            // The weak, wider candidate bridge retains its independently fading strength.
++            val localAlpha = alpha * (0.66f + 0.28f * fresh)
 +            // The first glow follows the real rounded key edge, without a circular wave front.
-+            val edgeAlpha = alpha * (1f - smoothstep(0.02f, 0.25f, progress))
++            val edgeAlpha = localAlpha * (1f - smoothstep(0.02f, 0.25f, progress))
 +            if (edgeAlpha > 0.003f) drawKeyEdgeMist(canvas, r, styles[r.colorIndex], edgeAlpha, travel)
-+            drawFluidLayer(canvas, textures, r, styles[r.colorIndex], alpha, width, height, progress)
++            drawFluidLayer(canvas, textures, r, styles[r.colorIndex], localAlpha, width, height, progress)
 +            // A faint wide shoulder carries the same field towards the candidate strip.
 +            // It is also drawn under the keyboard, so the strip has no radius/seam discontinuity.
-+            val farAlpha = alpha * 0.50f * smoothstep(0.06f, 0.32f, progress)
++            val farTail = 1f - smoothstep(450f, 1000f, (frameTime - r.start).toFloat())
++            val farAlpha = alpha * 0.32f * smoothstep(0.06f, 0.32f, progress) * farTail
 +            if (glowOnCandidates && farAlpha > 0.002f) {
 +                drawFluidLayer(canvas, textures, r, styles[r.colorIndex], farAlpha,
 +                    r.flashWidth + 3.3f * travel * r.stretchX,
@@ -3325,9 +3358,12 @@ index 0000000..17b53da
 +        // Geometry is expressed entirely in keyboard pixels. An explicit target rect
 +        // also makes drawBitmap immune to a cached mask's display-density metadata.
 +        borderRect.set(-width / 2f, -height / 2f, width / 2f, height / 2f)
-+        style.paint.alpha = (alpha * (1f - blend) * 255f).toInt()
++        // Compensate the second SRC_OVER phase so a bright centre does not dip
++        // every time the cached masks cross-fade through their midpoint.
++        val firstAlpha = (alpha * (1f - blend)).coerceIn(0f, 0.999f)
++        style.paint.alpha = (firstAlpha * 255f).toInt()
 +        canvas.drawBitmap(textures.fluid[r.shape][lower], null, borderRect, style.paint)
-+        style.paint.alpha = (alpha * blend * 255f).toInt()
++        style.paint.alpha = (alpha * blend / (1f - firstAlpha) * 255f).coerceIn(0f, 255f).toInt()
 +        canvas.drawBitmap(textures.fluid[r.shape][lower + 1], null, borderRect, style.paint)
 +        canvas.restoreToCount(saved)
 +    }
@@ -3447,7 +3483,8 @@ index 0000000..17b53da
 +        }
 +        private const val MAX_RIPPLES = 32
 +        private const val MAX_KEY_FACES = 96
-+        private const val LIGHT_BUDGET = 0.60f
++        private const val FRESH_LIGHT_BUDGET = 1.50f
++        private const val OLD_LIGHT_BUDGET = 0.45f
 +        private const val FLUID_PHASES = 9
 +        private const val FLUID_TEXTURE_SIZE = 128
 +
@@ -3578,19 +3615,26 @@ index 0000000..17b53da
 +            val nx = (x - c) / c
 +            val ny = (y - c) / c
 +            val theta = atan2(ny, nx)
-+            val warp = (noise.fbm(nx * 1.7f + ox, ny * 1.7f + oy) - 0.5f)
-+            val lobes = 1f + p * (0.13f * cos(2f * theta + phases[0]) +
-+                0.10f * cos(3f * theta + phases[1]) + 0.06f * cos(5f * theta + phases[2]))
++            // Phase advection gives the cloud internal motion, rather than a static
++            // stamp that only gets larger. All of this is prepared off the draw path.
++            val advectX = p * 0.55f * cos(phases[3])
++            val advectY = p * 0.45f * kotlin.math.sin(phases[3])
++            val warp = (noise.fbm(nx * 1.7f + ox + advectX, ny * 1.7f + oy + advectY) - 0.5f)
++            val lobes = 1f + p * (0.13f * cos(2f * theta + phases[0] + p * 0.8f) +
++                0.10f * cos(3f * theta + phases[1] - p * 0.6f) + 0.06f * cos(5f * theta + phases[2] + p))
 +            val power = 8f - 5.5f * p
 +            val footprint = (abs(nx).pow(power) + abs(ny).pow(power)).pow(1f / power)
 +            // Warping may move a point inside the source footprint. Negative distance
 +            // cannot enter a fractional power: it would create NaN/transparent holes.
 +            val distance = ((footprint + warp * 0.13f * p) / lobes).coerceAtLeast(0f)
-+            val core = exp(-(distance / (0.72f - 0.10f * p)).pow(2.4f))
-+            val feather = 1f - PressEffect.smoothstep(0.40f, 0.98f, distance)
-+            val texture = 1f - p * 0.28f + p * 0.38f * noise.fbm(nx * 1.1f + oy, ny * 1.1f + ox)
++            val core = exp(-(distance / (0.73f - 0.04f * p)).pow(2.2f))
++            // A wide irregular shoulder makes the travelling edge visible, while the
++            // filled centre and broad feathering prevent a hollow or hard-edged ring.
++            val shoulder = 0.28f * exp(-((distance - (0.48f + 0.10f * p)) / 0.22f).pow(2))
++            val feather = 1f - PressEffect.smoothstep(0.58f, 1.02f, distance)
++            val texture = 1f - p * 0.18f + p * 0.24f * noise.fbm(nx * 1.1f + oy + advectY, ny * 1.1f + ox + advectX)
 +            val outer = 1f - PressEffect.smoothstep(0.86f, 1f, max(abs(nx), abs(ny)))
-+            val alpha = (core * feather * texture * outer).coerceIn(0f, 1f)
++            val alpha = ((0.88f * core + shoulder) * feather * texture * outer).coerceIn(0f, 1f)
 +            pixels[y * size + x] = ((alpha * 255f + 0.5f).toInt() shl 24) or 0xffffff
 +        }
 +        return pixels
@@ -3672,10 +3716,10 @@ index 0000000..17b53da
 +}
 diff --git a/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
 new file mode 100644
-index 0000000..6dbb500
+index 0000000..bb6e80b
 --- /dev/null
 +++ b/app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffectTrail.kt
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,87 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -3704,6 +3748,8 @@ index 0000000..6dbb500
 +        var driftY = 0f
 +        var start = 0L
 +        var releasedAt = -1L
++        /** Once older light has been dimmed by typing, ending the burst cannot relight it. */
++        var lightGain = 1f
 +
 +        fun copyFrom(other: Ripple) {
 +            x = other.x; y = other.y
@@ -3713,7 +3759,7 @@ index 0000000..6dbb500
 +            rotation = other.rotation; spin = other.spin; size = other.size
 +            stretchX = other.stretchX; stretchY = other.stretchY
 +            driftX = other.driftX; driftY = other.driftY
-+            start = other.start; releasedAt = other.releasedAt
++            start = other.start; releasedAt = other.releasedAt; lightGain = other.lightGain
 +        }
 +    }
 +
@@ -5677,10 +5723,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..2f55472
+index 0000000..d10fa4d
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,779 @@
+@@ -0,0 +1,781 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -6169,7 +6215,9 @@ index 0000000..2f55472
 +        controller.visible()
 +        layout(root, 360, 312)
 +        keyboard.onInputMethodUpdate(ime(false))
-+        val effect = ReflectionHelpers.getField<Any>(keyboard, "pressEffectLayer")
++        val effect = ReflectionHelpers.getField<org.fcitx.fcitx5.android.input.keyboard.PressEffect>(keyboard, "pressEffectLayer")
++        effect.prepareTexturesForTest()
++        ReflectionHelpers.setField(effect, "random", kotlin.random.Random(1401))
 +        val start = SystemClock.uptimeMillis()
 +        var reviewTime = start
 +        val reviewClock: () -> Long = { reviewTime }
@@ -6733,10 +6781,10 @@ index 0000000..990d955
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
 new file mode 100644
-index 0000000..21039f4
+index 0000000..a34c98f
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectMasksTest.kt
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,83 @@
 +package org.fcitx.fcitx5.android
 +
 +import org.fcitx.fcitx5.android.input.keyboard.PressEffectMasks
@@ -6796,13 +6844,36 @@ index 0000000..21039f4
 +        assertEquals(PressEffectMasks.SHAPES, hashes.size)
 +    }
 +
++    @Test
++    fun fluidTravellingShoulderHasAreaAndRemainsBelowItsFilledCentre() {
++        val noise = PressEffectMasks.Noise(20261004)
++        val size = 128
++        var total = 0L
++        var samples = 0
++        repeat(PressEffectMasks.SHAPES) { shape ->
++            val pixels = PressEffectMasks.fluid(noise, PressEffectMasks.bodySeed(shape), 0.6f, size)
++            val centre = pixels[(size / 2) * size + size / 2] ushr 24
++            assertTrue("The shoulder must retain a filled core", centre > 180)
++            for (y in 0 until size) for (x in 0 until size) {
++                val nx = (x - (size - 1) / 2f) / ((size - 1) / 2f)
++                val ny = (y - (size - 1) / 2f) / ((size - 1) / 2f)
++                val radius = kotlin.math.hypot(nx, ny)
++                if (radius in 0.6f..0.8f) {
++                    total += pixels[y * size + x] ushr 24
++                    samples++
++                }
++            }
++        }
++        assertTrue("The travelling shoulder must not disappear into a nearly transparent edge", total.toDouble() / samples >= 45.0)
++    }
++
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
 new file mode 100644
-index 0000000..6697338
+index 0000000..62e359b
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt
-@@ -0,0 +1,498 @@
+@@ -0,0 +1,630 @@
 +package org.fcitx.fcitx5.android
 +
 +import android.app.Activity
@@ -6835,7 +6906,7 @@ index 0000000..6697338
 +    private class Harness(press: Boolean = false, expansion: Int = 500, fade: Int = 280,
 +        ignition: Int = 100, hold: Int = 260, retreat: Int = 480,
 +        production: Boolean = false, palette: IntArray = PressEffect.CYBERPUNK, sequential: Boolean = false,
-+        glowBrightness: Int = 100) {
++        glowBrightness: Int = 100, randomSeed: Int? = null) {
 +        val controller = Robolectric.buildActivity(Activity::class.java).setup()
 +        val activity = controller.get()
 +        val root = FrameLayout(activity)
@@ -6858,6 +6929,7 @@ index 0000000..6697338
 +            sequentialColors = sequential, glowBrightnessPercent = glowBrightness)
 +
 +        init {
++            if (randomSeed != null) org.robolectric.util.ReflectionHelpers.setField(effect, "random", kotlin.random.Random(randomSeed))
 +            // Reproduce attach-before-visible without relying on a subsequent visibility callback.
 +            effect.setActive(true)
 +            assertFalse(envelope.running)
@@ -7183,6 +7255,32 @@ index 0000000..6697338
 +    }
 +
 +    @Test
++    fun productionRepressAfterAnUndrawnExpiredFacePreservesItsPreviewColour() {
++        val cyan = 0xff00ffff.toInt()
++        val darkBlue = 0xff202060.toInt()
++        val h = Harness(press = true, production = true, hold = 120, retreat = 1400,
++            palette = intArrayOf(cyan, darkBlue), sequential = true)
++        try {
++            h.render(0)
++            h.press(5, 0, 0)
++            assertEquals(cyan, PressEffect.colorForKey(5))
++            assertTrue(h.surface(5, 0).second > 0.5f)
++            h.now = 40
++            h.effect.onRelease(0)
++            // Input can arrive before the next traversal after a busy main thread.
++            // Do not draw while the old 120 + 1400 ms key tail expires.
++            h.press(5, 0, 1700)
++            assertEquals("Retiring an undrawn old face must preserve the new popup tint",
++                darkBlue, PressEffect.colorForKey(5))
++            val fresh = h.surface(5, 1700)
++            val pixel = fresh.first.getPixel(30, 50)
++            assertTrue("The real key surface must use the new dark-blue tint, not old cyan",
++                Color.blue(pixel) > Color.green(pixel) * 2)
++            assertTrue("Legend contrast must follow the new colour", fresh.second < 0.3f)
++        } finally { h.finish() }
++    }
++
++    @Test
 +    fun productionStaticHeldFaceStopsSchedulingWholeKeyboardFrames() {
 +        val h = Harness(press = true, production = true, hold = 120, retreat = 1400)
 +        try {
@@ -7298,6 +7396,111 @@ index 0000000..6697338
 +            legacy.effect.setTextureDensityForTest(Bitmap.DENSITY_NONE)
 +            legacy.finish()
 +        }
++    }
++
++    @Test
++    fun productionSinglePressShowsAnEarlyAreaOfLightAndAnOutwardMovingFront() {
++        val h = Harness(press = true, production = true, expansion = 900, fade = 450,
++            hold = 120, retreat = 1400, palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0)
++            h.press(401, 0, 0)
++            h.now = 50
++            h.effect.onRelease(0)
++            fun outsideCount(image: Bitmap, threshold: Int): Int {
++                var count = 0
++                for (y in 0 until image.height) for (x in 0 until image.width) {
++                    if (x in 262 until 338 && y in 57 until 143) continue
++                    val pixel = image.getPixel(x, y)
++                    if (maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) >= threshold) count++
++                }
++                return count
++            }
++            fun lightRadius(image: Bitmap): Double {
++                var energy = 0.0
++                var radialEnergy = 0.0
++                for (y in 0 until image.height) for (x in 0 until image.width) {
++                    if (x in 262 until 338 && y in 57 until 143) continue
++                    val pixel = image.getPixel(x, y)
++                    val value = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++                    if (value < 30) continue
++                    energy += value
++                    radialEnergy += value * kotlin.math.hypot((x - 300).toDouble(), (y - 100).toDouble())
++                }
++                return if (energy > 0) radialEnergy / energy else 0.0
++            }
++            val early = h.render(200)
++            val late = h.render(550)
++            save(early, "flow-single-200ms")
++            save(late, "flow-single-550ms")
++            val earlyArea = outsideCount(early, 60)
++            assertTrue("200ms must show a visible area outside the key, not a few changed pixels (area=$earlyArea)", earlyArea >= 600)
++            val earlyRadius = lightRadius(early)
++            val lateRadius = lightRadius(late)
++            assertTrue("The light field must visibly travel outwards (r200=$earlyRadius,r550=$lateRadius)", lateRadius >= earlyRadius + 20.0)
++        } finally { h.finish() }
++    }
++
++    @Test
++    fun productionRapidTypingKeepsVisibleNewLightAndCannotRelightOldWavesAfterStopping() {
++        val h = Harness(press = true, production = true, expansion = 900, fade = 450,
++            hold = 120, retreat = 1400, palette = intArrayOf(0xff00ffff.toInt()), randomSeed = 1401)
++        try {
++            h.effect.prepareTexturesForTest()
++            h.render(0)
++            var visibleFrames = 0
++            var inputPeak = 0
++            var lastTime = 0L
++            repeat(12) { i ->
++                val time = i * 150L
++                h.press(500 + i, 0, time, intArrayOf(220, 300, 380, 300)[i % 4])
++                h.render(time)
++                h.now = time + 50
++                h.effect.onRelease(0)
++                h.render(time + 50)
++                lastTime = time + 149
++                val image = h.render(lastTime)
++                if (i >= 4) {
++                    var area = 0
++                    for (y in 0 until image.height) for (x in 0 until image.width) {
++                        // Exclude every pressed key-cell in this synthetic row.
++                        if (x in 180 until 420 && y in 55 until 145) continue
++                        val pixel = image.getPixel(x, y)
++                        val value = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++                        inputPeak = maxOf(inputPeak, value)
++                        if (value >= 60) area++
++                    }
++                    if (area >= 1500) visibleFrames++
++                    val trail = org.robolectric.util.ReflectionHelpers.getField<org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail>(h.effect, "ripples")
++                    assertTrue("Typing must not divide the latest front down to a fifth", trail[trail.size - 1].lightGain >= 0.45f)
++                }
++                if (i == 11) save(image, "flow-typing-active")
++            }
++            assertTrue("Repeated input needs a sustained visible field outside all key-cells", visibleFrames >= 6)
++            val gains = mutableMapOf<Long, Float>()
++            val trail = org.robolectric.util.ReflectionHelpers.getField<org.fcitx.fcitx5.android.input.keyboard.PressEffectTrail>(h.effect, "ripples")
++            for (i in 0 until trail.size) gains[trail[i].start] = trail[i].lightGain
++            var postStopPeak = 0
++            for (step in 1..12) {
++                val image = h.render(lastTime + step * 100L)
++                for (i in 0 until trail.size) {
++                    val r = trail[i]
++                    val before = gains[r.start]!!
++                    assertTrue("Removing other waves cannot brighten an older wave", r.lightGain <= before + 0.0001f)
++                    gains[r.start] = r.lightGain
++                }
++                if (step >= 4) {
++                    for (y in 0 until image.height) for (x in 0 until image.width) {
++                        if (x in 180 until 420 && y in 55 until 145) continue
++                        val pixel = image.getPixel(x, y)
++                        postStopPeak = maxOf(postStopPeak, Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++                    }
++                }
++                if (step == 4) save(image, "flow-typing-release-400ms")
++            }
++            assertTrue("The tail must not become brighter than the input field", postStopPeak <= inputPeak + 20)
++        } finally { h.finish() }
 +    }
 +
 +}
@@ -7614,10 +7817,10 @@ index 6b9129f..afa223b 100644
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
 new file mode 100644
-index 0000000..03b2bdc
+index 0000000..ee21b7a
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/V14PreviewRenderingTest.kt
-@@ -0,0 +1,477 @@
+@@ -0,0 +1,637 @@
 +/*
 + * SPDX-License-Identifier: LGPL-2.1-or-later
 + * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
@@ -7683,7 +7886,9 @@ index 0000000..03b2bdc
 +import splitties.dimensions.dp
 +import java.io.File
 +import java.time.Duration
++import java.util.Locale
 +import kotlin.math.abs
++import kotlin.random.Random
 +
 +/** Review frames are drawn by the same Android views and touch path as the APK. */
 +@RunWith(RobolectricTestRunner::class)
@@ -7746,7 +7951,7 @@ index 0000000..03b2bdc
 +
 +    private fun save(image: Bitmap, path: String) {
 +        val file = File("build/outputs/effect-checks/$path.png")
-+        file.parentFile.mkdirs()
++        file.parentFile!!.mkdirs()
 +        file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
 +    }
 +
@@ -7759,8 +7964,96 @@ index 0000000..03b2bdc
 +        if (english) "keyboard-us" else "rime", "", "", "", "",
 +        if (english) "en" else "zh", "", false, InputMethodSubMode())
 +
++    private fun screenBoundsIn(view: View, root: View): Rect? {
++        if (!view.isShown) return null
++        val rectangle = Rect()
++        if (!view.getGlobalVisibleRect(rectangle)) return null
++        val rootRectangle = Rect()
++        if (!root.getGlobalVisibleRect(rootRectangle)) return null
++        rectangle.offset(-rootRectangle.left, -rootRectangle.top)
++        return rectangle
++    }
++
++    private fun exclude(mask: BooleanArray, rectangle: Rect, width: Int, height: Int) {
++        for (y in rectangle.top.coerceAtLeast(0) until rectangle.bottom.coerceAtMost(height)) {
++            for (x in rectangle.left.coerceAtLeast(0) until rectangle.right.coerceAtMost(width)) {
++                mask[y * width + x] = false
++            }
++        }
++    }
++
++    private data class LightArea(
++        val pixels: Int,
++        val meanMaxRgb: Double,
++        val peak: Int,
++        val colour30: Int,
++        val colour60: Int,
++        val centreX: Double,
++        val centreY: Double
++    ) {
++        val fraction30 get() = colour30.toDouble() / pixels.coerceAtLeast(1)
++    }
++
++    /** White glyphs and neutral highlights cannot satisfy the coloured-light thresholds. */
++    private fun lightArea(pixels: IntArray, mask: BooleanArray, width: Int): LightArea {
++        var count = 0
++        var sum = 0L
++        var peak = 0
++        var colour30 = 0
++        var colour60 = 0
++        var weights = 0L
++        var weightedX = 0L
++        var weightedY = 0L
++        for (index in pixels.indices) {
++            if (!mask[index]) continue
++            val pixel = pixels[index]
++            val red = Color.red(pixel)
++            val green = Color.green(pixel)
++            val blue = Color.blue(pixel)
++            val maximum = maxOf(red, green, blue)
++            val chroma = maximum - minOf(red, green, blue)
++            count++
++            sum += maximum
++            peak = maxOf(peak, maximum)
++            if (maximum > 30 && chroma >= 15) {
++                colour30++
++                if (maximum > 60) colour60++
++                val weight = maximum - 30L
++                weights += weight
++                weightedX += (index % width) * weight
++                weightedY += (index / width) * weight
++            }
++        }
++        return LightArea(count, sum.toDouble() / count.coerceAtLeast(1), peak, colour30, colour60,
++            if (weights > 0) weightedX.toDouble() / weights else -1.0,
++            if (weights > 0) weightedY.toDouble() / weights else -1.0)
++    }
++
++    private data class VisibilityFrame(
++        val frame: Int,
++        val gap: LightArea,
++        val candidate: LightArea,
++        val fixedGap: LightArea
++    ) {
++        fun csv() = String.format(Locale.US,
++            "%d,%d,%d,%.2f,%d,%d,%d,%.2f,%.2f,%d,%.2f,%d,%d,%d,%.2f",
++            frame, frame * 50, gap.pixels, gap.meanMaxRgb, gap.peak, gap.colour30, gap.colour60,
++            gap.centreX, gap.centreY, candidate.pixels, candidate.meanMaxRgb, candidate.peak,
++            candidate.colour30, candidate.colour60, fixedGap.meanMaxRgb)
++    }
++
++    private fun longestRun(samples: List<VisibilityFrame>, condition: (VisibilityFrame) -> Boolean): Int {
++        var longest = 0
++        var current = 0
++        for (sample in samples) {
++            current = if (condition(sample)) current + 1 else 0
++            longest = maxOf(longest, current)
++        }
++        return longest
++    }
++
 +    /** Same reusable UI and lifecycle as PopupComponent, without its engine dependencies. */
-+    private class PreviewHost(private val root: FrameLayout) {
++    private inner class PreviewHost(private val root: FrameLayout) {
 +        private val entries = mutableMapOf<Int, PopupEntryUi>()
 +        private val free = ArrayDeque<PopupEntryUi>()
 +        private val rootLocation = IntArray(2)
@@ -7807,6 +8100,10 @@ index 0000000..03b2bdc
 +
 +        fun entry(viewId: Int) = entries[viewId]
 +
++        fun visibleCharacterBounds(): List<Rect> = entries.values.mapNotNull {
++            if (it.root.alpha > 0f) screenBoundsIn(it.textView, root) else null
++        }
++
 +        fun stop() {
 +            entries.values.forEach { it.previewLifecycle.hideImmediately() }
 +            free.forEach { it.previewLifecycle.hideImmediately() }
@@ -7850,6 +8147,8 @@ index 0000000..03b2bdc
 +        keyboard.onPunctuationUpdate(mapOf("," to "，", "." to "。"))
 +        val effect = ReflectionHelpers.getField<PressEffect>(keyboard, "pressEffectLayer")
 +        effect.prepareTexturesForTest()
++        // Fix only this review/test's random stream; the APK continues to choose random colours.
++        ReflectionHelpers.setField(effect, "random", Random(1401))
 +        var reviewTime = SystemClock.uptimeMillis()
 +        ReflectionHelpers.setField(effect, "clock", { reviewTime } as () -> Long)
 +        val start = reviewTime
@@ -7896,10 +8195,47 @@ index 0000000..03b2bdc
 +                adapter.updateCandidates(words, words.size)
 +            }
 +        }
-+        var changedGapPixels = 0
-+        var changedCandidateBackgroundPixels = 0
-+        var candidateBackgroundPeak = 0
 +        var readableGlyphPixels = 0
++        val keyboardRectangle = screenBoundsIn(keyboard, root)!!
++        val barRectangle = screenBoundsIn(bar, root)!!
++        assertEquals(Rect(0, 60, root.width, root.height), keyboardRectangle)
++        assertEquals(Rect(0, 0, root.width, 60), barRectangle)
++        val idlePixels = IntArray(root.width * root.height).also {
++            idle.getPixels(it, 0, root.width, 0, 0, root.width, root.height)
++        }
++        // Only the baseline's black keyboard gaps are eligible: key backgrounds,
++        // letters, icons, and shadows do not count as light propagating outside a key.
++        val baseGapMask = BooleanArray(idlePixels.size) { pixel ->
++            keyboardRectangle.contains(pixel % root.width, pixel / root.width) &&
++                maxOf(Color.red(idlePixels[pixel]), Color.green(idlePixels[pixel]), Color.blue(idlePixels[pixel])) <= 3
++        }
++        // The top 1/8 of the actual candidate bar is outside its 24sp glyph ink.
++        // Current popup bounds are subtracted again before measuring every frame.
++        val candidateMask = BooleanArray(idlePixels.size) { pixel ->
++            val y = pixel / root.width
++            barRectangle.contains(pixel % root.width, y) && y < barRectangle.top + barRectangle.height() / 8
++        }
++        val keyRectangles = keys(keyboard).associate { it.id to screenBoundsIn(it, root)!! }
++        val lastPressTimes = mutableMapOf<Int, Long>()
++        val faceTail = 50L + ThemeManager.prefs.pressKeyHoldTime.getValue() +
++            ThemeManager.prefs.pressKeyRetreatTime.getValue()
++        // A fixed, conservative mask enables before/after-stop comparisons without
++        // gaining newly eligible pixels merely because an old key face has disappeared.
++        val fixedGapMask = baseGapMask.copyOf()
++        val inputLetters = input.map(Char::toString).toSet()
++        keys(keyboard).filter { (it.def as? KeyDef.Appearance.Text)?.displayText?.lowercase() in inputLetters }
++            .forEach { key ->
++                val rectangle = keyRectangles.getValue(key.id)
++                exclude(fixedGapMask, rectangle, root.width, root.height)
++                val previewRect = Rect(
++                    ((rectangle.left + rectangle.right - root.dp(44)) / 2).coerceIn(0, root.width - root.dp(44)),
++                    rectangle.bottom - root.dp(100) - root.dp(ThemeManager.prefs.keyVerticalMargin.getValue()),
++                    0, 0)
++                previewRect.right = previewRect.left + root.dp(44)
++                previewRect.bottom = previewRect.top + root.dp(52)
++                exclude(fixedGapMask, previewRect, root.width, root.height)
++            }
++        val visibility = ArrayList<VisibilityFrame>()
 +        // 6.67 keys/sec, down for 50 ms, 20 fps; one second of the release tail is retained.
 +        for (frame in 0..92) {
 +            reviewTime = start + frame * 50L
@@ -7911,6 +8247,7 @@ index 0000000..03b2bdc
 +                }
 +                val rect = bounds(keyboard, key)
 +                val action = if (frame % 3 == 0) MotionEvent.ACTION_DOWN else MotionEvent.ACTION_UP
++                if (action == MotionEvent.ACTION_DOWN) lastPressTimes[key.id] = reviewTime
 +                val event = MotionEvent.obtain(start + index * 150L, reviewTime, action,
 +                    rect.exactCenterX(), rect.exactCenterY(), 0)
 +                assertTrue(keyboard.dispatchTouchEvent(event))
@@ -7944,36 +8281,61 @@ index 0000000..03b2bdc
 +                }
 +                assertTrue("The character stays legible above the coloured face", readableGlyphPixels > 5)
 +            }
-+            if (frame in 8..70) {
-+                for (row in 1..4) for (x in 0 until 600) {
-+                    val y = 60 + row * 72
-+                    if (image.getPixel(x, y) != idle.getPixel(x, y)) changedGapPixels++
-+                }
-+                // Above the 24sp text ink and outside all popup bounds: only the genuine
-+                // RippleBarView extension can change this candidate background strip.
-+                for (x in 0 until 600) {
-+                    val pixel = image.getPixel(x, 2)
-+                    if (pixel != idle.getPixel(x, 2)) changedCandidateBackgroundPixels++
-+                    candidateBackgroundPeak = maxOf(candidateBackgroundPeak,
-+                        Color.red(pixel), Color.green(pixel), Color.blue(pixel))
++            val gapMask = baseGapMask.copyOf()
++            val candidateBackgroundMask = candidateMask.copyOf()
++            // KeySurfacePainter's static coloured edge can extend within its touch
++            // cell. Exclude that whole measured cell for every still-coloured key.
++            for ((id, pressedAt) in lastPressTimes) {
++                if (reviewTime - pressedAt <= faceTail) {
++                    exclude(gapMask, keyRectangles.getValue(id), root.width, root.height)
 +                }
 +            }
++            for (rectangle in previews.visibleCharacterBounds()) {
++                exclude(gapMask, rectangle, root.width, root.height)
++                exclude(candidateBackgroundMask, rectangle, root.width, root.height)
++            }
++            val pixels = IntArray(idlePixels.size)
++            image.getPixels(pixels, 0, root.width, 0, 0, root.width, root.height)
++            visibility.add(VisibilityFrame(frame, lightArea(pixels, gapMask, root.width),
++                lightArea(pixels, candidateBackgroundMask, root.width), lightArea(pixels, fixedGapMask, root.width)))
 +            image.recycle()
 +            // Advance only a bounded interval; never run a perpetually scheduled light to idle.
 +            advance(50)
 +        }
 +        assertEquals(input, typed.toString())
 +        assertEquals("两个黄鹂鸣翠柳", adapter.candidates.first().text)
-+        assertTrue("Light must spread into the real gaps outside pressed key faces", changedGapPixels > 100)
-+        assertTrue("The same light must reach the candidate bar in its actual window coordinates",
-+            changedCandidateBackgroundPixels > 30)
-+        assertTrue("Candidate light must be visibly tinted, rather than merely one changed pixel: $candidateBackgroundPeak",
-+            candidateBackgroundPeak > 16)
++        val active = visibility.filter { it.frame in 6..70 }
++        val tail = visibility.filter { it.frame > 70 }
++        val summary = String.format(Locale.US,
++            "seed=1401\nactive_gap_colour60_peak_area=%d\nactive_gap_colour60_visible_frames=%d\n" +
++                "active_candidate_colour30_longest_run=%d\nactive_fixed_gap_peak_mean=%.2f\ntail_fixed_gap_peak_mean=%.2f\n",
++            active.maxOf { it.gap.colour60 }, active.count { it.gap.colour60 >= 750 },
++            longestRun(active) { it.candidate.fraction30 >= 0.15 },
++            active.maxOf { it.fixedGap.meanMaxRgb }, tail.maxOf { it.fixedGap.meanMaxRgb })
++        val csv = "frame,time_ms,gap_pixels,gap_mean_maxrgb,gap_peak,gap_colour_gt30,gap_colour_gt60," +
++            "gap_centre_x,gap_centre_y,candidate_strip_pixels,candidate_mean_maxrgb,candidate_peak," +
++            "candidate_colour_gt30,candidate_colour_gt60,fixed_gap_mean_maxrgb\n" +
++            visibility.joinToString("\n") { it.csv() } + "\n"
++        File("build/outputs/effect-checks/v14-typing/visibility.csv").writeText(csv)
 +        File("build/outputs/effect-checks/v14-typing/preview.txt").writeText(
 +            "source=Android TextKeyboard/CandidateUi/RippleBarView/PopupEntryUi\n" +
 +                "graphics=Robolectric NATIVE\nframes=93\nfps=20\nwidth=600\nheight=420\ndensity=hdpi\nlogical_width_dp=400\n" +
 +                "key_interval_ms=150\nkey_hold_ms=50\ninput=$input\n" +
-+                "candidates=replay of real bundled Rime fixture; not live native execution in this UI test\n")
++                "candidates=replay of real bundled Rime fixture; not live native execution in this UI test\n" +
++                "measurement=actual KeyView bounds; baseline black gaps; active key cells and popup glyph bounds excluded\n" +
++                "coloured_pixel=maxRGB>30/60 and channel spread>=15\n" + summary + "\n" + csv)
++        assertTrue("A moving light field must cover a visible area outside active key faces: $summary",
++            active.maxOf { it.gap.colour60 } >= 1500)
++        assertTrue("Rapid input must retain a visible external light field over multiple frames: $summary",
++            active.count { it.gap.colour60 >= 750 } >= 18)
++        assertTrue("Candidate light must colour 15% of the clear strip for at least 300ms during input: $summary",
++            longestRun(active) { it.candidate.fraction30 >= 0.15 } >= 6)
++        assertTrue("The keyboard must keep a dark base around the moving local light",
++            active.maxOf { it.gap.meanMaxRgb } < 70.0)
++        assertTrue("The candidate strip must remain dark enough for its text",
++            active.maxOf { it.candidate.meanMaxRgb } < 45.0)
++        assertTrue("Stopping input must not release the old light into a much brighter wash: $summary",
++            tail.maxOf { it.fixedGap.meanMaxRgb } <= active.maxOf { it.fixedGap.meanMaxRgb } * 1.6 + 5.0)
 +        previews.stop()
 +        keyboard.onDetach()
 +        controller.pause().stop().destroy()
@@ -7994,6 +8356,7 @@ index 0000000..03b2bdc
 +        keyboard.keyActionListener = KeyActionListener { _, _ -> }
 +        val effect = ReflectionHelpers.getField<PressEffect>(keyboard, "pressEffectLayer")
 +        effect.prepareTexturesForTest()
++        ReflectionHelpers.setField(effect, "random", Random(1401))
 +        var reviewTime = SystemClock.uptimeMillis()
 +        ReflectionHelpers.setField(effect, "clock", { reviewTime } as () -> Long)
 +        val start = reviewTime

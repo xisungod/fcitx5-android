@@ -1,0 +1,34 @@
+{
+  "tests": {
+    "tests": 85,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "metrics": {
+    "gap_mean_maxrgb": {
+      "max": 54.17,
+      "frame": 14
+    },
+    "gap_colour_gt60": {
+      "max": 18838.0,
+      "frame": 26
+    },
+    "candidate_mean_maxrgb": {
+      "max": 27.4,
+      "frame": 64
+    },
+    "candidate_colour_gt30": {
+      "max": 2109.0,
+      "frame": 65
+    },
+    "fixed_gap_mean_maxrgb": {
+      "max": 56.21,
+      "frame": 35
+    },
+    "gap_frames_gt60_area750": 65,
+    "candidate_visible_run": 10,
+    "tail_fixed_gap_peak": 43.68,
+    "original_4line_mean": 72.19652777777777
+  }
+}
