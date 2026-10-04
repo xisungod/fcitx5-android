@@ -1,0 +1,138 @@
+{
+  "isolated": {
+    "mode": "isolated",
+    "host_package": "org.fcitx.fcitx5.android.xuancai.black.v14",
+    "rime_package": "org.fcitx.fcitx5.android.plugin.rime.xuancai.black.v14",
+    "queries": [
+      "org.fcitx.fcitx5.android.xuancai.black.v14"
+    ],
+    "metadata": [
+      "org.fcitx.fcitx5.android.xuancai.black.v14.plugin.METADATA"
+    ],
+    "manifest_actions": [
+      "org.fcitx.fcitx5.android.xuancai.black.v14.plugin.MANIFEST"
+    ],
+    "version_code": 802,
+    "version_name": "xuancai-black-v14",
+    "actual_merged_manifests_sha256": {
+      "app": "9ee9c57bbfacab6f2d0b41315c8a96c205eea1791a5501bdc8d62c2b06b96e03",
+      "rime": "9271b9247f09dd99ab7962dc008dc6dc03b7011e7017836fef8356b4bb63d275"
+    },
+    "result": "PASS"
+  },
+  "stable": {
+    "mode": "stable",
+    "host_package": "org.fcitx.fcitx5.android.xuancai.black",
+    "rime_package": "org.fcitx.fcitx5.android.plugin.rime.xuancai.black",
+    "queries": [
+      "org.fcitx.fcitx5.android.xuancai.black"
+    ],
+    "metadata": [
+      "org.fcitx.fcitx5.android.xuancai.black.plugin.METADATA"
+    ],
+    "manifest_actions": [
+      "org.fcitx.fcitx5.android.xuancai.black.plugin.MANIFEST"
+    ],
+    "version_code": 802,
+    "version_name": "xuancai-black-v14",
+    "actual_merged_manifests_sha256": {
+      "app": "cbe9c6d5a378a5da37e6c7a2d4a3538f4d3f382946678280d43ac1186e25effc",
+      "rime": "66483367eb587b6adf60de5a195b13e0384787ef25d4e15df87cb188b9900c42"
+    },
+    "result": "PASS",
+    "signing_note": "Package/manifest mode only; no signing credentials inspected or used locally"
+  },
+  "apk_parser_checks": {
+    "fixture_type": "synthetic APKs with aapt-generated binary manifests, not production artifacts",
+    "checks": [
+      {
+        "case": "isolated matching binary manifests",
+        "expected": "pass",
+        "actual": "pass"
+      },
+      {
+        "case": "isolated wrong-package",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime package org.fcitx.fcitx5.android.plugin.rime.debug does not match host org.fcitx.fcitx5.android.xuancai.black.v14; expected org.fcitx.fcitx5.android.plugin.rime.xuancai.black.v14"
+      },
+      {
+        "case": "isolated wrong-query",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime host package queries ['org.fcitx.fcitx5.android.debug'] do not match org.fcitx.fcitx5.android.xuancai.black.v14"
+      },
+      {
+        "case": "isolated wrong-metadata",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime metadata host mismatch: ['org.fcitx.fcitx5.android.debug.plugin.METADATA']"
+      },
+      {
+        "case": "isolated wrong-action",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime manifest intent host mismatch: ['org.fcitx.fcitx5.android.debug.plugin.MANIFEST']"
+      },
+      {
+        "case": "isolated wrong-version",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "/tmp/xuancai-v14-apk-host-fixtures/isolated-wrong-version/fixture.apk: expected arm64 versionCode 802, got 801"
+      },
+      {
+        "case": "isolated wrong-abi",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "/tmp/xuancai-v14-apk-host-fixtures/isolated-wrong-abi/fixture.apk: expected only arm64-v8a, got ['x86_64']"
+      },
+      {
+        "case": "stable matching binary manifests",
+        "expected": "pass",
+        "actual": "pass"
+      },
+      {
+        "case": "stable wrong-package",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime package org.fcitx.fcitx5.android.plugin.rime.debug does not match host org.fcitx.fcitx5.android.xuancai.black; expected org.fcitx.fcitx5.android.plugin.rime.xuancai.black"
+      },
+      {
+        "case": "stable wrong-query",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime host package queries ['org.fcitx.fcitx5.android.debug'] do not match org.fcitx.fcitx5.android.xuancai.black"
+      },
+      {
+        "case": "stable wrong-metadata",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime metadata host mismatch: ['org.fcitx.fcitx5.android.debug.plugin.METADATA']"
+      },
+      {
+        "case": "stable wrong-action",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "Rime manifest intent host mismatch: ['org.fcitx.fcitx5.android.debug.plugin.MANIFEST']"
+      },
+      {
+        "case": "stable wrong-version",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "/tmp/xuancai-v14-apk-host-fixtures/stable-wrong-version/fixture.apk: expected arm64 versionCode 802, got 801"
+      },
+      {
+        "case": "stable wrong-abi",
+        "expected": "reject",
+        "actual": "reject",
+        "reason": "/tmp/xuancai-v14-apk-host-fixtures/stable-wrong-abi/fixture.apk: expected only arm64-v8a, got ['x86_64']"
+      }
+    ]
+  },
+  "build_logs": [
+    "/tmp/xuancai-v14-manifest-isolated.log",
+    "/tmp/xuancai-v14-manifest-stable.log"
+  ],
+  "apk_verifier_log": "/tmp/xuancai-v14-apk-host-verifier-check.log",
+  "source_main_build_gradle_sha256": "81a07a1f747aed97dc6ffb375ab59d0cc4179a15430988bcb7624b38aef538c8"
+}

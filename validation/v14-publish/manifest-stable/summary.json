@@ -1,0 +1,22 @@
+{
+  "mode": "stable",
+  "host_package": "org.fcitx.fcitx5.android.xuancai.black",
+  "rime_package": "org.fcitx.fcitx5.android.plugin.rime.xuancai.black",
+  "queries": [
+    "org.fcitx.fcitx5.android.xuancai.black"
+  ],
+  "metadata": [
+    "org.fcitx.fcitx5.android.xuancai.black.plugin.METADATA"
+  ],
+  "manifest_actions": [
+    "org.fcitx.fcitx5.android.xuancai.black.plugin.MANIFEST"
+  ],
+  "version_code": 802,
+  "version_name": "xuancai-black-v14",
+  "actual_merged_manifests_sha256": {
+    "app": "cbe9c6d5a378a5da37e6c7a2d4a3538f4d3f382946678280d43ac1186e25effc",
+    "rime": "66483367eb587b6adf60de5a195b13e0384787ef25d4e15df87cb188b9900c42"
+  },
+  "result": "PASS",
+  "signing_note": "Package/manifest mode only; no signing credentials inspected or used locally"
+}

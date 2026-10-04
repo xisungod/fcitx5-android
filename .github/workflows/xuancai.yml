@@ -128,7 +128,7 @@ jobs:
           sed -n '1,6p' /tmp/app-badging.txt
           "$SDK_TOOLS/aapt" dump badging /tmp/xuancai-v14/fcitx5-rime-black-v14-arm64.apk > /tmp/rime-badging.txt
           sed -n '1,6p' /tmp/rime-badging.txt
-          python3 /tmp/xuancai-v14-scripts/verify-xuancai-rime-package.py /tmp/xuancai-v14/fcitx5-rime-black-v14-arm64.apk
+          python3 /tmp/xuancai-v14-scripts/verify-xuancai-rime-package.py /tmp/xuancai-v14/fcitx5-rime-black-v14-arm64.apk /tmp/xuancai-v14/fcitx5-xuancai-black-v14-arm64.apk --aapt "$SDK_TOOLS/aapt"
           cd /tmp/xuancai-v14
           sha256sum *.apk *.zip > SHA256SUMS.txt
       - name: 上传安装包

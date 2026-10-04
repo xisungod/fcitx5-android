@@ -1,0 +1,13 @@
+{
+  "baseline": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "patch_sha256": "dc03c070cb2450a482eacb96e1c867f72038b29c57975a971105526d7200b3a2",
+  "files_compared": 103,
+  "clean_apply_check": "passed",
+  "byte_comparison": "passed",
+  "mismatches": [],
+  "changes_since_local_120_ui_tests": [
+    "app/build.gradle.kts"
+  ],
+  "ui_source_unchanged": true,
+  "ci_will_retest_publish_commit": true
+}
