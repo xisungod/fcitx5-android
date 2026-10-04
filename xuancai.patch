@@ -4861,10 +4861,10 @@ index 0000000..c615b8d
 +}
 diff --git a/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
 new file mode 100644
-index 0000000..cc900af
+index 0000000..b03321e
 --- /dev/null
 +++ b/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt
-@@ -0,0 +1,755 @@
+@@ -0,0 +1,757 @@
 +package org.fcitx.fcitx5.android
 +
 +import androidx.activity.ComponentActivity
@@ -5252,6 +5252,7 @@ index 0000000..cc900af
 +        val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY(), 0)
 +        keyboard.dispatchTouchEvent(down)
 +        down.recycle()
++        render(keyboard) // first pass lets the legend switch its ink
 +        val lit = render(keyboard)
 +        val face = lit.getPixel(bounds.left + 10, bounds.top + 10)
 +        assertTrue("A bright key face must not be dimmed by its own dark background",
@@ -5262,8 +5263,9 @@ index 0000000..cc900af
 +            if (minOf(Color.red(old), Color.green(old), Color.blue(old)) >= 242) {
 +                whitePixels++
 +                val pixel = lit.getPixel(x, y)
-+                assertTrue("The colour must not paint over the character",
-+                    minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) >= 235)
++                // V13: the character stays above the colour and switches to dark ink on a bright face
++                assertTrue("The character must stay above the colour, in dark ink on a bright key",
++                    maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) <= 90)
 +            }
 +        }
 +        assertTrue(whitePixels > 5)
