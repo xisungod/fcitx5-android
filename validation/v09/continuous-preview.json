@@ -1,0 +1,20 @@
+{
+  "render_source_commit": "fabad35c50a9be835e4c05fd3f970b7946a6c676",
+  "render_run": "https://github.com/xisungod/fcitx5-android/actions/runs/37163604592",
+  "render_test": "continuousTypingRendersRealKeyColoursPopupsAndRecordedRimeCandidates",
+  "render_test_result": "passed",
+  "input": "lianggehuangkimigcuiliao",
+  "final_first_candidate": "两个黄鹂鸣翠柳",
+  "frames": 141,
+  "frame_interval_ms": 33,
+  "key_interval_ms": 132,
+  "key_hold_ms": 99,
+  "ripple_radius_factor": 0.85,
+  "key_colour_hold_ms": 260,
+  "key_colour_retreat_ms": 480,
+  "gif_duration_ms": 5770,
+  "candidate_data": "Actual librime 1.12.0 + Lua + octagram, fresh user dictionary; captured in app/src/test/resources/xuancai-typing-candidates.tsv using scripts/capture-xuancai-typing.c",
+  "rendering": "Android Views rendered by Robolectric native graphics. Production PressEffect, candidate UI and PopupEntryUi; controlled animation clock. Preview listener reproduces production popup placement and dismisses on release after 99 ms (above the 70 ms minimum). Not a device recording.",
+  "gif_sha256": "cbbdb323aad138907a61fcacedf48dfaf4342517e494623dfc2115a2ea2d792e",
+  "published": false
+}
