@@ -1,0 +1,11 @@
+{
+  "tests": 81,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "classes": 15,
+  "source_commit": "17e225bed3b387b05396ec053baaf8f77dc2e5dd",
+  "local_test_task": ":app:testDebugUnitTest -x :app:generateDataDescriptor",
+  "native_assets": "Validated separately by full GitHub CI build",
+  "preview_graphics": "Robolectric NATIVE; production Android views; not a device recording"
+}
