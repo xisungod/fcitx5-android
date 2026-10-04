@@ -7,5 +7,13 @@
   "source_commit": "17e225bed3b387b05396ec053baaf8f77dc2e5dd",
   "local_test_task": ":app:testDebugUnitTest -x :app:generateDataDescriptor",
   "native_assets": "Validated separately by full GitHub CI build",
-  "preview_graphics": "Robolectric NATIVE; production Android views; not a device recording"
+  "preview_graphics": "Robolectric NATIVE; production Android views; not a device recording",
+  "full_ci": {
+    "source_commit": "17e225bed3b387b05396ec053baaf8f77dc2e5dd",
+    "conclusion": "success",
+    "url": "https://github.com/xisungod/fcitx5-android/actions/runs/37182773568",
+    "main_apk": true,
+    "paired_rime_apk": true,
+    "native_candidate_validation": true
+  }
 }
