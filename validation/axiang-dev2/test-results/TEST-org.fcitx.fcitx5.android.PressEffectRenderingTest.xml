@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.PressEffectRenderingTest" tests="45" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:16.501Z" hostname="566dc45241c0" time="5.674">
+  <properties/>
+  <testcase name="productionStaticHeldFaceStopsSchedulingWholeKeyboardFrames" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.037"/>
+  <testcase name="warmAndCoolPresetFieldsStaySaturatedAndInsideTheirChosenHueFamilyDuringContinuousTyping" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.249"/>
+  <testcase name="keyChangesColourBeforeTheSameWaveExpandsOutwards" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.047"/>
+  <testcase name="productionNativeFrontKeepsTravellingAcrossTheJoin" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.148"/>
+  <testcase name="productionHeldKeyWaitsForItsOwnFingerAndReleaseStartsTheTail" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.048"/>
+  <testcase name="productionSlowWaveHasARealHoldThenUsesTheConfiguredFade" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.091"/>
+  <testcase name="productionExpansionSlowsContinuouslyWithoutInternalPausesOrReacceleration" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.072"/>
+  <testcase name="productionRapidTypingKeepsVisibleNewLightAndCannotRelightOldWavesAfterStopping" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.514"/>
+  <testcase name="productionSoftIgnitionKeepsTheCapContourWhileTheGapLightBuilds" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.058"/>
+  <testcase name="expiredIdleGlowCannotBeRestartedByVisibleDrawing" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.029"/>
+  <testcase name="productionWaveCapacityCannotDeleteAStillVisibleKeyFace" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.019"/>
+  <testcase name="productionV15DisplayClockExpiresAfterTraversalInsteadOfFreezingLaterDraws" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.018"/>
+  <testcase name="productionLongFunctionalHoldKeepsItsReleaseTail" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.039"/>
+  <testcase name="productionV15FieldContinuesMovingDuringHoldAndFadeWithoutMovingCaps" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.113"/>
+  <testcase name="productionLongExpansionHoldAndFadeReachTheirActualConfiguredEnd" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.055"/>
+  <testcase name="productionMaskDensityCannotMoveOrRescaleTheKeyAndItsLight" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.039"/>
+  <testcase name="productionSlowTypingLetsTheWeakBridgeReachTheCandidateStrip" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.193"/>
+  <testcase name="productionV15NinthPressDoesNotReplaceOlderLightWithABoundingBoxOrDimIt" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.12"/>
+  <testcase name="keyColourOutlivesTheWaveThenShrinksToASpotAndClears" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.055"/>
+  <testcase name="productionV15SharedFieldHasFixedStorageWorkAndSaturatedExposure" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.751"/>
+  <testcase name="productionV15ShortCapTrailLeavesTheConnectedFieldVisible" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.04"/>
+  <testcase name="productionGlowBrightnessZeroLeavesTheKeyFaceButRemovesTravellingLight" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.112"/>
+  <testcase name="productionLongSettingsKeepTheNewestTypingLightAndFixedWaveStorage" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.387"/>
+  <testcase name="productionSlideReleasesOnlyTheSlidingPointer" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.03"/>
+  <testcase name="productionV15HoldDeformsTheFrontBeyondWholeFieldTranslationOrScaling" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.083"/>
+  <testcase name="idleSchedulesARealViewInvalidationWithoutTouchEvents" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.021"/>
+  <testcase name="productionRepressAfterAnUndrawnExpiredFacePreservesItsPreviewColour" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.018"/>
+  <testcase name="productionDefaultStrongLightStaysNearThreeToFourColumnsWithWeakVisibleCandidateSpill" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="1.09"/>
+  <testcase name="firstVisibleDrawStartsWithoutAnyKeyPressAndActuallyChangesPixels" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.07"/>
+  <testcase name="productionDefaultNewDownRetainsAtLeastNinetyPercentOfDistantOldLight" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.232"/>
+  <testcase name="productionV15CandidateAndKeyboardShareOneFieldBuildPerDisplayFrame" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.021"/>
+  <testcase name="productionRepeatedKeyUsesOnlyItsNewColourAndLegendBrightness" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.018"/>
+  <testcase name="productionExpansionSliderChangesTheActualFrontWithoutSlowingTheLocalStart" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.125"/>
+  <testcase name="longUserSelectedHoldIsNotCutOffByAShortWave" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.022"/>
+  <testcase name="animationInvalidatesChildSurfacesAsWellAsTheHostDisplayList" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.031"/>
+  <testcase name="disablingAndReenablingEffectsCanRecoverOnTheNextVisibleDraw" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.03"/>
+  <testcase name="productionArbitraryPalettePreservesEachChosenKeyAndCloudHue" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.153"/>
+  <testcase name="bottomRowRippleReachesTheCandidateStripAndThenClears" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.021"/>
+  <testcase name="productionExpiredFaceRemovesItsPerKeyPreviewColour" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.017"/>
+  <testcase name="productionSinglePressShowsAnEarlyAreaOfLightAndAnOutwardMovingFront" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.156"/>
+  <testcase name="productionDefaultCapTailOverlapsTheNextKeyWhileTheSharedFieldContinues" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.029"/>
+  <testcase name="productionNextPressSharesLightSmoothlyWithoutInterruptingTheOlderWave" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.131"/>
+  <testcase name="productionV15FrontBendsAndHasAnInteriorGradientInsteadOfAFlatRectangle" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.051"/>
+  <testcase name="hidingStopsDrawingAndShowingRestartsWithANewDelay" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.034"/>
+  <testcase name="productionDeepCapsKeepUnpressedKeysDarkAndConnectedGapsBright" classname="org.fcitx.fcitx5.android.PressEffectRenderingTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

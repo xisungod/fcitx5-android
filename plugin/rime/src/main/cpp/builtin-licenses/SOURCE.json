@@ -1,0 +1,17 @@
+{
+  "engine": "1.12.0",
+  "sources": {
+    "librime": {
+      "url": "https://codeload.github.com/rime/librime/tar.gz/refs/tags/1.12.0",
+      "sha256": "e3efe05603e9ec6db058bbff478540c28482513c24662e0aa336d2da72cceee4"
+    },
+    "librime-lua": {
+      "url": "https://codeload.github.com/hchunhui/librime-lua/tar.gz/68f9c36",
+      "sha256": "5a5012da02919c78c78f9cedbb5de1ad7b92c92eb2a65be1d1dbe38bd2af73d4"
+    },
+    "librime-octagram": {
+      "url": "https://codeload.github.com/lotem/librime-octagram/tar.gz/dfcc151",
+      "sha256": "27f59e184661408b9c689a8c6840452304695251180907570bfb90baab59c81d"
+    }
+  }
+}

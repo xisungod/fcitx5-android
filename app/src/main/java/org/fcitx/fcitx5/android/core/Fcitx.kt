@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.data.DataManager
+import org.fcitx.fcitx5.android.core.data.BuiltinRimeProfile
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.utils.ImmutableGraph
@@ -427,7 +428,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             val dataDir = DataManager.dataDir.absolutePath
             val plugins = DataManager.getLoadedPlugins()
             val nativeLibDir = StringBuilder(context.applicationInfo.nativeLibraryDir)
-            val extDomains = arrayListOf<String>()
+            val extDomains = arrayListOf("fcitx5-rime")
             plugins.forEach {
                 if (it.nativeLibraryDir.isNotBlank()) {
                     nativeLibDir.append(':')
@@ -447,6 +448,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             """.trimIndent()
             )
             with(FcitxApplication.getInstance().directBootAwareContext) {
+                BuiltinRimeProfile.initialize(this)
                 startupFcitx(
                     locale,
                     dataDir,

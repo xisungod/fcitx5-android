@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyboard_quick_settings">键盘设置</string>
+    <string name="keyboard_quick_settings_hint">点“完成”应用更改；返回或切换设置不保存。</string>
+    <string name="keyboard_quick_settings_layout">布局与反馈</string>
+    <string name="keyboard_quick_settings_effects">按键动效</string>
+    <string name="keyboard_quick_settings_more">更多设置</string>
+    <string name="keyboard_quick_settings_more_summary">打开完整设置页面</string>
+    <string name="keyboard_quick_settings_height_summary">在键盘上直接上下拖动高度</string>
+    <string name="keyboard_quick_settings_haptic_hint">0% 关闭震动，其他强度遵循上方震动模式。</string>
+    <string name="keyboard_quick_settings_retreat_hint">控制松手后的键面淡出；悬浮回落模式随动作自动退色。</string>
+    <string name="keyboard_quick_settings_disabled_animation">高级设置已禁用动画，按键动作暂不生效。</string>
+    <string name="keyboard_quick_settings_number_row">竖屏数字行</string>
+    <string name="keyboard_quick_settings_rime">启用／切换中州韵（雾凇拼音）</string>
+    <string name="keyboard_quick_settings_rime_summary">使用内置离线中文引擎，保留现有英语和拼音。</string>
+    <string name="keyboard_quick_settings_rime_missing">内置中文引擎未就绪，请重启输入法后重试。</string>
+    <string name="keyboard_quick_settings_rime_active">已切换到中州韵</string>
+    <string name="keyboard_quick_settings_rime_failed">未能启用内置中文引擎，请重启输入法后重试。</string>
+    <string name="keyboard_quick_settings_value_percent">%1$d%%</string>
+    <string name="keyboard_quick_settings_value_ms">%1$d 毫秒</string>
+</resources>

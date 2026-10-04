@@ -1,0 +1,3 @@
+<resources>
+    <string name="keyboard_switch_finish_composing">請先完成目前選詞，再切換鍵盤；未完成的輸入已保留。</string>
+</resources>

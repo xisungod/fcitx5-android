@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cyber_palette_cyan_blue_purple">Cyan · Blue · Purple</string>
+    <string name="cyber_palette_red_orange_yellow">Red · Orange · Yellow</string>
+    <string name="cyber_palette_purple_pink_red">Purple · Pink · Red</string>
+    <string name="cyber_palette_mint_cyan">Mint · Cyan</string>
+    <string name="cyber_palette_blue_purple_pink">Blue · Purple · Pink</string>
+    <string name="cyber_palette_full_spectrum">Full spectrum</string>
+    <string name="cyber_palette_hint">Swipe for six neon presets. Each press uses one color from the selected family.</string>
+    <string name="cyber_palette_current">Current: %1$s</string>
+</resources>

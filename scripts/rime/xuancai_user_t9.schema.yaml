@@ -1,0 +1,15 @@
+# Rime schema
+# SPDX-License-Identifier: GPL-3.0-only
+schema:
+  schema_id: xuancai_user_t9
+  name: 阿翔九键个人词库
+  version: "2026-10-05"
+engine:
+  processors: [speller, selector, express_editor]
+  segmentors: [abc_segmentor]
+  translators: [script_translator]
+speller:
+  __include: rime_ice_t9.schema:/speller
+translator:
+  __include: xuancai_user.schema:/translator
+  prism: xuancai_user_t9

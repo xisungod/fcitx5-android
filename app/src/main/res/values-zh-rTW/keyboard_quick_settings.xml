@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyboard_quick_settings_retreat_hint">控制鬆手後的鍵面淡出；懸浮回落模式隨動作自動退色。</string>
+</resources>

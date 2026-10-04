@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rime_dictionary_import">导入 Rime 个人词库</string>
+    <string name="rime_dictionary_import_summary">支持 UTF-8 的 TXT／TSV：词语、Tab、用空格分开的拼音，可再加 Tab 和权重。例如：双卡双待 [Tab] shuang ka shuang dai。导入会合并已有词条，最多 4 MiB／5 万条。其他输入法的专有二进制词库需先转换成此格式。</string>
+    <string name="rime_dictionary_import_deploy">已导入 %1$d 条词语，Rime 正在重新部署。</string>
+    <string name="rime_dictionary_import_saved">已保存 %1$d 条词语。请切换到 Rime，再点“应用并重新部署 Rime 配置”使其生效。</string>
+    <string name="rime_dictionary_import_bad_line">第 %1$d 行格式有误。请用：词语 [Tab] 用空格分开的拼音 [Tab] 可选权重（0–100000）。原词库未改动。</string>
+    <string name="rime_dictionary_import_failed">未完成导入，请检查 UTF-8 编码、文件大小和词条格式。</string>
+</resources>

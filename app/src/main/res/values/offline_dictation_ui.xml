@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_dictation_ui_title">Offline dictation</string>
+    <string name="offline_dictation_ui_start">Start dictation</string>
+    <string name="offline_dictation_ui_stop">Stop dictation</string>
+    <string name="offline_dictation_ui_ready">Ready to listen</string>
+    <string name="offline_dictation_ui_preparing">Preparing offline recognition…</string>
+    <string name="offline_dictation_ui_recording">Listening</string>
+    <string name="offline_dictation_ui_finishing">Finishing this sentence…</string>
+    <string name="offline_dictation_ui_finished">Dictation complete</string>
+    <string name="offline_dictation_ui_unavailable">Dictation unavailable</string>
+    <string name="offline_dictation_ui_error">Dictation stopped</string>
+    <string name="offline_dictation_ui_ready_hint">Tap the microphone · Recognized entirely on this device</string>
+    <string name="offline_dictation_ui_preparing_hint">Loading the local model · Tap the icon to stop</string>
+    <string name="offline_dictation_ui_recording_hint">Tap the icon to stop · Offline recognition with local punctuation</string>
+    <string name="offline_dictation_ui_finishing_hint">The microphone has stopped · Finishing the text locally</string>
+    <string name="offline_dictation_ui_finished_hint">Text has been entered · Tap the microphone to continue</string>
+    <string name="offline_dictation_ui_unavailable_hint">Offline dictation is unavailable here. You can return to the keyboard.</string>
+    <string name="offline_dictation_ui_error_hint">Tap the microphone to retry, or return to the keyboard.</string>
+</resources>

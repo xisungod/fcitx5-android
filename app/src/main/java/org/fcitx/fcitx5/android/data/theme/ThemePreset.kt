@@ -6,6 +6,33 @@ package org.fcitx.fcitx5.android.data.theme
 
 object ThemePreset {
 
+    /** Deep keycaps preserve the bright grid of the light travelling underneath. */
+    val XuancaiBlackV09 = Theme.Builtin(
+        name = "曜黑",
+        isDark = true,
+        backgroundColor = 0xff000000,
+        barColor = 0xff000000,
+        keyboardColor = 0xff000000,
+        keyBackgroundColor = 0xEB15171D.toInt(),
+        keyTextColor = 0xfff5f5f7,
+        candidateTextColor = 0xfff5f5f7,
+        candidateLabelColor = 0xffb8b8c0,
+        candidateCommentColor = 0xffa4a4ae,
+        altKeyBackgroundColor = 0xEE101217.toInt(),
+        altKeyTextColor = 0xffdedee4,
+        accentKeyBackgroundColor = 0xEE101217.toInt(),
+        accentKeyTextColor = 0xfff5f5f7,
+        keyPressHighlightColor = 0x00000000,
+        keyShadowColor = 0x00000000,
+        popupBackgroundColor = 0xff202026,
+        popupTextColor = 0xfff5f5f7,
+        spaceBarColor = 0xEB15171D.toInt(),
+        dividerColor = 0xff202024,
+        clipboardEntryColor = 0xff242426,
+        genericActiveBackgroundColor = 0xff3d4c66,
+        genericActiveForegroundColor = 0xfff5f5f7
+    )
+
     val MaterialLight = Theme.Builtin(
         name = "MaterialLight",
         isDark = false,

@@ -1,0 +1,5 @@
+<resources>
+    <string name="keyboard_height_adjust">调整高度</string>
+    <string name="keyboard_height_drag_hint">↕ 上下拖动调整高度</string>
+    <string name="keyboard_height_reset">恢复默认</string>
+</resources>

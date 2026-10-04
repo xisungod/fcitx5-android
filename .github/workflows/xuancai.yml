@@ -1,25 +1,25 @@
-name: 阿翔输入法 1.0 构建与发布
+name: 阿翔输入法开发构建（不发布）
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 发布阿翔输入法1.0安装包
-        type: boolean
-        default: false
   push:
-    branches: ["release/axiang-1.0"]
-    paths: ["xuancai.patch", "scripts/**", ".github/workflows/xuancai.yml", "AXIANG-1.0.md"]
+    branches: ["work/axiang-keyboard-controls"]
+    paths: ["patches/**", "scripts/**", ".github/workflows/xuancai.yml", "AXIANG-NEXT.md"]
 
 concurrency:
-  group: axiang-1.0-${{ github.ref }}
+  group: axiang-dev-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: read
+    env:
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_NAME: "1.1-dev.2"
+      BUILD_COMMIT_HASH: ${{ github.sha }}
+      XUANCAI_APP_SUFFIX: .axiang.dev.r${{ github.run_id }}
     steps:
       - name: 拉取源码
         uses: actions/checkout@v7
@@ -28,14 +28,22 @@ jobs:
           submodules: recursive
       - name: 切到已验证版本并应用补丁
         run: |
-          cp xuancai.patch /tmp/xuancai.patch
-          cp AXIANG-1.0.md /tmp/AXIANG-1.0.md
-          cp -r scripts /tmp/axiang-1.0-scripts
+          cp AXIANG-NEXT.md /tmp/AXIANG-NEXT.md
+          cp -r patches /tmp/axiang-dev-patches
+          cp -r scripts /tmp/axiang-dev-scripts
+          python3 /tmp/axiang-dev-scripts/assemble-axiang-patch.py --parts /tmp/axiang-dev-patches --output /tmp/xuancai.patch
           git -c advice.detachedHead=false checkout e6199a2801b0c76e1baeff7a48f6b18e910e9dd7
           git submodule update --init --recursive
           git apply --whitespace=nowarn /tmp/xuancai.patch
       - name: 准备完整雾凇与固定语法模型
-        run: python3 /tmp/axiang-1.0-scripts/prepare-xuancai-rime.py --zip /tmp/axiang-1.0-rime-data.zip
+        run: python3 /tmp/axiang-dev-scripts/prepare-xuancai-rime.py
+      - name: 准备固定版本的本地听写运行库与中文模型
+        run: python3 /tmp/axiang-dev-scripts/prepare-axiang-asr.py
+      - name: 验证本地语音模型与自动标点的真实推理
+        run: |
+          python3 -m venv "$RUNNER_TEMP/axiang-asr-check"
+          "$RUNNER_TEMP/axiang-asr-check/bin/pip" install sherpa-onnx==1.13.8 numpy
+          "$RUNNER_TEMP/axiang-asr-check/bin/python" /tmp/axiang-dev-scripts/check-axiang-asr.py --output "$RUNNER_TEMP/axiang-asr-checks.json"
       - name: 准备 Java
         uses: actions/setup-java@v5
         with:
@@ -48,21 +56,11 @@ jobs:
           sdkmanager --install "cmake;3.31.6"
           sudo apt-get update -qq
           sudo apt-get install -y extra-cmake-modules gettext cmake ninja-build pkg-config libboost-regex-dev libyaml-cpp-dev libmarisa-dev libopencc-dev libleveldb-dev liblua5.4-dev libgoogle-glog-dev python3-yaml
-      - name: 准备固定签名（无密钥时使用独立体验包）
-        env:
-          XUANCAI_SIGN_KEY_BASE64: ${{ secrets.XUANCAI_SIGN_KEY_BASE64 }}
-          XUANCAI_SIGN_KEY_PWD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
-          XUANCAI_SIGN_KEY_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
-        run: python3 /tmp/axiang-1.0-scripts/prepare-xuancai-signing.py
       - name: 准备 Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: 预编译内置词典并验证真实 Rime 候选
+        run: python3 /tmp/axiang-dev-scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/xuancai-rime-host"
       - name: 编译主程序并运行界面测试
-        env:
-          BUILD_ABI: arm64-v8a
-          BUILD_VERSION_NAME: "1.0"
-          BUILD_COMMIT_HASH: ${{ github.sha }}
-          SIGN_KEY_PWD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
-          SIGN_KEY_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
         run: |
           set -o pipefail
           ./gradlew :app:assembleDebug :app:testDebugUnitTest 2>&1 | tee /tmp/app-build.log
@@ -92,58 +90,43 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-1.0-ui-checks
+          name: axiang-dev-ui-checks
           path: |
             app/build/outputs/effect-checks/
+            app/build/outputs/icon-checks/
+            app/build/outputs/ripple-shape-checks/
+            app/build/outputs/press-depth-checks/
             app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
-      - name: 预编译词典并验证真实 Rime 候选
-        run: python3 /tmp/axiang-1.0-scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/xuancai-rime-host"
-      - name: 编译配套 Rime 插件
-        env:
-          BUILD_ABI: arm64-v8a
-          BUILD_VERSION_NAME: "1.0"
-          BUILD_COMMIT_HASH: ${{ github.sha }}
-          SIGN_KEY_PWD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
-          SIGN_KEY_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
-        run: ./gradlew :plugin:rime:assembleDebug
       - name: 保留候选验证、绘制图与测试报告
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-1.0-checks
+          name: axiang-dev-checks
           path: |
             app/build/outputs/effect-checks/
+            app/build/outputs/icon-checks/
+            app/build/outputs/ripple-shape-checks/
+            app/build/outputs/press-depth-checks/
             app/build/test-results/testDebugUnitTest/
             ${{ runner.temp }}/xuancai-rime-host/checks/
+            ${{ runner.temp }}/axiang-asr-checks.json
           if-no-files-found: ignore
-      - name: 整理并校验安装包
+      - name: 整理并校验内置 Rime 的单一安装包
         run: |
-          mkdir -p /tmp/axiang-1.0
-          cp app/build/outputs/apk/debug/*.apk /tmp/axiang-1.0/axiang-input-1.0-arm64.apk
-          cp plugin/rime/build/outputs/apk/debug/*.apk /tmp/axiang-1.0/axiang-rime-1.0-arm64.apk
-          cp /tmp/axiang-1.0-rime-data.zip /tmp/axiang-1.0/
+          mkdir -p /tmp/axiang-dev
+          cp app/build/outputs/apk/debug/*.apk /tmp/axiang-dev/axiang-dev-input-arm64.apk
+          cp /tmp/AXIANG-NEXT.md /tmp/axiang-dev/README.md
           SDK_TOOLS="$ANDROID_HOME/build-tools/36.1.0"
-          "$SDK_TOOLS/apksigner" verify --verbose /tmp/axiang-1.0/axiang-input-1.0-arm64.apk
-          "$SDK_TOOLS/apksigner" verify --verbose /tmp/axiang-1.0/axiang-rime-1.0-arm64.apk
-          "$SDK_TOOLS/aapt" dump badging /tmp/axiang-1.0/axiang-input-1.0-arm64.apk > /tmp/app-badging.txt
+          "$SDK_TOOLS/apksigner" verify --verbose /tmp/axiang-dev/axiang-dev-input-arm64.apk
+          "$SDK_TOOLS/aapt" dump badging /tmp/axiang-dev/axiang-dev-input-arm64.apk > /tmp/app-badging.txt
           sed -n '1,6p' /tmp/app-badging.txt
-          "$SDK_TOOLS/aapt" dump badging /tmp/axiang-1.0/axiang-rime-1.0-arm64.apk > /tmp/rime-badging.txt
-          sed -n '1,6p' /tmp/rime-badging.txt
-          python3 /tmp/axiang-1.0-scripts/verify-xuancai-rime-package.py /tmp/axiang-1.0/axiang-rime-1.0-arm64.apk /tmp/axiang-1.0/axiang-input-1.0-arm64.apk --aapt "$SDK_TOOLS/aapt"
-          cd /tmp/axiang-1.0
-          sha256sum *.apk *.zip > SHA256SUMS.txt
-      - name: 上传安装包
+          python3 /tmp/axiang-dev-scripts/verify-xuancai-rime-package.py /tmp/axiang-dev/axiang-dev-input-arm64.apk --bundled-rime --offline-dictation --aapt "$SDK_TOOLS/aapt" --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" --expected-version-name "$BUILD_VERSION_NAME"
+          cd /tmp/axiang-dev
+          sha256sum *.apk > SHA256SUMS.txt
+      - name: 保存开发验证包（不发布）
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-1.0-and-rime-arm64
-          path: /tmp/axiang-1.0/*
-      - name: 发布（允许同提交重跑）
-        if: (github.event_name == 'workflow_dispatch' && inputs.publish) || (github.event_name == 'push' && github.ref == 'refs/heads/release/axiang-1.0')
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: bash /tmp/axiang-1.0-scripts/publish-axiang-1.0.sh
-      - name: 清理临时签名文件
-        if: always()
-        run: rm -f "$RUNNER_TEMP/xuancai-signing.ks"
+          name: axiang-development-${{ github.run_id }}-arm64
+          path: /tmp/axiang-dev/*
+          retention-days: 14

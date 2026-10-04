@@ -1,0 +1,7 @@
+<resources>
+    <string name="pinyin_layout_nine_key">Pinyin · 9 keys</string>
+    <string name="pinyin_layout_full">Pinyin · 26 keys</string>
+    <string name="pinyin_layout_switching">Switching keyboard…</string>
+    <string name="pinyin_layout_text_only">Use an ordinary text field to select a Chinese keyboard</string>
+    <string name="pinyin_layout_unavailable">The keyboard is not ready yet. Please try again shortly.</string>
+</resources>

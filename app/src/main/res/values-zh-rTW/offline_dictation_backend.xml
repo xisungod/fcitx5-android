@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_dictation_backend_permission_title">離線聽寫需要麥克風權限</string>
+    <string name="offline_dictation_backend_permission">請允許麥克風權限，然後返回鍵盤重新點擊開始。聲音僅在本機處理。</string>
+    <string name="offline_dictation_backend_permission_denied">尚未取得麥克風權限，離線聽寫保持關閉。可在應用程式設定中允許麥克風權限。</string>
+    <string name="offline_dictation_backend_permission_settings">應用程式設定</string>
+    <string name="offline_dictation_backend_permission_granted">已允許麥克風權限。返回鍵盤，點擊開始後才會錄音。</string>
+    <string name="offline_dictation_backend_editor_type">目前輸入框不支援聽寫，請在一般文字框中使用。</string>
+    <string name="offline_dictation_backend_device">此手機不支援內建離線語音引擎，需要 ARM64 裝置。</string>
+    <string name="offline_dictation_backend_microphone">此裝置沒有可用的麥克風。</string>
+    <string name="offline_dictation_backend_models">內建離線語音模型缺失，請重新安裝完整安裝套件。</string>
+    <string name="offline_dictation_backend_audio">無法錄音，請檢查麥克風權限、系統麥克風開關，以及是否被其他應用程式占用。</string>
+    <string name="offline_dictation_backend_engine">本機語音引擎或模型無法在此裝置執行。聽寫已停止，聲音沒有上傳。</string>
+    <string name="offline_dictation_backend_editor">輸入框已切換，不會插入這次結果。請在目標輸入框重新開始聽寫。</string>
+    <string name="offline_dictation_backend_preedit">請先完成目前拼音選詞，再開始聽寫。</string>
+</resources>

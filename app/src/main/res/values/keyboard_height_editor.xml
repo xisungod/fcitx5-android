@@ -1,0 +1,5 @@
+<resources>
+    <string name="keyboard_height_adjust">Adjust height</string>
+    <string name="keyboard_height_drag_hint">↕ Drag up or down to resize</string>
+    <string name="keyboard_height_reset">Reset</string>
+</resources>

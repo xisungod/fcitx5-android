@@ -38,6 +38,7 @@ import androidx.autofill.inline.common.ImageViewStyle
 import androidx.autofill.inline.common.TextViewStyle
 import androidx.autofill.inline.common.ViewStyle
 import androidx.autofill.inline.v1.InlineSuggestionUi
+import androidx.core.content.ContextCompat
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineStart
@@ -55,6 +56,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.core.data.BuiltinRimeProfile
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
@@ -65,6 +67,9 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
+import org.fcitx.fcitx5.android.input.voice.DictationEditorWriter
+import org.fcitx.fcitx5.android.input.voice.OfflineDictationFactory
+import org.fcitx.fcitx5.android.input.voice.OfflineDictationSession
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.forceShowSelf
@@ -102,8 +107,73 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var inputView: InputView? = null
     private var candidatesView: CandidatesView? = null
 
+    private var offlineDictationEditorGeneration = 0L
+    private var offlineDictationSession: OfflineDictationSession? = null
+    private var offlineDictationEditor: android.view.inputmethod.InputConnection? = null
+    private var dictationOwnsComposition = false
+    private var offlineDictationWriter: DictationEditorWriter? = null
+
+    /** The session owns its original editor; late results can never enter another field. */
+    fun createOfflineDictationSession(): OfflineDictationSession {
+        finishOfflineDictation()
+        val generation = offlineDictationEditorGeneration
+        val editor = currentInputConnection
+        offlineDictationEditor = editor
+        val unfinishedPreedit = composing.isNotEmpty() || fcitx.runImmediately {
+            clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()
+        }
+        val writer = editor?.let {
+            DictationEditorWriter(it, { selection.latest.start },
+                onComposition = { start, text ->
+                    composing.update(start, start + text.length)
+                    composingText = FormattedText(arrayOf(text), intArrayOf(0), text.length)
+                    dictationOwnsComposition = true
+                    selection.predict(composing.end)
+                }, onCommit = { cursor ->
+                    resetComposingState()
+                    dictationOwnsComposition = false
+                    selection.predict(cursor)
+                }, onFinish = {
+                    resetComposingState()
+                    dictationOwnsComposition = false
+                })
+        }
+        offlineDictationWriter = writer
+        val mainExecutor = ContextCompat.getMainExecutor(this)
+        fun sameEditor() = generation == offlineDictationEditorGeneration && editor != null &&
+            editor === currentInputConnection && isInputViewShown && inputView?.visibility == View.VISIBLE
+        return OfflineDictationFactory.create(this,
+            currentInputEditorInfo?.inputType ?: InputType.TYPE_NULL, unfinishedPreedit,
+            applyTranscript = { run, result, stillCurrent, applied ->
+                mainExecutor.execute {
+                    if (!stillCurrent() || !sameEditor()) {
+                        applied(false)
+                        return@execute
+                    }
+                    // Writer only updates the current dictated range; input text is never logged.
+                    applied(writer?.apply(run, result) == true)
+                }
+            }, onAbandon = {
+                mainExecutor.execute {
+                    if (sameEditor()) writer?.finish()
+                }
+            }
+        ).also { offlineDictationSession = it }
+    }
+
+    private fun finishOfflineDictation() {
+        if (offlineDictationEditor === currentInputConnection) offlineDictationWriter?.finish()
+        offlineDictationWriter = null
+        dictationOwnsComposition = false
+        offlineDictationEditor = null
+        offlineDictationEditorGeneration++
+        offlineDictationSession?.close()
+        offlineDictationSession = null
+    }
+
     private val navbarMgr = NavigationBarManager()
     private val inputDeviceMgr = InputDeviceManager { isVirtualKeyboard ->
+        if (!isVirtualKeyboard) finishOfflineDictation()
         postFcitxJob {
             setCandidatePagingMode(if (isVirtualKeyboard) 0 else 1)
         }
@@ -148,6 +218,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     )
 
     private fun replaceInputView(theme: Theme): InputView {
+        finishOfflineDictation()
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
         inputDeviceMgr.setInputView(newInputView)
@@ -182,9 +253,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceCandidateView(ThemeManager.activeTheme)
     }
 
+    private var pendingTheme: Theme? = null
+    private val applyPendingTheme = Runnable {
+        val next = pendingTheme ?: return@Runnable
+        pendingTheme = null
+        replaceInputViews(next)
+    }
+
     @Keep
     private val onThemeChangeListener = ThemeManager.OnThemeChangeListener {
-        replaceInputViews(it)
+        // A keyboard settings panel can save several preferences in one editor.
+        // Their synchronous callbacks should rebuild the IME only once next frame.
+        pendingTheme = it
+        if (::decorView.isInitialized) {
+            decorView.removeCallbacks(applyPendingTheme)
+            decorView.post(applyPendingTheme)
+        }
     }
 
     /**
@@ -202,7 +286,32 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return job
     }
 
+    private var smsCodeReceiver: org.fcitx.fcitx5.android.data.otp.SmsCodeReceiver? = null
+
+    /** listen for SMS codes only while the user wants it and has granted RECEIVE_SMS */
+    private fun updateSmsCodeReceiver() {
+        val wanted = AppPrefs.getInstance().clipboard.verificationCodeFromSms.getValue() &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.RECEIVE_SMS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val current = smsCodeReceiver
+        if (wanted && current == null) {
+            val receiver = org.fcitx.fcitx5.android.data.otp.SmsCodeReceiver()
+            runCatching {
+                androidx.core.content.ContextCompat.registerReceiver(
+                    this, receiver,
+                    android.content.IntentFilter(android.provider.Telephony.Sms.Intents.SMS_RECEIVED_ACTION),
+                    androidx.core.content.ContextCompat.RECEIVER_EXPORTED
+                )
+            }.onSuccess { smsCodeReceiver = receiver }
+        } else if (!wanted && current != null) {
+            runCatching { unregisterReceiver(current) }
+            smsCodeReceiver = null
+        }
+    }
+
     override fun onCreate() {
+        updateSmsCodeReceiver()
         fcitx = FcitxDaemon.connect(javaClass.name)
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
@@ -232,9 +341,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
+                if (offlineDictationSession != null) finishOfflineDictation()
                 commitText(event.data.text, event.data.cursor)
             }
             is FcitxEvent.KeyEvent -> event.data.let event@{
+                if (offlineDictationSession != null) finishOfflineDictation()
                 if (it.states.virtual) {
                     // KeyEvent from virtual keyboard
                     when (it.sym.sym) {
@@ -242,6 +353,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         FcitxKeyMapping.FcitxKey_Return -> handleReturnKey()
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(KeyEvent.KEYCODE_DPAD_LEFT)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+                        FcitxKeyMapping.FcitxKey_Up -> handleArrowKey(KeyEvent.KEYCODE_DPAD_UP)
+                        FcitxKeyMapping.FcitxKey_Down -> handleArrowKey(KeyEvent.KEYCODE_DPAD_DOWN)
                         else -> if (it.unicode > 0) {
                             commitText(Character.toString(it.unicode))
                         } else {
@@ -304,9 +417,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 }
             }
             is FcitxEvent.ClientPreeditEvent -> {
-                updateComposingText(event.data)
+                if (offlineDictationSession != null && event.data.isNotEmpty()) finishOfflineDictation()
+                if (!dictationOwnsComposition) updateComposingText(event.data)
             }
             is FcitxEvent.DeleteSurroundingEvent -> {
+                if (offlineDictationSession != null) finishOfflineDictation()
                 val (before, after) = event.data
                 handleDeleteSurrounding(before, after)
             }
@@ -401,6 +516,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun handleArrowKey(keyCode: Int) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            // The editor knows its wrapped visual lines and preferred horizontal cursor position.
+            sendDownUpKeyEvents(keyCode)
+            return
+        }
         val type = currentInputEditorInfo.inputType and InputType.TYPE_MASK_CLASS
         val variation = currentInputEditorInfo.inputType and InputType.TYPE_MASK_VARIATION
         if (type == InputType.TYPE_NULL ||
@@ -642,7 +762,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return false
     }
 
+    private var heightEditorHandledBack = false
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK &&
+            (heightEditorHandledBack || inputView?.cancelKeyboardHeightEditor() == true)) {
+            heightEditorHandledBack = true
+            return true
+        }
         // request to show floating CandidatesView when pressing physical keyboard
         if (inputDeviceMgr.evaluateOnKeyDown(event, this)) {
             postFcitxJob {
@@ -654,6 +781,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK && heightEditorHandledBack) {
+            heightEditorHandledBack = false
+            return true
+        }
         return forwardKeyEvent(event) || super.onKeyUp(keyCode, event)
     }
 
@@ -677,23 +808,20 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val uid = currentInputBinding.uid
         val pkgName = pkgNameCache.forUid(uid)
         Timber.d("onBindInput: uid=$uid pkg=$pkgName")
+        val firstBinding = firstBindInput
+        firstBindInput = false
+        // Restore the subtype only once: later binds must preserve ShareInputState=Program.
+        val subtypeInputMethod = if (firstBinding &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            inputMethodManager.currentInputMethodSubtype?.let(SubtypeManager::inputMethodOf)
+        } else null
         postFcitxJob {
-            // ensure InputContext has been created before focusing it
+            // Ensure InputContext and native startup/profile initialization are complete.
             activate(uid, pkgName)
-        }
-        if (firstBindInput) {
-            firstBindInput = false
-            // only use input method from subtype for the first `onBindInput`, because
-            // 1. fcitx has `ShareInputState` option, thus reading input method from subtype
-            //    everytime would ruin `ShareInputState=Program`
-            // 2. im from subtype should be read once, when user changes input method from other
-            //    app to a subtype of ours via system input method picker (on 34+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                val subtype = inputMethodManager.currentInputMethodSubtype ?: return
-                val im = SubtypeManager.inputMethodOf(subtype)
-                postFcitxJob {
-                    activateIme(im)
-                }
+            if (firstBinding) {
+                val initial = BuiltinRimeProfile.consumeInitialInputMethod()
+                val inputMethod = initial ?: subtypeInputMethod
+                if (inputMethod != null) activateIme(inputMethod)
             }
         }
     }
@@ -725,12 +853,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        finishOfflineDictation()
+        inputView?.cancelPendingEngineSwitch()
+        inputView?.finishTransientEditors()
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
         // right cursor position, try to workaround this would simply introduce more bugs.
         selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
         resetComposingState()
+        updateSmsCodeReceiver()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
         // EditorInfo may change between onStartInput and onStartInputView
@@ -873,6 +1005,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             // cursor update can't match any prediction: it's treated as a user input
             selection.resetTo(newSelStart, newSelEnd)
+            if (offlineDictationSession != null) {
+                // A user cursor move invalidates the dictation range as well as a focus change.
+                finishOfflineDictation()
+                return
+            }
         }
         // skip selection range update, we only care about selection cursor (zero width) here
         if (newSelStart != newSelEnd) return
@@ -1048,6 +1185,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        finishOfflineDictation()
+        heightEditorHandledBack = false
+        inputView?.finishTransientEditors()
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
@@ -1063,7 +1203,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         showingDialog?.dismiss()
     }
 
+    override fun onWindowHidden() {
+        finishOfflineDictation()
+        heightEditorHandledBack = false
+        inputView?.finishTransientEditors()
+        super.onWindowHidden()
+    }
+
     override fun onFinishInput() {
+        finishOfflineDictation()
+        inputView?.cancelPendingEngineSwitch()
         Timber.d("onFinishInput")
         postFcitxJob {
             focus(false)
@@ -1072,6 +1221,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
+        finishOfflineDictation()
+        inputView?.cancelPendingEngineSwitch()
         cachedKeyEvents.evictAll()
         cachedKeyEventIndex = 0
         cursorUpdateIndex = 0
@@ -1084,6 +1235,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onDestroy() {
+        finishOfflineDictation()
+        if (::decorView.isInitialized) decorView.removeCallbacks(applyPendingTheme)
+        pendingTheme = null
+        smsCodeReceiver?.let { runCatching { unregisterReceiver(it) } }
+        smsCodeReceiver = null
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)
         }
@@ -1096,7 +1252,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private var showingDialog: Dialog? = null
 
-    fun showDialog(dialog: Dialog) {
+    fun showDialog(dialog: Dialog, onDismiss: (() -> Unit)? = null) {
         showingDialog?.dismiss()
         dialog.window?.also {
             it.attributes.apply {
@@ -1109,7 +1265,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             it.setDimAmount(styledFloat(android.R.attr.backgroundDimAmount))
         }
         dialog.setOnDismissListener {
-            showingDialog = null
+            if (showingDialog === dialog) showingDialog = null
+            onDismiss?.invoke()
         }
         dialog.show()
         showingDialog = dialog

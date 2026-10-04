@@ -6,9 +6,12 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.view.View
 import androidx.annotation.Keep
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.allViews
+import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyState
@@ -16,32 +19,58 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
 class TextKeyboard(
     context: Context,
     theme: Theme
-) : BaseKeyboard(context, theme, Layout) {
+) : BaseKeyboard(context, theme, layoutFor(context)) {
+
+    override val slideSelectionEnabled = true
 
     enum class CapsState { None, Once, Lock }
 
     companion object {
         const val Name = "Text"
 
+        /** Rime latin mode, an English keyboard or an English engine all count as English */
+        fun isEnglish(ime: InputMethodEntry): Boolean =
+            ime.uniqueName.startsWith("keyboard-") ||
+                ime.languageCode.startsWith("en") || ime.subMode.icon.startsWith("fcitx_rime_latin") ||
+                ime.subMode.label.equals("A", ignoreCase = true)
+
+        /** The space legend is an icon; language state has its own key. */
+        fun spaceLabel(@Suppress("UNUSED_PARAMETER") english: Boolean): String = ""
+
+        private val NumberRow = "1234567890".map { digit ->
+            KeyDef(
+                KeyDef.Appearance.Text(digit.toString(), 20f),
+                setOf(KeyDef.Behavior.Press(KeyAction.FcitxKeyAction(digit.toString()))),
+                arrayOf(KeyDef.Popup.Preview(digit.toString()))
+            )
+        }
+
+        private fun layoutFor(context: Context): List<List<KeyDef>> =
+            if (ThemeManager.prefs.portraitNumberRow.getValue() &&
+                context.resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+            ) listOf(NumberRow) + Layout else Layout
+
         val Layout: List<List<KeyDef>> = listOf(
             listOf(
-                AlphabetKey("Q", "1"),
-                AlphabetKey("W", "2"),
-                AlphabetKey("E", "3"),
-                AlphabetKey("R", "4"),
-                AlphabetKey("T", "5"),
-                AlphabetKey("Y", "6"),
-                AlphabetKey("U", "7"),
-                AlphabetKey("I", "8"),
-                AlphabetKey("O", "9"),
-                AlphabetKey("P", "0")
+                AlphabetKey("Q"),
+                AlphabetKey("W"),
+                AlphabetKey("E"),
+                AlphabetKey("R"),
+                AlphabetKey("T"),
+                AlphabetKey("Y"),
+                AlphabetKey("U"),
+                AlphabetKey("I"),
+                AlphabetKey("O"),
+                AlphabetKey("P")
             ),
             listOf(
                 AlphabetKey("A", "@"),
@@ -66,20 +95,20 @@ class TextKeyboard(
                 BackspaceKey()
             ),
             listOf(
-                LayoutSwitchKey("?123", ""),
-                CommaKey(0.1f, KeyDef.Appearance.Variant.Alternative),
-                LanguageKey(),
-                SpaceKey(),
-                SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative),
-                ReturnKey()
+                LayoutSwitchKey("!#1", SymbolKeyboard.Name, 0.14f),
+                LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, textSize = 18f),
+                CommaKey(0.08f, KeyDef.Appearance.Variant.Normal),
+                SpaceKey(0.32f),
+                SymbolKey(".", 0.08f, KeyDef.Appearance.Variant.Normal),
+                LanguageKey(0.10f),
+                ReturnKey(0.16f)
             )
         )
     }
 
     val caps: ImageKeyView by lazy { findViewById(R.id.button_caps) }
     val backspace: ImageKeyView by lazy { findViewById(R.id.button_backspace) }
-    val quickphrase: ImageKeyView by lazy { findViewById(R.id.button_quickphrase) }
-    val lang: ImageKeyView by lazy { findViewById(R.id.button_lang) }
+    val lang: TextKeyView by lazy { findViewById(R.id.button_lang) }
     val space: TextKeyView by lazy { findViewById(R.id.button_space) }
     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
 
@@ -93,6 +122,8 @@ class TextKeyboard(
     private val keepLettersUppercase by AppPrefs.getInstance().keyboard.keepLettersUppercase
 
     init {
+        space.contentDescription = context.getString(R.string.space_key_label)
+        space.setSpaceIcon()
         updateLangSwitchKey(showLangSwitchKey.getValue())
         showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
     }
@@ -102,6 +133,7 @@ class TextKeyboard(
     }
 
     private var capsState: CapsState = CapsState.None
+    private var englishMode = false
 
     private fun transformAlphabet(c: String): String {
         return when (capsState) {
@@ -111,14 +143,14 @@ class TextKeyboard(
     }
 
     private var punctuationMapping: Map<String, String> = mapOf()
-    private fun transformPunctuation(p: String) = punctuationMapping.getOrDefault(p, p)
+    private fun transformPunctuation(p: String) = if (englishMode) p else punctuationMapping.getOrDefault(p, p)
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         var transformed = action
         when (action) {
             is KeyAction.FcitxKeyAction -> when (source) {
                 KeyActionListener.Source.Keyboard -> {
-                    when (capsState) {
+                    if (action.act.length == 1 && action.act[0].isLetter()) when (capsState) {
                         CapsState.None -> {
                             transformed = action.copy(act = action.act.lowercase())
                         }
@@ -150,6 +182,7 @@ class TextKeyboard(
     }
 
     override fun onAttach() {
+        super.onAttach()
         capsState = CapsState.None
         updateCapsButtonIcon()
         updateAlphabetKeys()
@@ -165,13 +198,13 @@ class TextKeyboard(
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
-        space.mainText.text = buildString {
-            append(ime.displayName)
-            ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
-        }
-        if (capsState != CapsState.None) {
-            switchCapsState()
-        }
+        englishMode = isEnglish(ime)
+        lang.contentDescription = if (englishMode) "English" else "中文"
+        lang.mainText.text = if (englishMode) "英" else "中"
+        capsState = CapsState.None
+        updateCapsButtonIcon()
+        updateAlphabetKeys()
+        updatePunctuationKeys()
     }
 
     private fun transformPopupPreview(c: String): String {
@@ -194,7 +227,11 @@ class TextKeyboard(
                             )
                         else action
                     }
-                    is KeyDef.Popup.Keyboard.Explicit -> action
+                    is KeyDef.Popup.Keyboard.Explicit -> action.copy(
+                        keyboard = KeyDef.Popup.Keyboard.Explicit(
+                            action.keyboard.items.map { PunctuationMode.forMode(it, englishMode) }.toTypedArray()
+                        )
+                    )
                 }
             }
             else -> action
@@ -231,14 +268,21 @@ class TextKeyboard(
 
     private fun updateLangSwitchKey(visible: Boolean) {
         lang.visibility = if (visible) View.VISIBLE else View.GONE
+        // Keep the space centered and the row fully touchable when the language
+        // key is hidden: its width belongs to the keys on the right of space.
+        `return`.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            matchConstraintPercentWidth = if (visible) 0.16f else 0.26f
+        }
     }
 
     private fun updateAlphabetKeys() {
         textKeys.forEach {
-            if (it.def !is KeyDef.Appearance.AltText) return
+            // The dedicated digit row precedes the letters; skip it without
+            // terminating the entire case update.
+            if (it.def !is KeyDef.Appearance.AltText) return@forEach
             it.mainText.text = it.def.displayText.let { str ->
                 if (str.length != 1 || !str[0].isLetter()) return@forEach
-                if (keepLettersUppercase) str.uppercase() else transformAlphabet(str)
+                if (!englishMode && keepLettersUppercase) str.uppercase() else transformAlphabet(str)
             }
         }
     }
@@ -251,7 +295,7 @@ class TextKeyboard(
             } else {
                 it.def as KeyDef.Appearance.Text
                 it.mainText.text = it.def.displayText.let { str ->
-                    if (str[0].run { isLetter() || isWhitespace() }) return@forEach
+                    if (it.id == R.id.button_lang || it.id == R.id.button_space || str.isEmpty() || str[0].run { isLetter() || isWhitespace() }) return@forEach
                     transformPunctuation(str)
                 }
             }

@@ -1,0 +1,11 @@
+{
+  "source": "/tmp/xuancai-v13-source/app/build/outputs/apk/debug/org.fcitx.fcitx5.android-1.1-dev-arm64-v8a-debug.apk",
+  "snapshot": "/tmp/axiang-dev-controls-validation/axiang-1.1-dev-controls-arm64.apk",
+  "size_bytes": 164851199,
+  "sha256": "18abd40133c430a4a02d7b2381116bad387a6bfc412ccfe59d21c887832159a5",
+  "source_mtime_ns": 1791135846536000871,
+  "expected_version": "1.1-dev",
+  "expected_package": "org.fcitx.fcitx5.android.axiang.dev.controls",
+  "build_log": "/tmp/axiang-final-tests.log",
+  "snapshot_stage": "final-frozen-source-assemble"
+}

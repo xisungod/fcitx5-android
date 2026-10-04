@@ -1,0 +1,9 @@
+{
+  "source_commit": "f3064bb0491d800e3adad8bf017a5a0aedd7ef2f",
+  "base_commit": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "patch_sha256": "39a048b7f72a071eb0916227f3ad3d4d744c2fca9eb1be5e88312ea9d6a63cee",
+  "changed_paths_compared": 271,
+  "reassembly_exact": true,
+  "clean_apply": true,
+  "all_changed_files_match": true
+}

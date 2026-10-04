@@ -84,7 +84,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         scaleType = ImageView.ScaleType.CENTER_CROP
     }
 
-    private val barHeight = ctx.dp(40)
+    private val barHeight = ctx.dp(52)
     private val fakeKawaiiBar = view(::View)
 
     private var keyboardWidth = -1
@@ -95,7 +95,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
         add(bkg, lParams {
             centerInParent()
         })
-        add(fakeKawaiiBar, lParams(height = dp(40)) {
+        add(fakeKawaiiBar, lParams(height = dp(52)) {
             centerHorizontally()
         })
     }

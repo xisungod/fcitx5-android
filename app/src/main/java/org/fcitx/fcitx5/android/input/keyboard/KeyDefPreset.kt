@@ -41,22 +41,22 @@ class SymbolKey(
 
 class AlphabetKey(
     val character: String,
-    val punctuation: String,
+    val punctuation: String = "",
     variant: Variant = Variant.Normal,
     popup: Array<Popup>? = null
 ) : KeyDef(
     Appearance.AltText(
         displayText = character,
         altText = punctuation,
-        textSize = 23f,
+        textSize = 22f,
         variant = variant
     ),
-    setOf(
-        Behavior.Press(KeyAction.FcitxKeyAction(character)),
-        Behavior.Swipe(KeyAction.FcitxKeyAction(punctuation))
-    ),
+    buildSet {
+        add(Behavior.Press(KeyAction.FcitxKeyAction(character)))
+        if (punctuation.isNotEmpty()) add(Behavior.Swipe(KeyAction.FcitxKeyAction(punctuation)))
+    },
     popup ?: arrayOf(
-        Popup.AltPreview(character, punctuation),
+        if (punctuation.isEmpty()) Popup.Preview(character) else Popup.AltPreview(character, punctuation),
         Popup.Keyboard.Preset(character)
     )
 )
@@ -111,11 +111,12 @@ class LayoutSwitchKey(
     displayText: String,
     val to: String = "",
     percentWidth: Float = 0.15f,
-    variant: Variant = Variant.Alternative
+    variant: Variant = Variant.Alternative,
+    textSize: Float = 16f
 ) : KeyDef(
     Appearance.Text(
         displayText,
-        textSize = 16f,
+        textSize = textSize,
         textStyle = Typeface.BOLD,
         percentWidth = percentWidth,
         variant = variant
@@ -127,12 +128,14 @@ class LayoutSwitchKey(
 
 class BackspaceKey(
     percentWidth: Float = 0.15f,
-    variant: Variant = Variant.Alternative
+    variant: Variant = Variant.Alternative,
+    border: Border = Border.Default
 ) : KeyDef(
     Appearance.Image(
-        src = R.drawable.ic_baseline_backspace_24,
+        src = R.drawable.ic_keyboard_backspace_outline,
         percentWidth = percentWidth,
         variant = variant,
+        border = border,
         viewId = R.id.button_backspace,
         soundEffect = InputFeedbacks.SoundEffect.Delete
     ),
@@ -158,44 +161,27 @@ class CommaKey(
     percentWidth: Float,
     variant: Variant,
 ) : KeyDef(
-    Appearance.ImageText(
+    Appearance.Text(
         displayText = ",",
         textSize = 23f,
         percentWidth = percentWidth,
-        variant = variant,
-        src = R.drawable.ic_baseline_tag_faces_24
+        variant = variant
     ),
     setOf(
         Behavior.Press(KeyAction.FcitxKeyAction(","))
     ),
     arrayOf(
         Popup.Preview(","),
-        Popup.Menu(
-            arrayOf(
-                Popup.Menu.Item(
-                    "Emoji",
-                    R.drawable.ic_baseline_tag_faces_24,
-                    KeyAction.PickerSwitchAction()
-                ),
-                Popup.Menu.Item(
-                    "QuickPhrase",
-                    R.drawable.ic_baseline_format_quote_24,
-                    KeyAction.QuickPhraseAction
-                ),
-                Popup.Menu.Item(
-                    "Unicode",
-                    R.drawable.ic_logo_unicode,
-                    KeyAction.UnicodeAction
-                )
-            )
-        )
+        Popup.Keyboard.Explicit(arrayOf("，", "。", "？", "！", "…"))
     )
 )
 
-class LanguageKey : KeyDef(
-    Appearance.Image(
-        src = R.drawable.ic_baseline_language_24,
-        variant = Variant.AltForeground,
+class LanguageKey(percentWidth: Float = 0.1f) : KeyDef(
+    Appearance.Text(
+        displayText = "中",
+        textSize = 20f,
+        percentWidth = percentWidth,
+        variant = Variant.Alternative,
         viewId = R.id.button_lang
     ),
     setOf(
@@ -204,11 +190,11 @@ class LanguageKey : KeyDef(
     )
 )
 
-class SpaceKey : KeyDef(
+class SpaceKey(percentWidth: Float = 0f) : KeyDef(
     Appearance.Text(
         displayText = " ",
         textSize = 13f,
-        percentWidth = 0f,
+        percentWidth = percentWidth,
         border = Border.Special,
         viewId = R.id.button_space,
         soundEffect = InputFeedbacks.SoundEffect.SpaceBar
@@ -229,17 +215,10 @@ class ReturnKey(percentWidth: Float = 0.15f) : KeyDef(
         soundEffect = InputFeedbacks.SoundEffect.Return
     ),
     setOf(
-        Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return)))
-    ),
-    arrayOf(
-        Popup.Menu(
-            arrayOf(
-                Popup.Menu.Item(
-                    "Emoji", R.drawable.ic_baseline_tag_faces_24, KeyAction.PickerSwitchAction()
-                )
-            )
-        )
-    ),
+        Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Return))),
+        // Commit literal text so Send/Search/Done actions cannot replace this newline.
+        Behavior.LongPress(KeyAction.CommitAction("\n"))
+    )
 )
 
 class ImageLayoutSwitchKey(

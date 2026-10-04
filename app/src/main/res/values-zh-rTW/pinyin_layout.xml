@@ -1,0 +1,7 @@
+<resources>
+    <string name="pinyin_layout_nine_key">拼音九鍵</string>
+    <string name="pinyin_layout_full">拼音26鍵</string>
+    <string name="pinyin_layout_switching">正在切換鍵盤…</string>
+    <string name="pinyin_layout_text_only">請在一般文字輸入框使用中文鍵盤</string>
+    <string name="pinyin_layout_unavailable">鍵盤尚未就緒，請稍後再試</string>
+</resources>

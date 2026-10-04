@@ -44,6 +44,13 @@ class AutoScaleTextView @JvmOverloads constructor(
 
     var scaleMode = Mode.None
 
+    /** Optional fixed outline; changes paint only, never text measurement or position. */
+    var contrastOutlineWidth = 0f
+        set(value) {
+            field = value.coerceAtLeast(0f)
+            invalidate()
+        }
+
     private var needsMeasureText = true
     private val fontMetrics = Paint.FontMetrics()
     private val textBounds = Rect()
@@ -190,11 +197,28 @@ class AutoScaleTextView @JvmOverloads constructor(
         }
         val paint = paint
         paint.color = currentTextColor
+        val label = text.toString()
         canvas.withSave {
             translate(scrollX.toFloat(), scrollY.toFloat())
             translate(baselineX, baselineY)
             scale(textScaleX, textScaleY)
-            drawText(text.toString(), 0.0f, 0.0f, paint)
+            if (contrastOutlineWidth > 0f) {
+                // Keep the glyph readable while its fill changes above a lit key.
+                // The outline is constant through the entire press and release.
+                val originalStyle = paint.style
+                val originalWidth = paint.strokeWidth
+                val originalJoin = paint.strokeJoin
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = contrastOutlineWidth
+                paint.strokeJoin = Paint.Join.ROUND
+                paint.color = android.graphics.Color.BLACK
+                drawText(label, 0.0f, 0.0f, paint)
+                paint.style = originalStyle
+                paint.strokeWidth = originalWidth
+                paint.strokeJoin = originalJoin
+                paint.color = currentTextColor
+            }
+            drawText(label, 0.0f, 0.0f, paint)
         }
     }
 

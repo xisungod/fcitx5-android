@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyboard_menu_breathing_on">呼吸灯：开</string>
+    <string name="keyboard_menu_breathing_off">呼吸灯：关</string>
+</resources>

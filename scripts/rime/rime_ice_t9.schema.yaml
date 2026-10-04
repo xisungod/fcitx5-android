@@ -1,0 +1,51 @@
+# Rime schema
+# SPDX-License-Identifier: GPL-3.0-only
+schema:
+  schema_id: rime_ice_t9
+  name: 雾凇九键
+  version: "2026-10-05"
+  dependencies: [xuancai_user_t9]
+switches:
+  __include: rime_ice.schema:/switches
+engine:
+  processors:
+    - lua_processor@*xuancai_ascii
+    - ascii_composer
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors: [abc_segmentor, punct_segmentor, fallback_segmentor]
+  translators: [punct_translator, script_translator, script_translator@xuancai_user]
+  filters: [lua_filter@*t9_preedit, simplifier@emoji, simplifier@traditionalize, uniquifier]
+speller:
+  alphabet: "23456789"
+  delimiter: " '"
+  algebra:
+    - derive/^([nl])ve$/$1ue/
+    - derive/^([jqxy])u/$1v/
+    - derive/^([nl])ue$/$1ve/
+    - derive/^([jqxy])v/$1u/
+    - xlit/abcdefghijklmnopqrstuvwxyz/22233344455566677778889999/
+translator:
+  __include: rime_ice.schema:/translator
+  prism: rime_ice_t9
+  user_dict: rime_ice
+  spelling_hints: 32
+  comment_format: []
+xuancai_user:
+  __include: rime_ice.schema:/xuancai_user
+  prism: xuancai_user_t9
+  spelling_hints: 32
+  always_show_comments: true
+emoji:
+  __include: rime_ice.schema:/emoji
+traditionalize:
+  __include: rime_ice.schema:/traditionalize
+punctuator:
+  __include: rime_ice.schema:/punctuator
+editor:
+  __include: rime_ice.schema:/editor
+grammar:
+  __include: rime_ice.schema:/grammar

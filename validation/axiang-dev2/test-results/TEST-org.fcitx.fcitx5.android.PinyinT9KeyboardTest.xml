@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.PinyinT9KeyboardTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:14.641Z" hostname="566dc45241c0" time="0.609">
+  <properties/>
+  <testcase name="literalDigitsReturnAndLayoutSwitchesRetainTheirSeparateActions" classname="org.fcitx.fcitx5.android.PinyinT9KeyboardTest" time="0.184"/>
+  <testcase name="spaceSupportsTapAndHeldFourDirectionCursorMovementWithoutAddingSpaces" classname="org.fcitx.fcitx5.android.PinyinT9KeyboardTest" time="0.076"/>
+  <testcase name="nativeT9RendersAtPhoneWidthAndSharesTheExistingPressEffect" classname="org.fcitx.fcitx5.android.PinyinT9KeyboardTest" time="0.148"/>
+  <testcase name="localKeyboardMenuOffersPinyinEnglishAndNumbersAndOnlyActsOnExplicitSelection" classname="org.fcitx.fcitx5.android.PinyinT9KeyboardTest" time="0.064"/>
+  <testcase name="realDigitTouchesSendAsciiT9CodesRatherThanNumpadKeysOrLiteralCommits" classname="org.fcitx.fcitx5.android.PinyinT9KeyboardTest" time="0.134"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

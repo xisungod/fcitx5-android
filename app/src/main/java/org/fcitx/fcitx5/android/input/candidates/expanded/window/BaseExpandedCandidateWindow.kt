@@ -161,12 +161,12 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         }
         updateTabs(fcitx.runImmediately { inputPanelCached.tabs })
         offsetJob = service.lifecycleScope.launch {
-            horizontalCandidate.expandedCandidateOffset.collect {
-                if (it <= 0) {
+            horizontalCandidate.expandedCandidateOffset.collect { _ ->
+                if (horizontalCandidate.adapter.candidates.isEmpty()) {
                     windowManager.attachWindow(KeyboardWindow)
                 } else {
                     candidateLayout.resetPosition()
-                    adapter.refreshWithOffset(it)
+                    adapter.refreshWithOffset(0)
                 }
             }
         }
@@ -195,7 +195,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
     override fun onDetached() {
         bar.expandButtonStateMachine.push(
             ExpandedCandidatesDetached,
-            ExpandedCandidatesEmpty to (horizontalCandidate.adapter.total == adapter.offset)
+            ExpandedCandidatesEmpty to horizontalCandidate.adapter.candidates.isEmpty()
         )
         candidatesSubmitJob?.cancel()
         offsetJob?.cancel()

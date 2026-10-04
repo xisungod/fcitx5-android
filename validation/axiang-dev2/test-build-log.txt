@@ -1,0 +1,272 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :build-logic:convention:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :build-logic:convention:compileKotlin UP-TO-DATE
+> Task :build-logic:convention:compileJava NO-SOURCE
+> Task :build-logic:convention:pluginDescriptors UP-TO-DATE
+> Task :build-logic:convention:processResources UP-TO-DATE
+> Task :build-logic:convention:classes UP-TO-DATE
+> Task :build-logic:convention:jar
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:dataBindingMergeDependencyArtifactsDebug UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:prepareLibraryDefinitionsDebug UP-TO-DATE
+> Task :app:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:common:preBuild UP-TO-DATE
+> Task :lib:common:preDebugBuild UP-TO-DATE
+> Task :lib:common:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5:preBuild UP-TO-DATE
+> Task :lib:fcitx5:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:preBuild UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:fcitx5-lua:preBuild UP-TO-DATE
+> Task :lib:fcitx5-lua:preDebugBuild UP-TO-DATE
+> Task :lib:fcitx5-lua:extractDebugSupportedLocales UP-TO-DATE
+> Task :lib:libime:preBuild UP-TO-DATE
+> Task :lib:libime:preDebugBuild UP-TO-DATE
+> Task :lib:libime:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:generateDebugLocaleConfig UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :lib:common:generateDebugResources UP-TO-DATE
+> Task :lib:common:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:packageDebugResources UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugResources UP-TO-DATE
+> Task :lib:fcitx5-lua:packageDebugResources UP-TO-DATE
+> Task :lib:libime:generateDebugResources UP-TO-DATE
+> Task :lib:libime:packageDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :lib:common:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:processDebugNavigationResources UP-TO-DATE
+> Task :lib:fcitx5-lua:processDebugNavigationResources UP-TO-DATE
+> Task :lib:libime:processDebugNavigationResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :lib:common:parseDebugLocalResources UP-TO-DATE
+> Task :lib:common:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugRFile UP-TO-DATE
+> Task :lib:fcitx5-lua:parseDebugLocalResources UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugRFile UP-TO-DATE
+> Task :lib:libime:parseDebugLocalResources UP-TO-DATE
+> Task :lib:libime:generateDebugRFile UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesDebug UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :codegen:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :codegen:compileKotlin UP-TO-DATE
+> Task :codegen:compileJava NO-SOURCE
+> Task :codegen:processResources UP-TO-DATE
+> Task :codegen:classes UP-TO-DATE
+> Task :codegen:jar UP-TO-DATE
+> Task :lib:common:compileDebugAidl UP-TO-DATE
+> Task :lib:common:compileDebugKotlin UP-TO-DATE
+> Task :lib:common:javaPreCompileDebug UP-TO-DATE
+> Task :lib:common:compileDebugJavaWithJavac UP-TO-DATE
+> Task :lib:common:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5-lua:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5-lua:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:libime:compileDebugKotlin NO-SOURCE
+> Task :lib:libime:javaPreCompileDebug UP-TO-DATE
+> Task :lib:libime:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:libime:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugKotlin NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugJavaWithJavac NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :lib:fcitx5:configureCMakeDebug[arm64-v8a]
+> Task :lib:fcitx5:buildCMakeDebug[arm64-v8a][Fcitx5Config,Fcitx5Core,etc]
+> Task :lib:fcitx5:externalNativeBuildDebug
+> Task :lib:fcitx5:generateJsonModelDebug
+> Task :lib:fcitx5:installFcitxDevelComponent
+> Task :lib:fcitx5:installFcitxHeaders
+> Task :lib:fcitx5:prefabDebugConfigurePackage
+> Task :lib:fcitx5:prefabDebugPackage UP-TO-DATE
+> Task :lib:fcitx5-lua:configureCMakeDebug[arm64-v8a]
+> Task :lib:fcitx5-lua:buildCMakeDebug[arm64-v8a][cmake,luaaddonloader]
+> Task :lib:fcitx5:mergeDebugJniLibFolders UP-TO-DATE
+> Task :lib:fcitx5:mergeDebugNativeLibs UP-TO-DATE
+> Task :lib:fcitx5:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :lib:fcitx5-lua:externalNativeBuildDebug
+> Task :lib:fcitx5-lua:generateJsonModelDebug
+> Task :lib:fcitx5-lua:installFcitxHeaders
+> Task :lib:fcitx5-lua:prefabDebugConfigurePackage
+> Task :lib:libime:configureCMakeDebug[arm64-v8a]
+> Task :lib:libime:buildCMakeDebug[arm64-v8a][IMECore,IMEPinyin,etc]
+> Task :lib:libime:externalNativeBuildDebug
+> Task :lib:libime:generateJsonModelDebug
+> Task :lib:libime:installFcitxHeaders
+> Task :lib:libime:prefabDebugConfigurePackage
+> Task :lib:fcitx5-chinese-addons:configureCMakeDebug[arm64-v8a]
+> Task :app:installLibraryConfig[fcitx5-chinese-addons]
+> Task :app:installLibraryConfig[fcitx5-lua]
+> Task :app:installLibraryConfig[fcitx5]
+> Task :app:installLibraryConfig[libime]
+> Task :app:installLibraryTranslation[fcitx5-chinese-addons]
+> Task :app:installLibraryTranslation[fcitx5-lua]
+> Task :app:installLibraryTranslation[fcitx5]
+> Task :app:installLibraryTranslation[libime]
+> Task :lib:fcitx5-lua:prefabDebugPackage UP-TO-DATE
+> Task :lib:libime:prefabDebugPackage UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:buildCMakeDebug[arm64-v8a][chttrans,cmake,etc]
+> Task :lib:fcitx5-lua:mergeDebugJniLibFolders UP-TO-DATE
+> Task :lib:fcitx5-lua:mergeDebugNativeLibs UP-TO-DATE
+> Task :lib:fcitx5-lua:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :lib:libime:mergeDebugJniLibFolders UP-TO-DATE
+> Task :lib:libime:mergeDebugNativeLibs UP-TO-DATE
+> Task :lib:libime:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:externalNativeBuildDebug
+> Task :lib:fcitx5-chinese-addons:generateJsonModelDebug
+> Task :lib:fcitx5-chinese-addons:installFcitxHeaders
+> Task :lib:fcitx5-chinese-addons:prefabDebugConfigurePackage
+> Task :app:configureCMakeDebug[arm64-v8a]
+> Task :app:installProjectConfig
+> Task :app:installProjectPrebuiltAssets
+> Task :app:installProjectTranslation
+> Task :app:installFcitxComponent
+> Task :app:deleteFcitxComponentExcludeFiles
+> Task :app:generateDataDescriptor UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :lib:common:generateDebugAssets UP-TO-DATE
+> Task :lib:common:mergeDebugAssets UP-TO-DATE
+> Task :lib:fcitx5:generateDebugAssets UP-TO-DATE
+> Task :lib:fcitx5:mergeDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:generateDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:mergeDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-lua:generateDebugAssets UP-TO-DATE
+> Task :lib:fcitx5-lua:mergeDebugAssets UP-TO-DATE
+> Task :lib:libime:generateDebugAssets UP-TO-DATE
+> Task :lib:libime:mergeDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:generateDebugGlobalSynthetics UP-TO-DATE
+> Task :app:l8DexDesugarLibDebug UP-TO-DATE
+> Task :lib:common:processDebugJavaRes UP-TO-DATE
+> Task :lib:fcitx5:processDebugJavaRes NO-SOURCE
+> Task :lib:fcitx5-chinese-addons:processDebugJavaRes NO-SOURCE
+> Task :lib:fcitx5-lua:processDebugJavaRes NO-SOURCE
+> Task :lib:libime:processDebugJavaRes NO-SOURCE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:fcitx5:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:libime:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :lib:common:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :lib:common:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:fcitx5:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:fcitx5-lua:writeDebugAarMetadata UP-TO-DATE
+> Task :lib:libime:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:common:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:common:processDebugManifest UP-TO-DATE
+> Task :lib:fcitx5:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:fcitx5:processDebugManifest UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:processDebugManifest UP-TO-DATE
+> Task :lib:fcitx5-lua:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:fcitx5-lua:processDebugManifest UP-TO-DATE
+> Task :lib:libime:extractDeepLinksDebug UP-TO-DATE
+> Task :lib:libime:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :lib:common:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:common:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:fcitx5:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:fcitx5:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:fcitx5-lua:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:fcitx5-lua:compileDebugLibraryResources UP-TO-DATE
+> Task :lib:libime:mapDebugSourceSetPaths UP-TO-DATE
+> Task :lib:libime:compileDebugLibraryResources UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:prefabDebugPackage UP-TO-DATE
+> Task :app:buildCMakeDebug[arm64-v8a][androidfrontend,androidkeyboard,etc]
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :lib:common:mergeDebugJniLibFolders UP-TO-DATE
+> Task :lib:common:mergeDebugNativeLibs NO-SOURCE
+> Task :lib:common:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:mergeDebugJniLibFolders UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:mergeDebugNativeLibs UP-TO-DATE
+> Task :lib:fcitx5-chinese-addons:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:packageDebugUnitTestForUnitTest UP-TO-DATE
+> Task :app:mergeDebugUnitTestManifest UP-TO-DATE
+> Task :app:processDebugUnitTestManifest UP-TO-DATE
+> Task :app:generateDebugUnitTestConfig UP-TO-DATE
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:dexBuilderDebug
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:kspDebugUnitTestKotlin SKIPPED
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:generateBuildMetadataDebug UP-TO-DATE
+> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleDebug
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt:96:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/KeyboardVisualRegressionTest.kt:430:78 'field scaledDensity: Float' is deprecated. Deprecated in Java.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt:126:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/PinyinT9KeyboardTest.kt:111:17 Expression is unused.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/PinyinT9KeyboardTest.kt:151:13 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/PressEffectRenderingTest.kt:165:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/RippleShapeRenderingTest.kt:118:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:386:68 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:653:68 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:758:72 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:850:68 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:1021:72 No cast needed.
+w: file:///tmp/xuancai-v13-source/app/src/test/java/org/fcitx/fcitx5/android/V15PreviewRenderingTest.kt:1263:72 No cast needed.
+
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :app:testDebugUnitTest
+
+[Incubating] Problems report is available at: file:///tmp/xuancai-v13-source/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 48s
+197 actionable tasks: 47 executed, 150 up-to-date

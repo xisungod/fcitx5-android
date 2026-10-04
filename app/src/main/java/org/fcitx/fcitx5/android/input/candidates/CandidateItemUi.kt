@@ -25,7 +25,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val text = view(::AutoScaleTextView) {
         scaleMode = AutoScaleTextView.Mode.Proportional
-        textSize = 20f // sp
+        textSize = 24f // sp
         isSingleLine = true
         gravity = gravityCenter
         setTextColor(theme.candidateTextColor)

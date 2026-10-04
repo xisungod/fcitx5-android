@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardSizePolicy
 import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSymbolDirection
@@ -59,6 +60,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     inner class Keyboard : ManagedPreferenceCategory(R.string.virtual_keyboard, sharedPreferences) {
+        val hapticStrength = int(
+            R.string.haptic_strength, "haptic_strength_percent", 100, 0, 100, "%"
+        )
+        val rimeFuzzyNl = switch(R.string.rime_fuzzy_nl, "rime_fuzzy_nl", false)
+        val rimeFuzzyZh = switch(R.string.rime_fuzzy_zh, "rime_fuzzy_zh", false)
+        val rimeFuzzyAng = switch(R.string.rime_fuzzy_ang, "rime_fuzzy_ang", false)
         val hapticOnKeyPress =
             enumList(
                 R.string.button_haptic_feedback,
@@ -137,22 +144,16 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val focusChangeResetKeyboard =
             switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true)
         val expandToolbarByDefault =
-            switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false)
+            switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", true)
         val inlineSuggestions = switch(R.string.inline_suggestions, "inline_suggestions", true)
         val toolbarNumRowOnPassword =
-            switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true)
+            switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", false)
         val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
         val keepLettersUppercase = switch(
             R.string.keep_keyboard_letters_uppercase,
             "keep_keyboard_letters_uppercase",
-            false
+            true
         )
-
-        val showVoiceInputButton =
-            switch(R.string.show_voice_input_button, "show_voice_input_button", false)
-        val preferredVoiceInput = voiceInputPreference(
-            R.string.preferred_voice_input, "preferred_voice_input", ""
-        ) { showVoiceInputButton.getValue() }
 
         val expandKeypressArea =
             switch(R.string.expand_keypress_area, "expand_keypress_area", false)
@@ -173,16 +174,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val spaceKeyLongPressBehavior = enumList(
             R.string.space_long_press_behavior,
             "space_long_press_behavior",
-            SpaceLongPressBehavior.None
+            SpaceLongPressBehavior.MoveCursor
         )
         val spaceSwipeMoveCursor =
-            switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
+            switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true,
+                enableUiOn = { spaceKeyLongPressBehavior.getValue() != SpaceLongPressBehavior.MoveCursor })
         val showLangSwitchKey =
             switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
         val langSwitchKeyBehavior = enumList(
             R.string.lang_switch_key_behavior,
             "lang_switch_key_behavior",
-            LangSwitchBehavior.Enumerate
+            LangSwitchBehavior.ToggleActivate
         ) { showLangSwitchKey.getValue() }
 
         val keyboardHeightPercent: ManagedPreference.PInt
@@ -193,7 +195,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 R.string.keyboard_height,
                 R.string.portrait,
                 "keyboard_height_percent",
-                30,
+                appContext.resources.displayMetrics.let {
+                    KeyboardSizePolicy.defaultPortraitHeightPercent(it.widthPixels, it.heightPixels, it.density)
+                },
                 R.string.landscape,
                 "keyboard_height_percent_landscape",
                 49,
@@ -355,6 +359,14 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val clipboardMaskSensitive = switch(
             R.string.clipboard_mask_sensitive, "clipboard_mask_sensitive", true
         ) { clipboardListening.getValue() }
+        val verificationCodeFromClipboard = switch(
+            R.string.verification_code_clipboard, "verification_code_clipboard", true,
+            R.string.verification_code_clipboard_summary
+        ) { clipboardListening.getValue() && clipboardSuggestion.getValue() }
+        val verificationCodeFromSms = switch(
+            R.string.verification_code_sms, "verification_code_sms", false,
+            R.string.verification_code_sms_summary
+        )
     }
 
     inner class Symbols : ManagedPreferenceCategory(R.string.emoji_and_symbols, sharedPreferences) {
@@ -421,7 +433,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 clipboard
             ).forEach { category ->
                 category.managedPreferences.forEach {
-                    it.value.putValueTo(this@edit)
+                    // Keep an untouched strength at legacy system feedback even before unlock.
+                    if (it.key == keyboard.hapticStrength.key && !sharedPreferences.contains(it.key)) {
+                        remove(it.key)
+                    } else it.value.putValueTo(this@edit)
                 }
             }
         }

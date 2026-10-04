@@ -40,7 +40,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
         return super.onCreateViewHolder(parent, viewType).apply {
             itemView.apply {
-                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(40))
+                layoutParams = GridLayoutManager.LayoutParams(matchParent, dp(52))
             }
         }
     }

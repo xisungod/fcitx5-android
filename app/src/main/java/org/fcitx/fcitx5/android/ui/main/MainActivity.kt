@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -24,6 +25,7 @@ import androidx.navigation.fragment.NavHostFragment
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.setup.SetupActivity
@@ -35,12 +37,36 @@ import splitties.views.topPadding
 
 class MainActivity : AppCompatActivity() {
 
+    /** SMS verification codes are opt-in: ask for RECEIVE_SMS only when the user turns them on */
+    private val smsPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) AppPrefs.getInstance().clipboard.verificationCodeFromSms.setValue(false)
+    }
+
+    private val smsCodePrefListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
+        if (enabled) requestSmsPermissionIfNeeded()
+    }
+
+    private fun requestSmsPermissionIfNeeded() {
+        if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+            smsPermission.launch(Manifest.permission.RECEIVE_SMS)
+        }
+    }
+
+    override fun onDestroy() {
+        AppPrefs.getInstance().clipboard.verificationCodeFromSms.unregisterOnChangeListener(smsCodePrefListener)
+        super.onDestroy()
+    }
+
     private val viewModel: MainViewModel by viewModels()
 
     private lateinit var navController: NavController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppPrefs.getInstance().clipboard.verificationCodeFromSms.let {
+            it.registerOnChangeListener(smsCodePrefListener)
+            if (it.getValue()) requestSmsPermissionIfNeeded()
+        }
         enableEdgeToEdge()
         val binding = ActivityMainBinding.inflate(layoutInflater)
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->

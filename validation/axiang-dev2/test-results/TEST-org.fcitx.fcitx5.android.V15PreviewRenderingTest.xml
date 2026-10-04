@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.V15PreviewRenderingTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:24.995Z" hostname="566dc45241c0" time="24.317">
+  <properties/>
+  <testcase name="fPressShowsTheRealSoftFieldWithTheNumberRowBothEnabledAndDisabled" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="2.016"/>
+  <testcase name="continuousSixtyFpsPressesUseIrregularRealTouchesAndKeepStableReadableGlyphs" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="10.497"/>
+  <testcase name="stableThirtyFpsPressesKeepActualGlyphCoordinatesAndPopupSizeThroughCompleteTails" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="5.746"/>
+  <testcase name="arbitrarySingleAndTwoColourChoicesRenderThroughTheProductionKeyboard" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="0.351"/>
+  <testcase name="numberAndCategorySymbolPagesRenderTheirRealAndroidLayouts" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="0.143"/>
+  <testcase name="oneReleasedKeyDimsThroughTheActualViewInsteadOfDisappearingOnUp" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="0.569"/>
+  <testcase name="continuousTypingUsesRealTouchesKeyFacesCandidateExtensionAndPopupLifecycle" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="3.522"/>
+  <testcase name="shortTypingBurstRendersTheMergedFieldAndCompleteReleaseTail" classname="org.fcitx.fcitx5.android.V15PreviewRenderingTest" time="1.463"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

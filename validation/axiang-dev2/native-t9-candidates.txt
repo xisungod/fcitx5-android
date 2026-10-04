@@ -1,0 +1,16 @@
+Nine-key 64426 => 你好 (candidate 0); no digit commits.
+Nine-key 94664486 => 中国 (candidate 0); no digit commits.
+Nine-key 54782654 => 计算机 (candidate 0); no digit commits.
+Nine-key 74826452748264324 => 双卡双待 (candidate 0); no digit commits.
+Nine-key 3298926669464 => 大语言模型 (candidate 0); no digit commits.
+Nine-key 9426 => 小 (candidate 0); no digit commits.
+Nine-key 94'26 => 西安 (candidate 0); no digit commits.
+Nine-key nihao => 你好 (candidate 0); no digit commits.
+Nine-key 64426 => 你好 (candidate 0); no digit commits.
+T9 backspace, space selection, cancel, alphabetic switch and Latin digit boundaries passed.
+Nine-key Rime native candidate checks passed.
+Nine-key 98262244373624842692694364 => 炫彩个人词条验证 (candidate 0); no digit commits.
+Nine-key 26948654942628748243426 => 安卓离线部署词典 (candidate 0); no digit commits.
+Nine-key Rime native candidate checks passed.
+Nine-key 385432678248426 => 独立导入词条 (candidate 0); no digit commits.
+Nine-key Rime native candidate checks passed.

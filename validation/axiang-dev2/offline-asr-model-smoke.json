@@ -1,0 +1,63 @@
+{
+  "sherpa_onnx_version": "1.13.8",
+  "provider": "cpu",
+  "num_threads": 1,
+  "model_sample_rate": 16000,
+  "model_type": "zipformer",
+  "host_only": true,
+  "asr_init_seconds": 0.2550325030024396,
+  "archive": {
+    "filename": "cpu-model.tar.bz2",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23.tar.bz2",
+    "sha256": "2cbd71b640d9c37d3784f29367333a4577b0398b62e9deeed418170b081cba8b"
+  },
+  "asr_tests": [
+    {
+      "wav_in_archive": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/test_wavs/0.wav",
+      "wav_sha256": "668bf8df51a10027b84d5d8816a1ce11ae93545538dc05cfe2aa6811d399c250",
+      "sample_rate": 16000,
+      "duration_seconds": 5.6115,
+      "actual": "对我做了介绍那么我想说的是大家如果对我的研究感兴趣",
+      "inference_seconds": 0.13136495799699333,
+      "expected": "对我做了介绍那么我想说的是大家如果对我的研究感兴趣",
+      "reference": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html"
+    },
+    {
+      "wav_in_archive": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/test_wavs/1.wav",
+      "wav_sha256": "30edbabea84ca4c076f5b43bb44495f436f6711319c32a200d3fc5c67c1fee1d",
+      "sample_rate": 16000,
+      "duration_seconds": 5.1530625,
+      "actual": "重点呢想谈三个问题首先就是这一轮全球金融动能的表现",
+      "inference_seconds": 0.12162036300287582
+    },
+    {
+      "wav_in_archive": "sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/test_wavs/8k.wav",
+      "wav_sha256": "0ed3bddacf0a23477d2b3c07ff9c24ad9c1fc3b31cdd47cb0773441e8e045cde",
+      "sample_rate": 8000,
+      "duration_seconds": 4.524375,
+      "actual": "深入点飞机分析这一次全球金融动荡背后的根源",
+      "inference_seconds": 0.09851773999980651
+    }
+  ],
+  "punctuation_tests": [
+    {
+      "input": "我们都是木头人不会说话不会动",
+      "actual": "我们都是木头人，不会说话，不会动。",
+      "inference_seconds": 0.003834243005258031,
+      "expected": "我们都是木头人，不会说话，不会动。",
+      "reference": "https://k2-fsa.github.io/sherpa/onnx/punctuation/pretrained_models.html"
+    },
+    {
+      "input": "明天你有时间吗我们一起去公园吧",
+      "actual": "明天你有时间吗？我们一起去公园吧。",
+      "inference_seconds": 0.0029305689968168736
+    },
+    {
+      "input": "对我做了介绍那么我想说的是大家如果对我的研究感兴趣",
+      "actual": "对我做了介绍，那么我想说的是，大家如果对我的研究感兴趣。",
+      "inference_seconds": 0.007594254988362081
+    }
+  ],
+  "punctuation_init_seconds": 0.16461091399833094,
+  "passed": true
+}

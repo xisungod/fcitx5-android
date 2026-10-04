@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.bar
 
 import android.graphics.Color
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import android.os.Build
 import android.util.Size
 import android.view.KeyEvent
@@ -13,8 +14,8 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestion
 import android.view.inputmethod.InlineSuggestionsResponse
-import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
+import android.widget.PopupMenu
 import android.widget.ViewAnimator
 import android.widget.inline.InlineContentView
 import androidx.annotation.Keep
@@ -48,6 +49,8 @@ import org.fcitx.fcitx5.android.input.bar.ui.CandidateUi
 import org.fcitx.fcitx5.android.input.bar.ui.IdleUi
 import org.fcitx.fcitx5.android.input.bar.ui.TitleUi
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.input.bar.ui.idle.KeyboardLayoutChoice
+import org.fcitx.fcitx5.android.input.bar.ui.idle.keyboardLayoutMenu
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.FlexboxExpandedCandidateWindow
@@ -58,16 +61,17 @@ import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
-import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
+import org.fcitx.fcitx5.android.input.voice.OfflineDictationWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
-import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.must
 import splitties.bitflags.hasFlag
@@ -78,6 +82,7 @@ import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
+import org.fcitx.fcitx5.android.data.otp.VerificationCodes
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -103,10 +108,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandedCandidateStyle by prefs.keyboard.expandedCandidateStyle
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
-    private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
-    private val preferredVoiceInput by prefs.keyboard.preferredVoiceInput
 
     private var clipboardTimeoutJob: Job? = null
+    private var keyboardLayoutPopup: PopupMenu? = null
 
     private var isClipboardFresh: Boolean = false
     private var isInlineSuggestionPresent: Boolean = false
@@ -123,13 +127,26 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.OnClipboardUpdateListener {
             if (!clipboardSuggestion.getValue()) return@OnClipboardUpdateListener
             service.lifecycleScope.launch {
+                val token = ClipboardSuggestionDismissals.Token(
+                    ClipboardSuggestionDismissals.Source.Clipboard, it.timestamp, it.id)
+                // Check inside the posted callback too: closing can precede a queued update.
+                if (ClipboardSuggestionDismissals.shared.isDismissed(token)) return@launch
                 if (it.text.isEmpty()) {
-                    isClipboardFresh = false
+                    clearClipboardSuggestion()
                 } else {
-                    idleUi.clipboardUi.text.text = if (it.sensitive && clipboardMaskSensitive) {
-                        ClipboardEntry.BULLET.repeat(min(42, it.text.length))
-                    } else {
-                        it.text.take(42)
+                    val code = if (codeFromClipboard.getValue()) VerificationCodes.extract(it.text) else null
+                    chipToken = token
+                    chipEntry = it
+                    chipCode = code
+                    chipFromSms = false
+                    val masked = it.sensitive && clipboardMaskSensitive
+                    idleUi.clipboardUi.text.text = when {
+                        code != null -> context.getString(
+                            R.string.verification_code_chip,
+                            if (masked) ClipboardEntry.BULLET.repeat(code.length) else code
+                        )
+                        masked -> ClipboardEntry.BULLET.repeat(min(42, it.text.length))
+                        else -> it.text.take(42)
                     }
                     isClipboardFresh = true
                     launchClipboardTimeoutJob()
@@ -138,14 +155,66 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
+    private val codeFromClipboard = prefs.clipboard.verificationCodeFromClipboard
+    private val codeFromSms = prefs.clipboard.verificationCodeFromSms
+
+    /** verification code currently offered in the clipboard chip; tapping pastes just the code */
+    private var chipCode: String? = null
+    private var chipFromSms = false
+    private var chipEntry: ClipboardEntry? = null
+    private var chipToken: ClipboardSuggestionDismissals.Token? = null
+
+    private fun clearClipboardSuggestion() {
+        chipCode = null
+        chipFromSms = false
+        chipEntry = null
+        chipToken = null
+        clipboardTimeoutJob?.cancel()
+        clipboardTimeoutJob = null
+        isClipboardFresh = false
+    }
+
+    private fun dismissClipboardSuggestion() {
+        chipToken?.let(ClipboardSuggestionDismissals.shared::dismiss)
+        clearClipboardSuggestion()
+        evalIdleUiState()
+    }
+
+    private fun showSmsCode(code: VerificationCodes.Code) {
+        if (!codeFromSms.getValue() || code.source != VerificationCodes.Source.Sms) return
+        val token = ClipboardSuggestionDismissals.Token(ClipboardSuggestionDismissals.Source.Sms, code.timestamp)
+        if (ClipboardSuggestionDismissals.shared.isDismissed(token)) return
+        chipToken = token
+        chipEntry = null
+        chipCode = code.code
+        chipFromSms = true
+        idleUi.clipboardUi.text.text = context.getString(R.string.verification_code_sms_chip, code.code)
+        isClipboardFresh = true
+        // an SMS code stays offered for its whole validity window, independent of the clipboard timeout
+        clipboardTimeoutJob?.cancel()
+        val left = VerificationCodes.TTL_MS - (System.currentTimeMillis() - code.timestamp)
+        clipboardTimeoutJob = service.lifecycleScope.launch {
+            delay(left.coerceAtLeast(0L))
+            if (chipFromSms) {
+                clearClipboardSuggestion()
+                evalIdleUiState()
+            }
+            clipboardTimeoutJob = null
+        }
+        evalIdleUiState()
+    }
+
+    @Keep
+    private val onVerificationCodeListener = VerificationCodes.Listener { code ->
+        service.lifecycleScope.launch { showSmsCode(code) }
+    }
+
     @Keep
     private val onClipboardSuggestionUpdateListener =
         ManagedPreference.OnChangeListener<Boolean> { _, it ->
             if (!it) {
-                isClipboardFresh = false
+                clearClipboardSuggestion()
                 evalIdleUiState()
-                clipboardTimeoutJob?.cancel()
-                clipboardTimeoutJob = null
             }
         }
 
@@ -154,8 +223,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ManagedPreference.OnChangeListener<Int> { _, _ ->
             when (idleUi.currentState) {
                 IdleUi.State.Clipboard -> {
-                    // renew timeout when clipboard suggestion is present
-                    launchClipboardTimeoutJob()
+                    // SMS offers retain their own fixed validity window.
+                    if (!chipFromSms) launchClipboardTimeoutJob()
                 }
                 else -> {}
             }
@@ -163,13 +232,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private fun launchClipboardTimeoutJob() {
         clipboardTimeoutJob?.cancel()
+        clipboardTimeoutJob = null
         val timeout = clipboardItemTimeout.getValue() * 1000L
         // never transition to ClipboardTimedOut state when timeout < 0
         if (timeout < 0L) return
         clipboardTimeoutJob = service.lifecycleScope.launch {
             delay(timeout)
-            isClipboardFresh = false
-            clipboardTimeoutJob = null
+            clearClipboardSuggestion()
+            evalIdleUiState()
         }
     }
 
@@ -254,34 +324,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         } else false
     }
 
-    private var voiceInputSubtype: Pair<String, InputMethodSubtype>? = null
-
-    private val switchToVoiceInputCallback = View.OnClickListener {
-        val (id, subtype) = voiceInputSubtype ?: return@OnClickListener
-        InputMethodUtil.switchInputMethod(service, id, subtype)
-    }
-
     private val idleUi: IdleUi by lazy {
         IdleUi(context, theme, popup, commonKeyActionListener).apply {
             menuButton.setOnClickListener {
-                when (idleUi.currentState) {
-                    IdleUi.State.Empty -> {
-                        isToolbarManuallyToggled = !expandToolbarByDefault
-                        evalIdleUiState(fromUser = true)
-                    }
-                    IdleUi.State.Toolbar -> {
-                        isToolbarManuallyToggled = expandToolbarByDefault
-                        evalIdleUiState(fromUser = true)
-                    }
-                    else -> {
-                        isToolbarManuallyToggled = !expandToolbarByDefault
-                        idleUi.updateState(IdleUi.State.Toolbar, fromUser = true)
-                    }
-                }
-                // reset timeout timer (if present) when user switch layout
-                if (clipboardTimeoutJob != null) {
-                    launchClipboardTimeoutJob()
-                }
+                windowManager.attachWindow(StatusAreaWindow())
             }
             hideKeyboardButton.apply {
                 setOnClickListener(hideKeyboardCallback)
@@ -291,39 +337,63 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 onGestureListener = swipeHideKeyboardCallback
             }
             buttonsUi.apply {
+                keyboardLayoutButton.setOnClickListener { anchor ->
+                    keyboardLayoutPopup?.dismiss()
+                    val chooser = keyboardLayoutMenu(context, anchor) { choice ->
+                        // Switching windows can clear dependencies and popup anchors; keep the
+                        // destination before detaching anything, then act on that same keyboard.
+                        val target = windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow
+                        windowManager.attachWindow(KeyboardWindow)
+                        when (choice) {
+                            KeyboardLayoutChoice.PinyinNine -> target.selectPinyinLayout(true)
+                            KeyboardLayoutChoice.Pinyin26 -> target.selectPinyinLayout(false)
+                            KeyboardLayoutChoice.English -> target.selectEnglishKeyboard()
+                            KeyboardLayoutChoice.Numbers -> target.switchLayout(NumberKeyboard.Name)
+                        }
+                    }
+                    keyboardLayoutPopup = chooser
+                    chooser.setOnDismissListener {
+                        if (keyboardLayoutPopup === chooser) keyboardLayoutPopup = null
+                    }
+                    chooser.show()
+                }
+                microphoneButton.setOnClickListener {
+                    val session = service.createOfflineDictationSession()
+                    windowManager.attachWindow(OfflineDictationWindow(session))
+                }
                 undoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
                 }
                 redoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
                 }
-                cursorMoveButton.setOnClickListener {
-                    windowManager.attachWindow(TextEditingWindow())
+                emojiButton.setOnClickListener {
+                    windowManager.attachWindow(PickerWindow.Key.Emoji)
                 }
                 clipboardButton.setOnClickListener {
                     windowManager.attachWindow(ClipboardWindow())
                 }
-                moreButton.setOnClickListener {
-                    windowManager.attachWindow(StatusAreaWindow())
-                }
             }
             clipboardUi.suggestionView.apply {
                 setOnClickListener {
-                    ClipboardManager.lastEntry?.let {
+                    val code = chipCode
+                    if (code != null) {
+                        service.commitText(code)
+                        if (chipFromSms) VerificationCodes.consume()
+                    } else chipEntry?.let {
                         service.commitText(it.text)
                     }
-                    clipboardTimeoutJob?.cancel()
-                    clipboardTimeoutJob = null
-                    isClipboardFresh = false
+                    clearClipboardSuggestion()
                     evalIdleUiState()
                 }
                 setOnLongClickListener {
-                    ClipboardManager.lastEntry?.let {
+                    if (!chipFromSms) chipEntry?.let {
                         AppUtil.launchClipboardEdit(context, it.id, true)
                     }
                     true
                 }
             }
+            clipboardUi.dismissButton.setOnClickListener { dismissClipboardSuggestion() }
             numberRow.apply {
                 onCollapseListener = {
                     numberRowState = NumberRowState.ForceHide
@@ -407,8 +477,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         view.displayedChild = index
     }
 
+    fun setEffectKeyboard(keyboard: BaseKeyboard?) { view.keyboard = keyboard }
+
     override val view by lazy {
-        ViewAnimator(context).apply {
+        RippleBarView(context).apply {
             backgroundColor =
                 if (ThemeManager.prefs.keyBorder.getValue()) Color.TRANSPARENT
                 else theme.barColor
@@ -422,16 +494,19 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.lastEntry?.let {
             val now = System.currentTimeMillis()
             val clipboardTimeout = clipboardItemTimeout.getValue() * 1000L
-            if (now - it.timestamp < clipboardTimeout) {
+            if (clipboardTimeout < 0 || now - it.timestamp < clipboardTimeout) {
                 onClipboardUpdateListener.onUpdate(it)
             }
         }
         ClipboardManager.addOnUpdateListener(onClipboardUpdateListener)
+        VerificationCodes.addListener(onVerificationCodeListener)
+        VerificationCodes.fresh()?.let { showSmsCode(it) }
         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        keyboardLayoutPopup?.dismiss()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
@@ -441,13 +516,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             idleUi.inlineSuggestionsBar.clear()
         }
-        voiceInputSubtype = InputMethodUtil.findVoiceSubtype(preferredVoiceInput)
-        val shouldShowVoiceInput =
-            showVoiceInputButton && voiceInputSubtype != null && !capFlags.has(CapabilityFlag.Password)
-        idleUi.setHideKeyboardIsVoiceInput(
-            shouldShowVoiceInput,
-            if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback
-        )
         evalIdleUiState()
     }
 
@@ -474,6 +542,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onWindowDetached(window: InputWindow) {
+        keyboardLayoutPopup?.dismiss()
         barStateMachine.push(WindowDetached)
     }
 
@@ -537,7 +606,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     companion object {
-        const val HEIGHT = 40
+        const val HEIGHT = 52
     }
 
     fun onKeyboardLayoutSwitched(isNumber: Boolean) {

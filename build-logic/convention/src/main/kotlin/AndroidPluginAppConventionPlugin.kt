@@ -15,6 +15,8 @@ import org.gradle.kotlin.dsl.configure
 class AndroidPluginAppConventionPlugin : Plugin<Project> {
 
     override fun apply(target: Project) {
+        val mainApplicationId = "org.fcitx.fcitx5.android" +
+            (target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".axiang.v1")
         target.extensions.configure<ApplicationExtension> {
             buildFeatures {
                 buildConfig = true
@@ -29,10 +31,10 @@ class AndroidPluginAppConventionPlugin : Plugin<Project> {
                     )
                 }
                 debug {
-                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"org.fcitx.fcitx5.android.debug\"")
+                    buildConfigField("String", "MAIN_APPLICATION_ID", "\"$mainApplicationId\"")
                     addManifestPlaceholders(
                         mapOf(
-                            "mainApplicationId" to "org.fcitx.fcitx5.android.debug",
+                            "mainApplicationId" to mainApplicationId,
                         )
                     )
                 }

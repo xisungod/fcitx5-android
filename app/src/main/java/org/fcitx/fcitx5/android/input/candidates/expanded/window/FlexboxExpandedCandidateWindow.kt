@@ -30,7 +30,7 @@ class FlexboxExpandedCandidateWindow :
                     itemView.apply {
                         minimumWidth = dp(40)
                         setPaddingDp(10, 0, 10, 0)
-                        layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, dp(40))
+                        layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, dp(52))
                             .apply { flexGrow = 1f }
                     }
                 }

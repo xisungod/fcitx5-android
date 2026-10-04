@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyboard_layout_section">Keyboard layout</string>
+    <string name="keyboard_show_number_row">Show number row above letters</string>
+    <string name="keyboard_show_number_row_summary">In portrait, show a separate 1–0 row. Hiding it gives letter keys more height.</string>
+    <string name="press_color_mode">Press colour mode</string>
+    <string name="press_color_mode_random">Random colours</string>
+    <string name="press_color_mode_single">Single colour</string>
+    <string name="press_color_mode_custom">My palette</string>
+    <string name="press_wave_hold_time">Wave hold time</string>
+    <string name="light_effect_settings">Key lighting</string>
+    <string name="light_effect_settings_summary">Any RGB colour, your own palette and animation timing</string>
+    <string name="light_effect_saved">Saved automatically. Return to the keyboard to try it.</string>
+    <string name="light_effect_palette">Colours</string>
+    <string name="light_effect_random_summary">One random colour per press, shared by the key and its light.</string>
+    <string name="light_effect_single_summary">Use any colour for every press. Tap the colour to edit it.</string>
+    <string name="light_effect_custom_summary">Pick from your own colours on each press.</string>
+    <string name="light_effect_color_guide">Tap to edit · Hold to remove · Up to 8 colours</string>
+    <string name="light_effect_color_add">+ Add a colour</string>
+    <string name="light_effect_color_single_min">Keep at least one colour.</string>
+    <string name="light_effect_color_number">Colour %1$d</string>
+    <string name="light_effect_animation">Animation timing</string>
+    <string name="light_effect_expand">Expansion time</string>
+    <string name="light_effect_wave_fade">Wave fade out</string>
+    <string name="light_effect_face_hold">Key colour hold</string>
+    <string name="light_effect_face_exit">Key colour fade</string>
+    <string name="light_effect_total">Total wave duration: %1$d ms</string>
+    <string name="light_effect_total_detail">Includes %1$d ms of ignition. Wave and key holds are independent.</string>
+    <string name="light_effect_light">Light spread</string>
+    <string name="light_effect_reach">Spread distance</string>
+    <string name="light_effect_brightness">Wave brightness</string>
+    <string name="light_effect_enable">Enable key lighting</string>
+    <string name="light_effect_glow_candidates">Extend light into the candidate bar</string>
+    <string name="light_effect_edit_color">Edit colour</string>
+    <string name="light_effect_color_hex">Colour value (HEX)</string>
+    <string name="light_effect_hex_error">Enter six hexadecimal digits, for example #18FFC1.</string>
+    <string name="light_effect_hue">Hue</string>
+    <string name="light_effect_saturation">Saturation</string>
+    <string name="light_effect_value">Brightness</string>
+</resources>

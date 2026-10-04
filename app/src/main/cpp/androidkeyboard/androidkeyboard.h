@@ -29,7 +29,7 @@ FCITX_CONFIG_ENUM_NAME_WITH_I18N(
 FCITX_CONFIGURATION(
         AndroidKeyboardEngineConfig,
         Option<bool>
-            enableWordHint{this, "EnableWordHint", _("Enable word hint"), true};
+            enableWordHint{this, "EnableWordHint", _("Enable word hint"), false};
         Option<bool>
             hintOnPhysicalKeyboard{this, "WordHintOnPhysicalKeyboard", _("Enable word hint when using physical keyboard"), false};
         Option<bool>

@@ -148,6 +148,14 @@ class PickerWindow(
     override fun onAttached() {
         pickerLayout.embeddedKeyboard.also {
             pickerPagesAdapter.refreshIfNeeded()
+            // Every symbol-button tap starts on punctuation, even after browsing another category.
+            if (key == Key.Symbol) {
+                val range = pickerPagesAdapter.getRangeOfCategoryIndex(1)
+                pickerLayout.pager.setCurrentItem(range.first, false)
+                pickerLayout.tabsUi.activateTab(1)
+                pickerLayout.paginationUi.updatePageCount(range.last - range.first + 1)
+                pickerLayout.paginationUi.updateScrollProgress(0, 0f)
+            }
             it.onReturnDrawableUpdate(returnKeyDrawable.resourceId)
             it.keyActionListener = keyActionListener
         }

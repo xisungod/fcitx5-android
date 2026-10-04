@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cyber_palette_cyan_blue_purple">青蓝紫</string>
+    <string name="cyber_palette_red_orange_yellow">红橙黄</string>
+    <string name="cyber_palette_purple_pink_red">紫粉红</string>
+    <string name="cyber_palette_mint_cyan">薄荷青</string>
+    <string name="cyber_palette_blue_purple_pink">蓝紫粉</string>
+    <string name="cyber_palette_full_spectrum">全光谱</string>
+    <string name="cyber_palette_hint">左右滑动选择六款赛博配色，每次按键只亮其中一色。</string>
+    <string name="cyber_palette_current">当前：%1$s</string>
+</resources>

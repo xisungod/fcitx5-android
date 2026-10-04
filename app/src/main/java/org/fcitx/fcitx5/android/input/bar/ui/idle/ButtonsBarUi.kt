@@ -20,32 +20,36 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     override val root = view(::FlexboxLayout) {
         alignItems = AlignItems.CENTER
-        justifyContent = JustifyContent.SPACE_AROUND
+        justifyContent = JustifyContent.SPACE_BETWEEN
     }
 
     private fun toolButton(@DrawableRes icon: Int) = ToolButton(ctx, icon, theme).also {
         val size = ctx.dp(40)
-        root.addView(it, FlexboxLayout.LayoutParams(size, size))
+        root.addView(it, FlexboxLayout.LayoutParams(size, size).apply { flexShrink = 1f })
+    }
+
+    val keyboardLayoutButton = toolButton(R.drawable.ic_baseline_keyboard_24).apply {
+        contentDescription = ctx.getString(R.string.keyboard_layout_menu_title)
+        if (android.os.Build.VERSION.SDK_INT >= 26) tooltipText = contentDescription
+    }
+
+    val microphoneButton = toolButton(R.drawable.ic_offline_mic_24).apply {
+        contentDescription = ctx.getString(R.string.offline_dictation_ui_title)
+        if (android.os.Build.VERSION.SDK_INT >= 26) tooltipText = contentDescription
     }
 
     val undoButton = toolButton(R.drawable.ic_baseline_undo_24).apply {
         contentDescription = ctx.getString(R.string.undo)
     }
-
     val redoButton = toolButton(R.drawable.ic_baseline_redo_24).apply {
         contentDescription = ctx.getString(R.string.redo)
-    }
-
-    val cursorMoveButton = toolButton(R.drawable.ic_cursor_move).apply {
-        contentDescription = ctx.getString(R.string.text_editing)
     }
 
     val clipboardButton = toolButton(R.drawable.ic_clipboard).apply {
         contentDescription = ctx.getString(R.string.clipboard)
     }
 
-    val moreButton = toolButton(R.drawable.ic_baseline_more_horiz_24).apply {
-        contentDescription = ctx.getString(R.string.status_area)
+    val emojiButton = toolButton(R.drawable.ic_baseline_tag_faces_24).apply {
+        contentDescription = ctx.getString(R.string.emoji_and_symbols)
     }
-
 }

@@ -33,7 +33,7 @@ android {
             proguardFile("proguard-rules.pro")
         }
         debug {
-            resValue("string", "app_name", "@string/app_name_debug")
+            resValue("string", "app_name", "阿翔输入法 Rime")
         }
     }
 

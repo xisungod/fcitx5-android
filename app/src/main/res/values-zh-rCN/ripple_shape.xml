@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ripple_shape">涟漪形状</string>
+    <string name="ripple_shape_soft_mist">柔雾（默认）</string>
+    <string name="ripple_shape_irregular_fluid">不规则流体</string>
+</resources>

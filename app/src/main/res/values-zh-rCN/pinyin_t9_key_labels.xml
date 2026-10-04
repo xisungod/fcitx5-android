@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pinyin_t9_letters_description">%1$s，数字 %2$d</string>
+    <string name="pinyin_t9_separator_description">拼音分词，长按输入数字 1</string>
+    <string name="pinyin_t9_switch_26_description">切换到 26 键拼音</string>
+</resources>

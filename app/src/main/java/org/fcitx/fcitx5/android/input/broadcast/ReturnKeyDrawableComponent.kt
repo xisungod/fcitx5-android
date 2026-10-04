@@ -39,7 +39,7 @@ class ReturnKeyDrawableComponent :
         return when (info.imeOptions and EditorInfo.IME_MASK_ACTION) {
             EditorInfo.IME_ACTION_GO -> R.drawable.ic_baseline_arrow_forward_24
             EditorInfo.IME_ACTION_SEARCH -> R.drawable.ic_baseline_search_24
-            EditorInfo.IME_ACTION_SEND -> R.drawable.ic_baseline_send_24
+            EditorInfo.IME_ACTION_SEND -> R.drawable.ic_send_swoosh_24
             EditorInfo.IME_ACTION_NEXT -> R.drawable.ic_baseline_keyboard_tab_24
             EditorInfo.IME_ACTION_DONE -> R.drawable.ic_baseline_done_24
             EditorInfo.IME_ACTION_PREVIOUS -> R.drawable.ic_baseline_keyboard_tab_reverse_24

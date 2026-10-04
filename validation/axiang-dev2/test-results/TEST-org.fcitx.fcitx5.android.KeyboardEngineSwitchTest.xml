@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardEngineSwitchTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:10.537Z" hostname="566dc45241c0" time="0.045">
+  <properties/>
+  <testcase name="pendingCompositionIsPreservedWithoutSelectingAnyCandidateOrResetting" classname="org.fcitx.fcitx5.android.KeyboardEngineSwitchTest" time="0.023"/>
+  <testcase name="changingTheInputConnectionDuringASuspendedReadBlocksTheNextActionEvenWithoutAnExplicitCancel" classname="org.fcitx.fcitx5.android.KeyboardEngineSwitchTest" time="0.008"/>
+  <testcase name="endingTheSessionDuringANativeReadPreventsTheFollowingSchemaMutation" classname="org.fcitx.fcitx5.android.KeyboardEngineSwitchTest" time="0.008"/>
+  <testcase name="replacingARequestCancelsItsOldContinuationButTheNewRequestCanComplete" classname="org.fcitx.fcitx5.android.KeyboardEngineSwitchTest" time="0.003"/>
+  <testcase name="anInvalidatedUntrackedRequestCannotStartAndMissingSchemaDoesNotPretendToSucceed" classname="org.fcitx.fcitx5.android.KeyboardEngineSwitchTest" time="0.001"/>
+  <testcase name="endingTheSessionWhileItsJobIsQueuedPreventsEvenTheFirstNativeRead" classname="org.fcitx.fcitx5.android.KeyboardEngineSwitchTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

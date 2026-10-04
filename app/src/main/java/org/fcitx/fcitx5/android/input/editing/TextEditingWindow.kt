@@ -92,6 +92,12 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 userSelection = false
                 service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             }
+            undoButton.setOnClickListener {
+                service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
+            }
+            redoButton.setOnClickListener {
+                service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
+            }
             clipboardButton.setOnClickListener {
                 windowManager.attachWindow(ClipboardWindow())
             }

@@ -194,7 +194,17 @@ class TextEditingUi(
         contentDescription = ctx.getString(R.string.clipboard)
     }
 
+    val undoButton = ToolButton(ctx, R.drawable.ic_baseline_undo_24, theme).apply {
+        contentDescription = ctx.getString(R.string.undo)
+    }
+
+    val redoButton = ToolButton(ctx, R.drawable.ic_baseline_redo_24, theme).apply {
+        contentDescription = ctx.getString(R.string.redo)
+    }
+
     val extension = horizontalLayout {
+        add(undoButton, lParams(dp(40), dp(40)))
+        add(redoButton, lParams(dp(40), dp(40)))
         add(clipboardButton, lParams(dp(40), dp(40)))
     }
 }

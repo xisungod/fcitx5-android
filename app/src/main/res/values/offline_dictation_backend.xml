@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_dictation_backend_permission_title">Offline dictation microphone permission</string>
+    <string name="offline_dictation_backend_permission">Allow microphone access, then return to the keyboard and tap Start again. Audio stays on this phone.</string>
+    <string name="offline_dictation_backend_permission_denied">Microphone access was not granted. Offline dictation remains off. You can enable microphone permission in app settings.</string>
+    <string name="offline_dictation_backend_permission_settings">App settings</string>
+    <string name="offline_dictation_backend_permission_granted">Microphone access allowed. Return to the keyboard and tap Start to dictate.</string>
+    <string name="offline_dictation_backend_editor_type">Dictation is unavailable in this field. Use a regular text field.</string>
+    <string name="offline_dictation_backend_device">This phone does not support the bundled offline speech engine. An ARM64 device is required.</string>
+    <string name="offline_dictation_backend_microphone">No microphone is available on this device.</string>
+    <string name="offline_dictation_backend_models">The bundled offline speech model is missing. Reinstall the complete application package.</string>
+    <string name="offline_dictation_backend_audio">Cannot record audio. Check microphone permission, the system microphone switch, and whether another app is using it.</string>
+    <string name="offline_dictation_backend_engine">The local speech engine or model cannot run on this device. Dictation has stopped; no audio was uploaded.</string>
+    <string name="offline_dictation_backend_editor">The input field changed. This result will not be inserted. Start again in the intended field.</string>
+    <string name="offline_dictation_backend_preedit">Finish choosing the current input candidate before starting dictation.</string>
+</resources>

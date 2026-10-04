@@ -1,0 +1,3 @@
+<resources>
+    <string name="keyboard_switch_finish_composing">Finish choosing the current word before switching keyboards. Your unfinished input is kept.</string>
+</resources>

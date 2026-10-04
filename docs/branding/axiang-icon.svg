@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="648" height="648">
+  <title>Axiang Input: faceted A and rising wings</title>
+  <desc>Original geometric vector source. Adaptive foreground occupies the central 66-unit safe circle. API 24+ uses restrained gradients; API 23 keeps the same silhouette with solid facets.</desc>
+  <defs>
+    <clipPath id="tile"><rect width="108" height="108" rx="23"/></clipPath>
+    <linearGradient id="left" gradientUnits="userSpaceOnUse" x1="30" y1="37" x2="55" y2="64"><stop stop-color="#38F2F7"/><stop offset="1" stop-color="#2697FF"/></linearGradient>
+    <linearGradient id="right" gradientUnits="userSpaceOnUse" x1="53" y1="29" x2="79" y2="66"><stop stop-color="#527EFF"/><stop offset="1" stop-color="#B259EE"/></linearGradient>
+    <linearGradient id="bar" gradientUnits="userSpaceOnUse" x1="43" y1="53" x2="68" y2="62"><stop stop-color="#279DFF"/><stop offset="1" stop-color="#7963FF"/></linearGradient>
+  </defs>
+  <g clip-path="url(#tile)">
+    <path fill="#080E20" d="M0 0H108V108H0Z"/>
+    <path fill="#101E35" d="M0 0H108L0 88Z"/>
+    <path fill="#141329" d="M108 30V108H28Z"/>
+  </g>
+  <g id="foreground">
+    <path fill="url(#left)" d="M54,25 L28,66 L42,62 L58,35 Z"/>
+    <path fill="url(#right)" d="M54,25 L80,66 L66,62 L50,35 Z"/>
+    <path fill="#129CDA" d="M28,66 L42,62 L49,50 L39,53 Z"/>
+    <path fill="#8B59EE" d="M54,25 L59,40 L72,62 L80,66 Z"/>
+    <path fill="url(#bar)" d="M45,52 L63,52 L69,62 L39,62 Z"/>
+    <path fill="#6DDFFF" d="M45,52 L63,52 L61,55 L43,55 Z"/>
+    <path fill="#A3FFFF" d="M54,25 L52,31 L32,61 L28,66 Z"/>
+    <path fill="#ED6BDF" d="M71,55 L80,66 L73,64 Z"/>
+    <path fill="#388BBF" d="M36,72 H41 Q42,72 42,73 V75 Q42,76 41,76 H36 Q35,76 35,75 V73 Q35,72 36,72 Z"/>
+    <path fill="#67CFFD" d="M48,72 H60 Q62,72 62,74 Q62,76 60,76 H48 Q46,76 46,74 Q46,72 48,72 Z"/>
+    <path fill="#7A78D6" d="M67,72 H72 Q73,72 73,73 V75 Q73,76 72,76 H67 Q66,76 66,75 V73 Q66,72 67,72 Z"/>
+  </g>
+</svg>

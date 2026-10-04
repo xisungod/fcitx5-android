@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- A curved, rising hook for the editor's Send action. -->
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M4.8,7.6C2.8,9.8 1.5,12.6 2.8,15.2C4,17.6 7,18.2 9.5,16.6L22.2,5.4L8.7,12.4C6.9,13.3 5.3,13.1 4.7,11.8C4.1,10.6 4.3,9.1 4.8,7.6Z" />
+</vector>

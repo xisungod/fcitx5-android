@@ -108,25 +108,20 @@ class CommonKeyActionListener :
                     commitAndReset()
                     triggerUnicode()
                 }
-                is LangSwitchAction -> {
-                    when (langSwitchKeyBehavior) {
+                is LangSwitchAction -> service.postFcitxJob {
+                    if (inputMethodEntryCached.uniqueName == "rime") {
+                        // Use Rime's native option action without resetting or committing pinyin.
+                        RimeActions.asciiToggle(statusArea())?.let { activateAction(it.id) }
+                    } else when (langSwitchKeyBehavior) {
                         LangSwitchBehavior.Enumerate -> {
-                            service.postFcitxJob {
-                                if (enabledIme().size < 2) {
-                                    service.lifecycleScope.launch {
-                                        service.showDialog(AddMoreInputMethodsPrompt.build(context))
-                                    }
-                                } else {
-                                    enumerateIme()
+                            if (enabledIme().size < 2) {
+                                service.lifecycleScope.launch {
+                                    service.showDialog(AddMoreInputMethodsPrompt.build(context))
                                 }
-                            }
+                            } else enumerateIme()
                         }
-                        LangSwitchBehavior.ToggleActivate -> {
-                            service.postFcitxJob {
-                                toggleIme()
-                            }
-                        }
-                        LangSwitchBehavior.NextInputMethodApp -> {
+                        LangSwitchBehavior.ToggleActivate -> toggleIme()
+                        LangSwitchBehavior.NextInputMethodApp -> service.lifecycleScope.launch {
                             service.switchToNextIME()
                         }
                     }
@@ -172,7 +167,7 @@ class CommonKeyActionListener :
                 }
                 is SpaceLongPressAction -> {
                     when (spaceKeyLongPressBehavior) {
-                        SpaceLongPressBehavior.None -> {}
+                        SpaceLongPressBehavior.None, SpaceLongPressBehavior.MoveCursor -> {}
                         SpaceLongPressBehavior.Enumerate -> service.postFcitxJob {
                             enumerateIme()
                         }

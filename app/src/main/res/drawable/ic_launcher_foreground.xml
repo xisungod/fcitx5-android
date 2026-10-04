@@ -1,39 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Axiang: faceted A / rising wings. Geometry is shared with docs/branding/axiang-icon.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:pathData="M43.702,55.287 L96.415,108H108V64.83L66.558,23.26Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85"
-                android:endY="85"
-                android:startX="54"
-                android:startY="54"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <path
-        android:fillColor="#ffffff"
-        android:pathData="m40.999,25.834v23.334c-0.001,3.667 9.333,11.334 13,11.334 3.667,0 13,-7.667 13,-11.334V25.834c0,-1 -1.333,-2.333 -2.333,-2.333H43.499c-1,0 -2.5,1.333 -2.5,2.333z" />
-    <path
-        android:fillColor="#020000"
-        android:pathData="m43.499,22.5c-0.944,0 -1.673,0.479 -2.301,1.054C40.57,24.13 40,24.834 40,25.834v23.333c-0,1.341 0.722,2.604 1.716,3.92 0.994,1.316 2.319,2.659 3.76,3.884 1.441,1.226 2.993,2.33 4.458,3.147 1.464,0.817 2.801,1.382 4.066,1.382 1.265,0 2.601,-0.565 4.065,-1.382 1.464,-0.817 3.017,-1.923 4.458,-3.148 1.441,-1.226 2.766,-2.567 3.76,-3.883C67.276,51.771 68,50.508 68,49.168v-23.333c0,-0.944 -0.498,-1.662 -1.085,-2.249 -0.587,-0.587 -1.303,-1.085 -2.248,-1.085zM43.499,24.501h21.168c0.056,0 0.504,0.169 0.834,0.498 0.33,0.33 0.498,0.78 0.498,0.835v23.333c0,0.492 -0.442,1.563 -1.313,2.715 -0.871,1.153 -2.109,2.415 -3.46,3.564 -1.351,1.149 -2.819,2.191 -4.136,2.926 -1.317,0.735 -2.522,1.128 -3.091,1.128 -0.568,0 -1.775,-0.393 -3.092,-1.128 -1.317,-0.735 -2.785,-1.776 -4.136,-2.926 -1.351,-1.149 -2.589,-2.412 -3.46,-3.564 -0.871,-1.153 -1.313,-2.223 -1.313,-2.715v-23.333c0,0 0.179,-0.464 0.551,-0.805 0.372,-0.341 0.893,-0.529 0.949,-0.529z" />
-    <path
-        android:fillColor="#020000"
-        android:pathData="m49.667,45.835a1,1 0,0 0,-0.923 1.388l2.667,6.333a1,1 0,0 0,0.922 0.613h3.333a1,1 0,0 0,0.923 -0.613l2.666,-6.333a1,1 0,0 0,-0.922 -1.388zM51.173,47.834h5.655l-1.825,4.333h-2.007z" />
-    <path
-        android:fillColor="#020000"
-        android:pathData="m51.25,31.924 l-8.001,3.668a1,1 0,0 0,-0.492 1.325,1 1,0 0,0 1.325,0.492l8.001,-3.666a1,1 0,0 0,0.492 -1.326,1 1,0 0,0 -1.325,-0.492z" />
-    <path
-        android:fillColor="#020000"
-        android:pathData="m56.75,31.924a1,1 0,0 0,-1.326 0.492,1 1,0 0,0 0.493,1.326l8,3.666a1,1 0,0 0,1.326 -0.492,1 1,0 0,0 -0.493,-1.325z" />
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#27DEEF" android:pathData="M54,25 L28,66 L42,62 L58,35 Z" />
+    <path android:fillColor="#7864FF" android:pathData="M54,25 L80,66 L66,62 L50,35 Z" />
+    <path android:fillColor="#129CDA" android:pathData="M28,66 L42,62 L49,50 L39,53 Z" />
+    <path android:fillColor="#8B59EE" android:pathData="M54,25 L59,40 L72,62 L80,66 Z" />
+    <path android:fillColor="#4190FF" android:pathData="M45,52 L63,52 L69,62 L39,62 Z" />
+    <path android:fillColor="#6DDFFF" android:pathData="M45,52 L63,52 L61,55 L43,55 Z" />
+    <path android:fillColor="#A3FFFF" android:pathData="M54,25 L52,31 L32,61 L28,66 Z" />
+    <path android:fillColor="#ED6BDF" android:pathData="M71,55 L80,66 L73,64 Z" />
+    <path android:fillColor="#388BBF" android:pathData="M36,72 H41 Q42,72 42,73 V75 Q42,76 41,76 H36 Q35,76 35,75 V73 Q35,72 36,72 Z" />
+    <path android:fillColor="#67CFFD" android:pathData="M48,72 H60 Q62,72 62,74 Q62,76 60,76 H48 Q46,76 46,74 Q46,72 48,72 Z" />
+    <path android:fillColor="#7A78D6" android:pathData="M67,72 H72 Q73,72 73,73 V75 Q73,76 72,76 H67 Q66,76 66,75 V73 Q66,72 67,72 Z" />
 </vector>

@@ -39,7 +39,6 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.matchParent
-import splitties.views.imageResource
 import timber.log.Timber
 
 class IdleUi(
@@ -64,18 +63,16 @@ class IdleUi(
         if (ctx.resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_LTR) 1f else -1f
     }
 
-    private val menuButtonRotation
-        get() = when {
-            inPrivate -> 0f
-            currentState == State.Toolbar -> 90f * translateDirection
-            else -> -90f * translateDirection
-        }
+    private val menuButtonRotation get() = 0f
 
-    val menuButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
+    val menuButton = ToolButton(ctx, R.drawable.ic_keyboard_tools_24, theme).apply {
         iconRotation = menuButtonRotation
+        contentDescription = ctx.getString(R.string.keyboard_tools)
     }
 
-    val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, theme)
+    val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_keyboard_hide_24, theme).apply {
+        contentDescription = ctx.getString(R.string.hide_keyboard)
+    }
 
     val emptyBar = Space(ctx)
 
@@ -146,15 +143,14 @@ class IdleUi(
     private fun updateMenuButtonIcon() {
         menuButton.setIcon(
             if (inPrivate) R.drawable.ic_view_private
-            else R.drawable.ic_baseline_expand_more_24
+            else R.drawable.ic_keyboard_tools_24
         )
     }
 
     private fun updateMenuButtonContentDescription() {
         menuButton.contentDescription = when {
             inPrivate -> ctx.getString(R.string.private_mode)
-            currentState == State.Toolbar -> ctx.getString(R.string.hide_toolbar)
-            else -> ctx.getString(R.string.expand_toolbar)
+            else -> ctx.getString(R.string.keyboard_tools)
         }
     }
 
@@ -169,17 +165,6 @@ class IdleUi(
                 iconRotation = targetRotation
             }
         }
-    }
-
-    fun setHideKeyboardIsVoiceInput(isVoiceInput: Boolean, callback: View.OnClickListener) {
-        if (isVoiceInput) {
-            hideKeyboardButton.setIcon(R.drawable.ic_baseline_keyboard_voice_24)
-            hideKeyboardButton.contentDescription = ctx.getString(R.string.switch_to_voice_input)
-        } else {
-            hideKeyboardButton.setIcon(R.drawable.ic_baseline_arrow_drop_down_24)
-            hideKeyboardButton.contentDescription = ctx.getString(R.string.hide_keyboard)
-        }
-        hideKeyboardButton.setOnClickListener(callback)
     }
 
     private fun clearAnimation() {

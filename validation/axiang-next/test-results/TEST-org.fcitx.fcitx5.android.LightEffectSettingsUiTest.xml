@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-04T17:44:25.062Z" hostname="566dc45241c0" time="3.202">
+  <properties/>
+  <testcase name="lightSettingsExposeTheKeyboardSizeAndFeedbackShortcut" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.491"/>
+  <testcase name="shapeSelectorPersistsIndependentlyOfTheUsersColorMode" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.277"/>
+  <testcase name="openingRandomModeDisplaysItsActualLegacyPaletteWithoutChangingPreferences" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.399"/>
+  <testcase name="numberRowSwitchChangesTheRealKeyboardAndItsTouchGeometry" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.31"/>
+  <testcase name="nativeFragmentOpensWithoutStartingTheInputEngine" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.151"/>
+  <testcase name="customPaletteEditsAddsAndRemovesRealStoredColoursUpToEight" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.512"/>
+  <testcase name="quickerDefaultIgnitionIsAdjustableWithoutOverwritingASavedTiming" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.098"/>
+  <testcase name="toolbarSettingsOpenInsideTheKeyboardAndBackDiscardsWhileDoneApplies" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.308"/>
+  <testcase name="singleColourCanBeAnyRgbValueAndInvalidHexCannotSave" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.183"/>
+  <testcase name="openingThePageKeepsExistingTimingsAndSliderReleasePersistsTheChosenDuration" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.08"/>
+  <testcase name="renderTheActualSettingsScreenAndNativeColourEditor" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.385"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

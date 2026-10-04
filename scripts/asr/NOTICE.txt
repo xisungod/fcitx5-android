@@ -1,0 +1,48 @@
+Axiang Input Method / 阿翔输入法 — bundled offline speech components
+
+All model and runtime files are obtained during the application build. The
+Android application does not download models or send audio/text to a server.
+CPU is the only execution provider enabled by this integration.
+
+Runtime: sherpa-onnx 1.13.8, copyright its contributors, Apache License 2.0.
+https://github.com/k2-fsa/sherpa-onnx/tree/v1.13.8
+Source archive (including Android build scripts and pinned dependency recipes):
+https://codeload.github.com/k2-fsa/sherpa-onnx/tar.gz/refs/tags/v1.13.8
+SHA256 b0374cc56dbc186d442ae73d5de743bb092470b640c4c50ce7b029044c0c4fa8
+Android prebuilt AAR contains ONNX Runtime 1.28.2 (MIT and third-party licenses).
+Only the ARM64 JNI library, ONNX Runtime library, and JVM binding are packaged.
+
+The upstream prebuilt JNI also includes eSpeak NG (GPL-3.0-or-later), even
+though this application does not call TTS. See espeak-ng-LICENSE.txt. Do not
+describe the complete prebuilt JNI as solely Apache licensed.
+Corresponding upstream source and build dependency commit:
+https://github.com/csukuangfj/espeak-ng/tree/ed530aa113046142eb5115cf2fc9157854d0ffe1
+https://github.com/csukuangfj/piper-phonemize/tree/f3ff95afc03640bc1399e113e83361192a2fafb4
+See the sherpa-onnx v1.13.8 cmake/ directory and Android build scripts for the
+complete dependency revisions and reproducible build configuration.
+
+Other native dependencies: kaldi-native-fbank 1.22.3, kaldi-decoder 0.3.0,
+OpenFst 1.8.5-2026-07-09, simple-sentencepiece 0.7, nlohmann/json 3.12.0,
+KISS FFT (commit febd4caeed32e33ad8b2e0bb5ea77542c40f18ec),
+and piper-phonemize. Their included license texts and exact source URLs/hashes
+are recorded by assets/asr/SOURCE.json. ONNX Runtime's own dependency notices
+are reproduced in onnxruntime-ThirdPartyNotices.txt.
+
+Chinese streaming acoustic model:
+sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23, Apache License 2.0.
+Original model author/repository: marcoyang
+https://huggingface.co/marcoyang/sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23
+Its original Apache-2.0 model card is included as zh-14m-model-card.md.
+The ONNX conversion is provided by the sherpa-onnx project.
+
+Chinese/English punctuation model:
+sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8,
+Apache License 2.0, converted by sherpa-onnx from Alibaba's CT-Transformer:
+https://modelscope.cn/models/iic/punc_ct-transformer_zh-cn-common-vocab272727-pytorch
+The upstream model card at revision v2.0.4 is included. The INT8 ONNX model
+contains its vocabulary and uses local neural punctuation inference.
+
+Both model licenses use the full Apache License 2.0 text reproduced in
+sherpa-onnx-LICENSE.txt. Models and upstream runtime binaries are unmodified;
+asset filenames have been shortened for this application. All archive hashes
+and packaged-file hashes are recorded in assets/asr/SOURCE.json.

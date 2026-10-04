@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyPressDepthTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:02.707Z" hostname="566dc45241c0" time="7.117">
+  <properties/>
+  <testcase name="realPressFloatsTheBackgroundAndCharacterTogetherEvenWithAllLightsOff" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.127"/>
+  <testcase name="realMotionOffAndDisabledAnimationsLeaveTheKeyUnchanged" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.293"/>
+  <testcase name="releaseKeepsAColouredFloatingFaceForHundredsOfMillisecondsThenRestsWithoutBounces" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.01"/>
+  <testcase name="actualRedTextKeyboardFloatsLThenAKeepsBothTailsAndAcceptsImmediateInputForOldFadeSettings" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="2.292"/>
+  <testcase name="aNewKeyDoesNotCancelThePreviousKeysReleaseAndSkippedFramesHaveTheSameMotion" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.01"/>
+  <testcase name="disablingAnimationsDuringAHoldResetsEveryActionOnReleaseWithoutAnotherAnimation" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.245"/>
+  <testcase name="hidingACachedKeyboardCancelsItsHeldFloatWithoutCommittingAndShowingStartsAtRest" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.077"/>
+  <testcase name="actualTextKeyboardShowsDifferentFluidBoundariesForTheSavedShapeWithTheSameColourAndTouches" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="3.969"/>
+  <testcase name="repressPreservesDescendingVelocityAndDuplicateDownDoesNotRestartTheSpring" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.01"/>
+  <testcase name="realSameKeyPointersReleaseOnlyTheLastFingerAndDetachResetsHeldDepth" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.063"/>
+  <testcase name="theFirstFrameFloatsAndShortTouchesReleaseFromTheirCurrentMotion" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

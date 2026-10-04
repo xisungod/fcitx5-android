@@ -31,6 +31,13 @@ add_subdirectory(androidfrontend)
 add_subdirectory(androidkeyboard)
 add_subdirectory(androidnotification)
 
+# Build the same pinned Rime addon and install its complete offline data into
+# the main app. There is no dependency on the optional plugin APK at runtime.
+set(AXIANG_NATIVE_OUTPUT_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../../plugin/rime/src/main/cpp"
+        "builtin-rime")
+set_target_properties(rime PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${AXIANG_NATIVE_OUTPUT_DIR}")
+
 # prebuilt libuv
 set(libuv_DIR "${PREBUILT_DIR}/libuv/${ANDROID_ABI}/lib/cmake/libuv")
 find_package(libuv)

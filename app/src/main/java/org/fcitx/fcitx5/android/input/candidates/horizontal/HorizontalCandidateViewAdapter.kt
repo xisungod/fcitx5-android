@@ -9,7 +9,7 @@ import android.annotation.SuppressLint
 import android.view.ViewGroup
 import androidx.annotation.CallSuper
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.flexbox.FlexboxLayoutManager
+import androidx.recyclerview.widget.RecyclerView.LayoutParams
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
@@ -22,9 +22,6 @@ import splitties.views.setPaddingDp
 open class HorizontalCandidateViewAdapter(val theme: Theme) :
     RecyclerView.Adapter<CandidateViewHolder>() {
 
-    init {
-        setHasStableIds(true)
-    }
 
     var candidates: Array<CandidateWord> = arrayOf()
         private set
@@ -41,15 +38,20 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
 
     override fun getItemCount() = candidates.size
 
-    override fun getItemId(position: Int) = candidates.getOrNull(position).hashCode().toLong()
+    fun appendCandidates(data: Array<CandidateWord>, total: Int) {
+        val start = candidates.size
+        candidates += data
+        this.total = total
+        notifyItemRangeInserted(start, data.size)
+    }
 
     @CallSuper
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {
         val ui = CandidateItemUi(parent.context, theme)
         ui.root.apply {
             minimumWidth = dp(40)
-            setPaddingDp(10, 0, 10, 0)
-            layoutParams = FlexboxLayoutManager.LayoutParams(wrapContent, matchParent)
+            setPaddingDp(16, 0, 16, 0)
+            layoutParams = LayoutParams(wrapContent, matchParent)
         }
         return CandidateViewHolder(ui)
     }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_dictation_backend_permission_title">离线听写需要麦克风权限</string>
+    <string name="offline_dictation_backend_permission">请允许麦克风权限，然后返回键盘重新点击开始。声音仅在本机处理。</string>
+    <string name="offline_dictation_backend_permission_denied">尚未获得麦克风权限，离线听写保持关闭。可在应用设置中允许麦克风权限。</string>
+    <string name="offline_dictation_backend_permission_settings">应用设置</string>
+    <string name="offline_dictation_backend_permission_granted">已允许麦克风权限。返回键盘，点击开始后才会录音。</string>
+    <string name="offline_dictation_backend_editor_type">当前输入框不支持听写，请在普通文本框中使用。</string>
+    <string name="offline_dictation_backend_device">此手机不支持内置离线语音引擎，需要 ARM64 设备。</string>
+    <string name="offline_dictation_backend_microphone">此设备没有可用的麦克风。</string>
+    <string name="offline_dictation_backend_models">内置离线语音模型缺失，请重新安装完整安装包。</string>
+    <string name="offline_dictation_backend_audio">无法录音，请检查麦克风权限、系统麦克风开关，以及是否被其他应用占用。</string>
+    <string name="offline_dictation_backend_engine">本地语音引擎或模型无法在此设备运行。听写已停止，声音没有上传。</string>
+    <string name="offline_dictation_backend_editor">输入框已切换，不会插入这次结果。请在目标输入框重新开始听写。</string>
+    <string name="offline_dictation_backend_preedit">请先完成当前拼音选词，再开始听写。</string>
+</resources>

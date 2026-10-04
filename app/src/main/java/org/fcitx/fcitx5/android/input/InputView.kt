@@ -9,6 +9,8 @@ import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.graphics.Point
 import android.os.Build
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
@@ -35,10 +37,14 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightAdjustment
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightEditor
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardSizePolicy
 import org.fcitx.fcitx5.android.input.picker.emojiPicker
 import org.fcitx.fcitx5.android.input.picker.emoticonPicker
 import org.fcitx.fcitx5.android.input.picker.symbolPicker
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.settings.KeyboardQuickSettingsWindow
 import org.fcitx.fcitx5.android.input.preedit.PreeditComponent
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.unset
@@ -154,10 +160,35 @@ class InputView(
         keyboardHeightPercentBase,
     )
 
-    private val keyboardHeightPx: Int
+    private var textKeyboardLayout = true
+    private var keyboardSizeReady = false
+    private var heightAdjustment: KeyboardHeightAdjustment? = null
+    private var heightEditorOrientation = Configuration.ORIENTATION_UNDEFINED
+
+    private val heightEditor: KeyboardHeightEditor by lazy {
+        KeyboardHeightEditor(themedContext, theme,
+            onPreview = { pixels ->
+                heightAdjustment?.let { adjustment ->
+                    adjustment.preview(pixels)
+                    updateKeyboardSize()
+                    heightEditor.updateHeight(adjustment.heightPx)
+                }
+            },
+            onDone = { finishKeyboardHeightEditor(save = true) },
+            onCancel = { cancelKeyboardHeightEditor() },
+            onReset = {
+                heightAdjustment?.let { adjustment ->
+                    adjustment.reset()
+                    updateKeyboardSize()
+                    heightEditor.updateHeight(adjustment.heightPx)
+                }
+            })
+    }
+
+    private val keyboardHeightBasePx: Int
         get() {
             val baseType = keyboardHeightPercentBase.getValue()
-            val base = when (baseType) {
+            return when (baseType) {
                 DisplayMetrics -> resources.displayMetrics.heightPixels
                 RealSize -> Point().also {
                     @Suppress("DEPRECATION")
@@ -168,12 +199,23 @@ class InputView(
                     }.getRealSize(it)
                 }.y
             }
-            val percent = when (resources.configuration.orientation) {
+        }
+
+    private val activeHeightPreference
+        get() = when (resources.configuration.orientation) {
                 Configuration.ORIENTATION_LANDSCAPE -> keyboardHeightPercentLandscape
                 else -> keyboardHeightPercent
-            }.getValue()
-            Timber.d("keyboardHeightPx get(): baseType=${baseType}, base=${base}, percent=${percent}")
-            return base * percent / 100
+            }
+
+    private val keyboardHeightPx: Int
+        get() {
+            heightAdjustment?.let { return it.heightPx }
+            return KeyboardSizePolicy.heightForLayout(
+                keyboardHeightBasePx * activeHeightPreference.getValue() / 100,
+                resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE,
+                textKeyboardLayout,
+                ThemeManager.prefs.portraitNumberRow.getValue()
+            )
         }
 
     private val keyboardSidePaddingPx: Int
@@ -182,7 +224,8 @@ class InputView(
                 Configuration.ORIENTATION_LANDSCAPE -> keyboardSidePaddingLandscape
                 else -> keyboardSidePadding
             }.getValue()
-            return dp(value)
+            return KeyboardSizePolicy.sidePaddingForWidth(dp(value),
+                width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels, resources.displayMetrics.density)
         }
 
     private val keyboardBottomPaddingPx: Int
@@ -197,6 +240,7 @@ class InputView(
     @Keep
     private val onKeyboardSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (keyboardSizePrefs.any { it.key == key }) {
+            cancelKeyboardHeightEditor()
             updateKeyboardSize()
         }
     }
@@ -259,8 +303,15 @@ class InputView(
                 endToStartOf(rightPaddingSpace)
                 bottomOfParent()
             })
+            add(heightEditor, lParams(0, 0) {
+                topOfParent()
+                above(bottomPaddingSpace)
+                startOfParent()
+                endOfParent()
+            })
         }
 
+        keyboardSizeReady = true
         updateKeyboardSize()
 
         add(preedit.ui.root, lParams(matchParent, wrapContent) {
@@ -318,7 +369,78 @@ class InputView(
         kawaiiBar.view.setPadding(sidePadding, 0, sidePadding, 0)
     }
 
+    /** Resize the real keyboard in place. Draft sizes are never written until Done. */
+    fun showKeyboardHeightEditor() {
+        if (!keyboardSizeReady || heightAdjustment != null) return
+        val now = SystemClock.uptimeMillis()
+        MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, 0f, 0f, 0).let {
+            keyboardView.dispatchTouchEvent(it)
+            it.recycle()
+        }
+        popup.dismissAll()
+        windowManager.attachWindow(KeyboardWindow)
+        val portrait = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+        val numberRow = ThemeManager.prefs.portraitNumberRow.getValue()
+        val rows = if (portrait && textKeyboardLayout && !numberRow) 4 else 5
+        val availableHeight = height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        val bottomInset = (bottomPaddingSpace.layoutParams as LayoutParams).bottomMargin.coerceAtLeast(0)
+        val maximum = (availableHeight - dp(KawaiiBarComponent.HEIGHT) - keyboardBottomPaddingPx -
+            bottomInset - preedit.ui.root.height - dp(48)).coerceAtLeast(1)
+        val adjustment = KeyboardHeightAdjustment(activeHeightPreference, keyboardHeightBasePx,
+            portrait, textKeyboardLayout, numberRow,
+            dp(if (portrait) 32 else 28) * rows, maximum)
+        heightAdjustment = adjustment
+        heightEditorOrientation = resources.configuration.orientation
+        windowManager.view.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        kawaiiBar.view.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        heightEditor.show(adjustment.heightPx, adjustment.minimumHeightPx, adjustment.maximumHeightPx)
+        heightEditor.bringToFront()
+    }
+
+    internal fun cancelKeyboardHeightEditor(): Boolean = finishKeyboardHeightEditor(save = false)
+
+    internal fun cancelPendingEngineSwitch() = keyboardWindow.cancelPendingEngineSwitch()
+
+    internal fun finishTransientEditors() {
+        cancelPendingEngineSwitch()
+        cancelKeyboardHeightEditor()
+        if (windowManager.currentWindow is KeyboardQuickSettingsWindow ||
+            windowManager.currentWindow is org.fcitx.fcitx5.android.input.voice.OfflineDictationWindow) {
+            windowManager.attachWindow(KeyboardWindow)
+        }
+    }
+
+    private fun finishKeyboardHeightEditor(save: Boolean): Boolean {
+        val adjustment = heightAdjustment ?: return false
+        heightAdjustment = null
+        heightEditor.hide()
+        windowManager.view.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        kawaiiBar.view.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        if (save && heightEditorOrientation == resources.configuration.orientation) adjustment.save()
+        if (keyboardSizeReady) updateKeyboardSize()
+        return true
+    }
+
+    /** Called for alphabet, numeric, symbol and picker transitions; no row is left as empty padding. */
+    internal fun onKeyboardLayoutChanged(textLayout: Boolean) {
+        if (textKeyboardLayout == textLayout) return
+        cancelKeyboardHeightEditor()
+        textKeyboardLayout = textLayout
+        if (keyboardSizeReady) updateKeyboardSize()
+    }
+
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        if (oldWidth > 0 && oldHeight > 0 && (width != oldWidth || height != oldHeight)) {
+            cancelKeyboardHeightEditor()
+        }
+        if (keyboardSizeReady && width != oldWidth) updateKeyboardSize()
+    }
+
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+        if ((bottomPaddingSpace.layoutParams as LayoutParams).bottomMargin != getNavBarBottomInset(insets)) {
+            cancelKeyboardHeightEditor()
+        }
         bottomPaddingSpace.updateLayoutParams<LayoutParams> {
             bottomMargin = getNavBarBottomInset(insets)
         }
@@ -329,6 +451,7 @@ class InputView(
      * called when [InputView] is about to show, or restart
      */
     fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
+        cancelKeyboardHeightEditor()
         broadcaster.onStartInput(info, capFlags)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
         if (focusChangeResetKeyboard || !restarting) {
@@ -383,6 +506,8 @@ class InputView(
     }
 
     override fun onDetachedFromWindow() {
+        cancelPendingEngineSwitch()
+        cancelKeyboardHeightEditor()
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         // clear DynamicScope, implies that InputView should not be attached again after detached.

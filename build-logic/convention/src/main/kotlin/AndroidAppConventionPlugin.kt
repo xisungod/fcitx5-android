@@ -47,7 +47,8 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
                     proguardFile(getDefaultProguardFile("proguard-android-optimize.txt"))
                 }
                 debug {
-                    applicationIdSuffix = ".debug"
+                    applicationIdSuffix = target.providers.environmentVariable("XUANCAI_APP_SUFFIX").orNull ?: ".axiang.v1"
+                    signingConfigs.fromProjectEnv(target)?.let { signingConfig = it }
                 }
                 all {
                     // remove META-INF/version-control-info.textproto

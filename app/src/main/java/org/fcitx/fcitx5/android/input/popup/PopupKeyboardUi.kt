@@ -75,6 +75,7 @@ class PopupKeyboardUi(
     private val inactiveBackground = GradientDrawable().apply {
         cornerRadius = radius
         setColor(theme.popupBackgroundColor)
+        setStroke(ctx.dp(1), theme.dividerColor)
     }
 
     private val focusBackground = GradientDrawable().apply {
@@ -162,7 +163,7 @@ class PopupKeyboardUi(
     override val root = verticalLayout root@{
         background = inactiveBackground
         outlineProvider = ViewOutlineProvider.BACKGROUND
-        elevation = dp(2f)
+        elevation = dp(6f)
         // add rows in reverse order, because newly added view shows at bottom
         for (i in rowCount - 1 downTo 0) {
             val order = keyOrders[i]
@@ -219,7 +220,12 @@ class PopupKeyboardUi(
 
     override fun onTrigger(): KeyAction? {
         val key = keys.getOrNull(focusedIndex) ?: return null
-        return KeyAction.FcitxKeyAction(key)
+        // Fcitx's string key API parses one keysym, not a text sequence such as "...".
+        return if (key.codePointCount(0, key.length) == 1) {
+            KeyAction.FcitxKeyAction(key)
+        } else {
+            KeyAction.CommitAction(key)
+        }
     }
 
 }

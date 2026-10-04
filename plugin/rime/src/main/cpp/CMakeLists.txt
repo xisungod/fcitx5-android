@@ -57,3 +57,67 @@ install(FILES
         DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
         COMPONENT prebuilt-assets
         )
+
+# Pinned, checksum-verified data prepared by scripts/prepare-xuancai-rime.py.
+set(XUANCAI_RIME_DATA "${CMAKE_CURRENT_SOURCE_DIR}/xuancai-rime-ice")
+if(NOT EXISTS "${XUANCAI_RIME_DATA}/SOURCE.json")
+    message(FATAL_ERROR "Run scripts/prepare-xuancai-rime.py before building the Xuancai Rime plugin")
+endif()
+install(FILES
+        "${XUANCAI_RIME_DATA}/rime_ice.schema.yaml"
+        "${XUANCAI_RIME_DATA}/rime_ice_t9.schema.yaml"
+        "${XUANCAI_RIME_DATA}/rime_ice.dict.yaml"
+        "${XUANCAI_RIME_DATA}/xuancai_user.schema.yaml"
+        "${XUANCAI_RIME_DATA}/xuancai_user_t9.schema.yaml"
+        "${XUANCAI_RIME_DATA}/xuancai_user.dict.yaml"
+        "${XUANCAI_RIME_DATA}/melt_eng.schema.yaml"
+        "${XUANCAI_RIME_DATA}/melt_eng.dict.yaml"
+        "${XUANCAI_RIME_DATA}/radical_pinyin.schema.yaml"
+        "${XUANCAI_RIME_DATA}/radical_pinyin.dict.yaml"
+        "${XUANCAI_RIME_DATA}/custom_phrase.txt"
+        "${XUANCAI_RIME_DATA}/symbols_v.yaml"
+        "${XUANCAI_RIME_DATA}/xuancai_mobile.yaml"
+        "${XUANCAI_RIME_DATA}/zh-hans-t-essay-bgw-compact.gram"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
+        COMPONENT prebuilt-assets)
+install(DIRECTORY "${XUANCAI_RIME_DATA}/cn_dicts" "${XUANCAI_RIME_DATA}/en_dicts" "${XUANCAI_RIME_DATA}/lua"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
+        COMPONENT prebuilt-assets)
+install(DIRECTORY "${XUANCAI_RIME_DATA}/opencc/"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/opencc"
+        COMPONENT prebuilt-assets)
+install(FILES "${XUANCAI_RIME_DATA}/LICENSE" "${XUANCAI_RIME_DATA}/README.md"
+        "${XUANCAI_RIME_DATA}/SOURCE.json"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/licenses/rime-ice"
+        COMPONENT prebuilt-assets)
+
+install(DIRECTORY "${XUANCAI_RIME_DATA}/grammar-license/"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/licenses/rime-grammar"
+        COMPONENT prebuilt-assets)
+# Tables are generated and tested by the same pinned librime 1.12 on the build host.
+if(NOT EXISTS "${XUANCAI_RIME_DATA}/build/rime_ice.table.bin")
+    message(FATAL_ERROR "Precompile and verify Rime data before packaging")
+endif()
+foreach(T9_PREBUILT rime_ice_t9.prism.bin rime_ice_t9.schema.yaml
+        xuancai_user_t9.prism.bin xuancai_user_t9.schema.yaml)
+    if(NOT EXISTS "${XUANCAI_RIME_DATA}/build/${T9_PREBUILT}")
+        message(FATAL_ERROR "Precompile and verify the nine-key Rime schemas before packaging")
+    endif()
+endforeach()
+install(DIRECTORY "${XUANCAI_RIME_DATA}/build/"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data/build"
+        COMPONENT prebuilt-assets)
+
+# Bundled-engine license notices must travel with the main APK as well as the
+# optional standalone plugin. These are text from the pinned source revisions.
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/builtin-licenses/"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/licenses/rime-builtin"
+        COMPONENT prebuilt-assets)
+install(FILES "fcitx5-rime/LICENSES/LGPL-2.1-or-later.txt"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/licenses/rime-builtin"
+        RENAME "fcitx5-rime-LICENSE.txt" COMPONENT prebuilt-assets)
+foreach(RIME_DATA_COMPONENT rime-essay rime-prelude rime-luna-pinyin rime-stroke)
+    install(FILES "${RIME_DATA_COMPONENT}/LICENSE"
+            DESTINATION "${FCITX_INSTALL_DATADIR}/licenses/rime-builtin"
+            RENAME "${RIME_DATA_COMPONENT}-LICENSE.txt" COMPONENT prebuilt-assets)
+endforeach()

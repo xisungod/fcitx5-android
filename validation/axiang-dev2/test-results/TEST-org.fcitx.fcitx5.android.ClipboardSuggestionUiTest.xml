@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.ClipboardSuggestionUiTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:31:59.341Z" hostname="566dc45241c0" time="0.303">
+  <properties/>
+  <testcase name="aNarrowToolbarKeepsTheWholeCloseTargetInsideItsBoundsAndTappable" classname="org.fcitx.fcitx5.android.ClipboardSuggestionUiTest" time="0.153"/>
+  <testcase name="cancelingACloseGestureCannotDismissOrFallThroughToTheSuggestion" classname="org.fcitx.fcitx5.android.ClipboardSuggestionUiTest" time="0.047"/>
+  <testcase name="tappingTheCloseTargetIncludingItsEdgeOnlyDismissesAndPreservesTheSystemClipboard" classname="org.fcitx.fcitx5.android.ClipboardSuggestionUiTest" time="0.045"/>
+  <testcase name="theOriginalSuggestionStillSupportsTapAndConsumedLongPressWithoutClosing" classname="org.fcitx.fcitx5.android.ClipboardSuggestionUiTest" time="0.055"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

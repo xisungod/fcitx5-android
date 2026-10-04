@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.OfflineDictationUiTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:14.490Z" hostname="566dc45241c0" time="0.131">
+  <properties/>
+  <testcase name="microphoneStopsLiveRecognitionAndCanRestartAfterTheSentenceFinishes" classname="org.fcitx.fcitx5.android.OfflineDictationUiTest" time="0.078"/>
+  <testcase name="returningOrHidingClosesTheSessionExactlyOnce" classname="org.fcitx.fcitx5.android.OfflineDictationUiTest" time="0.01"/>
+  <testcase name="unavailableReasonRemainsVisibleAndReturnWorksAtShortKeyboardHeight" classname="org.fcitx.fcitx5.android.OfflineDictationUiTest" time="0.04"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

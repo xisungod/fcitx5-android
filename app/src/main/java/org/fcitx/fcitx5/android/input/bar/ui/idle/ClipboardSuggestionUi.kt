@@ -5,7 +5,11 @@
 package org.fcitx.fcitx5.android.input.bar.ui.idle
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.text.TextUtils
+import android.widget.ImageButton
+import android.widget.ImageView
+import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
@@ -14,7 +18,6 @@ import splitties.dimensions.dp
 import splitties.resources.drawable
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
-import splitties.views.dsl.constraintlayout.centerInParent
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
@@ -65,10 +68,29 @@ class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme)
         background = rippleDrawable(theme.keyPressHighlightColor)
     }
 
+    // A sibling touch target: closing must never invoke the chip's paste/long-press actions.
+    val dismissButton = ImageButton(ctx).apply {
+        setImageResource(R.drawable.ic_clipboard_dismiss_24)
+        imageTintList = ColorStateList.valueOf(theme.altKeyTextColor)
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        setPadding(dp(12), dp(12), dp(12), dp(12))
+        contentDescription = ctx.getString(R.string.dismiss_clipboard_suggestion)
+        background = rippleDrawable(theme.keyPressHighlightColor)
+    }
+
     override val root = constraintLayout {
         add(suggestionView, lParams(wrapContent, matchConstraints) {
-            centerInParent()
+            startOfParent()
+            before(dismissButton)
+            centerVertically()
+            horizontalChainStyle = ConstraintLayout.LayoutParams.CHAIN_PACKED
+            constrainedWidth = true
             verticalMargin = dp(4)
+        })
+        add(dismissButton, lParams(dp(44), dp(44)) {
+            after(suggestionView)
+            endOfParent()
+            centerVertically()
         })
     }
 }

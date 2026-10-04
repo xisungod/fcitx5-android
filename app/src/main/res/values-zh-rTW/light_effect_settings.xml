@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyboard_layout_section">鍵盤佈局</string>
+    <string name="keyboard_show_number_row">顯示頂部數字列</string>
+    <string name="keyboard_show_number_row_summary">直向顯示獨立 1–0 數字列；關閉後字母按鍵自動增高。</string>
+    <string name="press_color_mode">按鍵配色模式</string>
+    <string name="press_color_mode_random">隨機多彩</string>
+    <string name="press_color_mode_single">任意單色</string>
+    <string name="press_color_mode_custom">自選搭配</string>
+    <string name="press_wave_hold_time">波紋停留</string>
+    <string name="light_effect_settings">按鍵光效</string>
+    <string name="light_effect_settings_summary">任意顏色、自選搭配與動畫時長</string>
+    <string name="light_effect_saved">自動儲存，返回鍵盤即可試按。</string>
+    <string name="light_effect_palette">配色</string>
+    <string name="light_effect_random_summary">每次按鍵隨機一色，鍵面與柔光使用同一色。</string>
+    <string name="light_effect_single_summary">所有按鍵使用你選的顏色，點按色塊編輯。</string>
+    <string name="light_effect_custom_summary">每次按鍵從你搭配的顏色中選取一色。</string>
+    <string name="light_effect_color_guide">點按改色 · 長按移除 · 最多 8 色</string>
+    <string name="light_effect_color_add">+ 新增顏色</string>
+    <string name="light_effect_color_single_min">至少保留一種顏色。</string>
+    <string name="light_effect_color_number">顏色 %1$d</string>
+    <string name="light_effect_animation">動畫節奏</string>
+    <string name="light_effect_expand">擴散時間</string>
+    <string name="light_effect_wave_fade">消失淡出</string>
+    <string name="light_effect_face_hold">鍵面亮色保持</string>
+    <string name="light_effect_face_exit">鍵面退場</string>
+    <string name="light_effect_total">一次波紋總時長：%1$d 毫秒</string>
+    <string name="light_effect_total_detail">已含 %1$d 毫秒點亮；波紋與鍵面分別計時。</string>
+    <string name="light_effect_light">柔光範圍</string>
+    <string name="light_effect_reach">擴散範圍</string>
+    <string name="light_effect_brightness">波紋亮度</string>
+    <string name="light_effect_enable">啟用按鍵光效</string>
+    <string name="light_effect_glow_candidates">柔光延伸到候選列</string>
+    <string name="light_effect_edit_color">編輯顏色</string>
+    <string name="light_effect_color_hex">色值（HEX）</string>
+    <string name="light_effect_hex_error">請輸入 6 位色值，例如 #18FFC1。</string>
+    <string name="light_effect_hue">色相</string>
+    <string name="light_effect_saturation">飽和度</string>
+    <string name="light_effect_value">明度</string>
+</resources>

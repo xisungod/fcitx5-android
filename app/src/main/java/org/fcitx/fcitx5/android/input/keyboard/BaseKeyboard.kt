@@ -4,14 +4,19 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Rect
+import android.os.Build
 import android.view.MotionEvent
+import android.view.View
 import androidx.annotation.CallSuper
 import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.updateLayoutParams
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -20,6 +25,9 @@ import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.PressColorPalette
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -48,22 +56,104 @@ abstract class BaseKeyboard(
 ) : ConstraintLayout(context) {
 
     var keyActionListener: KeyActionListener? = null
+    internal var effectInvalidator: (() -> Unit)? = null
+        set(value) {
+            field = value
+            pressEffectLayer?.invalidateExtension = value
+        }
+    internal fun drawPressExtension(canvas: Canvas) { pressEffectLayer?.drawExtension(canvas) }
 
     private val prefs = AppPrefs.getInstance()
+    private val keyMotion = ThemeManager.prefs.keyMotionEffect.getValue()
+    private val floatingKeys = android.util.SparseArray<KeyView>()
+    private var motionLifecycleReady = false
+
+    /** colourful press effect (Keys Cafe style), drawn under and over the keys */
+    private val pressEffectLayer: PressEffect? = ThemeManager.prefs.let { p ->
+        if (!p.pressEffect.getValue() && !p.idleBreathing.getValue()) null
+        else PressEffect(
+            this,
+            PressColorPalette.colorsFor(p, theme.accentKeyBackgroundColor),
+            theme.isDark,
+            p.pressEffectSize.getValue(),
+            p.pressExpansionTime.getValue(),
+            p.pressFadeOutTime.getValue(),
+            p.pressEffectOverKeys.getValue(),
+            p.pressEffect.getValue(),
+            p.idleBreathing.getValue(),
+            IdleBreathing(
+                p.idleDelay.getValue().toLong(),
+                p.idleCycle.getValue().toLong(),
+                p.idleFadeIn.getValue().toLong(),
+                p.idleFadeOut.getValue().toLong(),
+                p.idleBrightness.getValue() / 100f,
+                p.idleTimeout.getValue() * 1000L
+            ),
+            if (p.idleRandomColors.getValue()) PressEffect.CYBERPUNK
+            else intArrayOf(p.idleColorPrimary.getValue().argb, p.idleColorSecondary.getValue().argb),
+            randomIdleColors = p.idleRandomColors.getValue(),
+            ignitionTimeMs = p.pressIgnitionTime.getValue(),
+            keyHoldTimeMs = p.pressKeyHoldTime.getValue(),
+            keyRetreatTimeMs = p.pressKeyRetreatTime.getValue(),
+            keySurfaceEffects = true,
+            keyColorStyle = p.keyColorStyle.getValue().ordinal,
+            keyCornerRadius = p.keyRadius.getValue() * resources.displayMetrics.density,
+            glowReachPercent = p.pressGlowReach.getValue(),
+            glowOnCandidates = p.pressGlowOnCandidates.getValue(),
+            holdWhilePressed = true,
+            dimExit = p.keyExitStyle.getValue() == ThemePrefs.KeyExitStyle.Dim,
+            ringWave = false,
+            sequentialColors = false,
+            exactKeyShape = true,
+            normalizeOldLight = true,
+            extensionStrength = 1f,
+            glowBrightnessPercent = p.pressGlowBrightness.getValue(),
+            waveHoldTimeMs = p.pressWaveHoldTime.getValue(),
+            coordinatePalette = p.pressColorMode.getValue() == ThemePrefs.PressColorMode.Random,
+            rippleShape = p.rippleShape.getValue(),
+            keyFloatOpacity = if (keyMotion == ThemePrefs.KeyMotionEffect.Press)
+                { keyId -> floatingKeys.get(keyId)?.floatingFaceOpacity() ?: 0f } else null
+        )
+    }
+
+    init {
+        if (pressEffectLayer != null) setWillNotDraw(false)
+    }
 
     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
     private val expandKeypressArea by prefs.keyboard.expandKeypressArea
     private val swipeSymbolDirection by prefs.keyboard.swipeSymbolDirection
 
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
+    private val spaceLongPressBehavior = prefs.keyboard.spaceKeyLongPressBehavior
     private val spaceKeys = mutableListOf<KeyView>()
-    private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
+    private val surfaceKeys = mutableListOf<KeyView>()
+    private val depthKeys = mutableListOf<KeyView>()
+    private fun updateSpaceGestures() {
+        val trackpad = spaceLongPressBehavior.getValue() == SpaceLongPressBehavior.MoveCursor
         spaceKeys.forEach {
-            it.swipeEnabled = v
+            it.swipeRequiresLongPress = trackpad
+            it.swipeEnabled = trackpad || spaceSwipeMoveCursor.getValue()
+            it.swipeDominantAxisOnly = trackpad
+            it.swipeThresholdX = selectionSwipeThreshold
+            it.swipeThresholdY = if (trackpad) selectionSwipeThreshold else disabledSwipeThreshold
         }
+    }
+    private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        updateSpaceGestures()
+    }
+    private val spaceLongPressChangeListener = ManagedPreference.OnChangeListener<SpaceLongPressBehavior> { _, _ ->
+        updateSpaceGestures()
     }
 
     private val vivoKeypressWorkaround by prefs.advanced.vivoKeypressWorkaround
+
+    protected open val slideSelectionEnabled = false
+    private val popupSelectionKeys = hashSetOf<Int>()
+    private fun canSlideSelect(key: KeyView): Boolean {
+        val text = (key.def as? KeyDef.Appearance.Text)?.displayText ?: return false
+        return text.length == 1 && (text[0] in 'a'..'z' || text[0] in 'A'..'Z' || text[0] in '0'..'9')
+    }
 
     private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
 
@@ -135,6 +225,22 @@ abstract class BaseKeyboard(
             })
         }
         spaceSwipeMoveCursor.registerOnChangeListener(spaceSwipeChangeListener)
+        spaceLongPressBehavior.registerOnChangeListener(spaceLongPressChangeListener)
+        pressEffectLayer?.invalidateKeySurfaces = {
+            // Invalidate child display lists as well as the parent light layer.
+            for (i in surfaceKeys.indices) surfaceKeys[i].invalidateKeySurface()
+        }
+        motionLifecycleReady = true
+    }
+
+    private val originalLegendInk = android.util.SparseIntArray()
+
+    /** Follow the fading face continuously instead of snapping black/white at one threshold. */
+    private fun updateLegendInk(key: KeyView, brightness: Float) {
+        val text = (key as? TextKeyView)?.mainText ?: return
+        if (originalLegendInk.indexOfKey(key.id) < 0) originalLegendInk.put(key.id, text.currentTextColor)
+        val ink = KeyLegendInk.color(brightness, originalLegendInk.get(key.id))
+        if (text.currentTextColor != ink) text.setTextColor(ink)
     }
 
     private fun createKeyView(def: KeyDef): KeyView {
@@ -144,6 +250,18 @@ abstract class BaseKeyboard(
             is KeyDef.Appearance.Text -> TextKeyView(context, theme, def.appearance)
             is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
         }.apply {
+            if (id == View.NO_ID) id = View.generateViewId()
+            if (keyMotion == ThemePrefs.KeyMotionEffect.Press) {
+                depthKeys.add(this)
+                floatingKeys.put(id, this)
+            }
+            pressEffectLayer?.let { effect ->
+                surfaceKeys.add(this)
+                (this as? TextKeyView)?.mainText?.contrastOutlineWidth = dp(0.8f)
+                keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
+                    updateLegendInk(this, effect.drawKeySurface(canvas, id, width, height, hMargin, vMargin))
+                }
+            }
             soundEffect = when (def) {
                 is SpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
                 is MiniSpaceKey -> InputFeedbacks.SoundEffect.SpaceBar
@@ -153,17 +271,19 @@ abstract class BaseKeyboard(
             }
             if (def is SpaceKey) {
                 spaceKeys.add(this)
-                swipeEnabled = spaceSwipeMoveCursor.getValue()
+                updateSpaceGestures()
                 swipeRepeatEnabled = true
-                swipeThresholdX = selectionSwipeThreshold
-                swipeThresholdY = disabledSwipeThreshold
                 onGestureListener = OnGestureListener { view, event ->
                     when (event.type) {
-                        GestureType.Move -> when (val count = event.countX) {
+                        GestureType.Move -> when (val count = if (swipeRequiresLongPress && event.countY != 0)
+                            event.countY else event.countX) {
                             0 -> false
                             else -> {
-                                val sym =
+                                val sym = if (swipeRequiresLongPress && event.countY != 0) {
+                                    if (count > 0) FcitxKeyMapping.FcitxKey_Down else FcitxKeyMapping.FcitxKey_Up
+                                } else {
                                     if (count > 0) FcitxKeyMapping.FcitxKey_Right else FcitxKeyMapping.FcitxKey_Left
+                                }
                                 val action = KeyAction.SymAction(KeySym(sym), KeyStates.Virtual)
                                 repeat(count.absoluteValue) {
                                     onAction(action)
@@ -356,6 +476,7 @@ abstract class BaseKeyboard(
             onPopupAction(PopupAction.DismissAction(keyView.id))
         }
         touchTargets.clear()
+        popupSelectionKeys.clear()
     }
 
     private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
@@ -392,16 +513,186 @@ abstract class BaseKeyboard(
             event.deviceId, event.edgeFlags
         )
         target.view.dispatchTouchEvent(e)
+        e.recycle()
+    }
+
+    private val effectKeyBounds = Rect()
+    private val effectHostLocation = IntArray(2)
+
+    private fun withinSlideTolerance(event: MotionEvent, index: Int, target: TouchTarget): Boolean {
+        val margin = minOf(dp(4f).toFloat(), target.hitRect.width() * 0.15f)
+        val x = event.getX(index)
+        val y = event.getY(index)
+        return x >= target.hitRect.left - margin && x < target.hitRect.right + margin &&
+            y >= target.hitRect.top - margin && y < target.hitRect.bottom + margin
+    }
+
+    private fun switchSlideTarget(event: MotionEvent, index: Int, old: TouchTarget, next: TouchTarget) {
+        old.view.cancelGestures()
+        onPopupAction(PopupAction.DismissAction(old.view.id))
+        touchTargets[event.getPointerId(index)] = next
+        illuminateKey(event, index, next)
+        dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, index, next)
+    }
+
+    private fun releaseTouch(event: MotionEvent, index: Int, target: TouchTarget) {
+        // A small lift-off drift must not discard a letter. If Android batches away
+        // the last MOVE, resolve a deliberate slide from the final UP coordinates.
+        if (slideSelectionEnabled && canSlideSelect(target.view) &&
+            target.view.id !in popupSelectionKeys && !withinSlideTolerance(event, index, target)) {
+            val next = findTouchTarget(event, index)
+            if (next != null && canSlideSelect(next.view)) {
+                switchSlideTarget(event, index, target, next)
+                dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, next)
+            } else {
+                target.view.cancelGestures()
+                onPopupAction(PopupAction.DismissAction(target.view.id))
+            }
+        } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, target)
+    }
+
+    private val motionViews = android.util.SparseArray<View>()
+    private val motionRandom = java.util.Random()
+
+    private fun motionAnimationsAllowed(): Boolean =
+        !prefs.advanced.disableAnimation.getValue() &&
+            (!ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
+
+    private fun resetMotion(view: View) {
+        view.animate().cancel()
+        view.scaleX = 1f
+        view.scaleY = 1f
+        view.rotation = 0f
+        view.translationY = 0f
+        (view as? KeyView)?.resetPressDepth()
+    }
+
+    private fun motionPress(pointerId: Int, view: View?) {
+        if (keyMotion == ThemePrefs.KeyMotionEffect.Off) return
+        if (!motionAnimationsAllowed()) {
+            motionReleaseAll()
+            view?.let(::resetMotion)
+            return
+        }
+        val old = motionViews.get(pointerId)
+        if (old === view) return
+        motionViews.remove(pointerId)
+        if (old != null && (keyMotion != ThemePrefs.KeyMotionEffect.Press || !motionViewIsHeld(old))) motionRelease(old)
+        if (view == null) {
+            return
+        }
+        motionViews.put(pointerId, view)
+        if (keyMotion == ThemePrefs.KeyMotionEffect.Press) {
+            (view as? KeyView)?.setDepthPressed(true)
+            return
+        }
+        val a = view.animate().setDuration(70L).setInterpolator(android.view.animation.DecelerateInterpolator())
+        when (keyMotion) {
+            ThemePrefs.KeyMotionEffect.Shrink -> a.scaleX(0.86f).scaleY(0.86f)
+            ThemePrefs.KeyMotionEffect.Bounce -> a.scaleX(0.9f).scaleY(0.9f)
+            ThemePrefs.KeyMotionEffect.Tilt ->
+                a.rotation(if (motionRandom.nextBoolean()) 7f else -7f).scaleX(0.95f).scaleY(0.95f)
+            ThemePrefs.KeyMotionEffect.Press -> {}
+            ThemePrefs.KeyMotionEffect.Off -> {}
+        }
+        a.start()
+    }
+
+    private fun motionRelease(view: View) {
+        if (!motionAnimationsAllowed()) {
+            resetMotion(view)
+            return
+        }
+        if (keyMotion == ThemePrefs.KeyMotionEffect.Press) {
+            (view as? KeyView)?.setDepthPressed(false)
+            return
+        }
+        val a = view.animate().scaleX(1f).scaleY(1f).rotation(0f).translationY(0f)
+        when (keyMotion) {
+            ThemePrefs.KeyMotionEffect.Bounce ->
+                a.setDuration(320L).setInterpolator(android.view.animation.OvershootInterpolator(3.2f))
+            ThemePrefs.KeyMotionEffect.Tilt ->
+                a.setDuration(260L).setInterpolator(android.view.animation.OvershootInterpolator(2f))
+            else -> a.setDuration(140L).setInterpolator(android.view.animation.DecelerateInterpolator())
+        }
+        a.start()
+    }
+
+    private fun motionReleasePointer(pointerId: Int) {
+        val view = motionViews.get(pointerId) ?: return
+        motionViews.remove(pointerId)
+        if (keyMotion != ThemePrefs.KeyMotionEffect.Press || !motionViewIsHeld(view)) motionRelease(view)
+    }
+
+    private fun motionViewIsHeld(view: View): Boolean {
+        for (i in 0 until motionViews.size()) if (motionViews.valueAt(i) === view) return true
+        return false
+    }
+
+    private fun motionReleaseAll() {
+        for (i in 0 until motionViews.size()) motionRelease(motionViews.valueAt(i))
+        motionViews.clear()
+    }
+
+    private fun illuminateKey(event: MotionEvent, index: Int, target: TouchTarget?) {
+        motionPress(event.getPointerId(index), target?.view)
+        pressEffectLayer?.let { effect ->
+            val bounds = target?.view?.let { key ->
+                getLocationInWindow(effectHostLocation)
+                effectKeyBounds.set(key.bounds)
+                effectKeyBounds.offset(-effectHostLocation[0], -effectHostLocation[1])
+                effectKeyBounds.inset(key.hMargin, key.vMargin)
+                effectKeyBounds
+            }
+            effect.onPress(event.getX(index), event.getY(index), bounds,
+                target?.view?.let { key ->
+                    key.def.variant == KeyDef.Appearance.Variant.Normal &&
+                        (key.def as? KeyDef.Appearance.Text)?.displayText?.isNotBlank() == true
+                } == true, target?.view?.id ?: View.NO_ID,
+                pointerId = event.getPointerId(index))
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (pressEffectLayer != null || keyMotion != ThemePrefs.KeyMotionEffect.Off) {
+            val action = ev.actionMasked
+            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+                val i = ev.actionIndex
+                val target = findTouchTarget(ev, i)
+                illuminateKey(ev, i, target)
+            }
+        }
+        val handled = super.dispatchTouchEvent(ev)
+        // Final-UP retargeting can illuminate a new key inside onTouchEvent.
+        // Release afterwards so it cannot leave idle breathing in the held state.
+        if (ev.actionMasked == MotionEvent.ACTION_CANCEL) {
+            pressEffectLayer?.onRelease()
+            motionReleaseAll()
+        } else if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_POINTER_UP) {
+            val pointerId = ev.getPointerId(ev.actionIndex)
+            pressEffectLayer?.onRelease(pointerId)
+            motionReleasePointer(pointerId)
+        }
+        return handled
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        val effect = pressEffectLayer ?: return super.dispatchDraw(canvas)
+        effect.drawUnder(canvas)
+        effect.drawOver(canvas)
+        // Every travelling light layer stays below key faces and their legends.
+        super.dispatchDraw(canvas)
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         // intercept ACTION_DOWN and all following events will go to parent's onTouchEvent
-        return if (vivoKeypressWorkaround && ev.actionMasked == MotionEvent.ACTION_DOWN) true
+        return if ((vivoKeypressWorkaround || slideSelectionEnabled) && ev.actionMasked == MotionEvent.ACTION_DOWN) true
         else super.onInterceptTouchEvent(ev)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (vivoKeypressWorkaround) {
+        if (vivoKeypressWorkaround || slideSelectionEnabled) {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     releaseAllTouchTargets()
@@ -415,6 +706,10 @@ abstract class BaseKeyboard(
                     val i = event.actionIndex
                     val pid = event.getPointerId(i)
                     val target = findTouchTarget(event, i) ?: return true
+                    // Return has one long-press state. An extra finger must not reset it
+                    // and turn the final release into a Send/Search/Done action.
+                    if (target.view.id == R.id.button_return &&
+                        touchTargets.values.any { it.view === target.view }) return true
                     touchTargets[pid] = target
                     dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, i, target)
                     return true
@@ -423,6 +718,18 @@ abstract class BaseKeyboard(
                     for (i in 0 until event.pointerCount) {
                         val pid = event.getPointerId(i)
                         val target = touchTargets[pid] ?: continue
+                        if (slideSelectionEnabled && canSlideSelect(target.view) &&
+                            target.view.id !in popupSelectionKeys) {
+                            val next = findTouchTarget(event, i)
+                            // Do not send a tiny excursion to the child: its gesture
+                            // detector would permanently mark this tap as cancelled.
+                            if (next?.view !== target.view && withinSlideTolerance(event, i, target)) continue
+                            if (next != null && next.view !== target.view && canSlideSelect(next.view)) {
+                                // Cancel without an UP: intermediate letters must never be committed.
+                                switchSlideTarget(event, i, target, next)
+                                continue
+                            }
+                        }
                         dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, i, target)
                     }
                     return true
@@ -431,7 +738,7 @@ abstract class BaseKeyboard(
                     val i = event.actionIndex
                     val pid = event.getPointerId(i)
                     val target = touchTargets[pid] ?: return true
-                    dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, i, target)
+                    releaseTouch(event, i, target)
                     touchTargets.remove(pid)
                     return true
                 }
@@ -442,7 +749,7 @@ abstract class BaseKeyboard(
                         releaseAllTouchTargets()
                         return true
                     }
-                    dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, 0, target)
+                    releaseTouch(event, 0, target)
                     touchTargets.remove(pid)
                     return true
                 }
@@ -465,6 +772,12 @@ abstract class BaseKeyboard(
 
     @CallSuper
     protected open fun onPopupAction(action: PopupAction) {
+        when (action) {
+            is PopupAction.ShowKeyboardAction -> popupSelectionKeys.add(action.viewId)
+            is PopupAction.ShowMenuAction -> popupSelectionKeys.add(action.viewId)
+            is PopupAction.DismissAction -> popupSelectionKeys.remove(action.viewId)
+            else -> {}
+        }
         popupActionListener?.onPopupAction(action)
     }
 
@@ -484,8 +797,52 @@ abstract class BaseKeyboard(
         return true
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        pressEffectLayer?.setActive(true)
+    }
+
+    override fun onDetachedFromWindow() {
+        pressEffectLayer?.setActive(false)
+        if (keyMotion == ThemePrefs.KeyMotionEffect.Press) {
+            // Reattaching the same keyboard must not retain an old held pointer.
+            motionViews.clear()
+            for (i in depthKeys.indices) depthKeys[i].resetPressDepth()
+        }
+        super.onDetachedFromWindow()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        pressEffectLayer?.syncVisibility()
+        resetHiddenFloat(visibility != View.VISIBLE)
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        pressEffectLayer?.syncVisibility()
+        resetHiddenFloat(visibility != View.VISIBLE)
+    }
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        pressEffectLayer?.syncVisibility()
+        resetHiddenFloat(!isVisible)
+    }
+
+    /** IME windows can hide without detaching their cached keyboard views. */
+    private fun resetHiddenFloat(hidden: Boolean) {
+        // Visibility callbacks may arrive during View construction, before the
+        // keyboard's children and gesture storage have been initialised.
+        if (!motionLifecycleReady || keyMotion != ThemePrefs.KeyMotionEffect.Press) return
+        if (!hidden && isShown && windowVisibility == View.VISIBLE) return
+        releaseAllTouchTargets() // Cancel; hiding must never commit a pending letter.
+        motionViews.clear()
+        for (i in depthKeys.indices) depthKeys[i].resetPressDepth()
+    }
+
     open fun onAttach() {
-        // do nothing by default
+        pressEffectLayer?.setActive(true)
     }
 
     open fun onReturnDrawableUpdate(@DrawableRes returnDrawable: Int) {
@@ -502,6 +859,9 @@ abstract class BaseKeyboard(
 
     open fun onDetach() {
         releaseAllTouchTargets()
+        pressEffectLayer?.setActive(false)
+        motionReleaseAll()
+        for (i in depthKeys.indices) depthKeys[i].resetPressDepth()
     }
 
 }

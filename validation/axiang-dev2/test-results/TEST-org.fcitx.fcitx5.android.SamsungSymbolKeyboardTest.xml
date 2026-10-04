@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:22.834Z" hostname="566dc45241c0" time="0.481">
+  <properties/>
+  <testcase name="numericKeypadHasLargeThreeByThreeDigitsAndUsesRealKeypadSymbols" classname="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" time="0.074"/>
+  <testcase name="categoryButtonsOnlyNavigateAndChineseEnglishSymbolsCommitLiterally" classname="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" time="0.114"/>
+  <testcase name="unlockedSelectionReturnsToLettersWhileLockedSelectionStaysForContinuousSymbols" classname="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" time="0.048"/>
+  <testcase name="pagingStopsAtEdgesAndSwitchingCategoryResetsItsPage" classname="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" time="0.031"/>
+  <testcase name="independentCategoryRailAndGridFillKeyboardWithoutOverlappingTouchRects" classname="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" time="0.151"/>
+  <testcase name="recentHistorySurvivesRecreationDeduplicatesAndStoresWholeStrings" classname="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" time="0.013"/>
+  <testcase name="longNetworkLabelsFitTheirOwnCell" classname="org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

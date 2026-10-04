@@ -7,7 +7,7 @@
     </queries>
 
     <queries>
-        <package android:name="org.fcitx.fcitx5.android.debug" />
+        <package android:name="${mainApplicationId}" />
     </queries>
 
     <application>
@@ -15,7 +15,7 @@
             android:name="org.fcitx.fcitx5.android.plugin.METADATA"
             tools:node="remove" />
         <meta-data
-            android:name="org.fcitx.fcitx5.android.debug.plugin.METADATA"
+            android:name="${mainApplicationId}.plugin.METADATA"
             android:resource="@xml/plugin" />
 
         <activity
@@ -28,7 +28,7 @@
                 <action android:name="org.fcitx.fcitx5.android.plugin.MANIFEST" />
             </intent-filter>
             <intent-filter>
-                <action android:name="org.fcitx.fcitx5.android.debug.plugin.MANIFEST" />
+                <action android:name="${mainApplicationId}.plugin.MANIFEST" />
             </intent-filter>
         </activity>
     </application>

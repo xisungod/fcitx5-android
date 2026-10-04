@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rime_dictionary_import">Import personal Rime dictionary</string>
+    <string name="rime_dictionary_import_summary">UTF-8 TXT / TSV: phrase, TAB, space-separated pinyin, optional TAB and weight. Example: 双卡双待 [TAB] shuang ka shuang dai. Merges existing words; maximum 4 MiB and 50,000 entries. Proprietary binary dictionaries need conversion to this format.</string>
+    <string name="rime_dictionary_import_deploy">Imported %1$d entries. Rime deployment has started.</string>
+    <string name="rime_dictionary_import_saved">Saved %1$d entries. Select Rime, then tap Apply and deploy Rime configuration to activate them.</string>
+    <string name="rime_dictionary_import_bad_line">Line %1$d has an invalid format. Use phrase [TAB] space-separated pinyin [TAB] optional weight (0–100000). The previous dictionary is unchanged.</string>
+    <string name="rime_dictionary_import_failed">Could not finish importing. Check UTF-8 encoding, file size and dictionary format.</string>
+</resources>

@@ -6,11 +6,32 @@ package org.fcitx.fcitx5.android.ui.main.settings.theme
 
 import android.os.Bundle
 import androidx.preference.SwitchPreference
+import androidx.preference.Preference
+import androidx.preference.PreferenceScreen
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
+import org.fcitx.fcitx5.android.utils.navigateWithAnim
 
 class ThemeSettingsFragment : ManagedPreferenceFragment(ThemeManager.prefs) {
+
+    override fun onPreferenceUiCreated(screen: PreferenceScreen) {
+        screen.findPreference<SwitchPreference>(ThemeManager.prefs.portraitNumberRow.key)?.apply {
+            setTitle(R.string.keyboard_show_number_row)
+            setSummary(R.string.keyboard_show_number_row_summary)
+            order = 0
+        }
+        screen.addPreference(Preference(requireContext()).apply {
+            key = "detailed_light_effect_settings"
+            setTitle(R.string.light_effect_settings)
+            setSummary(R.string.light_effect_settings_summary)
+            setIcon(R.drawable.ic_baseline_palette_24)
+            order = -1
+            setOnPreferenceClickListener { navigateWithAnim(SettingsRoute.LightEffects); true }
+        })
+    }
 
     private val followSystemDayNightTheme = ThemeManager.prefs.followSystemDayNightTheme
 

@@ -105,6 +105,12 @@ object DataManager {
 
         // Parse plugin.xml
         for (packageName in pluginPackages) {
+            // A separately installed old Rime APK must not replace the bundled
+            // addon or append its native library directory to the loader path.
+            if (isBundledPluginPackage(packageName)) {
+                Timber.i("Ignoring $packageName: Rime is built into the main app")
+                continue
+            }
             val res = pm.getResourcesForApplication(packageName)
 
             @SuppressLint("DiscouragedApi")
@@ -177,6 +183,10 @@ object DataManager {
         }
         return PluginSet(toLoad, preloadFailed)
     }
+
+    internal fun isBundledPluginPackage(packageName: String): Boolean =
+        packageName == PluginDescriptor.pluginPackagePrefix + "rime" +
+            PluginDescriptor.pluginPackageSuffix
 
     fun sync() = lock.withLock {
         synced = false

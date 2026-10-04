@@ -26,7 +26,7 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
     }
 
     override val root = ctx.constraintLayout {
-        add(expandButton, lParams(dp(40)) {
+        add(expandButton, lParams(dp(48)) {
             centerVertically()
             endOfParent()
         })

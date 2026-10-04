@@ -60,6 +60,8 @@ for name, target in [
     ('PinyinData-LICENSE.txt', 'cn_dicts/PinyinData-LICENSE.txt'),
     ('xuancai_user.dict.yaml', 'xuancai_user.dict.yaml'),
     ('xuancai_user.schema.yaml', 'xuancai_user.schema.yaml'),
+    ('rime_ice_t9.schema.yaml', 'rime_ice_t9.schema.yaml'),
+    ('xuancai_user_t9.schema.yaml', 'xuancai_user_t9.schema.yaml'),
 ]:
     (stage / target).write_bytes((extension_dir / name).read_bytes())
 
@@ -115,6 +117,7 @@ manifest = {
         'rare_characters': {'table': 'cn_dicts/41448', 'source': 'Pinned Rime Ice table, derived from Unihan and pinyin-data', 'licenses': {'Unicode': 'cn_dicts/Unicode-LICENSE.txt', 'pinyin-data': 'cn_dicts/PinyinData-LICENSE.txt'}, 'source_urls': ['https://www.unicode.org/Public/16.0.0/ucd/Unihan.zip', 'https://github.com/mozillazg/pinyin-data'], 'ranking': '8105 precedes 41448; upstream weights preserved'},
         'mobile_vocabulary': {'table': 'cn_dicts/xuancai_mobile', 'source': 'Original, explicitly annotated Xuancai vocabulary', 'license': 'GPL-3.0-only'},
         'personal_dictionary': {'file': 'xuancai_user.dict.yaml', 'schema': 'xuancai_user.schema.yaml', 'format': 'UTF-8 word<TAB>space-separated-pinyin<TAB>integer-weight', 'deployment': 'Small independent dictionary; rime_ice.table.bin is reused'},
+        'nine_key_pinyin': {'schema': 'rime_ice_t9.schema.yaml', 'dictionary': 'rime_ice', 'prism': 'rime_ice_t9', 'mapping': 'abcdefghijklmnopqrstuvwxyz -> 22233344455566677778889999', 'personal_prism': 'xuancai_user_t9', 'deployment': 'Independent small prisms reuse the same Chinese and personal tables; alphabetic rime_ice remains the first/default schema'},
     },
     'raw_dictionary_rows': counts,
     'files_sha256': {str(p.relative_to(stage)): hashlib.sha256(p.read_bytes()).hexdigest()

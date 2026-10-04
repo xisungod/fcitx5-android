@@ -19,17 +19,28 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.editing.TextEditingWindow
 import org.fcitx.fcitx5.android.input.editorinfo.EditorInfoWindow
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.InputMethod
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Keyboard
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ReloadConfig
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.ThemeList
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.TextEditing
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Settings
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.KeyboardHeight
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.KeyboardSettings
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.RippleShape
+import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.IdleBreathing
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.settings.KeyboardQuickSettingsWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -49,6 +60,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     InputBroadcastReceiver {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
+    private val inputView by manager.inputView()
     private val fcitx: FcitxConnection by manager.fcitx()
     private val theme by manager.theme()
     private val windowManager: InputWindowManager by manager.must()
@@ -57,26 +69,14 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
 
     private val staticEntries by lazy {
         arrayOf(
-            StatusAreaEntry.Android(
-                context.getString(R.string.theme),
-                R.drawable.ic_baseline_palette_24,
-                ThemeList
-            ),
-            StatusAreaEntry.Android(
-                context.getString(R.string.input_method_options),
-                R.drawable.ic_baseline_language_24,
-                InputMethod
-            ),
-            StatusAreaEntry.Android(
-                context.getString(R.string.reload_config),
-                R.drawable.ic_baseline_sync_24,
-                ReloadConfig
-            ),
-            StatusAreaEntry.Android(
-                context.getString(R.string.virtual_keyboard),
-                R.drawable.ic_baseline_keyboard_24,
-                Keyboard
-            )
+            StatusAreaEntry.Android(context.getString(R.string.keyboard_quick_settings), R.drawable.ic_baseline_palette_24, KeyboardSettings),
+            StatusAreaEntry.Android(context.getString(R.string.ripple_shape), R.drawable.ic_baseline_auto_awesome_24, RippleShape),
+            StatusAreaEntry.Android(context.getString(if (ThemeManager.prefs.idleBreathing.getValue())
+                R.string.keyboard_menu_breathing_on else R.string.keyboard_menu_breathing_off),
+                R.drawable.ic_baseline_light_mode_24, IdleBreathing, ThemeManager.prefs.idleBreathing.getValue()),
+            StatusAreaEntry.Android(context.getString(R.string.keyboard_height_adjust), R.drawable.ic_keyboard_height_24, KeyboardHeight),
+            StatusAreaEntry.Android(context.getString(R.string.text_editing), R.drawable.ic_cursor_move, TextEditing),
+            StatusAreaEntry.Android(context.getString(R.string.keyboard_quick_settings_more), R.drawable.ic_baseline_settings_24, Settings)
         )
     }
 
@@ -152,6 +152,36 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                         }
                         Keyboard -> AppUtil.launchMainToKeyboard(context)
                         ThemeList -> AppUtil.launchMainToThemeList(context)
+                        TextEditing -> windowManager.attachWindow(TextEditingWindow())
+                        Settings -> AppUtil.launchMain(context)
+                        KeyboardHeight -> inputView.showKeyboardHeightEditor()
+                        KeyboardSettings -> windowManager.attachWindow(KeyboardQuickSettingsWindow())
+                        RippleShape -> {
+                            val preference = ThemeManager.prefs.rippleShape
+                            val target = windowManager
+                            val popup = PopupMenu(context, view)
+                            ThemePrefs.RippleShape.entries.forEachIndexed { index, shape ->
+                                popup.menu.add(0, index + 1, index, shape.stringRes).apply {
+                                    isCheckable = true
+                                    isChecked = shape == preference.getValue()
+                                    setOnMenuItemClickListener {
+                                        target.attachWindow(KeyboardWindow)
+                                        preference.setValue(shape)
+                                        true
+                                    }
+                                }
+                            }
+                            popup.menu.setGroupCheckable(0, true, true)
+                            popupMenu?.dismiss()
+                            popupMenu = popup
+                            popup.show()
+                        }
+                        IdleBreathing -> {
+                            val preference = ThemeManager.prefs.idleBreathing
+                            val next = !preference.getValue()
+                            windowManager.attachWindow(KeyboardWindow)
+                            preference.setValue(next)
+                        }
                     }
                 }
             }
@@ -167,7 +197,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
             if (!keyBorder) {
                 backgroundColor = theme.barColor
             }
-            layoutManager = gridLayoutManager(4)
+            layoutManager = gridLayoutManager(3)
             adapter = this@StatusAreaWindow.adapter
         }
     }
@@ -175,7 +205,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     override fun onStatusAreaUpdate(actions: Array<Action>) {
         adapter.entries = arrayOf(
             *staticEntries,
-            *Array(actions.size) { StatusAreaEntry.fromAction(actions[it]) }
+            *compactStatusActions(actions).map { StatusAreaEntry.fromAction(it) }.toTypedArray()
         )
     }
 

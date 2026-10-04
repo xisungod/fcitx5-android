@@ -34,6 +34,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.global.GlobalConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodListFragment
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
+import org.fcitx.fcitx5.android.ui.main.settings.theme.LightEffectSettingsFragment
 import org.fcitx.fcitx5.android.utils.config.ConfigDescriptor
 import org.fcitx.fcitx5.android.utils.parcelable
 import kotlin.reflect.typeOf
@@ -67,6 +68,9 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object Theme : SettingsRoute()
+
+    @Serializable
+    data object LightEffects : SettingsRoute()
 
     @Serializable
     data object VirtualKeyboard : SettingsRoute()
@@ -206,6 +210,9 @@ sealed class SettingsRoute : Parcelable {
 
             fragment<ThemeFragment, Theme> {
                 label = ctx.getString(R.string.theme)
+            }
+            fragment<LightEffectSettingsFragment, LightEffects> {
+                label = ctx.getString(R.string.light_effect_settings)
             }
             fragment<KeyboardSettingsFragment, VirtualKeyboard> {
                 label = ctx.getString(R.string.virtual_keyboard)

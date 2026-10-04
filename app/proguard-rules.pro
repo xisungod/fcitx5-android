@@ -10,6 +10,8 @@
 
 # Keep JNI interface
 -keep class org.fcitx.fcitx5.android.core.* { *; }
+# Sherpa's JNI reads model configuration/result fields by their JVM names.
+-keep class com.k2fsa.sherpa.onnx.** { *; }
 -keep class org.fcitx.fcitx5.android.data.pinyin.customphrase.PinyinCustomPhrase {
     public <init>(...);
 }

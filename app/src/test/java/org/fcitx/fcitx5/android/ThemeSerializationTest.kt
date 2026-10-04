@@ -66,7 +66,7 @@ class ThemeSerializationTest {
 
     @Test
     fun version2() {
-        // Version 2.0
+        // Version 2.0 predates the candidate colours introduced by version 2.1.
         val raw = """
             {
                "name":"",
@@ -98,7 +98,12 @@ class ThemeSerializationTest {
             }
         """.trimIndent()
         val (decoded, migrated) = raw.toCustomTheme()
-        Assert.assertEquals("Migration shouldn't happen", false, migrated)
-        Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
+        Assert.assertEquals("Version 2.0 must migrate to 2.1", true, migrated)
+        Assert.assertEquals(decoded.keyTextColor, decoded.candidateTextColor)
+        Assert.assertEquals(decoded.keyTextColor, decoded.candidateLabelColor)
+        Assert.assertEquals(decoded.altKeyTextColor, decoded.candidateCommentColor)
+        val (roundTrip, migratedAgain) = decoded.toJson().toCustomTheme()
+        Assert.assertEquals("Round trip", decoded, roundTrip)
+        Assert.assertEquals("Current format must not migrate again", false, migratedAgain)
     }
 }

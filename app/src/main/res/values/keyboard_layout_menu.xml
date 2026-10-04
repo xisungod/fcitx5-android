@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyboard_layout_menu_title">Switch keyboard</string>
+    <string name="keyboard_layout_menu_english">English</string>
+    <string name="keyboard_layout_menu_numbers">Numbers</string>
+</resources>

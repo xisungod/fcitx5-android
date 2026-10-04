@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pinyin_t9_letters_description">%1$s, number %2$d</string>
+    <string name="pinyin_t9_separator_description">Separate pinyin syllables; hold for number 1</string>
+    <string name="pinyin_t9_switch_26_description">Switch to the 26-letter keyboard</string>
+</resources>

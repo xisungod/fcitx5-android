@@ -27,9 +27,28 @@ android {
                     // android specific modules
                     "androidfrontend",
                     "androidkeyboard",
-                    "androidnotification"
+                    "androidnotification",
+                    // Rime is a built-in engine, not a separately installed APK.
+                    "rime"
                 )
             }
+        }
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.jvmArgs(
+                "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                "--add-opens=java.base/java.util=ALL-UNNAMED",
+                "--add-opens=java.base/java.io=ALL-UNNAMED",
+                "--add-opens=java.base/java.net=ALL-UNNAMED",
+                "--add-opens=java.base/java.security=ALL-UNNAMED",
+                "--add-opens=java.base/java.text=ALL-UNNAMED",
+                "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
+                "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"
+            )
         }
     }
 
@@ -46,9 +65,10 @@ android {
             proguardFile("proguard-rules.pro")
         }
         debug {
+            // Application ID and signing follow the shared application convention.
             resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
-            resValue("string", "app_name", "@string/app_name_debug")
+            resValue("string", "app_name", "阿翔输入法")
         }
     }
 
@@ -56,6 +76,10 @@ android {
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true
     }
+
+    packaging.jniLibs.keepDebugSymbols += setOf(
+        "**/libonnxruntime.so", "**/libsherpa-onnx-jni.so"
+    )
 }
 
 fcitxComponent {
@@ -72,11 +96,25 @@ fcitxComponent {
     installPrebuiltAssets = true
 }
 
+generateDataDescriptor {
+    symlinks.put("usr/share/rime-data/opencc", "usr/share/opencc")
+    // Sherpa reads its bundled assets directly. Do not copy another model set into
+    // Fcitx's data directory or include it in the input-method configuration export.
+    excludes.addAll(provider {
+        fileTree("src/main/assets/asr").files.map {
+            it.relativeTo(file("src/main/assets")).invariantSeparatorsPath
+        }
+    })
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
+    // Prepared from the pinned official release by scripts/prepare-axiang-asr.py.
+    // The application uses local assets and never delegates dictation to a network service.
+    implementation(files("libs/sherpa-onnx-1.13.8.jar"))
     ksp(project(":codegen"))
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))
@@ -125,6 +163,7 @@ dependencies {
     implementation(libs.splitties.views.recyclerview)
     implementation(libs.aboutlibraries.core)
     testImplementation(libs.junit)
+    testImplementation("org.robolectric:robolectric:4.17")
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.lifecycle.testing)

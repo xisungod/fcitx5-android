@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_dictation_ui_title">离线听写</string>
+    <string name="offline_dictation_ui_start">开始听写</string>
+    <string name="offline_dictation_ui_stop">停止听写</string>
+    <string name="offline_dictation_ui_ready">准备听写</string>
+    <string name="offline_dictation_ui_preparing">正在准备离线识别…</string>
+    <string name="offline_dictation_ui_recording">正在聆听</string>
+    <string name="offline_dictation_ui_finishing">正在整理这一句话…</string>
+    <string name="offline_dictation_ui_finished">听写已完成</string>
+    <string name="offline_dictation_ui_unavailable">暂时无法听写</string>
+    <string name="offline_dictation_ui_error">听写已停止</string>
+    <string name="offline_dictation_ui_ready_hint">轻点话筒开始 · 全程本机识别</string>
+    <string name="offline_dictation_ui_preparing_hint">正在加载本地模型 · 轻点图案停止</string>
+    <string name="offline_dictation_ui_recording_hint">轻点图案停止 · 本机识别并自动加标点</string>
+    <string name="offline_dictation_ui_finishing_hint">麦克风已停止 · 正在本机整理文字</string>
+    <string name="offline_dictation_ui_finished_hint">文字已填入输入框 · 轻点话筒继续</string>
+    <string name="offline_dictation_ui_unavailable_hint">当前暂时无法离线听写，可以返回键盘继续输入。</string>
+    <string name="offline_dictation_ui_error_hint">轻点话筒重试，或返回键盘继续输入。</string>
+</resources>

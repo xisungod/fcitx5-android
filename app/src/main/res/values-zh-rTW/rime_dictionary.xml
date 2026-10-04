@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rime_dictionary_import">匯入 Rime 個人詞庫</string>
+    <string name="rime_dictionary_import_summary">支援 UTF-8 TXT／TSV：詞語、Tab、以空格分開的拼音，可再加 Tab 與權重。例如：雙卡雙待 [Tab] shuang ka shuang dai。匯入會合併既有詞條，最多 4 MiB／5 萬條。專有二進位詞庫需先轉換成此格式。</string>
+    <string name="rime_dictionary_import_deploy">已匯入 %1$d 條詞語，Rime 正在重新部署。</string>
+    <string name="rime_dictionary_import_saved">已儲存 %1$d 條詞語。請切換至 Rime，再點「套用並重新部署 Rime 設定」啟用。</string>
+    <string name="rime_dictionary_import_bad_line">第 %1$d 行格式有誤。請用：詞語 [Tab] 以空格分開的拼音 [Tab] 可選權重（0–100000）。原詞庫未變更。</string>
+    <string name="rime_dictionary_import_failed">未完成匯入，請檢查 UTF-8 編碼、檔案大小與詞條格式。</string>
+</resources>

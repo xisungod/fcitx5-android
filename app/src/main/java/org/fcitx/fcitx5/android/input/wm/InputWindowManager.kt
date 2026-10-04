@@ -34,7 +34,8 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
 
     private val essentialWindows = mutableMapOf<EssentialWindow.Key, Pair<InputWindow, View?>>()
 
-    private var currentWindow: InputWindow? = null
+    internal var currentWindow: InputWindow? = null
+        private set
     private var currentView: View? = null
 
     private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation

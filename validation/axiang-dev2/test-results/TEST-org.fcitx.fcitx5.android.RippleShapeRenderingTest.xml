@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.RippleShapeRenderingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-04T18:32:22.243Z" hostname="566dc45241c0" time="0.586">
+  <properties/>
+  <testcase name="liquidSurfaceIsVisibleInsideTheCapAndBothModesRespectBrightnessAndTheirFinalFade" classname="org.fcitx.fcitx5.android.RippleShapeRenderingTest" time="0.145"/>
+  <testcase name="existingPreferenceAndOmittedRendererOptionKeepTheCurrentMistExactly" classname="org.fcitx.fcitx5.android.RippleShapeRenderingTest" time="0.029"/>
+  <testcase name="fluidChangesVisibleGeometryAndKeepsMovingContinuouslyAfterExpansionFinishes" classname="org.fcitx.fcitx5.android.RippleShapeRenderingTest" time="0.41"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

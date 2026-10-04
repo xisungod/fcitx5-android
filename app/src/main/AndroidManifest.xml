@@ -12,6 +12,13 @@
         tools:node="remove" />
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Used only after an explicit local dictation start; no speech service or network. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <!-- Keep the input method offline. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- optional, off by default: read verification codes from incoming SMS, on device only -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- remove intent queries merged from library manifest (namely Android-Image-Cropper) -->
@@ -38,15 +45,20 @@
 
     <application
         android:name=".FcitxApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/full_backup_content"
+        android:fullBackupContent="false"
         android:icon="@mipmap/app_icon"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/app_icon_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.FcitxAppTheme"
         tools:targetApi="33">
+        <activity
+            android:name=".input.voice.OfflineDictationPermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.DialogTheme" />
         <activity
             android:name=".ui.setup.SetupActivity"
             android:exported="false"

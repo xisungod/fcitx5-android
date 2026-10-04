@@ -1,0 +1,8 @@
+{
+  "baseline": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+  "clean_apply": true,
+  "checked_paths": 218,
+  "byte_mismatches": [],
+  "patch_sha256": "131caa20701650abf68e279b3e44089167804886a65ddff7cd41616349bc8759",
+  "source_commit": "4aa16d84d9239e8c47600d7a987427dec6a8fa1e"
+}

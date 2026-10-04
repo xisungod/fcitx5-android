@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="keyboard_quick_settings">Keyboard settings</string>
+    <string name="keyboard_quick_settings_hint">Tap Done to apply. Going back or opening another settings panel discards these changes.</string>
+    <string name="keyboard_quick_settings_layout">Layout and feedback</string>
+    <string name="keyboard_quick_settings_effects">Key effects</string>
+    <string name="keyboard_quick_settings_more">More settings</string>
+    <string name="keyboard_quick_settings_more_summary">Open the full settings app</string>
+    <string name="keyboard_quick_settings_height_summary">Drag the keyboard edge up or down</string>
+    <string name="keyboard_quick_settings_haptic_hint">0% turns vibration off. Other levels follow the vibration mode above.</string>
+    <string name="keyboard_quick_settings_retreat_hint">Controls the key color fade after release. Floating return follows the key motion automatically.</string>
+    <string name="keyboard_quick_settings_disabled_animation">Key motion is currently disabled in Advanced settings.</string>
+    <string name="keyboard_quick_settings_number_row">Number row in portrait</string>
+    <string name="keyboard_quick_settings_rime">Enable / switch to Rime</string>
+    <string name="keyboard_quick_settings_rime_summary">Built-in offline Chinese input. Your other engines stay available.</string>
+    <string name="keyboard_quick_settings_rime_missing">The built-in Chinese engine is not ready. Restart the keyboard and try again.</string>
+    <string name="keyboard_quick_settings_rime_active">Switched to Rime</string>
+    <string name="keyboard_quick_settings_rime_failed">The built-in Chinese engine could not be enabled. Restart the keyboard and try again.</string>
+    <string name="keyboard_quick_settings_value_percent">%1$d%%</string>
+    <string name="keyboard_quick_settings_value_ms">%1$d ms</string>
+</resources>

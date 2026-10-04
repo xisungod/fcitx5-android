@@ -85,6 +85,11 @@ class MainFragment : PaddingPreferenceFragment() {
             }
             addCategory("Android") {
                 addDestinationPreference(
+                    R.string.light_effect_settings,
+                    R.drawable.ic_baseline_palette_24,
+                    SettingsRoute.LightEffects
+                )
+                addDestinationPreference(
                     R.string.theme,
                     R.drawable.ic_baseline_palette_24,
                     SettingsRoute.Theme

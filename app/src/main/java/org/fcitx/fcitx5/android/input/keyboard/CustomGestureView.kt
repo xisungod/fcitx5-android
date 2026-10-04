@@ -19,6 +19,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import kotlin.math.abs
 
 open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
 
@@ -66,6 +67,9 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
     private var repeatJob: Job? = null
 
     var swipeEnabled = false
+    // Space trackpad: hold first, then allow moves even after consuming the long press.
+    var swipeRequiresLongPress = false
+    var swipeDominantAxisOnly = false
     var swipeRepeatEnabled = false
     var swipeThresholdX = 24f
     var swipeThresholdY = 24f
@@ -231,9 +235,15 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
                         isPressed = false
                     }
                 }
-                if (!swipeEnabled || longPressTriggered || repeatStarted) return true
-                val countX = consumeSwipe(x, SwipeAxis.X)
-                val countY = consumeSwipe(y, SwipeAxis.Y)
+                if (!swipeEnabled || (longPressTriggered && !swipeRequiresLongPress) || repeatStarted) return true
+                if (swipeRequiresLongPress && !longPressTriggered) {
+                    swipeLastX = x
+                    swipeLastY = y
+                    return true
+                }
+                val axis = if (swipeDominantAxisOnly) dominantSwipeAxis(x, y) else null
+                val countX = if (!swipeDominantAxisOnly || axis == SwipeAxis.X) consumeSwipe(x, SwipeAxis.X) else 0
+                val countY = if (!swipeDominantAxisOnly || axis == SwipeAxis.Y) consumeSwipe(y, SwipeAxis.Y) else 0
                 dispatchGestureEvent(GestureType.Move, x, y, countX, countY)
                 swipeLastX = x
                 swipeLastY = y
@@ -259,6 +269,26 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         val consumed = onGestureListener?.onGesture(this, event) ?: return
         if (consumed && !gestureConsumed) {
             gestureConsumed = true
+        }
+    }
+
+    /** Choose one direction per step, without collecting perpendicular finger jitter. */
+    private fun dominantSwipeAxis(x: Float, y: Float): SwipeAxis? {
+        val pendingX = x - swipeLastX + swipeXUnconsumed
+        val pendingY = y - swipeLastY + swipeYUnconsumed
+        val stepsX = abs(pendingX / swipeThresholdX)
+        val stepsY = abs(pendingY / swipeThresholdY)
+        if (stepsX < 1f && stepsY < 1f) {
+            swipeXUnconsumed = pendingX
+            swipeYUnconsumed = pendingY
+            return null
+        }
+        return if (stepsY > stepsX) {
+            swipeXUnconsumed = 0f
+            SwipeAxis.Y
+        } else {
+            swipeYUnconsumed = 0f
+            SwipeAxis.X
         }
     }
 

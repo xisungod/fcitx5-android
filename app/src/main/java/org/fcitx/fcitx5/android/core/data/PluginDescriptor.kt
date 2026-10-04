@@ -12,7 +12,7 @@ import org.fcitx.fcitx5.android.core.data.PluginDescriptor.Companion.pluginPacka
  */
 data class PluginDescriptor(
     /**
-     * Must have [pluginPackagePrefix] prefix and end with `.debug` if it's debug variant
+     * Must have [pluginPackagePrefix] prefix and the same variant suffix as the host.
      */
     val packageName: String,
     /**
@@ -38,7 +38,9 @@ data class PluginDescriptor(
 
     companion object {
         const val pluginPackagePrefix = "org.fcitx.fcitx5.android.plugin."
-        const val pluginPackageSuffix = ".${BuildConfig.BUILD_TYPE}"
+        val pluginPackageSuffix = BuildConfig.APPLICATION_ID
+            .removePrefix("org.fcitx.fcitx5.android")
+            .ifEmpty { ".${BuildConfig.BUILD_TYPE}" }
         const val pluginAPI = "0.1"
     }
 }

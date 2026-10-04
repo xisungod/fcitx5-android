@@ -5,10 +5,12 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -16,6 +18,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
+import android.os.Build
 import android.util.TypedValue
 import android.view.View
 import android.widget.ImageView
@@ -25,6 +28,7 @@ import androidx.annotation.FloatRange
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
@@ -60,6 +64,67 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     val radius: Float
     val hMargin: Int
     val vMargin: Int
+
+    internal fun interface KeySurfacePainter {
+        fun draw(canvas: Canvas, width: Int, height: Int)
+    }
+    internal var keySurfacePainter: KeySurfacePainter? = null
+    internal fun invalidateKeySurface() { appearanceView.invalidate() }
+    internal fun floatingFaceOpacity(): Float =
+        if (depthAnimationsAllowed()) pressDepth.currentFaceOpacity() else 0f
+
+    private val pressDepth = KeyPressDepth()
+    private var depthFrameScheduled = false
+    private val depthFrame = object : Runnable {
+        override fun run() {
+            depthFrameScheduled = false
+            if (!isAttachedToWindow) return
+            if (!depthAnimationsAllowed()) {
+                resetPressDepth()
+                return
+            }
+            invalidateKeySurface()
+            if (pressDepth.isTransitioning()) scheduleDepthFrame()
+        }
+    }
+
+    private fun depthAnimationsAllowed(): Boolean =
+        !AppPrefs.getInstance().advanced.disableAnimation.getValue() &&
+            (!ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
+
+    internal fun setDepthPressed(pressed: Boolean) {
+        if (!depthAnimationsAllowed()) {
+            resetPressDepth()
+            return
+        }
+        if (pressed) pressDepth.pressed() else pressDepth.released()
+        invalidateKeySurface()
+        if (pressDepth.isTransitioning()) scheduleDepthFrame()
+    }
+
+    internal fun resetPressDepth() {
+        removeCallbacks(depthFrame)
+        depthFrameScheduled = false
+        pressDepth.reset()
+        invalidateKeySurface()
+    }
+
+    private fun scheduleDepthFrame() {
+        if (depthFrameScheduled || !isAttachedToWindow) return
+        depthFrameScheduled = true
+        postOnAnimation(depthFrame)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (pressDepth.isTransitioning()) scheduleDepthFrame()
+    }
+
+    override fun onDetachedFromWindow() {
+        resetPressDepth()
+        super.onDetachedFromWindow()
+    }
 
     init {
         val prefs = ThemeManager.prefs
@@ -104,7 +169,36 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
      * `AppearanceView` in the inner [ConstraintLayout], it can be smaller than its parent,
      * and holds the [bounds] for popup.
      */
-    protected val appearanceView = constraintLayout {
+    protected val appearanceView = object : ConstraintLayout(ctx) {
+        override fun draw(canvas: Canvas) {
+            val lift = if (depthAnimationsAllowed()) pressDepth.currentLift() else 0f
+            if (lift == 0f) {
+                super.draw(canvas)
+                return
+            }
+            // The touch cell and popup anchor do not move. Use only the spare
+            // key margins so the raised cap stays inside its own drawing cell.
+            val scaleGain = min(KeyPressDepth.SCALE_GAIN,
+                min(hMargin * 1.5f / width.coerceAtLeast(1), vMargin.toFloat() / height.coerceAtLeast(1)))
+            val scale = 1f + scaleGain * lift
+            val elevation = min(dp(4f), (vMargin - height * scaleGain / 2f - dp(0.5f)).coerceAtLeast(0f)) * lift
+            val saved = canvas.save()
+            try {
+                // Background, full coloured face and glyph float as one object.
+                canvas.translate(0f, -elevation)
+                canvas.scale(scale, scale, width / 2f, height / 2f)
+                super.draw(canvas)
+            } finally {
+                canvas.restoreToCount(saved)
+            }
+        }
+
+        override fun dispatchDraw(canvas: Canvas) {
+            // Draw after the key background but before the character views.
+            keySurfacePainter?.draw(canvas, width, height)
+            super.dispatchDraw(canvas)
+        }
+    }.apply {
         // sync any state from parent
         isDuplicateParentStateEnabled = true
     }
@@ -146,6 +240,11 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     }
 
     private fun setupPressHighlight(mask: Drawable? = null) {
+        // Neon themes use the keyboard-wide light, not an extra pressed rectangle.
+        if (Color.alpha(theme.keyPressHighlightColor) == 0) {
+            appearanceView.foreground = null
+            return
+        }
         appearanceView.foreground = if (rippled) {
             RippleDrawable(
                 ColorStateList.valueOf(theme.keyPressHighlightColor), null,
@@ -357,7 +456,17 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
     }
 
     private fun applyLayout(orientation: Int) {
+        if ((def as KeyDef.Appearance.AltText).altText.isEmpty()) {
+            applyNoAltTextPosition()
+            return
+        }
         when (ThemeManager.prefs.punctuationPosition.getValue()) {
+            PunctuationPosition.TopRowDigits -> {
+                val digits = (def as KeyDef.Appearance.AltText).altText.all { it.isDigit() }
+                if (digits && (orientation == Configuration.ORIENTATION_LANDSCAPE ||
+                        !ThemeManager.prefs.portraitNumberRow.getValue())) applyTopRightAltTextPosition()
+                else applyNoAltTextPosition()
+            }
             PunctuationPosition.Bottom -> when (orientation) {
                 Configuration.ORIENTATION_LANDSCAPE -> applyTopRightAltTextPosition()
                 else -> applyBottomAltTextPosition()

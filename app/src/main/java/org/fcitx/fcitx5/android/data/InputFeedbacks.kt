@@ -43,17 +43,21 @@ object InputFeedbacks {
     private val soundOnKeyPressVolume by keyboardPrefs.soundOnKeyPressVolume
     private val hapticOnKeyPress by keyboardPrefs.hapticOnKeyPress
     private val hapticOnKeyUp by keyboardPrefs.hapticOnKeyUp
+    private val hapticStrength by keyboardPrefs.hapticStrength
     private val buttonPressVibrationMilliseconds by keyboardPrefs.buttonPressVibrationMilliseconds
     private val buttonLongPressVibrationMilliseconds by keyboardPrefs.buttonLongPressVibrationMilliseconds
     private val buttonPressVibrationAmplitude by keyboardPrefs.buttonPressVibrationAmplitude
     private val buttonLongPressVibrationAmplitude by keyboardPrefs.buttonLongPressVibrationAmplitude
 
-    private val vibrator = appContext.vibrator
+    // A disabled strength must not even initialise or probe the vibration service.
+    private val vibrator by lazy { appContext.vibrator }
 
-    private val hasAmplitudeControl =
-        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) && vibrator.hasAmplitudeControl()
+    private fun supportsAmplitudeControl() =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && vibrator.hasAmplitudeControl()
 
     fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false) {
+        val strength = hapticStrength.coerceIn(0, 100)
+        if (strength == 0) return
         when (hapticOnKeyPress) {
             InputFeedbackMode.Enabled -> {}
             InputFeedbackMode.Disabled -> return
@@ -77,13 +81,25 @@ object InputFeedbacks {
             }
         }
 
+        // Until the user saves the new control, keep legacy system feedback.
+        // Once saved, the whole 1..100 range uses one explicit amplitude scale,
+        // so 99% cannot exceed 100% because of a vendor's weaker default pulse.
+        val explicitStrength = keyboardPrefs.hapticStrength.run { sharedPreferences.contains(key) }
+        val amplitudeControl = (explicitStrength || duration != 0L) && supportsAmplitudeControl()
+        if (explicitStrength && amplitudeControl) {
+            val pulseDuration = HapticStrength.duration(duration, longPress, keyUp)
+            val pulseAmplitude = HapticStrength.amplitude(strength, amplitude)
+            vibrator.vibrate(VibrationEffect.createOneShot(pulseDuration, pulseAmplitude))
+            return
+        }
+
         // there is `VibrationEffect.DEFAULT_AMPLITUDE` but no default duration;
         // also `VibrationEffect.createOneShot()` only accepts positive duration.
         // so changing amplitude without changing duration makes no sense
         if (duration != 0L) {
             // on Android 13, if system haptic feedback was disabled, `vibrator.vibrate()` won't work
             // but `view.performHapticFeedback()` with `FLAG_IGNORE_GLOBAL_SETTING` still works
-            if (hasAmplitudeControl && amplitude != 0) {
+            if (amplitudeControl && amplitude != 0) {
                 vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val ve = VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE)
