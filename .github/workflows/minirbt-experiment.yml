@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      SOURCE_COMMIT: 6ba28c89f73c8c1745dbed8d2302c8c1657a9291
+      SOURCE_COMMIT: d45562ac1fe7351d4b960d350919978bc662830d
       VERIFIED_NATIVE_COMMIT: 2a038c9bb5360d6760666c3df564cab4c66d1564
       SOURCE_RUN_ID: "37283910221"
       SOURCE_ARTIFACT_ID: "11333514116"
@@ -28,7 +28,7 @@ jobs:
       SOURCE_APK_NAME: axiang-pr-arm64.apk
       SOURCE_APK_SHA256: dd255bd528f6645ba71b61f9fcfc8e251a7f25beacac4f1f6c12c7c0c0e8e414
       MODEL_RELEASE_ID: "403572093"
-      MODEL_ASSET_ID: "0"
+      MODEL_ASSET_ID: "612221465"
       MODEL_RELEASE_TAG: axiang-minirbt-h256-mlm-v1
       MODEL_ASSET_NAME: axiang-minirbt-h256-mlm-fp32.zip
       MODEL_SHA256: d88fde3cff6ab399eaca90f360f2668d8be60925537d4c7a403a8b35da0498aa
@@ -43,14 +43,14 @@ jobs:
       NDK_VERSION: "28.0.13004108"
       BUILD_ABI: arm64-v8a
       BUILD_VERSION_CODE: "1"
-      BUILD_COMMIT_HASH: 6ba28c89f73c8c1745dbed8d2302c8c1657a9291
+      BUILD_COMMIT_HASH: d45562ac1fe7351d4b960d350919978bc662830d
       GH_REPO: ${{ github.repository }}
 
     steps:
       - name: Check out the exact experiment source
         uses: actions/checkout@v7
         with:
-          ref: 6ba28c89f73c8c1745dbed8d2302c8c1657a9291
+          ref: d45562ac1fe7351d4b960d350919978bc662830d
           fetch-depth: 0
           submodules: recursive
           persist-credentials: false
@@ -493,12 +493,12 @@ jobs:
               failures = sum(int(suite.attrib.get('failures', 0)) for suite in suites)
               errors = sum(int(suite.attrib.get('errors', 0)) for suite in suites)
               skipped = sum(int(suite.attrib.get('skipped', 0)) for suite in suites)
-              assert tests >= 399 and failures == errors == skipped == 0
+              assert tests >= 400 and failures == errors == skipped == 0
               suites_by_name = {suite.attrib['name']: suite for suite in suites}
               assert len(suites_by_name) == len(suites), 'Duplicate suite reports could inflate the test count'
               neural_suite_minimums = {
                   'org.fcitx.fcitx5.android.NeuralCandidateCoordinatorTest': 9,
-                  'org.fcitx.fcitx5.android.RankedCandidateBatchTest': 6,
+                  'org.fcitx.fcitx5.android.RankedCandidateBatchTest': 7,
                   'org.fcitx.fcitx5.android.MiniRbtTokenizerTest': 4,
                   'org.fcitx.fcitx5.android.data.neural.MiniRbtModelStoreTest': 13,
               }
