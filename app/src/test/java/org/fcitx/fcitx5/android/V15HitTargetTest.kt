@@ -61,6 +61,7 @@ class V15HitTargetTest {
         val keyboard: TextKeyboard
         val typed = mutableListOf<String>()
         private var downTime = 0L
+        private var eventTime = SystemClock.uptimeMillis()
 
         init {
             setting(ThemeManager.prefs.pressEffect, false)
@@ -109,7 +110,7 @@ class V15HitTargetTest {
         }
 
         fun event(action: Int, vararg fingers: Finger) {
-            if ((action and MotionEvent.ACTION_MASK) == MotionEvent.ACTION_DOWN) downTime = SystemClock.uptimeMillis()
+            if ((action and MotionEvent.ACTION_MASK) == MotionEvent.ACTION_DOWN) downTime = eventTime
             val properties = fingers.map { MotionEvent.PointerProperties().apply {
                 id = it.id
                 toolType = MotionEvent.TOOL_TYPE_FINGER
@@ -117,11 +118,13 @@ class V15HitTargetTest {
             val coords = fingers.map { MotionEvent.PointerCoords().apply {
                 x = it.x; y = it.y; pressure = 1f; size = 1f
             } }.toTypedArray()
-            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, fingers.size,
+            val event = MotionEvent.obtain(downTime, eventTime, action, fingers.size,
                 properties, coords, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
             try { assertTrue("A touch inside a real key must be handled", keyboard.dispatchTouchEvent(event)) }
             finally { event.recycle() }
         }
+
+        fun advanceTouchTime(milliseconds: Long) { eventTime += milliseconds }
 
         fun tap(finger: Finger) {
             event(MotionEvent.ACTION_DOWN, finger)
@@ -218,6 +221,8 @@ class V15HitTargetTest {
             val h = Harness(359, if (numberRow) 231 else 185, numberRow)
             try {
                 h.event(MotionEvent.ACTION_DOWN, h.finger(23, "G"))
+                h.event(MotionEvent.ACTION_MOVE, h.finger(23, "H"))
+                h.advanceTouchTime(64)
                 h.event(MotionEvent.ACTION_MOVE, h.finger(23, "H"))
                 h.event(MotionEvent.ACTION_MOVE, h.finger(23, "J"))
                 h.event(MotionEvent.ACTION_UP, h.finger(23, "J"))

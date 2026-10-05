@@ -48,7 +48,6 @@ import splitties.views.dsl.constraintlayout.rightToLeftOf
 import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
 import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
 
 abstract class BaseKeyboard(
     context: Context,
@@ -157,6 +156,8 @@ abstract class BaseKeyboard(
     private val vivoKeypressWorkaround by prefs.advanced.vivoKeypressWorkaround
 
     protected open val slideSelectionEnabled = false
+    /** Compact QWERTY cells favour stable taps; large numeric grids keep direct sliding. */
+    protected open val guardTapRetargeting = false
     private val popupSelectionKeys = hashSetOf<Int>()
     protected open fun canSlideSelect(key: KeyView): Boolean {
         val text = (key.def as? KeyDef.Appearance.Text)?.displayText ?: return false
@@ -464,13 +465,17 @@ abstract class BaseKeyboard(
     }
 
     private class TouchTarget(val view: KeyView, val hitRect: Rect)
+    private data class TouchSample(val x: Float, val y: Float, val time: Long)
 
     private class TouchContact(
         var target: TouchTarget,
         val downX: Float,
         val downY: Float,
+        val downAt: Long,
         val slideThreshold: Float,
-        var sliding: Boolean = false
+        var sliding: Boolean = false,
+        var settled: Boolean = false,
+        val retargetGuard: TapRetargetGuard = TapRetargetGuard()
     )
 
     /** Each pointer keeps its own original touch and deliberate-slide state. */
@@ -478,7 +483,7 @@ abstract class BaseKeyboard(
     private val slideTouchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
 
     private fun beginTouch(event: MotionEvent, index: Int, target: TouchTarget): TouchContact =
-        TouchContact(target, event.getX(index), event.getY(index),
+        TouchContact(target, event.getX(index), event.getY(index), event.eventTime,
             maxOf(slideTouchSlop * 1.5f, minOf(target.hitRect.width(), target.hitRect.height()) * 0.45f))
 
     private fun releaseAllTouchTargets() {
@@ -491,35 +496,37 @@ abstract class BaseKeyboard(
         popupSelectionKeys.clear()
     }
 
-    private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
-        val x0 = event.getX(pointerIndex).roundToInt()
-        val y0 = event.getY(pointerIndex).roundToInt()
-        val rowHitRect = Rect()
+    private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? =
+        findTouchTarget(event.getX(pointerIndex), event.getY(pointerIndex))
+
+    private fun findTouchTarget(x: Float, y: Float): TouchTarget? {
+        // View.getHitRect includes the view's animation matrix. Keycap shrink,
+        // bounce and tilt must never shrink, move or overlap the input cells.
         val row = keyRows.find {
-            it.getHitRect(rowHitRect)
-            rowHitRect.contains(x0, y0)
+            it.visibility == View.VISIBLE && x >= it.left && x < it.right &&
+                y >= it.top && y < it.bottom
         } ?: return null
-        val x1 = x0 - rowHitRect.left
-        val y1 = y0 - rowHitRect.top
-        val keyHitRect = Rect()
+        val x1 = x - row.left
+        val y1 = y - row.top
         val key = row.children.filterIsInstance<KeyView>().find {
-            it.getHitRect(keyHitRect)
-            keyHitRect.contains(x1, y1)
+            it.visibility == View.VISIBLE && x1 >= it.left && x1 < it.right &&
+                y1 >= it.top && y1 < it.bottom
         } ?: return null
-        keyHitRect.offset(rowHitRect.left, rowHitRect.top)
-        return TouchTarget(key, keyHitRect)
+        return TouchTarget(key, Rect(key.left + row.left, key.top + row.top,
+            key.right + row.left, key.bottom + row.top))
     }
 
     private fun dispatchMotionEventToTarget(
         event: MotionEvent,
         action: Int,
         pointerIndex: Int,
-        target: TouchTarget
+        target: TouchTarget,
+        sample: TouchSample? = null
     ) {
-        val childX = event.getX(pointerIndex) - target.hitRect.left
-        val childY = event.getY(pointerIndex) - target.hitRect.top
+        val childX = (sample?.x ?: event.getX(pointerIndex)) - target.hitRect.left
+        val childY = (sample?.y ?: event.getY(pointerIndex)) - target.hitRect.top
         val e = MotionEvent.obtain(
-            event.downTime, event.eventTime, action,
+            event.downTime, sample?.time ?: event.eventTime, action,
             childX, childY, event.getPressure(pointerIndex), event.getSize(pointerIndex),
             event.metaState, event.xPrecision, event.yPrecision,
             event.deviceId, event.edgeFlags
@@ -531,33 +538,115 @@ abstract class BaseKeyboard(
     private val effectKeyBounds = Rect()
     private val effectHostLocation = IntArray(2)
 
-    private fun withinSlideTolerance(event: MotionEvent, index: Int, target: TouchTarget): Boolean {
+    private fun withinSlideTolerance(event: MotionEvent, index: Int, target: TouchTarget): Boolean =
+        withinSlideTolerance(event.getX(index), event.getY(index), target)
+
+    private fun withinSlideTolerance(x: Float, y: Float, target: TouchTarget): Boolean {
         val margin = minOf(dp(4f).toFloat(), target.hitRect.width() * 0.15f)
-        val x = event.getX(index)
-        val y = event.getY(index)
         return x >= target.hitRect.left - margin && x < target.hitRect.right + margin &&
             y >= target.hitRect.top - margin && y < target.hitRect.bottom + margin
     }
 
-    private fun startsDeliberateSlide(event: MotionEvent, index: Int, contact: TouchContact, next: TouchTarget): Boolean {
-        val dx = event.getX(index) - contact.downX
-        val dy = event.getY(index) - contact.downY
+    private fun insideTarget(x: Float, y: Float, target: TouchTarget, inset: Float): Boolean =
+        x >= target.hitRect.left + inset && x < target.hitRect.right - inset &&
+            y >= target.hitRect.top + inset && y < target.hitRect.bottom - inset
+
+    private fun mayStartDeliberateSlide(x: Float, y: Float, contact: TouchContact, next: TouchTarget): Boolean {
+        val dx = x - contact.downX
+        val dy = y - contact.downY
         if (dx * dx + dy * dy < contact.slideThreshold * contact.slideThreshold) return false
         // Require entry into the neighbour's interior, not just a crossed border.
         // This remains proportional after editing individual key widths.
         val inset = minOf(dp(8f).toFloat(), minOf(next.hitRect.width(), next.hitRect.height()) * 0.22f)
-        return event.getX(index) >= next.hitRect.left + inset && event.getX(index) < next.hitRect.right - inset &&
-            event.getY(index) >= next.hitRect.top + inset && event.getY(index) < next.hitRect.bottom - inset
+        return insideTarget(x, y, next, inset)
     }
 
-    private fun switchSlideTarget(event: MotionEvent, index: Int, contact: TouchContact, next: TouchTarget) {
+    private fun maySettleBoundaryTap(
+        x: Float, y: Float, sampleTime: Long, contact: TouchContact, next: TouchTarget
+    ): Boolean {
+        if (contact.settled || sampleTime - contact.downAt !in 0L..TapRetargetGuard.SETTLE_WINDOW_MS) return false
+        val original = contact.target.hitRect
+        val edgeBand = minOf(dp(6f).toFloat(), minOf(original.width(), original.height()) * 0.20f)
+        // The original contact must be close to this neighbour, not merely close
+        // to some unrelated edge. This works for every row and custom key width.
+        val dx = maxOf(next.hitRect.left - contact.downX, contact.downX - next.hitRect.right, 0f)
+        val dy = maxOf(next.hitRect.top - contact.downY, contact.downY - next.hitRect.bottom, 0f)
+        if (dx * dx + dy * dy > edgeBand * edgeBand) return false
+        val inset = minOf(dp(4f).toFloat(), minOf(next.hitRect.width(), next.hitRect.height()) * 0.12f)
+        return insideTarget(x, y, next, inset)
+    }
+
+    private fun moveGuardedTap(event: MotionEvent, index: Int, contact: TouchContact) {
+        // Neighbour confirmations persist across batched MOVE samples.
+        // Advance a logical contact first, then dispatch at most one real DOWN
+        // so hidden intermediate samples cannot produce extra feedback.
+        val selection = TouchContact(contact.target, contact.downX, contact.downY,
+            contact.downAt, contact.slideThreshold, contact.sliding, contact.settled,
+            contact.retargetGuard)
+        var handover: TouchSample? = null
+        var pendingHoldCancelled = false
+
+        fun consumeSample(x: Float, y: Float, time: Long): Boolean {
+            val target = selection.target
+            val next = findTouchTarget(x, y)
+            if (next?.view !== target.view && withinSlideTolerance(x, y, target)) {
+                selection.retargetGuard.reset()
+                return true
+            }
+            if (next != null && next.view !== target.view && canSlideSelect(next.view)) {
+                val maySettle = maySettleBoundaryTap(x, y, time, selection, next)
+                val maySlide = mayStartDeliberateSlide(x, y, selection, next)
+                if (maySettle || maySlide) pendingHoldCancelled = true
+                val decision = if (selection.sliding) TapRetargetGuard.Decision.Slide
+                    else selection.retargetGuard.observe(next.view.id, time, maySettle, maySlide)
+                if (decision != TapRetargetGuard.Decision.Keep) {
+                    selection.target = next
+                    selection.sliding = decision == TapRetargetGuard.Decision.Slide
+                    if (decision == TapRetargetGuard.Decision.Settle) selection.settled = true
+                    selection.retargetGuard.reset()
+                    handover = TouchSample(x, y, time)
+                    pendingHoldCancelled = false
+                }
+                // Pending neighbour samples stay away from the old child: its
+                // touchMovedOutside flag would permanently cancel the tap.
+                return true
+            }
+            selection.retargetGuard.reset()
+            return false
+        }
+
+        for (history in 0 until event.historySize) {
+            consumeSample(event.getHistoricalX(index, history), event.getHistoricalY(index, history),
+                event.getHistoricalEventTime(history))
+        }
+        val consumed = consumeSample(event.getX(index), event.getY(index), event.eventTime)
+        handover?.let { sample ->
+            // Use the point that actually selected the final key. A later,
+            // unconfirmed excursion may already be over another neighbour.
+            switchSlideTarget(event, index, contact, selection.target, selection.sliding,
+                sample = sample, resetRetargetGuard = false)
+        }
+        contact.sliding = selection.sliding
+        contact.settled = selection.settled
+        if (pendingHoldCancelled) contact.target.view.cancelPendingHoldActions()
+        if (!consumed) dispatchMotionEventToTarget(event, MotionEvent.ACTION_MOVE, index, contact.target)
+    }
+
+    private fun switchSlideTarget(
+        event: MotionEvent, index: Int, contact: TouchContact, next: TouchTarget,
+        deliberateSlide: Boolean = true,
+        sample: TouchSample? = null,
+        resetRetargetGuard: Boolean = true
+    ) {
         val old = contact.target
         old.view.cancelGestures()
         onPopupAction(PopupAction.DismissAction(old.view.id))
         contact.target = next
-        contact.sliding = true
-        illuminateKey(event, index, next)
-        dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, index, next)
+        contact.sliding = deliberateSlide
+        if (!deliberateSlide) contact.settled = true
+        if (resetRetargetGuard) contact.retargetGuard.reset()
+        illuminateKey(event, index, next, sample)
+        dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, index, next, sample)
     }
 
     private fun releaseTouch(event: MotionEvent, index: Int, contact: TouchContact) {
@@ -661,7 +750,7 @@ abstract class BaseKeyboard(
         motionViews.clear()
     }
 
-    private fun illuminateKey(event: MotionEvent, index: Int, target: TouchTarget?) {
+    private fun illuminateKey(event: MotionEvent, index: Int, target: TouchTarget?, sample: TouchSample? = null) {
         motionPress(event.getPointerId(index), target?.view)
         pressEffectLayer?.let { effect ->
             val bounds = target?.view?.let { key ->
@@ -671,7 +760,7 @@ abstract class BaseKeyboard(
                 effectKeyBounds.inset(key.hMargin, key.vMargin)
                 effectKeyBounds
             }
-            effect.onPress(event.getX(index), event.getY(index), bounds,
+            effect.onPress(sample?.x ?: event.getX(index), sample?.y ?: event.getY(index), bounds,
                 target?.view?.let { key ->
                     key.def.variant == KeyDef.Appearance.Variant.Normal &&
                         (key.def as? KeyDef.Appearance.Text)?.displayText?.isNotBlank() == true
@@ -746,16 +835,27 @@ abstract class BaseKeyboard(
                         val contact = touchTargets[pid] ?: continue
                         val target = contact.target
                         if (slideSelectionEnabled && canRetargetPendingTap(target.view)) {
+                            if (guardTapRetargeting) {
+                                moveGuardedTap(event, i, contact)
+                                continue
+                            }
                             val next = findTouchTarget(event, i)
+                            val decision = when {
+                                contact.sliding -> TapRetargetGuard.Decision.Slide
+                                next != null && mayStartDeliberateSlide(event.getX(i), event.getY(i), contact, next) ->
+                                    TapRetargetGuard.Decision.Slide
+                                else -> TapRetargetGuard.Decision.Keep
+                            }
                             // Do not send a tiny excursion to the child: its gesture
                             // detector would permanently mark this tap as cancelled.
                             if (next?.view !== target.view && withinSlideTolerance(event, i, target)) continue
                             if (next != null && next.view !== target.view && canSlideSelect(next.view)) {
                                 // Suppress an unintentional excursion before forwarding to
                                 // the child, which otherwise permanently cancels the tap.
-                                if (!contact.sliding && !startsDeliberateSlide(event, i, contact, next)) continue
+                                if (decision == TapRetargetGuard.Decision.Keep) continue
                                 // Cancel without an UP: intermediate letters must never be committed.
-                                switchSlideTarget(event, i, contact, next)
+                                switchSlideTarget(event, i, contact, next,
+                                    deliberateSlide = decision == TapRetargetGuard.Decision.Slide)
                                 continue
                             }
                         }

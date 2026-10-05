@@ -22,6 +22,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -72,6 +74,7 @@ class TapAccuracyTest {
         private val expectedHeight = ((if (numberRow) 320 else 260) * density).roundToInt()
         val keyboard: TextKeyboard
         val typed = mutableListOf<String>()
+        val popups = mutableListOf<PopupAction>()
         private var downTime = 0L
 
         init {
@@ -99,6 +102,7 @@ class TapAccuracyTest {
             keyboard.keyActionListener = KeyActionListener { action, _ ->
                 if (action is KeyAction.FcitxKeyAction) typed += action.act
             }
+            keyboard.popupActionListener = PopupActionListener { popups += it }
         }
 
         private fun <T : Any> setting(pref: ManagedPreference<T>, value: T) {
@@ -115,8 +119,16 @@ class TapAccuracyTest {
         }
 
         fun key(label: String) = keys().first { (it.def as? KeyDef.Appearance.Text)?.displayText == label }
-        fun bounds(label: String) = Rect().also {
-            key(label).getDrawingRect(it); keyboard.offsetDescendantRectToMyCoords(key(label), it)
+        // Touch geometry must not inherit the transient scale/rotation/translation
+        // used to draw a pressed key. Keep the oracle independent of hit testing.
+        fun bounds(label: String): Rect {
+            var child: View = key(label)
+            val bounds = Rect(0, 0, child.width, child.height)
+            while (child !== keyboard) {
+                bounds.offset(child.left, child.top)
+                child = child.parent as View
+            }
+            return bounds
         }
         fun center(label: String, id: Int = 0) = bounds(label).let { Finger(id, it.exactCenterX(), it.exactCenterY()) }
 
@@ -130,10 +142,32 @@ class TapAccuracyTest {
             } }.toTypedArray()
             val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, fingers.size,
                 properties, coordinates, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
+            dispatch(event)
+        }
+
+        private fun dispatch(event: MotionEvent) {
             try { assertTrue(keyboard.dispatchTouchEvent(event)) } finally { event.recycle() }
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(8))
+            waitFor(8)
             assertEquals("The tested touch viewport must stay at its requested width", expectedWidth, keyboard.width)
             assertEquals("The tested touch viewport must stay at its requested height", expectedHeight, keyboard.height)
+        }
+
+        fun waitFor(milliseconds: Long) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(milliseconds))
+        }
+
+        /** Android may deliver several sensor samples in one MOVE dispatch. */
+        fun moveWithHistory(vararg samples: Pair<Long, Finger>) {
+            require(samples.isNotEmpty())
+            val start = SystemClock.uptimeMillis()
+            val (firstOffset, first) = samples.first()
+            val event = MotionEvent.obtain(downTime, start + firstOffset, MotionEvent.ACTION_MOVE,
+                first.x, first.y, 0)
+            for ((offset, finger) in samples.drop(1)) {
+                event.addBatch(start + offset, finger.x, finger.y, 1f, 1f, 0)
+            }
+            waitFor(samples.last().first)
+            dispatch(event)
         }
 
         fun tap(label: String) { event(MotionEvent.ACTION_DOWN, center(label)); event(MotionEvent.ACTION_UP, center(label)) }
@@ -160,31 +194,161 @@ class TapAccuracyTest {
         }
     }
 
+    private data class Neighbour(
+        val from: String,
+        val to: String,
+        val edgeX: Float,
+        val edgeY: Float,
+        val dx: Float,
+        val dy: Float
+    ) {
+        fun point(distance: Float, id: Int = 0) =
+            Finger(id, edgeX + dx * distance, edgeY + dy * distance)
+
+        override fun toString() = "$from→$to"
+    }
+
+    /** Enumerate shared borders and corners across staggered rows and resized keys. */
+    private fun neighbours(h: Harness): List<Neighbour> {
+        val labels = ('A'..'Z').map(Char::toString)
+        val pairs = labels.flatMap { from ->
+            val a = h.bounds(from)
+            labels.filter { it != from }.mapNotNull { to ->
+                val b = h.bounds(to)
+                val overlapLeft = maxOf(a.left, b.left)
+                val overlapRight = minOf(a.right, b.right)
+                val overlapTop = maxOf(a.top, b.top)
+                val overlapBottom = minOf(a.bottom, b.bottom)
+                when {
+                    overlapBottom > overlapTop && a.right == b.left ->
+                        Neighbour(from, to, a.right.toFloat(), (overlapTop + overlapBottom) / 2f, 1f, 0f)
+                    overlapBottom > overlapTop && a.left == b.right ->
+                        Neighbour(from, to, a.left.toFloat(), (overlapTop + overlapBottom) / 2f, -1f, 0f)
+                    overlapRight > overlapLeft && a.bottom == b.top ->
+                        Neighbour(from, to, (overlapLeft + overlapRight) / 2f, a.bottom.toFloat(), 0f, 1f)
+                    overlapRight > overlapLeft && a.top == b.bottom ->
+                        Neighbour(from, to, (overlapLeft + overlapRight) / 2f, a.top.toFloat(), 0f, -1f)
+                    a.right == b.left && a.bottom == b.top ->
+                        Neighbour(from, to, a.right.toFloat(), a.bottom.toFloat(), 1f, 1f)
+                    a.left == b.right && a.bottom == b.top ->
+                        Neighbour(from, to, a.left.toFloat(), a.bottom.toFloat(), -1f, 1f)
+                    a.right == b.left && a.top == b.bottom ->
+                        Neighbour(from, to, a.right.toFloat(), a.top.toFloat(), 1f, -1f)
+                    a.left == b.right && a.top == b.bottom ->
+                        Neighbour(from, to, a.left.toFloat(), a.top.toFloat(), -1f, -1f)
+                    else -> null
+                }
+            }
+        }
+        assertEquals("Every letter must participate in the neighbour regression", labels.toSet(), pairs.map { it.from }.toSet())
+        assertTrue("The regression must include cross-row neighbours", pairs.any { it.dy != 0f })
+        assertTrue("The regression must include same-row neighbours", pairs.any { it.dx != 0f })
+        assertTrue("Every shared border must be tested in both directions", pairs.all { pair ->
+            pairs.any { it.from == pair.to && it.to == pair.from }
+        })
+        return pairs
+    }
+
+    private val customWidths = "Text:4e=70;Text:42=150;Text:4c=70;Text:4b=150"
+
     private fun verifyBoundaryTaps() {
-        for (width in listOf(320, 360, 480)) for (overrides in listOf("", "Text:4e=70;Text:42=150;Text:4c=70;Text:4b=150")) {
+        for (width in listOf(320, 360, 480)) for (overrides in listOf("", customWidths)) {
             Harness(width, overrides, numberRow = width == 480).use { h ->
-                for (withMove in listOf(false, true)) {
+                for (pair in neighbours(h)) for (withMove in listOf(false, true)) {
                     h.typed.clear()
-                    listOf("S", "H", "A").forEach(h::tap)
-                    h.driftingTap("N", left = true, move = withMove)
-                    h.tap("G")
-                    assertEquals("The exact shang sequence must reach the engine at width=$width, overrides=$overrides, MOVE=$withMove",
-                        "shang", h.typed.joinToString(""))
-                    h.typed.clear()
-                    h.driftingTap("N", left = true, move = withMove)
-                    h.driftingTap("B", left = false, move = withMove)
-                    h.driftingTap("L", left = true, move = withMove)
-                    h.driftingTap("K", left = false, move = withMove)
-                    assertEquals(listOf("n", "b", "l", "k"), h.typed)
+                    val down = pair.point(-h.density)
+                    val drift = pair.point(6f * h.density)
+                    h.event(MotionEvent.ACTION_DOWN, down)
+                    if (withMove) h.event(MotionEvent.ACTION_MOVE, drift)
+                    h.event(MotionEvent.ACTION_UP, drift)
+                    assertEquals("A brief lift-off excursion must preserve $pair at width=$width, overrides=$overrides, MOVE=$withMove",
+                        listOf(pair.from.lowercase()), h.typed)
                 }
             }
         }
     }
 
-    @Test fun neighbouringLetterTapsSurviveLiftOffDriftAcrossWidths() = verifyBoundaryTaps()
+    @Test fun allAdjacentLetterTapsSurviveLiftOffDriftAcrossWidths() = verifyBoundaryTaps()
 
     @Test @Config(qualifiers = "zh-rCN-w600dp-h900dp-xhdpi")
-    fun neighbouringLetterTapsUseDensityIndependentTolerance() = verifyBoundaryTaps()
+    fun allAdjacentLetterTapsUseDensityIndependentTolerance() = verifyBoundaryTaps()
+
+    @Test fun everyLetterCenterKeepsItsIdentityAcrossLayouts() {
+        for (width in listOf(320, 360, 480)) {
+            Harness(width, if (width == 360) customWidths else "", numberRow = width == 480).use { h ->
+                ('A'..'Z').forEach { h.tap(it.toString()) }
+                assertEquals("abcdefghijklmnopqrstuvwxyz", h.typed.joinToString(""))
+            }
+        }
+    }
+
+    @Test fun aSingleFastMoveCannotTurnAnyCenteredTapIntoItsNeighbour() {
+        for (width in listOf(320, 360, 480)) {
+            Harness(width, if (width == 360) customWidths else "").use { h ->
+                for (pair in neighbours(h)) {
+                    h.typed.clear()
+                    h.event(MotionEvent.ACTION_DOWN, h.center(pair.from))
+                    h.event(MotionEvent.ACTION_MOVE, h.center(pair.to))
+                    h.event(MotionEvent.ACTION_UP, h.center(pair.to))
+                    assertEquals("A single fast sample must not turn $pair into a slide at width=$width",
+                        listOf(pair.from.lowercase()), h.typed)
+                }
+            }
+        }
+    }
+
+    @Test fun multipleFastSamplesStillCannotStartASlideWithoutDwell() {
+        Harness().use { h ->
+            for (pair in neighbours(h)) {
+                h.typed.clear()
+                h.event(MotionEvent.ACTION_DOWN, h.center(pair.from))
+                repeat(3) { h.event(MotionEvent.ACTION_MOVE, h.center(pair.to)) }
+                h.event(MotionEvent.ACTION_UP, h.center(pair.to))
+                assertEquals("Sample count alone must not turn a brief $pair excursion into a slide",
+                    listOf(pair.from.lowercase()), h.typed)
+            }
+        }
+    }
+
+    @Test fun aStableSettlingMovementRecoversEveryLowConfidenceNeighbourBoundary() {
+        for (width in listOf(320, 360, 480)) {
+            Harness(width, if (width == 360) customWidths else "").use { h ->
+                for (pair in neighbours(h)) {
+                    val target = h.bounds(pair.to)
+                    // An overlap may be only a sliver after custom resizing. Such a
+                    // corner is not a confident interior sample: settle toward the
+                    // target centre as a real finger would, keeping movement short.
+                    val inset = minOf(8f * h.density, minOf(target.width(), target.height()) * .28f)
+                    val interior = pair.point(inset).let {
+                        it.copy(x = it.x.coerceIn(target.left + inset, target.right - inset),
+                            y = it.y.coerceIn(target.top + inset, target.bottom - inset))
+                    }
+                    h.typed.clear()
+                    h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+                    assertTrue("The uncertain initial contact must actually land on ${pair.from}", h.key(pair.from).isPressed)
+                    h.event(MotionEvent.ACTION_MOVE, interior)
+                    h.waitFor(48)
+                    h.event(MotionEvent.ACTION_MOVE, interior)
+                    h.event(MotionEvent.ACTION_UP, interior)
+                    assertEquals("A stable interior landing must repair the uncertain first contact $pair at width=$width",
+                        listOf(pair.to.lowercase()), h.typed)
+                }
+            }
+        }
+    }
+
+    @Test fun aBoundaryRecoveryDoesNotEnableFreeSlideSelection() {
+        Harness().use { h ->
+            val pair = neighbours(h).first { it.from == "F" && it.to == "G" }
+            val settled = pair.point(8f * h.density)
+            h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+            h.event(MotionEvent.ACTION_MOVE, settled)
+            h.waitFor(48)
+            h.event(MotionEvent.ACTION_MOVE, settled)
+            h.event(MotionEvent.ACTION_UP, h.center("H"))
+            assertEquals("UP drift after a corrected landing must keep that corrected key", listOf("g"), h.typed)
+        }
+    }
 
     @Test fun driftBeyondTheChildSlopDoesNotCancelTheOriginalTap() {
         Harness().use { h ->
@@ -201,6 +365,9 @@ class TapAccuracyTest {
             assertTrue("A shallow boundary crossing is still a tap", h.key("G").isPressed)
             assertFalse(h.key("H").isPressed)
             h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+            assertTrue("One deep sample still cannot start a slide", h.key("G").isPressed)
+            h.waitFor(64)
+            h.event(MotionEvent.ACTION_MOVE, h.center("H"))
             assertFalse(h.key("G").isPressed)
             assertTrue(h.key("H").isPressed)
             h.event(MotionEvent.ACTION_MOVE, h.center("J"))
@@ -211,13 +378,147 @@ class TapAccuracyTest {
         }
     }
 
+    @Test fun batchedHistoricalSamplesCanEstablishTheSameDeliberateSlide() {
+        Harness().use { h ->
+            h.event(MotionEvent.ACTION_DOWN, h.center("G"))
+            h.moveWithHistory(0L to h.center("H"), 32L to h.center("H"), 64L to h.center("H"))
+            assertTrue("Batching must not hide a sustained landing", h.key("H").isPressed)
+            h.event(MotionEvent.ACTION_UP, h.center("J"))
+            assertEquals(listOf("j"), h.typed)
+        }
+    }
+
+    @Test fun aSlideConfirmedInHistoryContinuesIntoTheCurrentDifferentKey() {
+        for (batched in listOf(false, true)) Harness().use { h ->
+            h.event(MotionEvent.ACTION_DOWN, h.center("G"))
+            if (batched) {
+                h.moveWithHistory(0L to h.center("H"), 64L to h.center("H"), 72L to h.center("J"))
+            } else {
+                h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+                h.waitFor(56)
+                h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+                h.event(MotionEvent.ACTION_MOVE, h.center("J"))
+            }
+            assertTrue("An already confirmed slide must reach J, batched=$batched", h.key("J").isPressed)
+            assertTrue("Intermediate samples must not commit letters", h.typed.isEmpty())
+            h.event(MotionEvent.ACTION_UP, h.center("J"))
+            assertEquals("The same timed trajectory must commit J regardless of batching=$batched", listOf("j"), h.typed)
+        }
+    }
+
+    @Test fun aHistoricalBoundaryRecoverySurvivesTheWindowAndFinalLiftDrift() {
+        for (batched in listOf(false, true)) for (liftOn in listOf("G", "H")) Harness().use { h ->
+            val pair = neighbours(h).first { it.from == "F" && it.to == "G" }
+            val settled = pair.point(8f * h.density)
+            h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+            if (batched) {
+                h.moveWithHistory(0L to settled, 48L to settled, 160L to settled)
+            } else {
+                h.event(MotionEvent.ACTION_MOVE, settled)
+                h.waitFor(40)
+                h.event(MotionEvent.ACTION_MOVE, settled)
+                h.waitFor(104)
+                h.event(MotionEvent.ACTION_MOVE, settled)
+            }
+            assertTrue("The landing was confirmed before the 140ms window closed, batched=$batched", h.key("G").isPressed)
+            h.event(MotionEvent.ACTION_UP, h.center(liftOn))
+            assertEquals("A confirmed correction must neither expire nor become a slide, batched=$batched, UP=$liftOn",
+                listOf("g"), h.typed)
+        }
+    }
+
+    @Test fun waitingToConfirmASlideCannotTriggerThePreviousKeysLongPress() {
+        Harness().use { h ->
+            h.event(MotionEvent.ACTION_DOWN, h.center("G"))
+            h.waitFor(272)
+            h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+            h.waitFor(56)
+            h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+            h.event(MotionEvent.ACTION_UP, h.center("H"))
+            assertEquals("The intended slide must still type H across the old 300ms hold deadline", listOf("h"), h.typed)
+            assertTrue("Waiting for slide evidence must not open G's long-press popup",
+                h.popups.none { it is PopupAction.ShowKeyboardAction || it is PopupAction.ShowMenuAction })
+        }
+    }
+
+    @Test fun returningFromAnUnconfirmedNeighbourKeepsTheTapWithoutOpeningAHoldMenu() {
+        Harness().use { h ->
+            h.event(MotionEvent.ACTION_DOWN, h.center("G"))
+            h.waitFor(272)
+            h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+            h.waitFor(16)
+            h.event(MotionEvent.ACTION_MOVE, h.center("G"))
+            h.waitFor(64)
+            h.event(MotionEvent.ACTION_UP, h.center("G"))
+            assertEquals("An abandoned slide candidate must retain the original click", listOf("g"), h.typed)
+            assertTrue("Leaving the key must cancel its pending hold without consuming the tap",
+                h.popups.none { it is PopupAction.ShowKeyboardAction || it is PopupAction.ShowMenuAction })
+        }
+    }
+
+    @Test fun aStationaryLetterStillOpensItsLongPressKeyboard() {
+        Harness().use { h ->
+            h.event(MotionEvent.ACTION_DOWN, h.center("G"))
+            h.waitFor(320)
+            assertTrue("The movement guard must preserve ordinary letter long-press menus",
+                h.popups.any { it is PopupAction.ShowKeyboardAction && it.viewId == h.key("G").id })
+            h.event(MotionEvent.ACTION_CANCEL, h.center("G"))
+            assertTrue(h.typed.isEmpty())
+        }
+    }
+
+    @Test fun anInterruptedHistoricalExcursionCannotAccumulateNeighbourDwell() {
+        Harness().use { h ->
+            h.event(MotionEvent.ACTION_DOWN, h.center("G"))
+            h.moveWithHistory(0L to h.center("H"), 24L to h.center("G"), 64L to h.center("H"))
+            h.event(MotionEvent.ACTION_UP, h.center("H"))
+            assertEquals("Dwell restarts when the finger leaves the proposed neighbour", listOf("g"), h.typed)
+        }
+    }
+
+    @Test fun visualScaleRotationAndTranslationNeverChangeTheLetterTouchCells() {
+        Harness().use { h ->
+            for (label in ('A'..'Z').map(Char::toString)) {
+                val view = h.key(label)
+                val rect = h.bounds(label)
+                view.scaleX = .86f
+                view.scaleY = .86f
+                view.rotation = 7f
+                view.translationY = -3f * h.density
+                // Near each untransformed cell edge, including the area vacated
+                // by shrinking a cap. Both scale and rotated overlap used to
+                // affect getHitRect and could route this contact to a neighbour.
+                val edgePoints = listOf(
+                    Finger(0, rect.left + h.density, rect.exactCenterY()),
+                    Finger(0, rect.right - h.density, rect.exactCenterY()),
+                    Finger(0, rect.exactCenterX(), rect.top + h.density),
+                    Finger(0, rect.exactCenterX(), rect.bottom - h.density)
+                )
+                for (point in edgePoints) {
+                    h.typed.clear()
+                    h.event(MotionEvent.ACTION_DOWN, point)
+                    h.event(MotionEvent.ACTION_UP, point)
+                    assertEquals("The animated $label must retain all four original cell edges", listOf(label.lowercase()), h.typed)
+                }
+                view.scaleX = 1f
+                view.scaleY = 1f
+                view.rotation = 0f
+                view.translationY = 0f
+            }
+        }
+    }
+
     @Test fun simultaneousThumbsDoNotShareTheirSlideIntent() {
         Harness().use { h ->
             val l = h.bounds("L")
             val second = Finger(9, l.left + h.density, l.exactCenterY())
             val drift = second.copy(x = l.left - 6f * h.density)
             h.event(MotionEvent.ACTION_DOWN, h.center("G", 3))
-            h.event(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), h.center("G", 3), second)
+            h.event(MotionEvent.ACTION_MOVE, h.center("T", 3))
+            h.waitFor(64)
+            h.event(MotionEvent.ACTION_MOVE, h.center("T", 3))
+            assertTrue(h.key("T").isPressed)
+            h.event(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), h.center("T", 3), second)
             h.event(MotionEvent.ACTION_MOVE, h.center("T", 3), drift)
             assertTrue(h.key("T").isPressed)
             assertTrue(h.key("L").isPressed)

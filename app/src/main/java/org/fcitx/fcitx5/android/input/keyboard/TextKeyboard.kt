@@ -32,6 +32,7 @@ class TextKeyboard(
 ) : BaseKeyboard(context, theme, layoutFor(context), useEffectTheme) {
 
     override val slideSelectionEnabled = true
+    override val guardTapRetargeting = true
 
     enum class CapsState { None, Once, Lock }
 

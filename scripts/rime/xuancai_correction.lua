@@ -1,23 +1,7 @@
 -- Correction supplements exact spelling, without taking over short abbreviations or Lua commands.
 local M = {}
-local neighbors = {}
-local centers = {}
--- QWERTY rows are staggered, so an adjacent-key slip can cross a row as well
--- as move left/right. This affects only fallback candidate ranking, never the
--- raw input or the keyboard's hit regions.
-for y, row in ipairs({'qwertyuiop', 'asdfghjkl', 'zxcvbnm'}) do
-  local offset = ({0, 0.5, 1.5})[y]
-  for i = 1, #row do centers[row:sub(i, i)] = {x = i - 1 + offset, y = y - 1} end
-end
-for key, center in pairs(centers) do
-  local adjacent = {}
-  for other, position in pairs(centers) do
-    local dx, dy = center.x - position.x, center.y - position.y
-    if dx * dx + dy * dy <= 1.3 then adjacent[#adjacent + 1] = other end
-  end
-  table.sort(adjacent)
-  neighbors[key] = table.concat(adjacent)
-end
+local typo_index = require('axiang_typo_index')
+local neighbors = require('axiang_qwerty_neighbors')
 
 -- Bounded weighted edit distance: adjacent keys cost 1, omissions/transpositions
 -- cost 2, unrelated substitutions cost 4. Never rewrite the composing input.
@@ -128,18 +112,83 @@ local function phrase_repair(input, seg, env)
   end
 end
 
+-- Short, complete dictionary words need a separate recall path: the bundled
+-- native corrector only knows horizontal neighbors. Search a public-vocabulary
+-- index with the same two-dimensional graph for every letter, then ask Rime for
+-- real exact dictionary candidates. Never substitute text in the raw input.
+local function short_repair(input, seg, env)
+  if #input < 4 or #input > 24 then return end
+  local has_exact_word = false
+  local exact = env.exact:query(input, seg)
+  if exact then
+    for candidate in exact:iter() do
+      if candidate._end == seg._end and candidate.type ~= 'sentence' then
+        -- Do not hijack abbreviations, spelling-algebra aliases or completion.
+        -- Exact words keep priority but can have additional typo alternatives.
+        if candidate.comment:gsub('[^a-z]', '') ~= input then return end
+        has_exact_word = true
+      end
+      break
+    end
+  end
+  local matches = typo_index.search(env.typo_index, input, neighbors)
+  local groups, seen = {}, {}
+  local started = os.clock()
+  for rank, match in ipairs(matches) do
+    if rank > 8 or os.clock() - started > 0.004 then break end
+    local translation = env.exact:query(match.code, seg)
+    if translation then
+      local count, group = 0, {}
+      for candidate in translation:iter() do
+        count = count + 1
+        local spelling = candidate.comment:gsub('[^a-z]', '')
+        if candidate._end == seg._end and candidate.type == 'phrase'
+            and spelling == match.code and not seen[candidate.text] then
+          group[#group + 1] = candidate.text
+          seen[candidate.text] = true
+        end
+        if count >= 3 then break end
+      end
+      if #group > 0 then groups[#groups + 1] = group end
+    end
+    if #groups >= 3 then break end
+  end
+  -- Offer distinct corrected spellings before their homophones. A common code
+  -- must not consume every slot, nor lose all but its first Chinese word.
+  local emitted = 0
+  for round = 1, 3 do
+    for _, group in ipairs(groups) do
+      if group[round] then
+        local corrected = Candidate('axiang_adjacent_repair', seg.start, seg._end,
+          group[round], '纠错')
+        corrected.preedit = input
+        corrected.quality = (has_exact_word and 1.19 or 1.25) - emitted * 0.01
+        yield(corrected)
+        emitted = emitted + 1
+        if emitted >= 5 then return end
+      end
+    end
+  end
+end
+
 function M.init(env)
   env.translator = Component.Translator(env.engine, '', 'script_translator@xuancai_correction')
   env.exact = Component.Translator(env.engine, '', 'script_translator@xuancai_exact')
   env.heads, env.head_order = {}, {}
+  env.typo_index = typo_index.new(rime_api.get_shared_data_dir() .. '/lua/axiang_typo')
   env.commands = {}
-  for _, key in ipairs({'date', 'time', 'week', 'datetime', 'timestamp'}) do
+  for _, key in ipairs({'date', 'dateen', 'datezh', 'time', 'week', 'datetime', 'timestamp'}) do
     local command = env.engine.schema.config:get_string('date_translator/' .. key)
+    if command then env.commands[command] = true end
+  end
+  for _, key in ipairs({'lunar', 'uuid'}) do
+    local command = env.engine.schema.config:get_string(key)
     if command then env.commands[command] = true end
   end
 end
 function M.func(input, seg, env)
   if #input < 3 or not input:match('^[a-z]+$') or env.commands[input] then return end
+  short_repair(input, seg, env)
   phrase_repair(input, seg, env)
   local translation = env.translator:query(input, seg)
   if translation then for candidate in translation:iter() do yield(candidate) end end
@@ -148,5 +197,6 @@ function M.fini(env)
   env.translator = nil
   env.exact = nil
   env.heads, env.head_order = nil, nil
+  env.typo_index = nil
 end
 return M
