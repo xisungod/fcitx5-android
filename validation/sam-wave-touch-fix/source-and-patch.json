@@ -1,7 +1,7 @@
 {
-  "source_commit": "b438ddc3703ab85e9b04c5f20f0687924d0d1b99",
+  "source_commit": "f49391ded93e71bf2dbd8ddcc87b66412246833e",
   "base_commit": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
-  "patch_sha256": "4ced75a19d05bf1c87838da4b9850f5de7bc1a2f1d3805b2db1baf740b67163d",
+  "patch_sha256": "b4d20cf68279dad77dd74fd82fd170b27d6ad1a008b13c0d457e5e828fee334b",
   "reassembly_and_reverse_apply_check": "passed",
   "source_file_sha256": {
     "app/licenses/libraries/audiowide.json": "b0e565b24231b433baed275c2ab6ad6d5d9a502f5f9ab9cd8085ecde1492b642",
@@ -9,7 +9,7 @@
     "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/BaseKeyboard.kt": "14bd22af2e86443c526251783c52697e1f542498a830971f0b4520c023280a8b",
     "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyLegendTypeface.kt": "be0acb29decae6db801264dba1da5d590abbd72cf51da4897d460955dcb657eb",
     "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt": "99f1a565d714587751d06620a0413992726770676f5a07c593edf2dedd8816c3",
-    "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt": "a1af2cc8ef394e17cee0d2932caf8c8c6de4beeb06bfcf00ecc457ec51c21c46",
+    "app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PressEffect.kt": "6a323346c0f446dba670e421ac48d08a00841b8b7e502e2a8fb68c6b6142a7e4",
     "app/src/main/java/org/fcitx/fcitx5/android/input/popup/PopupEntryUi.kt": "4d1dfceed596d288ec2efb05ad1e36a9e10958999c184208c32be75c3019c90c",
     "app/src/main/java/org/fcitx/fcitx5/android/input/settings/KeyboardQuickSettingsDraft.kt": "817f1008e8a450e312203166663be5ef288f5829385a025009bde93cf6e1b42b",
     "app/src/main/java/org/fcitx/fcitx5/android/input/settings/KeyboardQuickSettingsWindow.kt": "40c4a08c419fd1fff2c37287642e0c0e27fdf5403c448a0e0a8cf5a4facf0670",
@@ -26,9 +26,10 @@
     "app/src/test/java/org/fcitx/fcitx5/android/LightEffectSettingsUiTest.kt": "878d5da507023c0b505d92f3d48a93f32d8054d9e1dca1692c399c1a533d0d0b",
     "app/src/test/java/org/fcitx/fcitx5/android/NineKeySlideGestureTest.kt": "b919dc92774dedcb8a2cb79a3fb15bae5f7ffc6bd766c35b4d17ee8bc680ce93",
     "app/src/test/java/org/fcitx/fcitx5/android/SamKeyboardRenderingTest.kt": "b0f5805bba0efac5b290aea98f4158aacccc9e3a631320d3539d006e87c05a4f",
-    "app/src/test/java/org/fcitx/fcitx5/android/SamWavePropagationTest.kt": "dafbe64097af38b75e4821142f3e563fe4425fac372f79b9689670362c91a1bc",
+    "app/src/test/java/org/fcitx/fcitx5/android/SamWavePropagationTest.kt": "795f5c30a319b313363ca9e53526463ee81fa48dce0e8065e063c6ae13c44620",
     "app/src/test/java/org/fcitx/fcitx5/android/TapAccuracyTest.kt": "955a1bcc9f079f37e893f78ab03c1b8a730b08e6a01a951c39a73e0b0a8c214c",
     "app/src/test/java/org/fcitx/fcitx5/android/V14TouchRoutingTest.kt": "c85cc5df047f83b6409ec43dc1379cb9d6b9263332a07fed35fcdb3741c35b85",
     "app/src/test/java/org/fcitx/fcitx5/android/V15LightEffectPrefsTest.kt": "e9869725262ad5eb5e02aaaf79c14508b952e81f555612674188bf09b4cc2ead"
-  }
+  },
+  "pr_workflow_sha256": "7b36be46aedd52041bc71ee1032921cb216a0adab8db789e8c2d8dfb6cb06401"
 }
