@@ -1,0 +1,25 @@
+name: Verify accuracy source artifact checksum
+on:
+  push:
+    branches: [delivery/accuracy-source-checksum]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  checksum:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: '11333514116'
+          run-id: '37283910221'
+          repository: xisungod/fcitx5-android
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/verified-apk
+      - name: Verify and report the actual APK checksum
+        working-directory: ${{ runner.temp }}/verified-apk
+        run: |
+          sha256sum --check SHA256SUMS.txt
+          sha256sum axiang-pr-arm64.apk
+          wc -c axiang-pr-arm64.apk
