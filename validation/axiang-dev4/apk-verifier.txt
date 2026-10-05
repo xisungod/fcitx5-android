@@ -1,0 +1,28 @@
+Single APK host verified: org.fcitx.fcitx5.android.axiang.dev.motion4; label, version 1.1-dev.4, versionCode 822, arm64-v8a, no network permission or speech service, explicit microphone permission for local dictation, cloud backup disabled.
+APK signing certificate SHA-256: 3a2d4a1e44aa177cc8f2c15968bc633a10f227b6e998308607acace46e4eb12d
+Bundled native Rime, addon registration, OpenCC link, licenses and 151 descriptor file hashes verified.
+Offline speech CPU runtime, Chinese streaming ASR, local punctuation and 22 source/license checksums verified.
+Packaged full Lua, grammar, all dictionary sources, rare-character/mobile extensions, personal dictionary, nine-key schemas and precompiled tables verified.
+
+Verifies
+Verified using v1 scheme (JAR signing): true
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=Axiang Development, O=Axiang Input, C=CN
+Signer #1 certificate SHA-256 digest: 3a2d4a1e44aa177cc8f2c15968bc633a10f227b6e998308607acace46e4eb12d
+Signer #1 certificate SHA-1 digest: 002f56221ee5904df621477065591d24e8cde229
+Signer #1 certificate MD5 digest: cf59d9e7b3ee2f3a8c93b2d50f16c878
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 3072
+Signer #1 public key SHA-256 digest: a6043514efb0eb4bfdec072d7e4d13856b31b7cdba2736dd31b7614b281de52c
+Signer #1 public key SHA-1 digest: 6c2f49e098a353bf5319d05e03f63548db5dc8bf
+Signer #1 public key MD5 digest: 845126b52a5aaf2289cb580e76e49f19
+WARNING: META-INF/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/verification.properties not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
+WARNING: META-INF/services/kotlin.reflect.jvm.internal.impl.builtins.BuiltInsLoader not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
+WARNING: META-INF/services/kotlin.reflect.jvm.internal.impl.resolve.ExternalOverridabilityCondition not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
+WARNING: META-INF/services/kotlinx.coroutines.CoroutineExceptionHandler not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.
+WARNING: META-INF/services/kotlinx.coroutines.internal.MainDispatcherFactory not protected by signature. Unauthorized modifications to this JAR entry will not be detected. Delete or move the entry outside of META-INF/.

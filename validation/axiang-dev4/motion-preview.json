@@ -1,0 +1,11 @@
+{
+  "source": "Android TextKeyboard via Robolectric NATIVE",
+  "source_folder": "v15-continuous-f-off",
+  "frame_rate": 60,
+  "source_frames": 111,
+  "unchanged_idle_padding_frames_each_end": 21,
+  "interpolation": false,
+  "source_commit": "2018499e48d05cd83a0f6df2e46a17db79dcbc16",
+  "soft_mist_fade_ms": 900,
+  "purpose": "Key-face motion preview; controlled test viewport, not a phone recording"
+}

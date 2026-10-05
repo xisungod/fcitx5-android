@@ -1,0 +1,28 @@
+nihao => 你好 👋 拟好 你是 你还 模式
+zhongguo => 中国 🇨🇳 种过 中过 中果 种果
+jisuanji => 计算机 🖥 计算后 集电极 机电局 几点几
+jintianwomentaolunyixiagongzuoanpai => 今天我们讨论一下工作安排 今天我们 今天我 今天起 混元气 今天
+mingtianxiawusandianwomenkaihui => 明天下午三点我们开会 明天下午三点我们来就 明天下午 明天早起 明天下 明天走
+nihso => 你受 你是 你还 你好 👋 模式
+shuangkashuangdai => 双卡双待 双卡双待功能 双卡双待手机 双卡 爽啦 双
+shuagkashuangdai => 双卡双待 双卡双待功能 双卡双待手机 双卡 爽啦 双
+dayuyanmoxing => 大语言模型 大预言 大体验 达衣岩 大于 >
+duomotaimoxing => 多模态模型 多模态 多尼亚 索尼亚 索妮亚 索妮娅
+xiangliangshujuku => 向量数据库 响亮 向量 箱梁 项梁 相框
+houxuancilan => 候选词栏 候选词 候选 后弦 齁咸 勾选
+jiugonggeshuzijianpan => 九宫格数字键盘 九宫格 九宫 旧宫 舅公 酒红
+Rare-character extension: bing => 靐 at candidate 36
+Rare-character extension: da => 龘 at candidate 44
+Whole phrase: yihangbailushangqingtiaj => 一行白鹭上青天
+Whole phrase: lianggehuangkimigcuiliao => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuanglimingcuiliao => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuangkimingcuiliu => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuanglimigcuiliu => 两个黄鹂鸣翠柳
+Whole phrase: lianggehuanglimingcuiliu => 两个黄鹂鸣翠柳
+Whole phrase: yihangbailushangqingtiam => 一行白鹭上青天
+Whole phrase: lianggehuanglimingcuiliule => 两个黄鹂鸣翠柳了
+Whole phrase: lianggehuanglimingcuiliudezuozhe => 两个黄鹂鸣翠柳的作者
+rq => 2026-10-04 2026/10/04 2026.10.04 20261004 2026年10月4日 日期
+cC1+2 => 3 1+2=3
+English direct commit: hello World!; pending Chinese + English: 你好x; no preedit.
+Full Lua, grammar configuration, correction and mode-switch checks passed.

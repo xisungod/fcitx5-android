@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.SpaceTrackpadGestureTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-05T00:42:35.220Z" hostname="1860ba65b9a5" time="0.466">
+  <properties/>
+  <testcase name="diagonalMovementChoosesTheDominantAxisAndDiscardsOrthogonalJitter" classname="org.fcitx.fcitx5.android.SpaceTrackpadGestureTest" time="0.072"/>
+  <testcase name="cancelEndsTheHeldGestureAndTheNextSpaceTapStartsFresh" classname="org.fcitx.fcitx5.android.SpaceTrackpadGestureTest" time="0.053"/>
+  <testcase name="normalTapAndDriftBeforeLongPressTypeSpaceWithoutMovingTheCursor" classname="org.fcitx.fcitx5.android.SpaceTrackpadGestureTest" time="0.081"/>
+  <testcase name="activatedTrackpadKeepsItsSpaceTargetAfterDraggingOutsideTheKey" classname="org.fcitx.fcitx5.android.SpaceTrackpadGestureTest" time="0.143"/>
+  <testcase name="oneHeldSpaceCanMoveRightUpLeftAndDownWithoutCommittingSpace" classname="org.fcitx.fcitx5.android.SpaceTrackpadGestureTest" time="0.058"/>
+  <testcase name="legacySwipeRemainsHorizontalAndCanBeDisabledOnAnExistingKeyboard" classname="org.fcitx.fcitx5.android.SpaceTrackpadGestureTest" time="0.054"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

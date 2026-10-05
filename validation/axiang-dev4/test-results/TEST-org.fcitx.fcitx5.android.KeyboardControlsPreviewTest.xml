@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardControlsPreviewTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-05T00:41:57.759Z" hostname="1860ba65b9a5" time="1.26">
+  <properties/>
+  <testcase name="quickSettingsRenderInTheKeyboardWithFixedDoneAndScrollableControls" classname="org.fcitx.fcitx5.android.KeyboardControlsPreviewTest" time="0.913"/>
+  <testcase name="realKeyboardAndHeightEditorRenderAtRegularAndDraggedHeights" classname="org.fcitx.fcitx5.android.KeyboardControlsPreviewTest" time="0.343"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

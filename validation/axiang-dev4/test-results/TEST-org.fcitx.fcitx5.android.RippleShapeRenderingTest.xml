@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.RippleShapeRenderingTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-05T00:42:32.691Z" hostname="1860ba65b9a5" time="1.7">
+  <properties/>
+  <testcase name="fluidKeepsTheWholeCapNormallyColouredWithoutAnUpperShadowAndBothModesFinishTheirFade" classname="org.fcitx.fcitx5.android.RippleShapeRenderingTest" time="0.3"/>
+  <testcase name="existingPreferenceAndOmittedRendererOptionKeepTheCurrentMistExactly" classname="org.fcitx.fcitx5.android.RippleShapeRenderingTest" time="0.065"/>
+  <testcase name="mistHasAVisibleLateTailForSavedAndNewFadeTimesWithoutChangingItsPeakOrEnd" classname="org.fcitx.fcitx5.android.RippleShapeRenderingTest" time="0.539"/>
+  <testcase name="fluidChangesVisibleGeometryAndKeepsMovingContinuouslyAfterExpansionFinishes" classname="org.fcitx.fcitx5.android.RippleShapeRenderingTest" time="0.792"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

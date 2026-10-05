@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardQuickSettingsDraftTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-05T00:41:59.439Z" hostname="1860ba65b9a5" time="0.187">
+  <properties/>
+  <testcase name="presetSelectionPersistsItsModeAndPaletteWithoutOverwritingSingleOrCustomColors" classname="org.fcitx.fcitx5.android.KeyboardQuickSettingsDraftTest" time="0.06"/>
+  <testcase name="shapeChangesAreStagedReversibleAndDoNotReplaceCustomColors" classname="org.fcitx.fcitx5.android.KeyboardQuickSettingsDraftTest" time="0.023"/>
+  <testcase name="doneAppliesAllEditsInOneTransactionAndEveryListenerSeesCompleteValues" classname="org.fcitx.fcitx5.android.KeyboardQuickSettingsDraftTest" time="0.054"/>
+  <testcase name="donePreservesUnchangedCustomValuesAndConcurrentEdits" classname="org.fcitx.fcitx5.android.KeyboardQuickSettingsDraftTest" time="0.025"/>
+  <testcase name="abandoningTheDraftAndCompletingAnUnchangedPanelNeverWritePreferences" classname="org.fcitx.fcitx5.android.KeyboardQuickSettingsDraftTest" time="0.019"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

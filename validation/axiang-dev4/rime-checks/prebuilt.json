@@ -1,0 +1,44 @@
+{
+  "engine": "1.12.0",
+  "plugins": {
+    "lua": "68f9c36",
+    "octagram": "dfcc151"
+  },
+  "sources": {
+    "librime": {
+      "url": "https://codeload.github.com/rime/librime/tar.gz/refs/tags/1.12.0",
+      "sha256": "e3efe05603e9ec6db058bbff478540c28482513c24662e0aa336d2da72cceee4"
+    },
+    "librime-lua": {
+      "url": "https://codeload.github.com/hchunhui/librime-lua/tar.gz/68f9c36",
+      "sha256": "5a5012da02919c78c78f9cedbb5de1ad7b92c92eb2a65be1d1dbe38bd2af73d4"
+    },
+    "librime-octagram": {
+      "url": "https://codeload.github.com/lotem/librime-octagram/tar.gz/dfcc151",
+      "sha256": "27f59e184661408b9c689a8c6840452304695251180907570bfb90baab59c81d"
+    }
+  },
+  "files_sha256": {
+    "default.yaml": "06af2f8a00abdad4952ae1622a29a0261b37441fd93f5a1a1c1f19cc5f7c3e09",
+    "melt_eng.prism.bin": "d8cd573469fcae62028f8ab5ba0d2e8d9a559c99c5158995a8d2bc41a1cec555",
+    "melt_eng.reverse.bin": "6ea036b8f1e9f5bb1db1f88504baee3670e44dcac6d92cf3e98ed30ace473ab6",
+    "melt_eng.schema.yaml": "63573966cb92f7fdb10ac227256a6f65c63271015f3a4540c0eebdee05a8402e",
+    "melt_eng.table.bin": "490d5aee0aa9973d374f02b82514f9af6d42261f50c9dc9b8b58fdfa3f393166",
+    "radical_pinyin.prism.bin": "5730f59cb68ab9aed189d1d676cf9636f69edfb338449639b160eacd78d877c8",
+    "radical_pinyin.reverse.bin": "578cb1673dc4563a32d6f082b2ee06095ecc3b3ecaae15aece4d240dba70168d",
+    "radical_pinyin.schema.yaml": "2066918c138439132673ba0420593da2704b822ccb64ac0833459a6c30629011",
+    "radical_pinyin.table.bin": "e1b41a3a444d5028e6b25cfe52d686e64efbb4e5aeeedef5892f7571cdbddd75",
+    "rime_ice.prism.bin": "a49ce68f725c5e1343ccaea647be75571881f7a2917dc7d0e937099aa1f5e612",
+    "rime_ice.reverse.bin": "33528fb1bd7882baa1f4d9aeaf22fd6a426e5322fc037816ebc53b413453545e",
+    "rime_ice.schema.yaml": "98c3a873c7bd9fa4c7d6f560d5f4f6838b978198e02db9ccc56a800da012fb76",
+    "rime_ice.table.bin": "d38d13441c961096feea7202d64403dc266a41f51ed915b01a0af70e94e540f0",
+    "rime_ice_t9.prism.bin": "f938f7443daa6fd90e737464d7719abffee19f330015fc91c91ffc66cfff596a",
+    "rime_ice_t9.schema.yaml": "09ffc824b7357a86758062db76aa68db9f4d39aa42a0c26199a10a74229a14f0",
+    "xuancai_user.prism.bin": "9507077e4d8624492ed7d96bbaf71001c4ba56e93fad2c6a8b2267b607ff7b22",
+    "xuancai_user.reverse.bin": "90067b886b52a5c90e6fc78151c17c6547ed55675b019eacc147f393a036a038",
+    "xuancai_user.schema.yaml": "dd7092a670f8b580da110c7deb2e2e6abc9202f2cc3cf4a4451bfbb13abb3de2",
+    "xuancai_user.table.bin": "c70e0c352baf58eb09f72e3d708ff90fb66375ab6b4cfeb072ef40002255a40c",
+    "xuancai_user_t9.prism.bin": "bf1f9053eec21d6d38ddf5750fc7adc1bedd53643486e3b87ca18d54be9158bb",
+    "xuancai_user_t9.schema.yaml": "a494c852e6aa4a31c6a430da50a201af91e0fe543a237252dd9517b01be3f820"
+  }
+}

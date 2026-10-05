@@ -9,6 +9,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Looper
@@ -134,6 +135,45 @@ class V15PreviewRenderingTest {
         view.draw(canvas)
         return image
     }
+
+    private data class SurfaceFrame(val image: Bitmap, val transforms: Map<Int, Matrix>)
+
+    /** Record the production Canvas transform without replacing its surface drawing. */
+    private fun renderSurfaces(root: View, observedKeys: Collection<KeyView>): SurfaceFrame {
+        val originals = observedKeys.associateWith { it.keySurfacePainter }
+        val transforms = mutableMapOf<Int, Matrix>()
+        try {
+            originals.forEach { (key, painter) ->
+                key.keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
+                    @Suppress("DEPRECATION")
+                    val transform = Matrix(canvas.matrix)
+                    transforms[key.id] = transform
+                    painter?.draw(canvas, width, height)
+                }
+            }
+            val image = render(root)
+            assertEquals("Every observed key must execute its actual appearance draw", originals.size, transforms.size)
+            return SurfaceFrame(image, transforms)
+        } finally {
+            originals.forEach { (key, painter) -> key.keySurfacePainter = painter }
+        }
+    }
+
+    private fun SurfaceFrame.colourAtRestPoint(key: KeyView, root: View, x: Float, y: Float): Int {
+        val appearance = ReflectionHelpers.getField<View>(key, "appearanceView")
+        val origin = screenBoundsIn(appearance, root)!!
+        val point = floatArrayOf(x - origin.left, y - origin.top)
+        transforms.getValue(key.id).mapPoints(point)
+        val drawnX = point[0].roundToInt()
+        val drawnY = point[1].roundToInt()
+        assertTrue("The transformed colour sample must remain inside the real frame",
+            drawnX in 0 until image.width && drawnY in 0 until image.height)
+        return image.getPixel(drawnX, drawnY)
+    }
+
+    private fun faceOrMotionActive(key: KeyView): Boolean =
+        key.floatingFaceOpacity() > 0f ||
+            ReflectionHelpers.getField<KeyPressDepth>(key, "pressDepth").isTransitioning()
 
     private fun save(image: Bitmap, path: String) {
         val file = File("build/outputs/effect-checks/$path.png")
@@ -516,12 +556,17 @@ class V15PreviewRenderingTest {
             }
             layout(root)
             render(root).recycle() // The real legend changes ink in response to the new face light.
-            val image = render(root)
+            val firstKey = if (frame == 0) renderedKeys.values.first {
+                (it.def as? KeyDef.Appearance.Text)?.displayText == "L"
+            } else null
+            val surfaceFrame = firstKey?.let { renderSurfaces(root, listOf(it)) }
+            val image = surfaceFrame?.image ?: render(root)
             save(image, "v15-soft-typing/frame-%03d".format(frame))
             if (frame == 0) {
                 val key = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == "L" }
                 val rect = bounds(keyboard, key).apply { offset(0, 60) }
-                val face = image.getPixel(rect.left + 10, rect.bottom - 15)
+                val face = surfaceFrame!!.colourAtRestPoint(key, root,
+                    rect.left + 10f, rect.bottom - 15f)
                 assertTrue("The real preview must leave the current key face visible",
                     maxOf(Color.red(face), Color.green(face), Color.blue(face)) > 100)
                 for (y in rect.centerY() - 12..rect.centerY() + 12) for (x in rect.left until rect.right) {
@@ -540,7 +585,7 @@ class V15PreviewRenderingTest {
             // Exclude the full fixed touch cell while its real coloured cap floats.
             // The legacy 100ms preference no longer describes that cap's lifetime.
             for ((id, pressedAt) in lastPressTimes) {
-                if (reviewTime - pressedAt <= faceTail || renderedKeys.getValue(id).floatingFaceOpacity() > 0f) {
+                if (reviewTime - pressedAt <= faceTail || faceOrMotionActive(renderedKeys.getValue(id))) {
                     exclude(gapMask, keyRectangles.getValue(id), root.width, root.height)
                 }
             }
@@ -554,8 +599,7 @@ class V15PreviewRenderingTest {
                 val pressedAt = lastPressTimes[id]
                 // A recovering floating face is still active. Only fully resting
                 // interiors may be counted as inactive black caps.
-                val depth = ReflectionHelpers.getField<KeyPressDepth>(renderedKeys.getValue(id), "pressDepth")
-                if (pressedAt != null && (reviewTime - pressedAt <= faceTail || depth.currentScale() != 1f)) continue
+                if (pressedAt != null && (reviewTime - pressedAt <= faceTail || faceOrMotionActive(renderedKeys.getValue(id)))) continue
                 val clearCap = capMask.copyOf()
                 for (rectangle in previews.visibleCharacterBounds()) {
                     exclude(clearCap, rectangle, root.width, root.height)
@@ -680,12 +724,10 @@ class V15PreviewRenderingTest {
             }
             layout(keyboard, 600, 360)
             render(keyboard).recycle()
-            val image = render(keyboard)
+            val surfaceFrame = renderSurfaces(keyboard, listOf(key))
+            val image = surfaceFrame.image
             save(image, "v15-soft-release/frame-%03d".format(frame))
-            val scale = ReflectionHelpers.getField<KeyPressDepth>(key, "pressDepth").currentScale()
-            val drawnX = (rect.exactCenterX() + (sampleX - rect.exactCenterX()) * scale).roundToInt()
-            val drawnY = (rect.exactCenterY() + (sampleY - rect.exactCenterY()) * scale).roundToInt()
-            val pixel = image.getPixel(drawnX, drawnY)
+            val pixel = surfaceFrame.colourAtRestPoint(key, keyboard, sampleX.toFloat(), sampleY.toFloat())
             val difference = abs(Color.red(pixel) - Color.red(rest)) +
                 abs(Color.green(pixel) - Color.green(rest)) + abs(Color.blue(pixel) - Color.blue(rest))
             if (frame == 1) earlyDistance = difference
@@ -777,16 +819,13 @@ class V15PreviewRenderingTest {
                 assertTrue("The production popup lifecycle must be visible during the held press", popup.root.alpha > 0.75f)
                 assertEquals(colour, (popup.textView.background as GradientDrawable).color?.defaultColor)
                 render(root).recycle()
-                val image = render(root)
+                val surfaceFrame = renderSurfaces(root, listOf(key))
+                val image = surfaceFrame.image
                 save(image, "v15-soft-palettes/$name-press-$index")
                 // Keep the original colour sample inside the actual drawn cap.
-                // The outer touch rectangle deliberately never follows its float.
-                val scale = ReflectionHelpers.getField<KeyPressDepth>(key, "pressDepth").currentScale()
-                val sampleX = (rectangle.exactCenterX() +
-                    (rectangle.left + 10 - rectangle.exactCenterX()) * scale).roundToInt()
-                val sampleY = (rectangle.exactCenterY() +
-                    (rectangle.bottom - 15 - rectangle.exactCenterY()) * scale).roundToInt()
-                val face = image.getPixel(sampleX, sampleY)
+                // The captured Canvas includes translation and geometry-limited scaling.
+                val face = surfaceFrame.colourAtRestPoint(key, root,
+                    rectangle.left + 10f, rectangle.bottom - 15f)
                 assertTrue("The configured colour is visible on the real key face",
                     maxOf(Color.red(face), Color.green(face), Color.blue(face)) > 100)
                 image.recycle()
@@ -925,7 +964,7 @@ class V15PreviewRenderingTest {
             val gapMask = gaps.copyOf()
             val candidateMask = candidateStrip.copyOf()
             lastPressTimes.forEach { (id, pressedAt) ->
-                if (reviewTime - pressedAt <= timing.releasedKeyTotal || renderedKeys.getValue(id).floatingFaceOpacity() > 0f)
+                if (reviewTime - pressedAt <= timing.releasedKeyTotal || faceOrMotionActive(renderedKeys.getValue(id)))
                     exclude(gapMask, keyRectangles.getValue(id), root.width, root.height)
             }
             previews.visibleCharacterBounds().forEach {
@@ -1138,7 +1177,7 @@ class V15PreviewRenderingTest {
     }
 
     private fun assertStableLegend(label: String, expected: LegendGeometry, actual: LegendGeometry) {
-        assertEquals("$label keycap coordinates stay fixed", expected.keyBounds, actual.keyBounds)
+        assertEquals("$label touch-cell layout coordinates stay fixed", expected.keyBounds, actual.keyBounds)
         assertEquals("$label text-view coordinates stay fixed", expected.textBounds, actual.textBounds)
         expected.values.zip(actual.values).forEachIndexed { index, (before, after) ->
             assertEquals("$label baseline, scale and paint measurement stay fixed (field $index)", before, after, 0.0001f)
@@ -1152,7 +1191,9 @@ class V15PreviewRenderingTest {
      * This includes both real fill and the fixed production contrast outline, independent of ink colour.
      */
     private fun legendContrast(image: Bitmap, key: TextKeyView, root: View): LegendContrast {
-        val rectangle = screenBoundsIn(key.mainText, root)!!
+        // The Canvas moves the ink within the fixed touch cell. Its resting
+        // TextView rectangle does not enclose every pressed/rebounding glyph.
+        val rectangle = screenBoundsIn(key, root)!!
         val visibility = key.mainText.visibility
         val background = try {
             key.mainText.visibility = View.INVISIBLE
@@ -1309,6 +1350,7 @@ class V15PreviewRenderingTest {
             val popupAlpha = ArrayList<Float>()
             val inkRows = ArrayList<String>()
             val geometryRows = ArrayList<String>()
+            val canvasRows = ArrayList<String>()
             val inkColours = ArrayList<Pair<Long, Int>>()
             val motionRows = ArrayList<String>()
             var previousPixels: IntArray? = null
@@ -1339,7 +1381,8 @@ class V15PreviewRenderingTest {
                 advanceTo(elapsed)
                 layout(root, 600, height)
                 render(root).recycle()
-                val image = render(root)
+                val surfaceFrame = renderSurfaces(root, touched.values)
+                val image = surfaceFrame.image
                 save(image, "$folder/frame-%03d".format(frame))
                 previews.assertUnscaled()
                 touched.forEach { (label, key) ->
@@ -1348,6 +1391,16 @@ class V15PreviewRenderingTest {
                     geometryRows.add("$frame,$elapsed,$label,${actual.keyBounds.left},${actual.keyBounds.top},${actual.keyBounds.right},${actual.keyBounds.bottom}," +
                         "${actual.textBounds.left},${actual.textBounds.top},${actual.textBounds.right},${actual.textBounds.bottom}," +
                         actual.values.joinToString(",") { String.format(Locale.US, "%.4f", it) })
+                    val transform = surfaceFrame.transforms.getValue(key.id)
+                    val matrixValues = FloatArray(9).also(transform::getValues)
+                    val appearance = ReflectionHelpers.getField<View>(key, "appearanceView")
+                    val centre = floatArrayOf(appearance.width / 2f, appearance.height / 2f)
+                    transform.mapPoints(centre)
+                    val depth = ReflectionHelpers.getField<KeyPressDepth>(key, "pressDepth")
+                    val motionValues = listOf(depth.currentLift(), depth.currentVelocity(), key.floatingFaceOpacity(),
+                        centre[0], centre[1]) + matrixValues.toList()
+                    canvasRows.add("$frame,$elapsed,$label," +
+                        motionValues.joinToString(",") { String.format(Locale.US, "%.6f", it) })
                 }
                 val focusKey = touched.getValue(focus)
                 val contrast = legendContrast(image, focusKey, root)
@@ -1364,7 +1417,7 @@ class V15PreviewRenderingTest {
                 val mask = gaps.copyOf()
                 val candidateMask = candidateStrip.copyOf()
                 lastPressTimes.forEach { (label, pressedAt) ->
-                    if (elapsed - pressedAt <= timing.releasedKeyTotal || touched.getValue(label).floatingFaceOpacity() > 0f)
+                    if (elapsed - pressedAt <= timing.releasedKeyTotal || faceOrMotionActive(touched.getValue(label)))
                         exclude(mask, keyBounds.getValue(label), root.width, root.height)
                 }
                 previews.visibleCharacterBounds().forEach {
@@ -1411,6 +1464,10 @@ class V15PreviewRenderingTest {
                 "key_tx,key_ty,key_rotation,key_sx,key_sy,text_tx,text_ty,text_rotation,text_sx,text_sy,baseline_x,baseline_y," +
                 "text_scale_x,text_scale_y,paint_text_size,paint_scale_x,paint_skew_x,paint_text_width,font_top,font_bottom,outline_width\n" +
                 geometryRows.joinToString("\n") + "\n")
+            File(directory, "canvas-motion.csv").writeText("frame,time_ms,key,signed_position,velocity,face_opacity,drawn_centre_x,drawn_centre_y," +
+                "canvas_scale_x,canvas_skew_x,canvas_translate_x,canvas_skew_y,canvas_scale_y,canvas_translate_y," +
+                "canvas_perspective_0,canvas_perspective_1,canvas_perspective_2\n" +
+                canvasRows.joinToString("\n") + "\n")
             File(directory, "motion.csv").writeText("frame,time_ms,fixed_exterior_pixels,changed_pixels,mean_abs_channel_change\n" +
                 motionRows.joinToString("\n") + "\n")
             val inkStep = inkColours.zipWithNext().filter { it.first.first >= 100L && !burst }.maxOfOrNull { (before, after) ->
@@ -1426,10 +1483,11 @@ class V15PreviewRenderingTest {
                 "press_times_ms=${pressTimes.joinToString(",")}\ntouch_hold_ms=50\n" +
                 "last_down_ms=$lastDown\nlast_up_ms=${lastDown + 50}\nidle_breathing=false\n" + timing.provenance() +
                 "baseline=mode/case update followed by real measure/layout and initial native draw\n" +
-                "geometry=actual view/key/text coordinates, baseline and paint measurements remain fixed; the appearance Canvas lifts and grows by at most 2.5% within its existing margins\n" +
-                "key_depth=per-key analytic critical damping; idle DOWN immediately seeds 0.45 normalised lift then rises at 48 rad/s; UP preserves position/velocity and settles at 10 rad/s over about 800-900ms; full face colour follows that same state instead of the saved legacy cap timer; retouch preserves velocity; our design parameters, not Samsung internals\n" +
+                "geometry=fixed touch-cell/text layout, baseline and paint measurements; actual appearance Canvas matrices and transformed centres captured during each exported frame in canvas-motion.csv\n" +
+                "key_depth=DOWN seeds -0.5 signed position and approaches -1 at 48 rad/s; negative motion shrinks by up to 8% (4% on idle DOWN); UP preserves position/velocity and springs toward +0.75 with damping ratio 0.55 and natural frequency 20 rad/s, then switches at its analytic first positive peak to a zero-target critical tail at 10 rad/s; positive rebound scale gain is up to 3%, limited by real margins; ordinary taps peak about 188-202ms after UP and settle in about 1s; our design parameters, not Samsung internals\n" +
+                "key_face_colour=full during press and positive rebound, then fades with the actual critical tail; legacy key_hold_ms/key_retreat_ms above are saved preferences, not this motion-driven face lifetime\n" +
                 "popup_scale=1 throughout actual production alpha lifecycle\n" +
-                "readability=same-time actual canvas comparison with only mainText hidden; includes fixed production outline\n" +
+                "readability=same-time native frame difference with only mainText hidden, scanning the complete fixed touch cell; includes moved ink and fixed production outline\n" +
                 "readable_pixel_threshold=channel contrast>=40 over at least 12 pixels\nminimum_readable_pixels=$minimumReadablePixels\n" +
                 "release_max_adjacent_ink_channel_step=$inkStep (descriptive metric)\n" +
                 "motion_metrics=fixed baseline black exterior gaps; all touched cells and their possible popup glyph rectangles excluded\n" +

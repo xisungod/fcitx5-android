@@ -1,0 +1,13 @@
+{
+  "verified": true,
+  "rime_source_manifest_sha256": "020b3ba319378d0fbd5b24f3f7311a5d50a546fce6254005f85ab2be3560a29a",
+  "rime_source_files": 72,
+  "rime_prebuilt_manifest_sha256": "7ba571c6dc0c13c5e47cdf27713fadcdeb7f40376db24bbaba72a308963709d5",
+  "rime_prebuilt_files": 21,
+  "asr_manifest_sha256": "23dc984bbf1ef55cd9c97eb0a75e5822cd22d1b8bb9b11cf6b8bb9e2376376ac",
+  "asr_apk_files": 22,
+  "asr_compile_jar_verified": true,
+  "native_rime_checks_passed": true,
+  "native_checks_dir": "/tmp/axiang-dev4-rime-precompile/checks",
+  "offline_asr_provider": "cpu"
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.DictationEditorWriterTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-05T00:41:52.457Z" hostname="1860ba65b9a5" time="0.304">
+  <properties/>
+  <testcase name="emptyResultNeverDeletesTheOriginalSelection" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.165"/>
+  <testcase name="cancelledRecordingPreservesDisplayedWordsAndEndsOnlyTheirComposition" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.031"/>
+  <testcase name="newRecordingAppendsAfterPreviousFinalResult" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.018"/>
+  <testcase name="engineCannotRewriteSentencesAlreadyCommitted" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.014"/>
+  <testcase name="emptyInterimUpdateDoesNotCloseSpanOrDuplicateTheFollowingRevision" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.014"/>
+  <testcase name="originalSelectionIsReplacedOnceAndSurroundingTextIsPreserved" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.016"/>
+  <testcase name="partialRevisionsReplaceOneComposingSpanWithoutDuplicatingWords" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.016"/>
+  <testcase name="punctuatedEndpointsCommitOnlyTheNewSentenceAndKeepNextPartialEditable" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.013"/>
+  <testcase name="editorThatRejectsComposingIsReportedWithoutAppendingEveryPartial" classname="org.fcitx.fcitx5.android.DictationEditorWriterTest" time="0.011"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.PressEffectMasksTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-05T00:42:21.740Z" hostname="1860ba65b9a5" time="0.537">
+  <properties/>
+  <testcase name="fluidPhasesStayFeatheredWithNoHollowRingAndDifferentOutlines" classname="org.fcitx.fcitx5.android.PressEffectMasksTest" time="0.172"/>
+  <testcase name="lateFluidKeepsAConnectedRoundedRectangleBodyInsteadOfRoundFog" classname="org.fcitx.fcitx5.android.PressEffectMasksTest" time="0.06"/>
+  <testcase name="flashFallsOffFromCenterToTransparentEdge" classname="org.fcitx.fcitx5.android.PressEffectMasksTest" time="0.0"/>
+  <testcase name="fluidTravellingShoulderHasAreaAndRemainsBelowItsFilledCentre" classname="org.fcitx.fcitx5.android.PressEffectMasksTest" time="0.062"/>
+  <testcase name="mistVariantsHaveTransparentEdgesAndFeathering" classname="org.fcitx.fcitx5.android.PressEffectMasksTest" time="0.239"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

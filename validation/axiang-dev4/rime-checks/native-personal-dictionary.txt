@@ -1,0 +1,5 @@
+Whole phrase: xuancaigerencitiaoyanzheng => 炫彩个人词条验证
+Whole phrase: anzhuolixianbushucidian => 安卓离线部署词典
+Separately deployed personal-dictionary candidates passed.
+Whole phrase: dulidaorucitiao => 独立导入词条
+Separately deployed personal-dictionary candidates passed.

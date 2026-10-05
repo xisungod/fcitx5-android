@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.RimeActionsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-05T00:42:32.669Z" hostname="1860ba65b9a5" time="0.001">
+  <properties/>
+  <testcase name="schemaSelectionUsesTheCurrentDynamicActionIdWithoutDependingOnOrder" classname="org.fcitx.fcitx5.android.RimeActionsTest" time="0.0"/>
+  <testcase name="activeSchemaVerificationRejectsOtherEnginesAndAsciiEvenWhenTheNameMatches" classname="org.fcitx.fcitx5.android.RimeActionsTest" time="0.001"/>
+  <testcase name="asciiToggleUsesTheNativeFirstActionAndRejectsMissingOrSeparatorEntries" classname="org.fcitx.fcitx5.android.RimeActionsTest" time="0.0"/>
+  <testcase name="matchingTextOutsideTheRimeSchemaMenuCannotBeMistakenForASelectableSchema" classname="org.fcitx.fcitx5.android.RimeActionsTest" time="0.0"/>
+  <testcase name="schemaMenuMayBeNestedButSeparatorsAliasesAndNestedActionLabelsAreNotSchemas" classname="org.fcitx.fcitx5.android.RimeActionsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

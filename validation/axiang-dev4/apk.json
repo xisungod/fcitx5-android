@@ -1,0 +1,16 @@
+{
+  "version_name": "1.1-dev.4",
+  "version_code": 822,
+  "application_id": "org.fcitx.fcitx5.android.axiang.dev.motion4",
+  "source_commit": "2018499e48d05cd83a0f6df2e46a17db79dcbc16",
+  "apk_filename": "axiang-input-1.1-dev.4-arm64.apk",
+  "bytes": 263594183,
+  "sha256": "caaaa29ca8fa178ae3b924a1750fca0e5aae13a25676088f012bf536b839fe01",
+  "signing_certificate_sha256": "3a2d4a1e44aa177cc8f2c15968bc633a10f227b6e998308607acace46e4eb12d",
+  "abi": "arm64-v8a",
+  "tests": 285,
+  "classes": 47,
+  "test_failures": 0,
+  "offline_package_verifier_passed": true,
+  "install_mode": "independent test package; coexists with older dev.controls"
+}
