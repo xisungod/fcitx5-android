@@ -1,0 +1,237 @@
+name: Deliver settings test to draft release
+
+on:
+  push:
+    branches: [delivery/settings-test-1]
+    paths: [.github/workflows/draft-settings-delivery.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: draft-settings-test-1-delivery
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    if: github.repository == 'xisungod/fcitx5-android' && github.ref == 'refs/heads/delivery/settings-test-1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      BASE_COMMIT: bbd20eed49a263167c91fdc20de0817bf4fb096c
+      OVERLAY_SHA256: b334fbd74d29a82f4ad438a063340688382e8d815f23cd07666bcc4dd03dfd57
+      FONT_SHA256: f0084dbd967c0d5f899a85e1fee5501da33d4c726e9372c566aef4dfa98f6008
+      SOURCE_APK_SHA256: 4cc6442e2efc1ccc44cc15f726fc3367b63787ef7e4dc09147e80f96b2ea6504
+      RELEASE_ID: "403460492"
+      RELEASE_TAG: settings-test.1-local
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "2"
+      BUILD_VERSION_NAME: settings-test.1
+      BUILD_COMMIT_HASH: bbd20ee-settings-test.1-draft
+      XUANCAI_APP_SUFFIX: .axiang.settings
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check out the verified source base
+        uses: actions/checkout@v7
+        with:
+          ref: bbd20eed49a263167c91fdc20de0817bf4fb096c
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Read source overlay from the unpublished draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_COMMIT"
+          gh api "repos/$GH_REPO/releases/$RELEASE_ID" > "$RUNNER_TEMP/font-release.json"
+          python3 - <<'PY'
+          import base64, hashlib, io, json, os, pathlib, zipfile
+          release = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'font-release.json').read_text())
+          assert release['draft'] is True and release['id'] == int(os.environ['RELEASE_ID'])
+          assert release['tag_name'] == os.environ['RELEASE_TAG']
+          begin = '<!-- AXIANG_PRIVATE_FONT_OVERLAY_START\n'
+          end = '\nAXIANG_PRIVATE_FONT_OVERLAY_END -->'
+          body = release['body']
+          assert body.count(begin) == body.count(end) == 1
+          raw = base64.b64decode(body.split(begin, 1)[1].split(end, 1)[0], validate=True)
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          assert digest(raw) == os.environ['OVERLAY_SHA256'], 'Overlay checksum mismatch'
+          allowed = {
+              'app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyLegendTypeface.kt',
+              'app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt',
+              'app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PinyinT9Keyboard.kt',
+              'app/src/test/java/org/fcitx/fcitx5/android/SamKeyboardRenderingTest.kt',
+              'app/licenses/libraries/lmyy-theme-reference.json',
+              'app/src/main/res/font/lmyy_theme_latin.ttf',
+              'app/src/main/res/raw/lmyy_theme_notice.txt',
+          }
+          removed = {
+              'app/licenses/libraries/audiowide.json',
+              'app/src/main/res/font/audiowide_regular.ttf',
+              'app/src/main/res/raw/audiowide_ofl.txt',
+          }
+          with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+              assert set(archive.namelist()) == allowed | {'font-overlay.json'}
+              assert len(archive.namelist()) == len(allowed) + 1
+              manifest = json.loads(archive.read('font-overlay.json'))
+              assert manifest['base_commit'] == os.environ['BASE_COMMIT']
+              assert manifest['font_sha256'] == os.environ['FONT_SHA256']
+              assert set(manifest['files']) == allowed and set(manifest['remove']) == removed
+              contents = {name: archive.read(name) for name in allowed}
+              assert all(digest(data) == manifest['files'][name] for name, data in contents.items())
+              assert digest(contents['app/src/main/res/font/lmyy_theme_latin.ttf']) == os.environ['FONT_SHA256']
+              for name, data in contents.items():
+                  destination = pathlib.Path(name)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(data)
+              for name in removed:
+                  pathlib.Path(name).unlink()
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'font-release.json').unlink()
+          print('Pinned font source overlay verified and applied without publishing its contents.')
+          PY
+
+      - name: Download previously verified native and offline inputs
+        uses: actions/download-artifact@v8
+        with:
+          name: axiang-pr-37268414227-arm64
+          run-id: 37268414227
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/font-source-apk
+
+      - name: Extract exact input assets and obtain only the compile-time speech JAR
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, importlib.util, json, os, pathlib, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          source = root / 'font-source-apk/axiang-pr-arm64.apk'
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          assert digest(source.read_bytes()) == os.environ['SOURCE_APK_SHA256']
+          with zipfile.ZipFile(source) as archive:
+              inputs = [n for n in archive.namelist() if n.startswith(('assets/', 'lib/')) and not n.endswith('/')]
+              assert sum(n.startswith('assets/') for n in inputs) == 325
+              assert sum(n.startswith('lib/') for n in inputs) == 27
+              for name in inputs:
+                  relative = pathlib.PurePosixPath(name)
+                  assert '..' not in relative.parts and not relative.is_absolute()
+                  destination = root / 'font-prebuilt' / ('jniLibs/' + name[4:] if name.startswith('lib/') else name)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(archive.read(name))
+              provenance = json.loads(archive.read('assets/asr/SOURCE.json'))
+          spec = importlib.util.spec_from_file_location('prepare_asr', 'scripts/prepare-axiang-asr.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          cache = root / 'font-runtime-cache'
+          cache.mkdir()
+          # The helper has no runtime-only CLI. Reuse its pinned fetch function;
+          # do not download models or replace any verified native libraries.
+          aar = module.fetch(module.DOWNLOADS['runtime'], cache, False)
+          with zipfile.ZipFile(aar) as archive:
+              jar = archive.read('classes.jar')
+          assert digest(jar) == provenance['compile_jar']['sha256']
+          destination = pathlib.Path('app/libs/sherpa-onnx-1.13.8.jar')
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          destination.write_bytes(jar)
+          print('Verified source APK, 325 assets, 27 native libraries, and pinned compile-time JAR.')
+          PY
+          cat > "$RUNNER_TEMP/font-rebuild.init.gradle" <<'GRADLE'
+          def verifiedInput = new File(System.getenv('RUNNER_TEMP'), 'font-prebuilt')
+          gradle.beforeProject { p ->
+              ['com.android.application', 'com.android.library'].each { androidPlugin ->
+                  p.plugins.withId(androidPlugin) {
+                      p.extensions.getByName('androidComponents').finalizeDsl { dsl ->
+                          dsl.externalNativeBuild.cmake.path = null
+                          dsl.buildFeatures.prefab = false
+                          if (androidPlugin == 'com.android.library') dsl.buildFeatures.prefabPublishing = false
+                          if (p.path == ':app') {
+                              dsl.sourceSets.getByName('main').assets.setSrcDirs([new File(verifiedInput, 'assets')])
+                              dsl.sourceSets.getByName('main').jniLibs.setSrcDirs([new File(verifiedInput, 'jniLibs')])
+                              dsl.packaging.jniLibs.keepDebugSymbols.add('**/*.so')
+                          }
+                      }
+                  }
+              }
+          }
+          GRADLE
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android
+        uses: android-actions/setup-android@v4
+
+      - name: Install the pinned platform and build tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Restore public Gradle dependencies without saving private build outputs
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+          add-job-summary: never
+          add-job-summary-as-pr-comment: never
+
+      - name: Compile Kotlin and font resources using verified native inputs
+        run: ./gradlew --no-daemon -I "$RUNNER_TEMP/font-rebuild.init.gradle" :app:assembleDebug -x :app:generateDataDescriptor
+
+      - name: Verify the APK signature, identity, every reused input, and font
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/debug/*.apk)
+          test "${#apks[@]}" -eq 1
+          mkdir -p "$RUNNER_TEMP/font-delivery"
+          cp "${apks[0]}" "$RUNNER_TEMP/font-delivery/axiang-settings-test.1-arm64.apk"
+          sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/font-delivery/axiang-settings-test.1-arm64.apk"
+          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/font-delivery/axiang-settings-test.1-arm64.apk" \
+            --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" \
+            --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" \
+            --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE" --expected-app-label AXiang
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          source = root / 'font-source-apk/axiang-pr-arm64.apk'
+          output = root / 'font-delivery/axiang-settings-test.1-arm64.apk'
+          with zipfile.ZipFile(source) as old, zipfile.ZipFile(output) as new:
+              select = lambda apk: {n for n in apk.namelist() if n.startswith(('assets/', 'lib/')) and not n.endswith('/')}
+              inputs = select(old)
+              assert inputs == select(new), 'Native/assets file list changed'
+              assert all(digest(old.read(n)) == digest(new.read(n)) for n in inputs), 'Native/assets bytes changed'
+              assert sum(n.startswith('assets/') for n in inputs) == 325
+              assert sum(n.startswith('lib/') for n in inputs) == 27
+              assert digest(new.read('res/font/lmyy_theme_latin.ttf')) == os.environ['FONT_SHA256']
+              assert not any('audiowide' in n.lower() for n in new.namelist())
+              assert new.read('res/raw/lmyy_theme_notice.txt') == pathlib.Path('app/src/main/res/raw/lmyy_theme_notice.txt').read_bytes()
+              about = json.loads(new.read('res/raw/aboutlibraries.json'))
+              assert b'audiowide' not in new.read('res/raw/aboutlibraries.json').lower()
+              reference = next(item for item in about['libraries'] if item['uniqueId'] == 'local-reference/lmyy-theme-latin')
+              assert not reference.get('licenses') and 'Restricted reference asset' in reference['description']
+          print('All 325 assets and 27 native libraries are byte-identical; font and attribution verified.')
+          PY
+          cd "$RUNNER_TEMP/font-delivery"
+          sha256sum axiang-settings-test.1-arm64.apk > SHA256SUMS.txt
+
+      - name: Deliver exclusively as unpublished draft release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.draft')" = true
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.tag_name')" = "$RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/font-delivery/axiang-settings-test.1-arm64.apk" "$RUNNER_TEMP/font-delivery/SHA256SUMS.txt" --clobber
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.draft')" = true
+
+      - name: Remove private inputs from the ephemeral runner
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/font-release.json"
+          rm -rf "$RUNNER_TEMP/font-delivery"
+          git restore app
+          git clean -fd -- app/licenses/libraries/lmyy-theme-reference.json app/src/main/res/font/lmyy_theme_latin.ttf app/src/main/res/raw/lmyy_theme_notice.txt
