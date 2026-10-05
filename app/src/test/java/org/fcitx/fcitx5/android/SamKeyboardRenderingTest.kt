@@ -101,7 +101,8 @@ class SamKeyboardRenderingTest {
     }
 
     private inner class Keyboard(shape: ThemePrefs.RippleShape, randomColours: Boolean = false,
-        numberRow: Boolean = true, customColours: String? = null) : AutoCloseable {
+        numberRow: Boolean = true, customColours: String? = null,
+        configure: (ThemePrefs) -> Unit = {}) : AutoCloseable {
         private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val activity = controller.get()
         val root = FrameLayout(activity)
@@ -129,6 +130,7 @@ class SamKeyboardRenderingTest {
             if (customColours != null) prefs.pressUserColors.setValue(customColours)
             prefs.pressSingleColor.setValue(Color.parseColor("#00F0FF"))
             prefs.portraitNumberRow.setValue(numberRow)
+            configure(prefs)
             AppPrefs.getInstance().keyboard.popupOnKeyPress.setValue(false)
             activity.setTheme(R.style.Theme_InputViewTheme)
             // The activity owns a full-window host. Keep the recorded keyboard in
@@ -495,7 +497,7 @@ class SamKeyboardRenderingTest {
             val levelsByTime = ArrayList<Pair<Long, GapLevels>>()
             val mask = board.gapMask()
             board.frame().also { save(it, "burst/idle"); it.recycle() }
-            for (index in 0..126) {
+            for (index in 0..144) {
                 val time = index * 1000L / 60
                 while (next < gestures.size && gestures[next].time <= time) {
                     val gesture = gestures[next++]
@@ -526,19 +528,72 @@ class SamKeyboardRenderingTest {
             assertEquals("All rapid cross-key touches still enter text in sequence", input.joinToString(""), board.typed.toString())
             assertTrue("Dense typing must leave visible light outside the actual keycaps", levelsByTime.any { it.second.coloured > 0 })
             assertTrue("The final sampled gaps return to black after both light and cap motion finish",
-                levelsByTime.filter { it.first >= 2050 }.all { it.second.peak == 0 })
+                levelsByTime.filter { it.first >= 2350 }.all { it.second.peak == 0 })
             board.assertBlackSurface("End of sequential typing")
             File("build/outputs/effect-checks/dev8-sam/burst/metrics.csv").writeText(
                 "frame,time_ms,gap_pixels,coloured_gap_pixels,dark_le16,bright_ge160,near_peak_ge210,p10,p50,p90,peak\n" + metrics.joinToString("\n") + "\n")
             File("build/outputs/effect-checks/dev8-sam/burst/provenance.txt").writeText(
                 "source=actual Android TextKeyboard and PressEffect\ngraphics=Robolectric NATIVE\n" +
-                    "portrait_width_dp=360\nheight_px=${board.pixelHeight}\ndensity=${board.root.resources.displayMetrics.density}\nbase_height_dp=288\nfps=60\nframes=127\n" +
+                    "portrait_width_dp=360\nheight_px=${board.pixelHeight}\ndensity=${board.root.resources.displayMetrics.density}\nbase_height_dp=288\nfps=60\nframes=145\n" +
                     "input=${input.joinToString("")}\npress_times_ms=${presses.joinToString(",")}\nrelease_after_ms=50\n" +
                     "portrait_number_row=false\npalette=production Cyberpunk random\nseed=1401\nripple_shape=Sam\n" +
                     "idle_breathing_preference=true (Sam suppresses it)\npopup=false\n" +
                     "gap_metrics=fixed physical gaps outside all resting cap interiors; no glyphs or deliberately hidden cap drawings\n" +
                     "direct_native_frames=true\ninterpolation=false\nphysical_device_capture=false\n")
         }
+    }
+
+    @Test
+    fun samColourTailRemainsVisibleAfterGeometryLandsWithEitherMotionPath() {
+        for (motion in listOf(ThemePrefs.KeyMotionEffect.Press, ThemePrefs.KeyMotionEffect.Off)) {
+            Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
+                it.keyMotionEffect.setValue(motion)
+                it.reboundMotionDuration.setValue(400)
+                // Old, explicitly saved mist values must not shorten Sam's tail.
+                it.pressKeyHoldTime.setValue(20)
+                it.pressKeyRetreatTime.setValue(20)
+                it.samKeyHoldTime.setValue(80)
+                it.samKeyRetreatTime.setValue(800)
+            }).use { board ->
+                board.touch("f", MotionEvent.ACTION_DOWN)
+                board.go(50)
+                board.touch("f", MotionEvent.ACTION_UP, 0)
+                board.go(650)
+                val late = board.motionFrame(board.letters.getValue("f"))
+                try {
+                    assertEquals("$motion has already returned to its resting geometry", 1f, late.scale, 0.0001f)
+                    assertTrue("$motion retains actual coloured cap pixels after landing", coloured(late.actualCapColour))
+                    board.assertReadable(late.image, "f")
+                    save(late.image, "release-tail-${motion.name}-650ms")
+                } finally { late.image.recycle() }
+                board.go(1600)
+                board.assertBlackSurface("$motion finishes the independent colour tail and wave")
+            }
+        }
+    }
+
+    @Test
+    fun samCapTimingPreferencesChangeRealPixelsWithoutChangingLegacyValues() {
+        val samples = listOf(200, 1600).map { fade ->
+            Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
+                it.keyMotionEffect.setValue(ThemePrefs.KeyMotionEffect.Off)
+                it.samKeyHoldTime.setValue(120)
+                it.samKeyRetreatTime.setValue(fade)
+                it.pressKeyHoldTime.setValue(30)
+                it.pressKeyRetreatTime.setValue(100)
+            }).use { board ->
+                board.touch("f", MotionEvent.ACTION_DOWN)
+                board.go(50)
+                board.touch("f", MotionEvent.ACTION_UP, 0)
+                board.go(1200)
+                val frame = board.motionFrame(board.letters.getValue("f"))
+                try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
+            }
+        }
+        assertEquals("A short selected Sam tail has fully ended", 0, samples[0])
+        assertTrue("A long selected Sam tail is still visibly coloured", samples[1] >= 25)
+        assertEquals(30, ThemeManager.prefs.pressKeyHoldTime.getValue())
+        assertEquals(100, ThemeManager.prefs.pressKeyRetreatTime.getValue())
     }
 
     @Test

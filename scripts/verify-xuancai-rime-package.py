@@ -107,16 +107,16 @@ def resolve_android_tools(aapt_override, apksigner_override=None):
 def verify_main_identity(main_package, main_manifest, expected_main_package):
  base='org.fcitx.fcitx5.android'
  allowed_hosts=[expected_main_package] if expected_main_package else [base+'.axiang.v1',base+'.axiang']
- require(main_package in allowed_hosts,f'Unexpected 阿翔输入法 host package {main_package}; expected {allowed_hosts}')
- require(main_package==base+'.axiang' or main_package.startswith(base+'.axiang.'),f'Host package is outside the 阿翔输入法 namespace: {main_package}')
+ require(main_package in allowed_hosts,f'Unexpected AXiang host package {main_package}; expected {allowed_hosts}')
+ require(main_package==base+'.axiang' or main_package.startswith(base+'.axiang.'),f'Host package is outside the AXiang namespace: {main_package}')
  applications=[node for node in main_manifest['children'] if node['name']=='application']
  require(len(applications)==1,'Main APK must have one application element')
  require(applications[0]['attrs'].get('android:allowBackup') is False,'Main APK must explicitly disable cloud backup')
 
 
-def verify_bundled_host(main_apk, aapt_override, apksigner_override, expected_main_package, expected_version_name, offline_dictation=False, expected_version_code=822):
+def verify_bundled_host(main_apk, aapt_override, apksigner_override, expected_main_package, expected_version_name, offline_dictation=False, expected_version_code=822, expected_app_label='AXiang'):
  aapt,apksigner=resolve_android_tools(aapt_override,apksigner_override)
- main_package,main_manifest=inspect_apk(aapt,main_apk,'阿翔输入法',expected_version_name,offline_dictation,expected_version_code)
+ main_package,main_manifest=inspect_apk(aapt,main_apk,expected_app_label,expected_version_name,offline_dictation,expected_version_code)
  verify_main_identity(main_package,main_manifest,expected_main_package)
  signers=signer_certificates(apksigner,main_apk)
  microphone='explicit microphone permission for local dictation' if offline_dictation else 'no microphone permission'
@@ -160,9 +160,9 @@ def verify_offline_dictation(apk):
  print(f'Offline speech CPU runtime, Chinese streaming ASR, local punctuation and {len(hashes)} source/license checksums verified.')
 
 
-def verify_host(main_apk, rime_apk, aapt_override, apksigner_override=None, expected_main_package=None, expected_version_name='1.0', expected_version_code=822):
+def verify_host(main_apk, rime_apk, aapt_override, apksigner_override=None, expected_main_package=None, expected_version_name='1.0', expected_version_code=822, expected_app_label='AXiang'):
  aapt,apksigner=resolve_android_tools(aapt_override,apksigner_override)
- main_package,main_manifest=inspect_apk(aapt,main_apk,'阿翔输入法',expected_version_name,expected_version_code=expected_version_code)
+ main_package,main_manifest=inspect_apk(aapt,main_apk,expected_app_label,expected_version_name,expected_version_code=expected_version_code)
  plugin_package,manifest=inspect_apk(aapt,rime_apk,'阿翔输入法 Rime',expected_version_name,expected_version_code=expected_version_code)
  verify_main_identity(main_package,main_manifest,expected_main_package)
  base='org.fcitx.fcitx5.android'
@@ -251,6 +251,7 @@ parser.add_argument('main_apk',type=Path,nargs='?',help='Main APK; when supplied
 parser.add_argument('--aapt',help='Android SDK aapt executable for binary manifest inspection')
 parser.add_argument('--apksigner',help='Android SDK apksigner executable; defaults to the binary beside aapt')
 parser.add_argument('--expected-main-package',help='Exact expected host application ID for an isolated development build')
+parser.add_argument('--expected-app-label',default='AXiang',help='Exact expected application label across all locales (default: AXiang)')
 parser.add_argument('--expected-version-name',default='1.0',help='Exact expected Android versionName (default: 1.0)')
 parser.add_argument('--expected-version-code',type=int,default=822,help='Exact expected Android versionCode (default: 822)')
 parser.add_argument('--bundled-rime',action='store_true',help='Verify native Rime and all data directly inside the single main APK')
@@ -259,9 +260,9 @@ args=parser.parse_args()
 require(not (args.bundled_rime and args.main_apk),'--bundled-rime accepts one main APK, not a separate Rime/main pair')
 require(not args.offline_dictation or args.bundled_rime,'--offline-dictation requires the single bundled main APK')
 if args.bundled_rime:
- verify_bundled_host(args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.offline_dictation,args.expected_version_code)
+ verify_bundled_host(args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.offline_dictation,args.expected_version_code,args.expected_app_label)
 elif args.main_apk:
- verify_host(args.main_apk,args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.expected_version_code)
+ verify_host(args.main_apk,args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.expected_version_code,args.expected_app_label)
 
 with zipfile.ZipFile(args.rime_apk) as apk:
  assert apk.testzip() is None
@@ -287,6 +288,29 @@ with zipfile.ZipFile(args.rime_apk) as apk:
  assert '- xuancai_user' in schema
  assert 'derive/^([a-z]*[aeio])ng$/$1g/' in schema
  assert 'language: zh-hans-t-essay-bgw-compact' in schema
+ typo_base='assets/usr/share/rime-data/lua/axiang_typo/'
+ typo=json.loads(apk.read(typo_base+'SOURCE.json'))
+ require(typo['scope']=={'min_letters':4,'max_letters':24,'min_characters':2,'max_characters':5,'max_adjacent_substitutions':2},'Adjacent-key index scope is incorrect')
+ require(typo['records']>=600000,'Adjacent-key index is missing dictionary coverage')
+ require(set(typo['files'])=={f'{length:02d}.bin' for length in range(4,25)},'Adjacent-key length shard is missing')
+ require(sum(entry['records'] for entry in typo['files'].values())==typo['records'],'Adjacent-key record total mismatch')
+ typo_bytes=0
+ for name,entry in typo['files'].items():
+  data=apk.read(typo_base+name)
+  length=int(name.removesuffix('.bin'))
+  require(4<=length<=24 and data[:8]==b'AXTI1\0\0\0' and data[8]==length,'Invalid adjacent-key index header: '+name)
+  require(len(data)==entry['bytes']==16+entry['records']*(length+4),'Invalid adjacent-key index size: '+name)
+  require(len(data)<=4*1024*1024,'Adjacent-key shard exceeds the runtime cache budget: '+name)
+  require(int.from_bytes(data[12:16],'little')==entry['records'],'Invalid adjacent-key record count: '+name)
+  require(hashlib.sha256(data).hexdigest()==entry['sha256'],'Adjacent-key index checksum mismatch: '+name)
+  typo_bytes+=len(data)
+ require(typo_bytes==typo['total_bytes'],'Adjacent-key total bytes mismatch')
+ for name,digest in typo['sources_sha256'].items():
+  require(manifest['files_sha256'].get(name)==digest,'Adjacent-key index source differs from packaged dictionary: '+name)
+ for name in ['axiang_typo_index.lua','axiang_qwerty_neighbors.lua']:
+  require('lua/'+name in manifest['files_sha256'],'Adjacent-key implementation is missing from provenance: '+name)
+ compiled_main=apk.read(base+'rime_ice.schema.yaml').decode()
+ require(re.search(r'xuancai_exact:\n(?:  [^\n]+\n)*?  spelling_hints: 32\n',compiled_main),'Exact translator lacks short-word spelling validation')
  dictionary=apk.read('assets/usr/share/rime-data/rime_ice.dict.yaml').decode()
  table_lines=[line.split('#',1)[0].strip() for line in dictionary.splitlines()]
  require('- cn_dicts/41448' in table_lines,'Extended character table was not enabled')

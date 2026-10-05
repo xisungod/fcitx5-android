@@ -17,9 +17,10 @@ internal class PressPaletteCards(
     private val context: Context,
     private val theme: Theme,
     tagPrefix: String,
+    accentColor: Int? = null,
     onSelect: (ThemePrefs.PressEffectPalette) -> Unit
 ) {
-    private val accent = if (theme.isDark) 0xFF90C9FF.toInt() else 0xFF356FA5.toInt()
+    private val accent = accentColor ?: if (theme.isDark) 0xFF90C9FF.toInt() else 0xFF356FA5.toInt()
     private val cards = linkedMapOf<ThemePrefs.PressEffectPalette, Pair<LinearLayout, TextView>>()
     private val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
     val root = HorizontalScrollView(context).apply {

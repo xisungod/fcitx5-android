@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_release">Fcitx5</string>
-    <string name="app_name_debug">Fcitx5 (Отладка)</string>
+    <string name="app_name_release">AXiang</string>
+    <string name="app_name_debug">AXiang</string>
     <string name="save">Сохранить</string>
     <string name="input_methods">Методы ввода</string>
     <string name="add_input_method">Добавить метод ввода</string>
@@ -51,7 +51,7 @@
     <string name="expanded_candidate_style_flexbox">Flexbox</string>
     <string name="no_more_input_methods">Методов ввода для переключения больше нет</string>
     <string name="add_more_input_methods">Хотите добавить больше методов ввода?</string>
-    <string name="about">О fcitx5 для Android</string>
+    <string name="about">О AXiang</string>
     <string name="faq">FAQ</string>
     <string name="current_version">Текущая версия</string>
     <string name="real_time_logs">Журналы в реальном времени</string>
@@ -154,7 +154,7 @@
     <string name="choose_input_method">Выбор метода ввода</string>
     <string name="edit_clipboard">Редактировать буфер обмена</string>
     <string name="clipboard_edit_text_hint">Содержимое буфера обмена</string>
-    <string name="config_addon_not_loaded">Параметры конфигурации недоступны, возможно, это дополнение отключено при запуске fcitx?</string>
+    <string name="config_addon_not_loaded">Параметры конфигурации недоступны, возможно, это дополнение отключено при запуске AXiang?</string>
     <string name="portrait">Портретный режим экрана</string>
     <string name="landscape">Горизонтальный режим экрана</string>
     <string name="keyboard_bottom_padding">Нижнее поле клавиатуры</string>
@@ -224,8 +224,8 @@
     <string name="path_conflict">Путь \"%1$s\" уже принадлежит %2$s</string>
     <string name="main_program">основная программа</string>
     <string name="edit_theme">Изменить тему</string>
-    <string name="fcitx_daemon">Демон Fcitx</string>
-    <string name="restarting_fcitx">Перезапуск Fcitx</string>
+    <string name="fcitx_daemon">Демон AXiang</string>
+    <string name="restarting_fcitx">Перезапуск AXiang</string>
     <string name="plugin_needs_reload">Обнаружены изменения плагина, нажмите здесь, чтобы перезагрузить</string>
     <string name="no_plugins">Нет доступных плагинов</string>
     <string name="removed_n_items">Удаленный %1$d элемент(ы)</string>
@@ -240,7 +240,7 @@
     <string name="reset_keyboard_on_focus_change">Переключиться обратно на клавиатуру при изменении фокуса</string>
     <string name="export_user_data">Экспорт пользовательских данных</string>
     <string name="import_user_data">Импорт пользовательских данных</string>
-    <string name="exception_user_data_filename">Расширение имени файла %1$s не указывает на пользовательские данные fcitx5-android</string>
+    <string name="exception_user_data_filename">Расширение имени файла %1$s не указывает на пользовательские данные AXiang</string>
     <string name="exception_user_data_metadata">Невозможно найти метаданные пользовательских данных</string>
     <string name="exception_user_data_package_name_mismatch">Пользовательские данные не соответствуют текущему приложению</string>
     <string name="user_data_imported">Пользовательские данные %1$s  были импортированы, перезапуск…</string>
@@ -280,8 +280,8 @@
     <string name="candidates_padding">Отступ от слова-кандидата</string>
     <string name="candidates_window_min_width">Минимальная ширина окна кандидата</string>
     <string name="candidates_window_padding">Поле окна кандидата</string>
-    <string name="restart_fcitx_instance">Перезапустить экземпляр fcitx</string>
-    <string name="restart_fcitx_instance_confirm">Экземпляр Fcitx будет уничтожен и повторно инициализирован. Продолжить?</string>
+    <string name="restart_fcitx_instance">Перезапустить экземпляр AXiang</string>
+    <string name="restart_fcitx_instance_confirm">Экземпляр AXiang будет уничтожен и повторно инициализирован. Продолжить?</string>
     <string name="ignore_system_window_insets">Игнорировать поля системного окна</string>
     <string name="browse_user_data_dir">Просмотр каталога пользовательских данных</string>
     <string name="haptic_on_repeat">Вибрация при повторном нажатии клавиши</string>

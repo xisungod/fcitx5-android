@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ax_settings_background">#101318</color>
+    <color name="ax_settings_surface">#1B2029</color>
+    <color name="ax_settings_text">#EEF2FA</color>
+    <color name="ax_settings_secondary">#A4AFC1</color>
+    <color name="ax_settings_accent">#8EAEFF</color>
+    <color name="ax_settings_accent_soft">#283852</color>
+    <color name="ax_settings_divider">#2A3342</color>
+    <color name="ax_settings_ripple">#248EAEFF</color>
+    <color name="ax_settings_disabled">#778396</color>
+</resources>

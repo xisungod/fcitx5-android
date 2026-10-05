@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="axiang_quick_title">Quick settings</string>
+    <string name="axiang_quick_number_row">Number row</string>
+    <string name="axiang_quick_popup">Key popups</string>
+    <string name="axiang_quick_haptic">Vibration</string>
+    <string name="axiang_quick_press_effect">Key lighting</string>
+    <string name="axiang_quick_height">Height</string>
+    <string name="axiang_quick_effects">Lighting</string>
+    <string name="axiang_quick_feel">Key feel</string>
+    <string name="axiang_quick_width">Key widths</string>
+    <string name="axiang_quick_feedback">Vibration feedback</string>
+    <string name="axiang_quick_back">‹ Quick</string>
+    <string name="axiang_quick_save_hint">Done to save</string>
+    <string name="axiang_quick_done_description">Save and return to typing</string>
+    <string name="axiang_quick_more_description">Save and open all AXiang settings</string>
+    <string name="axiang_quick_effects_hint">Choose a palette and adjust how your key lighting fades.</string>
+    <string name="axiang_quick_width_hint">Choose a key in the preview to adjust its width. These changes stay here until you tap Done.</string>
+</resources>

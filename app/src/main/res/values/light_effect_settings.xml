@@ -24,6 +24,10 @@
     <string name="light_effect_wave_fade">Wave fade out</string>
     <string name="light_effect_face_hold">Key colour hold</string>
     <string name="light_effect_face_exit">Key colour fade</string>
+    <string name="sam_key_hold_time">Sam colour hold after release</string>
+    <string name="sam_key_retreat_time">Sam colour fade</string>
+    <string name="sam_key_timing_hint">Sam keeps colour through the rebound and leaves an independent colour tail after release. Mist and Fluid retain their existing timing settings.</string>
+    <string name="sam_wave_total_detail">Sam starts immediately. Wave duration is independent of key colour and rebound.</string>
     <string name="light_effect_total">Total wave duration: %1$d ms</string>
     <string name="light_effect_total_detail">Includes %1$d ms of ignition. Wave and key holds are independent.</string>
     <string name="light_effect_light">Light spread</string>

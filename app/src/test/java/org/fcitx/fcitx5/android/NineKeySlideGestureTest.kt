@@ -238,12 +238,17 @@ class NineKeySlideGestureTest {
         }
     }
 
-    @Test fun aBatchedFinalUpSelectsItsCellWhileCancellationAndOutsideReleaseCommitNothing() {
+    @Test fun aFinalUpCannotStartASlideWhileCancellationAndOutsideReleaseCommitNothing() {
         for (kind in Kind.entries) Harness(kind).use { h ->
             h.event(MotionEvent.ACTION_DOWN, h.digit(2))
             h.advance(32)
             h.event(MotionEvent.ACTION_UP, h.digit(3))
-            assertEquals("An UP without a preceding MOVE must resolve the final cell", listOf(h.expectedDigit(3)), h.actions)
+            assertEquals("An UP without an intentional MOVE must retain the original cell", listOf(h.expectedDigit(2)), h.actions)
+            h.actions.clear()
+            h.event(MotionEvent.ACTION_DOWN, h.digit(2))
+            h.event(MotionEvent.ACTION_MOVE, h.digit(3))
+            h.event(MotionEvent.ACTION_UP, h.digit(6))
+            assertEquals("An established slide can resolve a batched final UP", listOf(h.expectedDigit(6)), h.actions)
             h.actions.clear()
             h.event(MotionEvent.ACTION_DOWN, h.digit(2))
             h.event(MotionEvent.ACTION_MOVE, h.digit(6))

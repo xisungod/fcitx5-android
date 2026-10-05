@@ -740,16 +740,19 @@ class KeyboardVisualRegressionTest {
             if (action is org.fcitx.fcitx5.android.input.popup.PopupAction.PreviewAction) previews.add(action.content)
         }
         fun key(label: String) = keys(keyboard).first { (it.def as? KeyDef.Appearance.Text)?.displayText == label }
+        var touchTime = SystemClock.uptimeMillis()
         fun touch(action: Int, label: String) {
             val view = key(label)
             val rect = Rect()
             view.getDrawingRect(rect)
             keyboard.offsetDescendantRectToMyCoords(view, rect)
-            val event = MotionEvent.obtain(0, SystemClock.uptimeMillis(), action, rect.exactCenterX(), rect.exactCenterY(), 0)
+            val event = MotionEvent.obtain(0, touchTime, action, rect.exactCenterX(), rect.exactCenterY(), 0)
             keyboard.dispatchTouchEvent(event)
             event.recycle()
         }
         touch(MotionEvent.ACTION_DOWN, "G")
+        touch(MotionEvent.ACTION_MOVE, "H")
+        touchTime += 64
         touch(MotionEvent.ACTION_MOVE, "H")
         touch(MotionEvent.ACTION_MOVE, "J")
         assertTrue(actions.isEmpty())
@@ -761,6 +764,8 @@ class KeyboardVisualRegressionTest {
         assertEquals(listOf("j"), actions.filterIsInstance<KeyAction.FcitxKeyAction>().map { it.act })
         actions.clear()
         touch(MotionEvent.ACTION_DOWN, "G")
+        touch(MotionEvent.ACTION_MOVE, "T")
+        touchTime += 64
         touch(MotionEvent.ACTION_MOVE, "T")
         touch(MotionEvent.ACTION_MOVE, "5")
         touch(MotionEvent.ACTION_UP, "5")
@@ -835,7 +840,7 @@ class KeyboardVisualRegressionTest {
     }
 
     @Test
-    fun finalUpCanSelectANewLetterWithoutMoveButCannotTriggerAFunctionKey() {
+    fun finalUpPreservesTheInitialLetterWithoutMoveAndCannotTriggerAFunctionKey() {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val activity = controller.get()
         activity.setTheme(R.style.Theme_InputViewTheme)
@@ -858,10 +863,11 @@ class KeyboardVisualRegressionTest {
         touch(MotionEvent.ACTION_DOWN, key("G"))
         touch(MotionEvent.ACTION_UP, key("H"))
         assertEquals(1, actions.size)
-        assertEquals("h", (actions.single() as KeyAction.FcitxKeyAction).act)
+        assertEquals("An UP alone cannot turn a normal tap into a slide", "g",
+            (actions.single() as KeyAction.FcitxKeyAction).act)
         val effect = ReflectionHelpers.getField<Any>(keyboard, "pressEffectLayer")
         val breathing = ReflectionHelpers.getField<Any>(effect, "breathing")
-        assertFalse("Lift-off retargeting must release the breathing envelope",
+        assertFalse("Lift-off must release the breathing envelope",
             ReflectionHelpers.getField<Boolean>(breathing, "touching"))
         actions.clear()
         touch(MotionEvent.ACTION_DOWN, key("G"))
@@ -890,6 +896,7 @@ class KeyboardVisualRegressionTest {
         keyboard.keyActionListener = KeyActionListener { action, _ ->
             if (action is KeyAction.FcitxKeyAction) typed.add(action.act)
         }
+        var touchTime = SystemClock.uptimeMillis()
         fun event(action: Int, vararg pointers: Pair<Int, String>) {
             val properties = pointers.map { (id, _) -> MotionEvent.PointerProperties().apply {
                 this.id = id; toolType = MotionEvent.TOOL_TYPE_FINGER
@@ -901,13 +908,15 @@ class KeyboardVisualRegressionTest {
                 keyboard.offsetDescendantRectToMyCoords(key, bounds)
                 MotionEvent.PointerCoords().apply { x = bounds.exactCenterX(); y = bounds.exactCenterY(); pressure = 1f; size = 1f }
             }.toTypedArray()
-            val e = MotionEvent.obtain(0, SystemClock.uptimeMillis(), action, pointers.size,
+            val e = MotionEvent.obtain(0, touchTime, action, pointers.size,
                 properties, coordinates, 0, 0, 1f, 1f, 0, 0, android.view.InputDevice.SOURCE_TOUCHSCREEN, 0)
             keyboard.dispatchTouchEvent(e)
             e.recycle()
         }
         event(MotionEvent.ACTION_DOWN, 0 to "G")
         event(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 0 to "G", 1 to "H")
+        event(MotionEvent.ACTION_MOVE, 0 to "T", 1 to "H")
+        touchTime += 64
         event(MotionEvent.ACTION_MOVE, 0 to "T", 1 to "H")
         assertTrue(typed.isEmpty())
         event(MotionEvent.ACTION_POINTER_UP, 0 to "T", 1 to "H")

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_release">Fcitx5</string>
-    <string name="app_name_debug">Fcitx5 (デバッグ)</string>
+    <string name="app_name_release">AXiang</string>
+    <string name="app_name_debug">AXiang</string>
     <string name="save">保存</string>
     <string name="input_methods">インプットメソッド</string>
     <string name="add_input_method">インプットメソッドの追加</string>
@@ -150,7 +150,7 @@
     <string name="choose_input_method">インプットメゾッドを選択</string>
     <string name="edit_clipboard">クリップボードを編集</string>
     <string name="clipboard_edit_text_hint">クリップボードのコンテンツ</string>
-    <string name="config_addon_not_loaded">利用可能な設定オプションがありません。もしかしたらこのアドオンはfcitxの起動時に無効になっているかもしれません</string>
+    <string name="config_addon_not_loaded">利用可能な設定オプションがありません。もしかしたらこのアドオンはAXiangの起動時に無効になっているかもしれません</string>
     <string name="portrait">縦画面時</string>
     <string name="landscape">横画面時</string>
     <string name="keyboard_bottom_padding">キーボードの下部余白</string>
@@ -219,8 +219,8 @@
     <string name="path_conflict">パス\"%1$s\"はすでに %2$s に使用されています</string>
     <string name="main_program">メインプログラム</string>
     <string name="edit_theme">テーマを編集</string>
-    <string name="fcitx_daemon">Fcitxデーモン</string>
-    <string name="restarting_fcitx">Fcitxを再起動中</string>
+    <string name="fcitx_daemon">AXiangデーモン</string>
+    <string name="restarting_fcitx">AXiangを再起動中</string>
     <string name="plugin_needs_reload">プラグインの変更を除去しました。ここをクリックして再読み込みします</string>
     <string name="no_plugins">利用可能なプラグインはありません</string>
     <string name="removed_n_items">%1$s 個のアイテムを削除しました</string>
@@ -233,7 +233,7 @@
     <string name="disable_it">無効にする</string>
     <string name="export_user_data">ユーザーデータをエクスポートする</string>
     <string name="import_user_data">ユーザーデータをインポートする</string>
-    <string name="exception_user_data_filename">%1$s のファイル拡張子はfcitx5-androidのユーザーデータを示していません</string>
+    <string name="exception_user_data_filename">%1$s のファイル拡張子はAXiangのユーザーデータを示していません</string>
     <string name="exception_user_data_metadata">ユーザーデータのメタデータが見つかりません</string>
     <string name="exception_user_data_package_name_mismatch">ユーザーデータが現在のアプリに適合しません</string>
     <string name="user_data_imported">%1$s のユーザーデータをインポートしました。再起動します…</string>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ax_light_advanced">Animation and glow</string>
+    <string name="ax_light_advanced_summary">Timing, lingering colour, brightness and candidate bar</string>
+    <string name="ax_light_expanded">Expanded</string>
+    <string name="ax_light_collapsed">Collapsed</string>
+</resources>

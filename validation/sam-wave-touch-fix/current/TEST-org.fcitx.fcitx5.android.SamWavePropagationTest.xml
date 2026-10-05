@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.SamWavePropagationTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-05T05:29:44.704Z" hostname="b891b174da30" time="0.463">
+  <properties/>
+  <testcase name="selectedWaveFadeAndHoldAreVisibleAndEndAtTheirConfiguredTimes" classname="org.fcitx.fcitx5.android.SamWavePropagationTest" time="0.098"/>
+  <testcase name="configuredExpansionTimeChangesTheObservedTravelTime" classname="org.fcitx.fcitx5.android.SamWavePropagationTest" time="0.203"/>
+  <testcase name="lightCrestVisitsNearThenFarPixelsAndLeavesASoftWake" classname="org.fcitx.fcitx5.android.SamWavePropagationTest" time="0.107"/>
+  <testcase name="travellingBandStaysBroadAndVisibleBeyondItsInitialBurst" classname="org.fcitx.fcitx5.android.SamWavePropagationTest" time="0.052"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

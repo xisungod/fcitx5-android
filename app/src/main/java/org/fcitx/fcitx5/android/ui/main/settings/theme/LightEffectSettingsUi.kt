@@ -7,6 +7,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -20,6 +21,7 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -29,13 +31,17 @@ import org.fcitx.fcitx5.android.data.theme.PressColorPalette
 import org.fcitx.fcitx5.android.data.theme.PressPaletteCards
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
+import org.fcitx.fcitx5.android.data.theme.ThemePreset
 
 /** Real settings controls shared by the production fragment and its rendering tests. */
 class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs = ThemeManager.prefs,
     private val openKeyboardSettings: (() -> Unit)? = null) {
-    private val ink = 0xFFF2F3F8.toInt()
-    private val subdued = 0xFF949AAA.toInt()
-    private val accent = 0xFF90C9FF.toInt()
+    private val ink = ContextCompat.getColor(context, R.color.ax_settings_text)
+    private val subdued = ContextCompat.getColor(context, R.color.ax_settings_secondary)
+    private val accent = ContextCompat.getColor(context, R.color.ax_settings_accent)
+    private val surface = ContextCompat.getColor(context, R.color.ax_settings_surface)
+    private val divider = ContextCompat.getColor(context, R.color.ax_settings_divider)
+    private val selectedSurface = ColorUtils.blendARGB(surface, accent, 0.10f)
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
 
     private fun text(value: String, size: Float = 14f, color: Int = ink) = TextView(context).apply {
@@ -45,20 +51,25 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
     }
 
     private fun background(fill: Int, stroke: Int? = null) = GradientDrawable().apply {
-        cornerRadius = dp(14).toFloat()
+        cornerRadius = dp(18).toFloat()
         setColor(fill)
         stroke?.let { setStroke(dp(1).coerceAtLeast(1), it) }
     }
 
+    private fun interactiveBackground(fill: Int, stroke: Int? = null) = RippleDrawable(
+        ColorStateList.valueOf(ContextCompat.getColor(context, R.color.ax_settings_ripple)),
+        background(fill, stroke), background(Color.WHITE))
+
     private val body = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(20), dp(20), dp(20), dp(32))
+        setPadding(dp(16), dp(20), dp(16), dp(32))
     }
 
     val root = ScrollView(context).apply {
         tag = "light-effect-settings"
         isFillViewport = true
-        setBackgroundColor(0xFF0B0C10.toInt())
+        setBackgroundColor(ContextCompat.getColor(context, R.color.ax_settings_background))
+        isVerticalScrollBarEnabled = false
         addView(body, ViewGroup.LayoutParams(-1, -2))
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
             val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
@@ -74,27 +85,21 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
     private val modeSummary = text("", color = subdued)
     private val totalLabel = text("", 13f, accent).apply { tag = "effect-total-time" }
     private val totalDetailLabel = text("", 12f, subdued).apply { tag = "effect-total-detail" }
+    private val keyTimingHint = text("", 12f, subdued)
     val durationControls = linkedMapOf<String, EffectRangeControl>()
     var activeColorDialog: AlertDialog? = null
         private set
 
     init {
-        body.addView(text(context.getString(R.string.light_effect_settings), 27f).apply { setTypeface(typeface, Typeface.BOLD) })
         body.addView(text(context.getString(R.string.light_effect_saved), 13f, subdued),
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(22) })
-        addSwitch(R.string.light_effect_enable, prefs.pressEffect)
-        section(R.string.keyboard_layout_section)
-        body.addView(Button(context).apply {
-            tag = "keyboard-size-feedback-settings"
-            text = context.getString(R.string.keyboard_size_feedback)
-            isAllCaps = false
-            textSize = 15f
-            setTextColor(accent)
-            background = background(0xFF171A22.toInt(), 0xFF343A49.toInt())
-            setOnClickListener { openKeyboardSettings?.invoke() }
-        }, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(10) })
-        addSwitch(R.string.keyboard_show_number_row, prefs.portraitNumberRow)
-        body.addView(text(context.getString(R.string.keyboard_show_number_row_summary), 12f, subdued))
+            LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
+        val basics = card().apply { tag = "effect-basics" }
+        addSwitch(basics, R.string.light_effect_enable, prefs.pressEffect)
+        addDivider(basics)
+        basics.addView(text(context.getString(R.string.ripple_shape), 15f),
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
+        addShapeSelector(basics)
+        body.addView(basics)
         section(R.string.light_effect_palette)
         val modeRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         listOf(ThemePrefs.PressColorMode.Random to R.string.press_color_mode_random,
@@ -105,6 +110,7 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
                 text = context.getString(title)
                 textSize = 13f
                 isAllCaps = false
+                stateListAnimator = null
                 minWidth = 0
                 minimumWidth = 0
                 minHeight = dp(48)
@@ -126,9 +132,100 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         body.addView(paletteCard)
         renderColors()
 
-        section(R.string.ripple_shape)
+        val advanced = LinearLayout(context).apply {
+            tag = "effect-advanced-content"
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        val advancedCard = card()
+        val toggle = LinearLayout(context).apply {
+            tag = "effect-advanced-toggle"
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(64)
+            isClickable = true
+            isFocusable = true
+            background = interactiveBackground(surface)
+            ViewCompat.setScreenReaderFocusable(this, true)
+        }
+        val toggleText = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        toggleText.addView(text(context.getString(R.string.ax_light_advanced), 16f).apply {
+            setTypeface(typeface, Typeface.BOLD)
+        })
+        toggleText.addView(text(context.getString(R.string.ax_light_advanced_summary), 12f, subdued),
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+        val chevron = text("⌄", 22f, subdued).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+        toggle.addView(toggleText, LinearLayout.LayoutParams(0, -2, 1f))
+        toggle.addView(chevron, LinearLayout.LayoutParams(dp(24), -2))
+        fun updateExpandedState() {
+            val expanded = advanced.visibility == View.VISIBLE
+            chevron.text = if (expanded) "⌃" else "⌄"
+            ViewCompat.setStateDescription(toggle, context.getString(
+                if (expanded) R.string.ax_light_expanded else R.string.ax_light_collapsed))
+        }
+        toggle.setOnClickListener {
+            advanced.visibility = if (advanced.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            updateExpandedState()
+        }
+        updateExpandedState()
+        advancedCard.addView(toggle)
+        advancedCard.addView(advanced)
+        body.addView(advancedCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+        addDivider(advanced)
+        val animationCard = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(16), 0, 0)
+        }
+        animationCard.addView(totalLabel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        animationCard.addView(totalDetailLabel,
+            LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
+        listOf(
+            Range(R.string.press_ignition_time, prefs.pressIgnitionTime, 30, 300, 10),
+            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
+            Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 10),
+            Range(R.string.light_effect_wave_fade, prefs.pressFadeOutTime, 100, 5000, 20),
+            Range(R.string.light_effect_face_hold, prefs.pressKeyHoldTime, 20, 1000, 10),
+            Range(R.string.light_effect_face_exit, prefs.pressKeyRetreatTime, 20, 5000, 10),
+            Range(R.string.sam_key_hold_time, prefs.samKeyHoldTime, 0, 1000, 10),
+            Range(R.string.sam_key_retreat_time, prefs.samKeyRetreatTime, 100, 5000, 10)
+        ).forEach { range -> addRange(animationCard, range, "ms") }
+        advanced.addView(animationCard)
+        advanced.addView(keyTimingHint,
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(16) })
+        updateTimingVisibility()
+        addDivider(advanced)
+        advanced.addView(text(context.getString(R.string.light_effect_light), 15f).apply {
+            setTypeface(typeface, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16); bottomMargin = dp(12) })
+        val lightCard = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 100, 5), "%")
+        addRange(lightCard, Range(R.string.light_effect_brightness, prefs.pressGlowBrightness, 0, 100, 5), "%")
+        advanced.addView(lightCard)
+        addSwitch(advanced, R.string.light_effect_glow_candidates, prefs.pressGlowOnCandidates)
+
+        section(R.string.keyboard_layout_section)
+        val keyboardCard = card()
+        keyboardCard.addView(Button(context).apply {
+            tag = "keyboard-size-feedback-settings"
+            text = context.getString(R.string.keyboard_size_feedback)
+            isAllCaps = false
+            textSize = 15f
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, 0)
+            setTextColor(accent)
+            background = interactiveBackground(surface)
+            stateListAnimator = null
+            setOnClickListener { openKeyboardSettings?.invoke() }
+        }, LinearLayout.LayoutParams(-1, dp(52)))
+        addDivider(keyboardCard)
+        addSwitch(keyboardCard, R.string.keyboard_show_number_row, prefs.portraitNumberRow)
+        keyboardCard.addView(text(context.getString(R.string.keyboard_show_number_row_summary), 12f, subdued))
+        body.addView(keyboardCard)
+    }
+
+    private fun addShapeSelector(parent: LinearLayout) {
         val shapes = ThemePrefs.RippleShape.entries
-        body.addView(Spinner(context).apply {
+        parent.addView(Spinner(context).apply {
             tag = "effect-ripple-shape"
             contentDescription = context.getString(R.string.ripple_shape)
             adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_spinner_item,
@@ -139,7 +236,7 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
                 override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
                     super.getDropDownView(position, convertView, parent).also {
                         (it as TextView).setTextColor(ink)
-                        it.setBackgroundColor(0xFF171A22.toInt())
+                        it.setBackgroundColor(surface)
                     }
             }
             setSelection(shapes.indexOf(prefs.rippleShape.getValue()))
@@ -147,59 +244,48 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                     val selected = shapes[position]
                     if (prefs.rippleShape.getValue() != selected) prefs.rippleShape.setValue(selected)
+                    updateTimingVisibility()
                 }
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
         }, LinearLayout.LayoutParams(-1, dp(48)))
-
-        section(R.string.light_effect_animation)
-        val animationCard = card()
-        animationCard.addView(totalLabel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-        animationCard.addView(totalDetailLabel,
-            LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
-        listOf(
-            Range(R.string.press_ignition_time, prefs.pressIgnitionTime, 30, 300, 10),
-            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
-            Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 10),
-            Range(R.string.light_effect_wave_fade, prefs.pressFadeOutTime, 100, 5000, 20),
-            Range(R.string.light_effect_face_hold, prefs.pressKeyHoldTime, 100, 1000, 20),
-            Range(R.string.light_effect_face_exit, prefs.pressKeyRetreatTime, 100, 5000, 20)
-        ).forEach { range -> addRange(animationCard, range, "ms") }
-        body.addView(animationCard)
-        body.addView(text(context.getString(R.string.keyboard_quick_settings_retreat_hint), 12f, subdued),
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-        updateTotal()
-        section(R.string.light_effect_light)
-        val lightCard = card()
-        addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 100, 5), "%")
-        addRange(lightCard, Range(R.string.light_effect_brightness, prefs.pressGlowBrightness, 0, 100, 5), "%")
-        body.addView(lightCard)
-        addSwitch(R.string.light_effect_glow_candidates, prefs.pressGlowOnCandidates)
     }
 
     private data class Range(val title: Int, val pref: ManagedPreference.PInt, val min: Int, val max: Int, val step: Int)
 
     private fun card() = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        background = background(0xFF171A22.toInt(), 0xFF252B38.toInt())
-        setPadding(dp(16), dp(16), dp(16), dp(12))
+        background = background(surface)
+        setPadding(dp(16), dp(12), dp(16), dp(16))
     }
 
     private fun section(title: Int) {
-        body.addView(text(context.getString(title), 17f).apply { setTypeface(typeface, Typeface.BOLD) },
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(22); bottomMargin = dp(12) })
+        body.addView(text(context.getString(title), 14f, subdued).apply { setTypeface(typeface, Typeface.BOLD) },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(24); bottomMargin = dp(10) })
     }
 
-    private fun addSwitch(title: Int, pref: ManagedPreference.PBool) {
-        body.addView(Switch(context).apply {
+    private fun addDivider(parent: LinearLayout) {
+        parent.addView(View(context).apply { setBackgroundColor(divider) },
+            LinearLayout.LayoutParams(-1, dp(1).coerceAtLeast(1)))
+    }
+
+    private fun addSwitch(parent: LinearLayout, title: Int, pref: ManagedPreference.PBool) {
+        parent.addView(Switch(context).apply {
             tag = pref.key
             text = context.getString(title)
-            textSize = 14f
+            textSize = 15f
+            minimumHeight = dp(56)
+            switchPadding = dp(12)
             setTextColor(ink)
             isChecked = pref.getValue()
-            thumbTintList = ColorStateList.valueOf(accent)
+            thumbTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(accent, subdued))
+            trackTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(ColorUtils.setAlphaComponent(accent, 80), divider))
             setOnCheckedChangeListener { _, checked -> pref.setValue(checked) }
-        }, LinearLayout.LayoutParams(-1, dp(54)))
+        }, LinearLayout.LayoutParams(-1, -2))
     }
 
     private fun addRange(parent: LinearLayout, range: Range, unit: String) {
@@ -209,12 +295,26 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         parent.addView(control.root)
     }
 
+    private fun updateTimingVisibility() {
+        val sam = prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
+        listOf(prefs.pressIgnitionTime, prefs.pressKeyHoldTime, prefs.pressKeyRetreatTime).forEach {
+            durationControls[it.key]?.root?.visibility = if (sam) View.GONE else View.VISIBLE
+        }
+        listOf(prefs.samKeyHoldTime, prefs.samKeyRetreatTime).forEach {
+            durationControls[it.key]?.root?.visibility = if (sam) View.VISIBLE else View.GONE
+        }
+        keyTimingHint.setText(if (sam) R.string.sam_key_timing_hint else R.string.keyboard_quick_settings_retreat_hint)
+        updateTotal()
+    }
+
     private fun updateTotal() {
-        val ignition = prefs.pressIgnitionTime.getValue()
+        val sam = prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
+        val ignition = if (sam) 0 else prefs.pressIgnitionTime.getValue()
         totalLabel.text = context.getString(R.string.light_effect_total,
             ignition + prefs.pressExpansionTime.getValue() +
                 prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
-        totalDetailLabel.text = context.getString(R.string.light_effect_total_detail, ignition)
+        totalDetailLabel.text = if (sam) context.getString(R.string.sam_wave_total_detail)
+            else context.getString(R.string.light_effect_total_detail, ignition)
     }
 
     private fun renderColors() {
@@ -223,8 +323,8 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
             val selected = entry == mode
             button.isSelected = selected
             button.setTextColor(if (selected) accent else ink)
-            button.background = background(if (selected) 0xFF25384D.toInt() else 0xFF21252F.toInt(),
-                if (selected) accent else 0xFF343A49.toInt())
+            button.background = interactiveBackground(if (selected) selectedSurface else surface,
+                if (selected) accent else divider)
         }
         val colors = when (mode) {
             ThemePrefs.PressColorMode.Random -> randomPaletteColors()
@@ -247,7 +347,12 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
                 colorsBody.addView(text(context.getString(R.string.cyber_palette_hint), 12f, subdued),
                     LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
                 val cards = PressPaletteCards(context,
-                    runCatching { ThemeManager.activeTheme }.getOrDefault(ThemeManager.DefaultTheme), "effect") { preset ->
+                    ThemePreset.MaterialLight.copy(
+                        isDark = ColorUtils.calculateLuminance(surface) < 0.5,
+                        keyBackgroundColor = surface,
+                        keyTextColor = ink,
+                        dividerColor = divider
+                    ), "effect", accentColor = accent) { preset ->
                     prefs.pressEffectPalette.setValue(preset)
                     renderColors()
                 }
@@ -287,7 +392,8 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
                     text = context.getString(R.string.light_effect_color_add)
                     isAllCaps = false
                     setTextColor(accent)
-                    background = background(0xFF202E3D.toInt(), 0xFF3C526A.toInt())
+                    background = interactiveBackground(selectedSurface, divider)
+                    stateListAnimator = null
                     isEnabled = colors.size < 8
                     alpha = if (isEnabled) 1f else 0.45f
                     setOnClickListener {
@@ -317,7 +423,8 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         isAllCaps = false
         minWidth = 0; minimumWidth = 0
         setPadding(dp(2), 0, dp(2), 0)
-        background = background(color, 0xFF667084.toInt())
+        background = interactiveBackground(color, divider)
+        stateListAnimator = null
         setTextColor(if (ColorUtils.calculateLuminance(color) > 0.179) Color.BLACK else Color.WHITE)
         setOnClickListener { action() }
     }
@@ -340,23 +447,29 @@ class EffectRangeControl(private val context: Context, label: String, private va
     private val min: Int, private val max: Int, private val step: Int, private val unit: String, private val afterCommit: () -> Unit) {
     private fun dp(value: Int) = (value * context.resources.displayMetrics.density).toInt()
     val root = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; tag = pref.key }
-    private val value = TextView(context).apply { setTextColor(0xFF90C9FF.toInt()); textSize = 13f }
+    private val accent = ContextCompat.getColor(context, R.color.ax_settings_accent)
+    private val value = TextView(context).apply { setTextColor(accent); textSize = 13f; setPadding(dp(8), 0, 0, 0) }
     val slider = SeekBar(context).apply {
         tag = "effect-slider-${pref.key}"
         this.max = (this@EffectRangeControl.max - this@EffectRangeControl.min) / step
         progress = (pref.getValue().coerceIn(this@EffectRangeControl.min, this@EffectRangeControl.max) - this@EffectRangeControl.min) / step
-        progressTintList = ColorStateList.valueOf(0xFF90C9FF.toInt())
+        progressTintList = ColorStateList.valueOf(accent)
+        progressBackgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, R.color.ax_settings_divider))
         thumbTintList = progressTintList
         contentDescription = label
     }
 
     init {
         val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        row.addView(TextView(context).apply { text = label; textSize = 14f; setTextColor(0xFFF2F3F8.toInt()) },
+        row.addView(TextView(context).apply {
+            text = label
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(context, R.color.ax_settings_text))
+        },
             LinearLayout.LayoutParams(0, -2, 1f))
         row.addView(value)
-        root.addView(row, LinearLayout.LayoutParams(-1, dp(28)))
-        root.addView(slider, LinearLayout.LayoutParams(-1, dp(36)).apply { bottomMargin = dp(8) })
+        root.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        root.addView(slider, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
         updateLabel(pref.getValue().coerceIn(min, max))
         slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) { updateLabel() }

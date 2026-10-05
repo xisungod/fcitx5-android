@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="axiang_brand_name">AXiang</string>
+    <string name="axiang_brand_tagline">讓每一次輸入，都合你心意</string>
+    <string name="axiang_about_app">AXiang</string>
+    <string name="axiang_about_project">專案與意見回饋</string>
+    <string name="axiang_about_project_summary">查看原始碼、版本與問題回報</string>
+    <string name="axiang_about_privacy">隱私與資料</string>
+    <string name="axiang_about_privacy_summary">瞭解本機輸入、權限和資料管理</string>
+    <string name="axiang_about_privacy_message">文字輸入與語音辨識在裝置本機執行，目前版本未申請網路權限。你主動開啟的外部連結由瀏覽器處理。\n\n開始語音輸入時使用麥克風權限；選用的簡訊驗證碼辨識在你啟用後使用簡訊權限。你可以在系統設定中管理這些權限。\n\n鍵盤偏好、輸入學習資料及啟用後的剪貼簿歷史記錄儲存在本機。剪貼簿歷史記錄可以在剪貼簿設定中清除。手動匯出的備份可能包含個人資料，請自行選擇儲存與分享位置。\n\n系統在啟用任意輸入法時可能顯示標準權限提示，請瞭解相關權限並按需使用。</string>
+    <string name="axiang_about_credits">開源致謝</string>
+    <string name="axiang_about_credits_summary">AXiang 以 Fcitx5 for Android、Rime、sherpa-onnx 等開源專案為基礎，保留原作者版權與各元件授權說明。</string>
+    <string name="axiang_about_legal">授權與致謝</string>
+    <string name="axiang_about_license_summary">AXiang 應用程式原始碼：LGPL-2.1-or-later</string>
+    <string name="axiang_about_build">建置資訊</string>
+    <string name="axiang_about_build_summary">版本編號與問題排查資訊</string>
+    <string name="axiang_build_details">版本：%1$s\n版本編號：%2$d\n應用程式套件：%3$s\n建置類型：%4$s\n提交：%5$s\n建置時間：%6$s</string>
+    <string name="axiang_setup_step">第 %1$d 步，共 %2$d 步</string>
+    <string name="axiang_setup_enable_title">開啟你的輸入體驗</string>
+    <string name="axiang_setup_select_title">準備好，就開始輸入</string>
+</resources>

@@ -155,6 +155,16 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
         }
     }
 
+    /** A neighbouring tap candidate must not fire the old key's pending hold. */
+    internal fun cancelPendingHoldActions() {
+        // Completed long presses and repeats keep their existing gesture state.
+        if (hasConsumedTouchAction) return
+        longPressJob?.cancel()
+        longPressJob = null
+        repeatJob?.cancel()
+        repeatJob = null
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x

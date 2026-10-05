@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-05T05:29:37.721Z" hostname="b891b174da30" time="6.95">
+  <properties/>
+  <testcase name="actualSamCapCompressesContinuouslyAndRemainsVisibleThroughItsRebound" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="1.504"/>
+  <testcase name="idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindBlackCaps" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="0.25"/>
+  <testcase name="samColourTailRemainsVisibleAfterGeometryLandsWithEitherMotionPath" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="0.189"/>
+  <testcase name="oldModesRemainVisuallyDistinctAndDisabledOrDetachedSamStopsDrawing" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="0.274"/>
+  <testcase name="samCapTimingPreferencesChangeRealPixelsWithoutChangingLegacyValues" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="0.071"/>
+  <testcase name="continuousTypingExportsRealFramesAndEachLetterKeepsItsOwnTail" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="4.656"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

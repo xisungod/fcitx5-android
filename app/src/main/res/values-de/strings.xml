@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name_release">Fcitx5</string>
-    <string name="app_name_debug">Fcitx5 (Debug)</string>
+    <string name="app_name_release">AXiang</string>
+    <string name="app_name_debug">AXiang</string>
     <string name="save">Speichern</string>
     <string name="input_methods">Eingabemethoden</string>
     <string name="add_input_method">Eingabemethode hinzufügen</string>
@@ -114,7 +114,7 @@
     <string name="choose_input_method">Eingabemethode auswählen</string>
     <string name="edit_clipboard">Zwischenablage bearbeiten</string>
     <string name="clipboard_edit_text_hint">Inhalt der Zwischenablage</string>
-    <string name="config_addon_not_loaded">Keine Konfigurationsoptionen vorhanden, ist das Addon beim Start von fcitx ausgeschaltet?</string>
+    <string name="config_addon_not_loaded">Keine Konfigurationsoptionen vorhanden, ist das Addon beim Start von AXiang ausgeschaltet?</string>
     <string name="portrait">Hochformat</string>
     <string name="landscape">Querformat</string>
     <string name="disable_addon_warn_title">Addon deaktivieren</string>
@@ -153,7 +153,7 @@
     <string name="horizontal_candidate_style">Stil der horizonttalen Kandidaten</string>
     <string name="num_items_deleted">%1$d Element(e) gelöscht</string>
     <string name="plugins">Plugins</string>
-    <string name="fcitx_daemon">Fcitx Daemon</string>
+    <string name="fcitx_daemon">AXiang Daemon</string>
     <string name="removed_n_items"> %1$d Element(e) entfernt</string>
     <string name="whether_reset_switch_preference">Wollen Sie diese Einstellung auf den Standard zurücksetzen?</string>
     <string name="enabled">Eingeschaltet</string>

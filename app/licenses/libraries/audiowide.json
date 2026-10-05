@@ -1,0 +1,10 @@
+{
+    "uniqueId": "google/fonts/audiowide",
+    "artifactVersion": "1.003",
+    "description": "Rounded square Latin and numeric keyboard legends. Copyright (c) 2012, Brian J. Bonislawsky DBA Astigmatic (AOETI), with Reserved Font Names Audiowide. Bundled unmodified; full SIL Open Font License is packaged in res/raw/audiowide_ofl.txt.",
+    "name": "Audiowide",
+    "website": "https://fonts.google.com/specimen/Audiowide",
+    "licenses": [
+        "OFL-1.1"
+    ]
+}

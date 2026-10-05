@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ax_light_advanced">动画与柔光</string>
+    <string name="ax_light_advanced_summary">时长、余色、亮度和候选栏</string>
+    <string name="ax_light_expanded">已展开</string>
+    <string name="ax_light_collapsed">已收起</string>
+</resources>

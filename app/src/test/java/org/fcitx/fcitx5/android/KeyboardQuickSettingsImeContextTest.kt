@@ -11,9 +11,11 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Looper
+import android.os.Bundle
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.view.ViewGroup
+import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -184,7 +186,7 @@ class KeyboardQuickSettingsImeContextTest {
         }
     }
 
-    private inner class Host : AutoCloseable {
+    private inner class Host(private val widthDp: Int = 360) : AutoCloseable {
         private val serviceController = Robolectric.buildService(RecordingImeService::class.java).create()
         val service = serviceController.get()
         // Identical wrapper resource to BaseInputView.themedContext; no Activity in this chain.
@@ -193,7 +195,7 @@ class KeyboardQuickSettingsImeContextTest {
         val activity = activityController.get()
         val shell = LinearLayout(imeContext).apply { orientation = LinearLayout.VERTICAL }
         private val frame = FrameLayout(activity).apply {
-            addView(shell, FrameLayout.LayoutParams(imeContext.dp(360), imeContext.dp(318)))
+            addView(shell, FrameLayout.LayoutParams(imeContext.dp(widthDp), imeContext.dp(318)))
         }
 
         init {
@@ -207,7 +209,7 @@ class KeyboardQuickSettingsImeContextTest {
         fun settle() {
             // Exercise real pending layout/transition/selection work with animations enabled.
             advance(160)
-            shell.measure(View.MeasureSpec.makeMeasureSpec(imeContext.dp(360), View.MeasureSpec.EXACTLY),
+            shell.measure(View.MeasureSpec.makeMeasureSpec(imeContext.dp(widthDp), View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(imeContext.dp(318), View.MeasureSpec.EXACTLY))
             shell.layout(0, 0, shell.measuredWidth, shell.measuredHeight)
             shell.viewTreeObserver.dispatchOnPreDraw()
@@ -257,6 +259,8 @@ class KeyboardQuickSettingsImeContextTest {
                     assertServiceWidgets(ui.root, host.service)
                     assertServiceWidgets(ui.extension, host.service)
                     assertTrue(ui.root.isAttachedToWindow && ui.root.isShown)
+                    assertTrue(ui.root.findViewWithTag<View>("quick_open_feel").performClick())
+                    host.settle()
                     val preview = ui.root.findViewWithTag<View>("quick_motion_preview")
                     val previewEnabled = motion == ThemePrefs.KeyMotionEffect.Press && !disabled
                     assertEquals("Preview enablement respects $motion and disableAnimation=$disabled", previewEnabled, preview.isEnabled)
@@ -264,6 +268,9 @@ class KeyboardQuickSettingsImeContextTest {
                         assertTrue("The actual animated motion preview remains interactive", preview.performClick())
                         host.settle()
                     } else assertFalse("A disabled preview cannot start an animation", preview.performClick())
+                    ui.root.findViewWithTag<View>("quick_page_back").performClick()
+                    ui.root.findViewWithTag<View>("quick_key_width_expand").performClick()
+                    host.settle()
                     val layout = ui.root.findViewWithTag<Spinner>("quick_key_width_layout")
                     assertNotNull(layout)
                     layout.setSelection(1)
@@ -271,7 +278,9 @@ class KeyboardQuickSettingsImeContextTest {
                     layout.setSelection(0)
                     host.settle()
                     assertNotNull(ui.root.findViewWithTag<View>("quick_key_width_preview"))
-                    val toggles = descendants(ui.root).filterIsInstance<SwitchCompat>()
+                    ui.root.findViewWithTag<View>("quick_page_back").performClick()
+                    host.settle()
+                    val toggles = descendants(ui.root).filterIsInstance<SwitchCompat>().filter { it.isShown }
                     assertTrue("The actual quick panel must contain its compatibility switches", toggles.size >= 3)
                     toggles.forEach { drawSwitch(it).recycle() }
                     val numberRow = ui.root.findViewWithTag<SwitchCompat>("quick_number_row")
@@ -348,7 +357,7 @@ class KeyboardQuickSettingsImeContextTest {
                 assertTrue(holder!!.itemView.performClick())
                 host.settle()
                 assertTrue("The selected settings Window must remain current after pending transitions", windows.currentWindow is KeyboardQuickSettingsWindow)
-                val panel = windows.view.findViewWithTag<View>("quick_motion_preview")
+                val panel = windows.view.findViewWithTag<View>("quick_page_home")
                 assertNotNull(panel)
                 assertTrue(panel.isAttachedToWindow && panel.isShown)
                 assertTrue(windows.view.isAttachedToWindow && windows.view.isShown)
@@ -369,6 +378,159 @@ class KeyboardQuickSettingsImeContextTest {
                 assertEquals("Back discards, while Done applies the actual switch choice",
                     if (visit == 0) originalRow else !originalRow, rowPreference.getValue())
                 host.assertVisible()
+            }
+        }
+    }
+
+    @Test fun shortcutsFitTheKeyboardAndNestedPagesKeepOneDraftUntilDone() {
+        Host().use { host ->
+            val storage = host.service.getSharedPreferences("ime-settings-navigation", Context.MODE_PRIVATE)
+            storage.edit().clear().commit()
+            val draft = KeyboardQuickSettingsDraft(ThemePrefs(storage), AppPrefs(storage).keyboard)
+            var exits = 0
+            val ui = KeyboardQuickSettingsUi(host.imeContext, ThemePreset.Sam, draft, false,
+                onDone = { draft.apply(); exits++ }, onCancel = { exits++ },
+                onHeight = { exits++ }, onMore = { exits++ })
+            try {
+                host.shell.addView(ui.extension, LinearLayout.LayoutParams(-1, host.imeContext.dp(48)))
+                host.shell.addView(ui.root, LinearLayout.LayoutParams(-1, host.imeContext.dp(260)))
+                host.settle()
+                val home = ui.root.findViewWithTag<android.widget.ScrollView>("quick_page_home")
+                assertFalse("The 260 dp shortcut homepage must not need scrolling", home.canScrollVertically(1))
+                val before = draft.values.numberRow
+                ui.root.findViewWithTag<SwitchCompat>("quick_number_row").performClick()
+                ui.root.findViewWithTag<View>("quick_open_feel").performClick()
+                host.settle()
+                val mode = ui.root.findViewWithTag<Spinner>("quick_haptic_mode")
+                mode.setSelection(org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode.Disabled.ordinal)
+                host.settle()
+                ui.root.findViewWithTag<View>("quick_page_back").performClick()
+                host.settle()
+                assertEquals(!before, ui.root.findViewWithTag<SwitchCompat>("quick_number_row").isChecked)
+                assertFalse("The home vibration switch reflects the detailed mode", ui.root.findViewWithTag<SwitchCompat>("quick_haptic").isChecked)
+                ui.root.findViewWithTag<SwitchCompat>("quick_haptic").performClick()
+                ui.root.findViewWithTag<View>("quick_open_feel").performClick()
+                host.settle()
+                assertEquals("A shortcut change is reflected when opening its detail page", draft.values.hapticMode.ordinal, mode.selectedItemPosition)
+                assertNotEquals(org.fcitx.fcitx5.android.data.InputFeedbacks.InputFeedbackMode.Disabled, draft.values.hapticMode)
+                assertTrue("Subpage navigation must never save a partial draft", storage.all.isEmpty())
+                assertEquals(0, exits)
+                // Compact keyboards still keep both exit actions above the scrollable detail content.
+                ui.root.layoutParams = LinearLayout.LayoutParams(-1, host.imeContext.dp(180))
+                host.settle()
+                for (tag in listOf("quick_page_back", "quick_more", "quick_cancel")) {
+                    val control = ui.root.findViewWithTag<View>(tag)
+                    val bounds = Rect().also { control.getDrawingRect(it); ui.root.offsetDescendantRectToMyCoords(control, it) }
+                    assertTrue("$tag must remain inside a short keyboard", bounds.top >= 0 && bounds.bottom <= ui.root.height)
+                    assertTrue(control.isShown)
+                }
+                ui.extension.findViewWithTag<View>("quick_done").performClick()
+                assertEquals(1, exits)
+                assertEquals(!before, ThemePrefs(storage).portraitNumberRow.getValue())
+                host.assertVisible()
+            } finally { ui.dispose() }
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w320dp-h800dp-mdpi")
+    fun largeTextKeepsShortcutLabelsClearOfTheSwitchAndActionsReachable() {
+        RuntimeEnvironment.setFontScale(1.4f)
+        Host(320).use { host ->
+            val storage = host.service.getSharedPreferences("ime-settings-large-text", Context.MODE_PRIVATE)
+            storage.edit().clear().commit()
+            val draft = KeyboardQuickSettingsDraft(ThemePrefs(storage), AppPrefs(storage).keyboard)
+            val ui = KeyboardQuickSettingsUi(host.imeContext, ThemePreset.Sam, draft, false,
+                onDone = {}, onCancel = {}, onHeight = {}, onMore = {})
+            try {
+                host.shell.addView(ui.extension, LinearLayout.LayoutParams(-1, host.imeContext.dp(48)))
+                host.shell.addView(ui.root, LinearLayout.LayoutParams(-1, host.imeContext.dp(260)))
+                host.settle()
+                for (tag in listOf("quick_number_row", "quick_popup", "quick_haptic", "quick_press_effect")) {
+                    val toggle = ui.root.findViewWithTag<SwitchCompat>(tag)
+                    val textLayout = requireNotNull(toggle.layout)
+                    val availableWidth = toggle.width - toggle.compoundPaddingLeft - toggle.compoundPaddingRight
+                    assertTrue("$tag keeps text away from its switch", (0 until textLayout.lineCount).all {
+                        textLayout.getLineMax(it) <= availableWidth + 1
+                    })
+                    assertTrue("$tag grows to show its final line", textLayout.getLineBottom(textLayout.lineCount - 1) <=
+                        toggle.height - toggle.totalPaddingTop - toggle.totalPaddingBottom)
+                    assertTrue("$tag has at least a 48 dp touch target", toggle.height >= host.imeContext.dp(48))
+                    drawSwitch(toggle).recycle()
+                }
+                for (tag in listOf("quick_more", "quick_cancel")) {
+                    val button = ui.root.findViewWithTag<View>(tag)
+                    val bounds = Rect()
+                    assertTrue(button.getGlobalVisibleRect(bounds))
+                    assertEquals("Fixed actions remain fully visible with large text", button.height, bounds.height())
+                    assertTrue(button.height >= host.imeContext.dp(48))
+                }
+                val image = Bitmap.createBitmap(ui.root.width, ui.root.height, Bitmap.Config.ARGB_8888)
+                ui.root.draw(Canvas(image))
+                java.io.File("build/outputs/effect-checks/keyboard-controls/settings-home-large-text.png").apply {
+                    parentFile.mkdirs()
+                    outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                }
+                image.recycle()
+            } finally { ui.dispose() }
+        }
+    }
+
+    @Test fun quickSamColourSlidersStageTheirOwnValuesAndRetainEditsWhenSwitchingModes() {
+        Host().use { host ->
+            val storage = host.service.getSharedPreferences("ime-sam-colour-draft", Context.MODE_PRIVATE)
+            storage.edit().clear().putInt("press_key_retreat_time", 1783).commit()
+            val theme = ThemePrefs(storage)
+            val draft = KeyboardQuickSettingsDraft(theme, AppPrefs(storage).keyboard)
+            val ui = KeyboardQuickSettingsUi(host.imeContext, ThemePreset.Sam, draft, false,
+                onDone = { draft.apply() }, onCancel = {}, onHeight = {}, onMore = {})
+            try {
+                host.shell.addView(ui.extension, LinearLayout.LayoutParams(-1, host.imeContext.dp(48)))
+                host.shell.addView(ui.root, LinearLayout.LayoutParams(-1, host.imeContext.dp(270)))
+                host.settle()
+                ui.root.findViewWithTag<View>("quick_open_effects").performClick()
+                host.settle()
+                val shape = ui.root.findViewWithTag<Spinner>("quick_ripple_shape")
+                val hold = ui.root.findViewWithTag<SeekBar>("quick_sam_key_hold")
+                val fade = ui.root.findViewWithTag<SeekBar>("quick_sam_key_retreat")
+                val legacy = ui.root.findViewWithTag<SeekBar>("quick_key_retreat")
+                fun shown(bar: SeekBar) = (bar.parent as View).visibility == View.VISIBLE
+                assertTrue(shown(hold))
+                assertTrue(shown(fade))
+                assertFalse(shown(legacy))
+                assertEquals(8, hold.progress)
+                assertEquals(70, fade.progress)
+                fun choose(bar: SeekBar, progress: Int) {
+                    assertTrue(bar.performAccessibilityAction(
+                        AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,
+                        Bundle().apply {
+                            putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, progress.toFloat())
+                        }))
+                }
+                choose(hold, 16)
+                choose(fade, 130)
+                assertEquals(160, draft.values.samKeyHoldTime)
+                assertEquals(1400, draft.values.samKeyRetreatTime)
+                assertEquals(800, theme.samKeyRetreatTime.getValue())
+                shape.setSelection(ThemePrefs.RippleShape.SoftMist.ordinal)
+                host.settle()
+                assertTrue(shown(legacy))
+                assertFalse(shown(fade))
+                choose(legacy, 21)
+                assertEquals(230, draft.values.keyRetreatTime)
+                assertEquals(1400, draft.values.samKeyRetreatTime)
+                shape.setSelection(ThemePrefs.RippleShape.Sam.ordinal)
+                host.settle()
+                assertTrue(shown(fade))
+                assertFalse(shown(legacy))
+                assertEquals(130, fade.progress)
+                assertTrue(ui.extension.findViewWithTag<View>("quick_done").performClick())
+                assertEquals(160, theme.samKeyHoldTime.getValue())
+                assertEquals(1400, theme.samKeyRetreatTime.getValue())
+                assertEquals(230, theme.pressKeyRetreatTime.getValue())
+                host.assertVisible()
+            } finally {
+                ui.dispose()
             }
         }
     }

@@ -4,14 +4,19 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/ax_settings_background"
     tools:context=".ui.main.MainActivity">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?android:attr/colorPrimary"
-        android:elevation="4dp"
+        android:background="@color/ax_settings_background"
+        android:minHeight="60dp"
+        app:titleTextAppearance="@style/AXiang.ToolbarTitle"
+        app:subtitleTextColor="@color/ax_settings_secondary"
+        app:contentInsetStartWithNavigation="4dp"
+        android:elevation="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />

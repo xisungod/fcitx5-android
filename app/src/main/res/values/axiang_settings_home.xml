@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ax_settings_title">Settings</string>
+    <string name="ax_settings_tagline">A keyboard that feels like you</string>
+    <string name="ax_settings_search">Search settings</string>
+    <string name="ax_settings_no_results">No matching settings. Try keyboard, sound or backup.</string>
+    <string name="ax_settings_clear_search">Clear search</string>
+    <string name="ax_settings_daily">Make it yours</string>
+    <string name="ax_settings_input">Typing experience</string>
+    <string name="ax_settings_general">General</string>
+    <string name="ax_settings_appearance">Themes</string>
+    <string name="ax_settings_appearance_summary">Keyboard colors and backgrounds</string>
+    <string name="ax_settings_effects">Key lighting</string>
+    <string name="ax_settings_effects_summary">SAM ripples, palettes and glow</string>
+    <string name="ax_settings_layout">Keyboard &amp; layout</string>
+    <string name="ax_settings_layout_summary">Height, width, key labels and gestures</string>
+    <string name="ax_settings_feedback">Sound &amp; vibration</string>
+    <string name="ax_settings_feedback_summary">Key sounds, volume and haptic strength</string>
+    <string name="ax_settings_typing">Typing &amp; suggestions</string>
+    <string name="ax_settings_typing_summary">Fuzzy pinyin, dictionaries and candidate layout</string>
+    <string name="ax_settings_clipboard_summary">History, suggestions and verification codes</string>
+    <string name="ax_settings_symbols_summary">Frequently used symbols and emoji preferences</string>
+    <string name="ax_settings_data">Data &amp; compatibility</string>
+    <string name="ax_settings_data_summary">Backup, restore and device compatibility</string>
+    <string name="ax_settings_tools">Extensions &amp; advanced</string>
+    <string name="ax_settings_tools_summary">Input languages, engines and diagnostic tools</string>
+    <string name="ax_settings_about">About AXiang</string>
+    <string name="ax_settings_about_summary">Version, feedback and open source acknowledgments</string>
+    <string name="ax_settings_engine_hint">Advanced options for input engines and external keyboards. Your everyday controls are on the settings home screen.</string>
+    <string name="ax_settings_engines">Input engines</string>
+    <string name="ax_settings_utilities">Tools</string>
+    <string name="ax_settings_quick_tip">While typing, open the keyboard toolbar for quick settings.</string>
+</resources>

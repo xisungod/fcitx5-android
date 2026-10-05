@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="axiang_keyboard_dimensions">Keyboard size</string>
+    <string name="axiang_keyboard_display">Keys and toolbar</string>
+    <string name="axiang_keyboard_gestures">Gestures and long press</string>
+    <string name="axiang_keyboard_haptics">Key vibration</string>
+    <string name="axiang_keyboard_sound">Key sounds</string>
+    <string name="axiang_keyboard_haptic_details">Fine-tune vibration</string>
+    <string name="axiang_keyboard_other">Other settings</string>
+    <string name="axiang_keyboard_related">Related settings</string>
+    <string name="axiang_keyboard_layout_entry">Layout and gestures</string>
+    <string name="axiang_keyboard_feedback_entry">Sound and vibration</string>
+    <string name="axiang_keyboard_typing_entry">Typing preferences</string>
+    <string name="axiang_typing_fuzzy">Fuzzy pinyin</string>
+    <string name="axiang_typing_dictionary">Personal dictionary</string>
+    <string name="axiang_typing_candidates">Candidate layout</string>
+    <string name="axiang_typing_behavior">Typing assistance</string>
+    <string name="axiang_typing_fuzzy_nl">n / l</string>
+    <string name="axiang_typing_fuzzy_zh">z / zh, c / ch, s / sh</string>
+    <string name="axiang_typing_fuzzy_ang">an / ang</string>
+    <string name="axiang_typing_apply">Apply fuzzy pinyin</string>
+    <string name="axiang_typing_apply_summary">Use the built-in Chinese input method, then apply to update its dictionary configuration.</string>
+    <string name="axiang_typing_candidate_window_entry">Floating candidate window</string>
+</resources>

@@ -239,4 +239,34 @@ class KeyboardQuickSettingsDraftTest {
         assertEquals(ThemePrefs.PressColorMode.Custom, theme.pressColorMode.getValue())
         assertEquals("#18FFC1,#D96EFF", theme.pressUserColors.getValue())
     }
+
+    @Test fun samAndLegacyColourEditsStayIndependentAcrossModeChangesAndConcurrentUpdates() {
+        val stored = storage("quick-sam-colour-timing")
+        val theme = ThemePrefs(stored)
+        val keyboard = AppPrefs(stored).keyboard
+        theme.pressKeyHoldTime.setValue(37)
+        theme.pressKeyRetreatTime.setValue(1783)
+        val draft = KeyboardQuickSettingsDraft(theme, keyboard)
+        assertEquals(80, draft.values.samKeyHoldTime)
+        assertEquals(800, draft.values.samKeyRetreatTime)
+        draft.values = draft.values.copy(samKeyHoldTime = 160, samKeyRetreatTime = 1400)
+        draft.values = draft.values.copy(rippleShape = ThemePrefs.RippleShape.SoftMist)
+        draft.values = draft.values.copy(rippleShape = ThemePrefs.RippleShape.Sam)
+        assertEquals("Staging Sam controls cannot persist before Done", 800, theme.samKeyRetreatTime.getValue())
+        assertTrue(draft.apply())
+        assertEquals(160, theme.samKeyHoldTime.getValue())
+        assertEquals(1400, theme.samKeyRetreatTime.getValue())
+        assertEquals(37, theme.pressKeyHoldTime.getValue())
+        assertEquals(1783, theme.pressKeyRetreatTime.getValue())
+
+        val reopened = KeyboardQuickSettingsDraft(theme, keyboard)
+        reopened.values = reopened.values.copy(rippleShape = ThemePrefs.RippleShape.IrregularFluid,
+            keyRetreatTime = 230)
+        theme.samKeyHoldTime.setValue(190)
+        theme.samKeyRetreatTime.setValue(1573)
+        assertTrue(reopened.apply())
+        assertEquals(230, theme.pressKeyRetreatTime.getValue())
+        assertEquals("Changing another mode preserves a concurrent Sam hold edit", 190, theme.samKeyHoldTime.getValue())
+        assertEquals(1573, theme.samKeyRetreatTime.getValue())
+    }
 }

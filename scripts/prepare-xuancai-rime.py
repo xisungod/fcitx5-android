@@ -7,6 +7,8 @@ from pathlib import Path
 import tarfile
 import urllib.request
 import zipfile
+import subprocess
+import sys
 
 REV = '3aea6d3694fb3d94ec663641f021f788822897ad'
 SHA256 = 'a170d79442f7463118fbfde089f62d046710475436e3c5347de2cf1aeaa95b48'
@@ -75,12 +77,13 @@ schema = schema.replace('  algebra:\n', '  algebra:\n    # Mobile omission toler
 schema = schema.replace('    - ascii_composer\n', '    - lua_processor@*xuancai_ascii\n    - ascii_composer\n', 1)
 schema = schema.replace('    - script_translator\n', '    - script_translator\n    - script_translator@xuancai_user\n    - lua_translator@*xuancai_correction\n', 1)
 schema += '\nxuancai_correction:\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: true\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n  spelling_hints: 32\n  always_show_comments: true\n  initial_quality: 0.2\n'
-schema += '\nxuancai_exact:\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: false\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n'
+schema += '\nxuancai_exact:\n  spelling_hints: 32\n  always_show_comments: true\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: false\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n'
 schema += '\nxuancai_user:\n  dictionary: xuancai_user\n  enable_completion: false\n  enable_word_completion: false\n  enable_sentence: false\n  enable_user_dict: false\n  initial_quality: 1.1\n'
 schema += '\n# Xuancai mobile settings (user copy takes precedence).\n__patch: xuancai_mobile:/patch\ngrammar:\n  language: zh-hans-t-essay-bgw-compact\n'
 schema_path.write_text(schema)
-for script in ['xuancai_correction.lua', 'xuancai_ascii.lua']:
+for script in ['xuancai_correction.lua', 'xuancai_ascii.lua', 'axiang_typo_index.lua', 'axiang_qwerty_neighbors.lua']:
     (stage / 'lua' / script).write_bytes((Path(__file__).parent / 'rime' / script).read_bytes())
+subprocess.run([sys.executable, str(Path(__file__).with_name('build-axiang-typo-index.py')), str(stage)], check=True)
 (stage / 'xuancai_mobile.yaml').write_text('# Managed by Xuancai\npatch: {}\n')
 MODEL_URL = 'https://github.com/lotem/rime-octagram-data/releases/download/20260712/zh-hans-t-essay-bgw-compact.gram'
 MODEL_SHA = 'd3cb2438c1fdcd6a855dd6ca8f5c1060a29273c6b64c2c2c69af67cd71b6aa7e'
@@ -118,6 +121,7 @@ manifest = {
         'mobile_vocabulary': {'table': 'cn_dicts/xuancai_mobile', 'source': 'Original, explicitly annotated Xuancai vocabulary', 'license': 'GPL-3.0-only'},
         'personal_dictionary': {'file': 'xuancai_user.dict.yaml', 'schema': 'xuancai_user.schema.yaml', 'format': 'UTF-8 word<TAB>space-separated-pinyin<TAB>integer-weight', 'deployment': 'Small independent dictionary; rime_ice.table.bin is reused'},
         'nine_key_pinyin': {'schema': 'rime_ice_t9.schema.yaml', 'dictionary': 'rime_ice', 'prism': 'rime_ice_t9', 'mapping': 'abcdefghijklmnopqrstuvwxyz -> 22233344455566677778889999', 'personal_prism': 'xuancai_user_t9', 'deployment': 'Independent small prisms reuse the same Chinese and personal tables; alphabetic rime_ice remains the first/default schema'},
+        'adjacent_key_correction': {'index': 'lua/axiang_typo/SOURCE.json', 'scope': '2-5 Chinese characters, 4-24 Pinyin letters, up to two horizontal or diagonal QWERTY substitutions', 'behavior': 'Additional candidates only; raw input and complete exact dictionary candidates are preserved'},
     },
     'raw_dictionary_rows': counts,
     'files_sha256': {str(p.relative_to(stage)): hashlib.sha256(p.read_bytes()).hexdigest()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile tables and exercise candidates with the same librime release as the Android plugin."""
 from pathlib import Path
-import argparse, hashlib, json, os, shutil, subprocess, tarfile, time, urllib.request
+import argparse, hashlib, json, os, shutil, subprocess, sys, tarfile, time, urllib.request
 parser=argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,default=Path.cwd())
 parser.add_argument('--work',type=Path,required=True)
@@ -39,6 +39,19 @@ cold=work/'cold-user';cold.mkdir(exist_ok=True)
 result=subprocess.run([str(smoke),str(stage),str(cold),str(stage/'build')],check=True,text=True,stdout=subprocess.PIPE)
 print(result.stdout)
 checks=work/'checks';checks.mkdir(exist_ok=True);(checks/'native-candidates.txt').write_text(result.stdout)
+adjacent_smoke=work/'rime-adjacent-smoke'
+subprocess.run(['gcc',str(Path(__file__).parent/'check-axiang-adjacent-correction.c'),'-I'+str(work/'librime/src'),'-L'+str(build/'lib'),'-Wl,-rpath,'+str(build/'lib'),'-lrime','-o',str(adjacent_smoke)],check=True)
+adjacent_user=work/'adjacent-user'
+if adjacent_user.exists(): shutil.rmtree(adjacent_user)
+adjacent_user.mkdir()
+adjacent_result=subprocess.run([str(adjacent_smoke),str(stage),str(adjacent_user),str(stage/'build')],check=True,text=True,stdout=subprocess.PIPE)
+(checks/'native-adjacent-candidates.txt').write_text(adjacent_result.stdout)
+print(adjacent_result.stdout)
+index_result=subprocess.run([sys.executable,str(Path(__file__).parent/'check-axiang-typo-index.py'),'--stage',str(stage)],check=True,text=True,stdout=subprocess.PIPE)
+(checks/'adjacent-index.json').write_text(index_result.stdout)
+index_summary=json.loads(index_result.stdout)
+print('Adjacent index: %s directed key pairs, %s queries; bounded cache/search checks passed.' %
+      (index_summary['directed_neighbour_pairs'], index_summary['queries']))
 t9_smoke=work/'rime-t9-smoke'
 subprocess.run(['gcc',str(Path(__file__).parent/'check-axiang-rime-t9.c'),'-I'+str(work/'librime/src'),'-L'+str(build/'lib'),'-Wl,-rpath,'+str(build/'lib'),'-lrime','-o',str(t9_smoke)],check=True)
 t9_user=work/'t9-user'
@@ -61,6 +74,8 @@ assert all(rule not in normal['speller']['algebra'] for rule in rules), 'Fuzzy m
 assert normal['grammar']['language']=='zh-hans-t-essay-bgw-compact'
 assert normal['xuancai_correction']['enable_correction'] is True
 assert normal['translator']['enable_correction'] is False
+assert normal['xuancai_exact']['spelling_hints'] == 32
+assert normal['xuancai_exact']['always_show_comments'] is True
 assert 'lua_translator@*xuancai_correction' in normal['engine']['translators']
 assert 'script_translator@xuancai_user' in normal['engine']['translators']
 assert 'xuancai_user' in normal['schema']['dependencies']

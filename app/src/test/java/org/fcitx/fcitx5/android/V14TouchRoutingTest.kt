@@ -237,12 +237,15 @@ class V14TouchRoutingTest {
     }
 
     @Test
-    fun aFinalUpRetargetedToAnotherLetterCannotLeaveThatNewKeyHeld() {
+    fun anEstablishedSlideFinalUpCannotLeaveItsNewKeyHeld() {
         val h = Harness()
         try {
             val baseline = h.render()
             val normalH = h.sample(baseline, "H")
-            h.event(MotionEvent.ACTION_DOWN, 23 to "G")
+            h.event(MotionEvent.ACTION_DOWN, 23 to "F")
+            h.event(MotionEvent.ACTION_MOVE, 23 to "G")
+            h.advance(64)
+            h.event(MotionEvent.ACTION_MOVE, 23 to "G")
             h.advance(30)
             h.event(MotionEvent.ACTION_UP, 23 to "H")
             assertEquals("Lift-off routing must commit only the newly selected letter", listOf("h"), h.typed)

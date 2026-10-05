@@ -15,7 +15,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.graphics.drawable.DrawerArrowDrawable
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
@@ -32,7 +31,6 @@ import org.fcitx.fcitx5.android.ui.setup.SetupActivity
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 import org.fcitx.fcitx5.android.utils.parcelable
 import org.fcitx.fcitx5.android.utils.startActivity
-import splitties.dimensions.dp
 import splitties.views.topPadding
 
 class MainActivity : AppCompatActivity() {
@@ -89,9 +87,10 @@ class MainActivity : AppCompatActivity() {
             supportActionBar!!.title = it
         }
         viewModel.toolbarShadow.observe(this) {
-            binding.toolbar.elevation = dp(if (it) 4f else 0f)
+            binding.toolbar.elevation = 0f
         }
         navController.addOnDestinationChangedListener { _, dest, _ ->
+            supportActionBar?.setDisplayHomeAsUpEnabled(!dest.hasRoute<SettingsRoute.Index>())
             dest.label?.let { viewModel.setToolbarTitle(it.toString()) }
             if (dest.hasRoute<SettingsRoute.Theme>()) {
                 viewModel.disableToolbarShadow()

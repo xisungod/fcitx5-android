@@ -8,17 +8,25 @@ on:
       # pull request's head branch was updated
       - synchronize
 
+permissions:
+  contents: read
+
+concurrency:
+  group: axiang-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   build_pull_request:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-24.04
-          - macos-15-intel
-          - macos-26
-          - windows-2025
+    # The bundled offline speech runtime is prepared for arm64 only. Use the
+    # same complete data/native checks as the development build on Linux.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "1"
+      BUILD_VERSION_NAME: pr-${{ github.event.pull_request.number }}.${{ github.run_number }}
+      BUILD_COMMIT_HASH: ${{ github.sha }}
+      XUANCAI_APP_SUFFIX: .axiang.pr.r${{ github.run_id }}
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -35,56 +43,67 @@ jobs:
       - name: Setup Android environment
         uses: android-actions/setup-android@v4
 
-      - name: Install Android NDK
+      - name: Install CMake and Rime verification dependencies
         run: |
           sdkmanager --install "cmake;3.31.6"
+          sudo apt-get update -qq
+          sudo apt-get install -y extra-cmake-modules gettext cmake ninja-build pkg-config libboost-regex-dev libyaml-cpp-dev libmarisa-dev libopencc-dev libleveldb-dev liblua5.4-dev libgoogle-glog-dev python3-yaml
 
-      - name: Install system dependencies (Ubuntu)
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
-        run: |
-          sudo apt update
-          sudo apt install extra-cmake-modules gettext
+      - name: Prepare pinned Rime dictionaries and grammar
+        run: python3 scripts/prepare-xuancai-rime.py
 
-      - name: Install system dependencies (macOS)
-        if: ${{ startsWith(matrix.os, 'macos') }}
-        run: |
-          brew install extra-cmake-modules
+      - name: Prepare complete offline speech runtime and models
+        run: python3 scripts/prepare-axiang-asr.py
 
-      - name: Install system dependencies (Windows)
-        if: ${{ startsWith(matrix.os, 'windows') }}
+      - name: Verify actual offline speech and punctuation inference
         run: |
-          C:/msys64/usr/bin/pacman -Syu --noconfirm
-          C:/msys64/usr/bin/pacman -S --noconfirm mingw-w64-ucrt-x86_64-gettext mingw-w64-ucrt-x86_64-extra-cmake-modules
-          Add-Content $env:GITHUB_PATH "C:/msys64/ucrt64/bin"
+          python3 -m venv "$RUNNER_TEMP/axiang-asr-check"
+          "$RUNNER_TEMP/axiang-asr-check/bin/pip" install sherpa-onnx==1.13.8 numpy
+          "$RUNNER_TEMP/axiang-asr-check/bin/python" scripts/check-axiang-asr.py --output "$RUNNER_TEMP/axiang-asr-checks.json"
+
+      - name: Precompile Rime dictionaries and verify native candidates
+        run: python3 scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/axiang-rime-host"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build Release APK
-        run: |
-          ./gradlew :app:assembleRelease
-          ./gradlew :assembleReleasePlugins
+      - name: Build the complete PR APK and run JVM tests
+        # Validate the checked-out PR merge tree, including native code and data.
+        # Do not reconstruct an older checkout from the distribution patches.
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest
 
-      - name: Upload app
+      - name: Verify the signed APK and all bundled offline assets
+        run: |
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/debug/*.apk)
+          test "${#apks[@]}" -eq 1
+          mkdir -p "$RUNNER_TEMP/axiang-pr"
+          cp "${apks[0]}" "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk"
+          sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk"
+          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk" \
+            --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" \
+            --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" \
+            --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE"
+          cd "$RUNNER_TEMP/axiang-pr"
+          sha256sum axiang-pr-arm64.apk > SHA256SUMS.txt
+
+      - name: Upload test and native verification evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: app-${{ matrix.os }}
-          path: app/build/outputs/apk/release/
+          name: axiang-pr-checks-${{ github.run_id }}
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            ${{ runner.temp }}/axiang-rime-host/checks/
+            ${{ runner.temp }}/axiang-asr-checks.json
+          if-no-files-found: warn
+          retention-days: 14
 
-      - name: Pack plugins
-        shell: bash
-        run: |
-          mkdir plugins-to-upload
-          for i in $(ls plugin)
-          do
-            if [ -d "plugin/${i}" ]
-            then
-              mv "plugin/${i}/build/outputs/apk/release" "plugins-to-upload/${i}"
-            fi
-          done
-
-      - name: Upload plugins
+      - name: Upload verified PR APK
         uses: actions/upload-artifact@v7
         with:
-          name: plugins-${{ matrix.os }}
-          path: plugins-to-upload
+          name: axiang-pr-${{ github.run_id }}-arm64
+          path: ${{ runner.temp }}/axiang-pr/*
+          if-no-files-found: error
+          retention-days: 14

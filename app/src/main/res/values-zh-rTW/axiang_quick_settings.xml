@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="axiang_quick_title">快捷設定</string>
+    <string name="axiang_quick_number_row">數字行</string>
+    <string name="axiang_quick_popup">按鍵氣泡</string>
+    <string name="axiang_quick_haptic">按鍵震動</string>
+    <string name="axiang_quick_press_effect">按鍵光效</string>
+    <string name="axiang_quick_height">鍵盤高度</string>
+    <string name="axiang_quick_effects">光效與配色</string>
+    <string name="axiang_quick_feel">按鍵手感</string>
+    <string name="axiang_quick_width">鍵位寬度</string>
+    <string name="axiang_quick_feedback">震動回饋</string>
+    <string name="axiang_quick_back">‹ 快捷設定</string>
+    <string name="axiang_quick_save_hint">完成後儲存</string>
+    <string name="axiang_quick_done_description">儲存設定並返回輸入</string>
+    <string name="axiang_quick_more_description">儲存並開啟 AXiang 更多設定</string>
+    <string name="axiang_quick_effects_hint">選擇喜歡的配色，調整亮度與鬆手後的餘光。</string>
+    <string name="axiang_quick_width_hint">點選預覽中的按鍵，再調整寬度。點「完成」統一儲存。</string>
+</resources>

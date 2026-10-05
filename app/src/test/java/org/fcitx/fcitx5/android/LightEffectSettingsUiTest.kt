@@ -9,6 +9,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.ColorDrawable
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
@@ -26,6 +27,8 @@ import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
@@ -106,7 +109,7 @@ class LightEffectSettingsUiTest {
     }
 
     private fun activity() = Robolectric.buildActivity(AppCompatActivity::class.java).also {
-        it.get().setTheme(R.style.Theme_FcitxAppTheme)
+        it.get().setTheme(R.style.Theme_AXiang)
     }.setup()
 
     private fun layout(view: View, width: Int = 600, height: Int = 1260) {
@@ -148,13 +151,83 @@ class LightEffectSettingsUiTest {
         val area = Rect(position[0] - origin[0], position[1] - origin[1],
             position[0] - origin[0] + slider.width, position[1] - origin[1] + slider.height)
         assertTrue("Slider must lie within the captured viewport", area.intersect(0, 0, bitmap.width, bitmap.height))
-        var bluePixels = 0
+        val accent = ContextCompat.getColor(viewport.context, R.color.ax_settings_accent)
+        var accentPixels = 0
         for (y in area.top until area.bottom) for (x in area.left until area.right) {
             val color = bitmap.getPixel(x, y)
-            if (Color.alpha(color) > 240 && abs(Color.red(color) - 144) < 20 &&
-                abs(Color.green(color) - 201) < 20 && Color.blue(color) > 235) bluePixels++
+            if (Color.alpha(color) > 240 && abs(Color.red(color) - Color.red(accent)) < 20 &&
+                abs(Color.green(color) - Color.green(accent)) < 20 &&
+                abs(Color.blue(color) - Color.blue(accent)) < 20) accentPixels++
         }
-        assertTrue("${slider.contentDescription} must be drawn as real visible slider pixels", bluePixels > 10)
+        assertTrue("${slider.contentDescription} must be drawn as real visible slider pixels", accentPixels > 10)
+    }
+
+
+    @Test fun commonControlsStayVisibleAndExpandingDetailsDoesNotChangeSavedSettings() {
+        val controller = activity()
+        val prefs = ThemeManager.prefs
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.Sam)
+        val stored = prefs.pressEffect.sharedPreferences
+        val before = stored.all.toMap()
+        val ui = LightEffectSettingsUi(controller.get())
+        try {
+            controller.get().setContentView(ui.root)
+            shadowOf(Looper.getMainLooper()).idle()
+            layout(ui.root)
+            assertEquals(ContextCompat.getColor(ui.context, R.color.ax_settings_background),
+                (ui.root.background as ColorDrawable).color)
+            assertEquals(ContextCompat.getColor(ui.context, R.color.ax_settings_surface),
+                (ui.root.findViewWithTag<View>("effect-basics").background as GradientDrawable).color!!.defaultColor)
+            assertTrue(ui.root.findViewWithTag<View>(prefs.pressEffect.key).isShown)
+            assertTrue(ui.root.findViewWithTag<View>("effect-ripple-shape").isShown)
+            assertTrue(ui.modeButtons.getValue(ThemePrefs.PressColorMode.Random).isShown)
+            val toggle = ui.root.findViewWithTag<View>("effect-advanced-toggle")
+            val timing = ui.durationControls.getValue(prefs.samKeyRetreatTime.key)
+            assertFalse(timing.root.isShown)
+            assertEquals(ui.context.getString(R.string.ax_light_collapsed), ViewCompat.getStateDescription(toggle))
+            toggle.performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            layout(ui.root)
+            assertTrue(timing.root.isShown)
+            assertEquals(ui.context.getString(R.string.ax_light_expanded), ViewCompat.getStateDescription(toggle))
+            toggle.performClick()
+            assertFalse(timing.root.isShown)
+            assertEquals("Opening or expanding controls never rewrites preferences", before, stored.all)
+        } finally {
+            ui.dismissDialogs()
+            controller.pause().stop().destroy()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "zh-rCN-w400dp-h900dp-night-hdpi")
+    fun lightSettingsAndColourEditorFollowTheNightPalette() {
+        val controller = activity()
+        val activity = controller.get()
+        val ui = LightEffectSettingsUi(activity)
+        try {
+            activity.setContentView(ui.root)
+            layout(ui.root)
+            val surface = ContextCompat.getColor(activity, R.color.ax_settings_surface)
+            val ink = ContextCompat.getColor(activity, R.color.ax_settings_text)
+            val accent = ContextCompat.getColor(activity, R.color.ax_settings_accent)
+            assertTrue("Night surface must be dark", androidx.core.graphics.ColorUtils.calculateLuminance(surface) < 0.15)
+            assertTrue("Text must remain readable on cards", androidx.core.graphics.ColorUtils.calculateContrast(ink, surface) >= 4.5)
+            val toggle = ui.root.findViewWithTag<Switch>(ThemeManager.prefs.pressEffect.key)
+            assertEquals(ink, toggle.currentTextColor)
+            val control = ui.durationControls.getValue(ThemeManager.prefs.samKeyRetreatTime.key)
+            assertEquals(accent, control.slider.progressTintList!!.defaultColor)
+            save(ui.root, "light-settings-night")
+            ui.modeButtons.getValue(ThemePrefs.PressColorMode.Single).performClick()
+            ui.root.findViewWithTag<Button>("effect-single-color").performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            val dialog = ui.activeColorDialog!!
+            assertEquals(accent, dialog.getButton(AlertDialog.BUTTON_POSITIVE).currentTextColor)
+            assertEquals(ink, dialog.window!!.decorView.findViewWithTag<EditText>("effect-color-hex").currentTextColor)
+        } finally {
+            ui.dismissDialogs()
+            controller.pause().stop().destroy()
+        }
     }
 
     @Test fun lightSettingsExposeTheKeyboardSizeAndFeedbackShortcut() {
@@ -402,6 +475,7 @@ class LightEffectSettingsUiTest {
 
     @Test fun quickerDefaultIgnitionIsAdjustableWithoutOverwritingASavedTiming() {
         val prefs = ThemeManager.prefs
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
         assertTrue(prefs.pressIgnitionTime.sharedPreferences.edit().remove(prefs.pressIgnitionTime.key).commit())
         assertEquals(40, prefs.pressIgnitionTime.getValue())
         val ui = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
@@ -420,6 +494,69 @@ class LightEffectSettingsUiTest {
         val reopened = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
         assertEquals("Opening the new page preserves the user's saved 100ms", 100, prefs.pressIgnitionTime.getValue())
         assertEquals(7, reopened.durationControls.getValue(prefs.pressIgnitionTime.key).slider.progress)
+    }
+
+    @Test fun samTimingControlsUseIndependentColoursAndImmediateWaveTimingAcrossModeChanges() {
+        val controller = activity()
+        val prefs = ThemeManager.prefs
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.Sam)
+        prefs.samKeyHoldTime.setValue(80)
+        prefs.samKeyRetreatTime.setValue(800)
+        prefs.pressKeyHoldTime.setValue(37)
+        prefs.pressKeyRetreatTime.setValue(1783)
+        val stored = prefs.pressEffect.sharedPreferences
+        val before = stored.all.toMap()
+        val ui = LightEffectSettingsUi(controller.get())
+        try {
+            controller.get().setContentView(ui.root)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("Opening timing settings cannot normalize saved values", before, stored.all)
+            fun visible(pref: org.fcitx.fcitx5.android.data.prefs.ManagedPreference.PInt) =
+                ui.durationControls.getValue(pref.key).root.visibility == View.VISIBLE
+            assertTrue(visible(prefs.samKeyHoldTime))
+            assertTrue(visible(prefs.samKeyRetreatTime))
+            assertFalse(visible(prefs.pressKeyHoldTime))
+            assertFalse(visible(prefs.pressKeyRetreatTime))
+            assertFalse(visible(prefs.pressIgnitionTime))
+            assertEquals(ui.context.getString(R.string.light_effect_total, 2650),
+                ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
+            assertEquals(ui.context.getString(R.string.sam_wave_total_detail),
+                ui.root.findViewWithTag<TextView>("effect-total-detail").text.toString())
+            val hold = ui.durationControls.getValue(prefs.samKeyHoldTime.key)
+            val fade = ui.durationControls.getValue(prefs.samKeyRetreatTime.key)
+            assertEquals(8, hold.slider.progress)
+            assertEquals(70, fade.slider.progress)
+            hold.slider.progress = 16
+            hold.commit()
+            fade.slider.progress = 130
+            fade.commit()
+            assertEquals(160, prefs.samKeyHoldTime.getValue())
+            assertEquals(1400, prefs.samKeyRetreatTime.getValue())
+            assertEquals(37, prefs.pressKeyHoldTime.getValue())
+            assertEquals(1783, prefs.pressKeyRetreatTime.getValue())
+            val selector = ui.root.findViewWithTag<Spinner>("effect-ripple-shape")
+            selector.setSelection(ThemePrefs.RippleShape.IrregularFluid.ordinal)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(visible(prefs.pressKeyHoldTime))
+            assertTrue(visible(prefs.pressKeyRetreatTime))
+            assertTrue(visible(prefs.pressIgnitionTime))
+            assertFalse(visible(prefs.samKeyHoldTime))
+            assertFalse(visible(prefs.samKeyRetreatTime))
+            assertEquals(ui.context.getString(R.string.light_effect_total, 2750),
+                ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
+            val legacy = ui.durationControls.getValue(prefs.pressKeyRetreatTime.key)
+            legacy.slider.progress = 21
+            legacy.commit()
+            assertEquals(230, prefs.pressKeyRetreatTime.getValue())
+            assertEquals(1400, prefs.samKeyRetreatTime.getValue())
+            selector.setSelection(ThemePrefs.RippleShape.Sam.ordinal)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(visible(prefs.samKeyRetreatTime))
+            assertEquals(130, fade.slider.progress)
+        } finally {
+            ui.dismissDialogs()
+            controller.pause().stop().destroy()
+        }
     }
 
     @Test fun openingRandomModeDisplaysItsActualLegacyPaletteWithoutChangingPreferences() {
@@ -573,6 +710,7 @@ class LightEffectSettingsUiTest {
         val controller = activity()
         val activity = controller.get()
         val prefs = ThemeManager.prefs
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
         prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Custom)
         prefs.pressUserColors.setValue(PressColorPalette.encode(intArrayOf(0xFF18FFC1.toInt(), 0xFFD96EFF.toInt(),
             0xFFFF8A32.toInt(), 0xFF00DAFF.toInt(), 0xFFFF3FA5.toInt(), 0xFFB1FF42.toInt())))
@@ -581,7 +719,16 @@ class LightEffectSettingsUiTest {
         shadowOf(Looper.getMainLooper()).idle()
         layout(ui.root)
         save(ui.root, "light-settings-colours")
-        val timingScroll = (ui.root.getChildAt(0).height - ui.root.height).coerceAtLeast(0)
+        val advanced = ui.root.findViewWithTag<View>("effect-advanced-content")
+        assertEquals("Detailed timing stays collapsed until requested", View.GONE, advanced.visibility)
+        ui.root.findViewWithTag<View>("effect-advanced-toggle").performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        layout(ui.root)
+        val body = ui.root.getChildAt(0) as ViewGroup
+        val firstTiming = ui.durationControls.getValue(prefs.pressFadeOutTime.key).root
+        val timingBounds = Rect(0, 0, firstTiming.width, firstTiming.height)
+        body.offsetDescendantRectToMyCoords(firstTiming, timingBounds)
+        val timingScroll = (timingBounds.top - 12).coerceAtLeast(0)
         assertTrue("Animation controls must extend beyond the palette viewport", timingScroll > 0)
         ui.root.scrollTo(0, timingScroll)
         ui.root.requestLayout()
