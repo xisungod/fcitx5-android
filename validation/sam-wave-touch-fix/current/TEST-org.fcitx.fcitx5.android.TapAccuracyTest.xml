@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.TapAccuracyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-05T05:05:45.485Z" hostname="b891b174da30" time="1.26">
+  <properties/>
+  <testcase name="cancellationAndLeavingTheKeyboardNeverCommitAPendingTap" classname="org.fcitx.fcitx5.android.TapAccuracyTest" time="0.097"/>
+  <testcase name="driftBeyondTheChildSlopDoesNotCancelTheOriginalTap" classname="org.fcitx.fcitx5.android.TapAccuracyTest" time="0.075"/>
+  <testcase name="neighbouringLetterTapsUseDensityIndependentTolerance" classname="org.fcitx.fcitx5.android.TapAccuracyTest" time="0.454"/>
+  <testcase name="deliberateMoveEntersTheNeighbourAndContinuesToFollowTheFinger" classname="org.fcitx.fcitx5.android.TapAccuracyTest" time="0.072"/>
+  <testcase name="simultaneousThumbsDoNotShareTheirSlideIntent" classname="org.fcitx.fcitx5.android.TapAccuracyTest" time="0.079"/>
+  <testcase name="neighbouringLetterTapsSurviveLiftOffDriftAcrossWidths" classname="org.fcitx.fcitx5.android.TapAccuracyTest" time="0.481"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

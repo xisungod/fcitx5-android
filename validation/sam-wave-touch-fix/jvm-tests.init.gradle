@@ -1,0 +1,13 @@
+// Local JVM-only verification: retain Android resources and production JVM code,
+// omit CMake/NDK packaging because tests deliberately avoid starting Fcitx JNI.
+gradle.beforeProject { p ->
+    ['com.android.application', 'com.android.library'].each { androidPlugin ->
+        p.plugins.withId(androidPlugin) {
+            p.extensions.getByName('androidComponents').finalizeDsl { dsl ->
+                dsl.externalNativeBuild.cmake.path = null
+                dsl.buildFeatures.prefab = false
+                if (androidPlugin == 'com.android.library') dsl.buildFeatures.prefabPublishing = false
+            }
+        }
+    }
+}

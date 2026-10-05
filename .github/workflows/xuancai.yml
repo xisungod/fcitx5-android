@@ -17,8 +17,8 @@ jobs:
       contents: read
     env:
       BUILD_ABI: arm64-v8a
-      BUILD_VERSION_CODE: "826"
-      BUILD_VERSION_NAME: "1.1-dev.9"
+      BUILD_VERSION_CODE: "827"
+      BUILD_VERSION_NAME: "1.1-dev.10"
       BUILD_COMMIT_HASH: ${{ github.sha }}
       XUANCAI_APP_SUFFIX: .axiang.dev.r${{ github.run_id }}
     steps:

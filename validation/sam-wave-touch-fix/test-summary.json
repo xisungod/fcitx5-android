@@ -1,0 +1,578 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-10-05",
+  "source_base_commit": "d038013632cc56b48fb1d0f50b853e508136ff6b",
+  "source_state": "working tree with Sam wave, key colour retention, touch accuracy and font changes",
+  "command": "/tmp/axiang-gradle -I /tmp/axiang-jvm-tests.init.gradle :app:testDebugUnitTest -x :app:generateDataDescriptor",
+  "build_exit_code": 0,
+  "build_duration_seconds": 92,
+  "totals": {
+    "classes": 56,
+    "tests": 334,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "environment": {
+    "jdk": "Eclipse Temurin 17.0.20.1+1",
+    "gradle": "9.6.1",
+    "android_compile_sdk": 36,
+    "android_build_tools": "36.1.0",
+    "robolectric": "4.17",
+    "os_arch": "Linux x86_64",
+    "max_workers": 2,
+    "sherpa_compile_jar": "1.13.8"
+  },
+  "excluded_build_work": [
+    "CMake externalNativeBuild",
+    "Prefab",
+    "app:generateDataDescriptor"
+  ],
+  "unverified": [
+    "Native C++/JNI build and engine runtime",
+    "APK packaging, signing, installation and device behavior",
+    "Bundled Rime dictionary packaging and actual candidates",
+    "Full ASR model preparation and inference"
+  ],
+  "baseline": {
+    "source_base_commit": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+    "patches_from_commit": "d038013632cc56b48fb1d0f50b853e508136ff6b",
+    "fixture": "Final TapAccuracyTest with fixed FrameLayout viewport; source identical to current test",
+    "tap_accuracy": {
+      "tests": 6,
+      "failures": 5,
+      "errors": 0,
+      "skipped": 0
+    },
+    "existing_hit_target": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "reproduced_mismatch": {
+      "expected": "shang",
+      "actual": "shabg",
+      "width_dp": 320,
+      "densities": [
+        "mdpi",
+        "xhdpi"
+      ],
+      "move_event": false
+    }
+  },
+  "classes": [
+    {
+      "name": "org.fcitx.fcitx5.android.AppOfflinePrivacyTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2.059,
+      "timestamp_utc": "2026-10-05T05:04:55.680Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.BuiltinRimeProfileTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.023,
+      "timestamp_utc": "2026-10-05T05:04:57.748Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.CandidatePageBufferTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.001,
+      "timestamp_utc": "2026-10-05T05:04:57.773Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.ChinesePunctuationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2.225,
+      "timestamp_utc": "2026-10-05T05:04:57.788Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.ClipboardSuggestionDismissalsTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.001,
+      "timestamp_utc": "2026-10-05T05:05:00.018Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.ClipboardSuggestionUiTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 3.06,
+      "timestamp_utc": "2026-10-05T05:05:00.027Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.CyberPaletteTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.008,
+      "timestamp_utc": "2026-10-05T05:05:03.090Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.DictationEditorWriterTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.152,
+      "timestamp_utc": "2026-10-05T05:05:03.104Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.EnterLongPressGestureTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.971,
+      "timestamp_utc": "2026-10-05T05:05:03.260Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.HapticStrengthTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.509,
+      "timestamp_utc": "2026-10-05T05:05:04.237Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.IconBrandingTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.989,
+      "timestamp_utc": "2026-10-05T05:05:04.750Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.IdleBreathingTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.003,
+      "timestamp_utc": "2026-10-05T05:05:06.740Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.IdleGlowDirectionTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.052,
+      "timestamp_utc": "2026-10-05T05:05:06.745Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyLegendInkTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.142,
+      "timestamp_utc": "2026-10-05T05:05:06.800Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyPressDepthTest",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 8.842,
+      "timestamp_utc": "2026-10-05T05:05:06.953Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyWidthControlsTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.858,
+      "timestamp_utc": "2026-10-05T05:05:15.798Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardControlsPreviewTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.572,
+      "timestamp_utc": "2026-10-05T05:05:17.660Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardEngineSwitchTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.035,
+      "timestamp_utc": "2026-10-05T05:05:18.234Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.061,
+      "timestamp_utc": "2026-10-05T05:05:18.271Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardHeightEditorTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.145,
+      "timestamp_utc": "2026-10-05T05:05:18.335Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardMotionControlsTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.432,
+      "timestamp_utc": "2026-10-05T05:05:18.486Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardQuickSettingsDraftTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.122,
+      "timestamp_utc": "2026-10-05T05:05:19.922Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardQuickSettingsImeContextTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.572,
+      "timestamp_utc": "2026-10-05T05:05:20.052Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardSizeSettingsTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.706,
+      "timestamp_utc": "2026-10-05T05:05:21.626Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.KeyboardVisualRegressionTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 3.752,
+      "timestamp_utc": "2026-10-05T05:05:22.338Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.LightEffectSettingsUiTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 2.47,
+      "timestamp_utc": "2026-10-05T05:05:26.098Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.043,
+      "timestamp_utc": "2026-10-05T05:05:28.575Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.NineKeySlideGestureTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.488,
+      "timestamp_utc": "2026-10-05T05:05:28.621Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.OfflineDictationUiTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.285,
+      "timestamp_utc": "2026-10-05T05:05:29.115Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PinyinLayoutPolicyTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.016,
+      "timestamp_utc": "2026-10-05T05:05:29.403Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PinyinT9KeyboardTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.387,
+      "timestamp_utc": "2026-10-05T05:05:29.421Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PopupPreviewLifecycleTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.225,
+      "timestamp_utc": "2026-10-05T05:05:29.813Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PressColorSettingsTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.553,
+      "timestamp_utc": "2026-10-05T05:05:30.042Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PressEffectMasksTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.316,
+      "timestamp_utc": "2026-10-05T05:05:30.597Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PressEffectRenderingTest",
+      "tests": 45,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 5.513,
+      "timestamp_utc": "2026-10-05T05:05:30.932Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.PressEffectTrailTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.009,
+      "timestamp_utc": "2026-10-05T05:05:36.446Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.ReturnKeyDrawableComponentTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.042,
+      "timestamp_utc": "2026-10-05T05:05:36.456Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.RimeActionsTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.001,
+      "timestamp_utc": "2026-10-05T05:05:36.500Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.RimeMobileOptionsTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.001,
+      "timestamp_utc": "2026-10-05T05:05:36.502Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.RimePersonalDictionaryTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.005,
+      "timestamp_utc": "2026-10-05T05:05:36.503Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.RippleShapeRenderingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.097,
+      "timestamp_utc": "2026-10-05T05:05:36.510Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.SamKeyboardRenderingTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 6.819,
+      "timestamp_utc": "2026-10-05T05:05:37.612Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.SamModeDefaultsTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.031,
+      "timestamp_utc": "2026-10-05T05:05:44.433Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.SamWavePropagationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.321,
+      "timestamp_utc": "2026-10-05T05:05:44.466Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.SamsungSymbolKeyboardTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.423,
+      "timestamp_utc": "2026-10-05T05:05:44.793Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.SpaceTrackpadGestureTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.255,
+      "timestamp_utc": "2026-10-05T05:05:45.224Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.StatusAreaVisibilityTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.0,
+      "timestamp_utc": "2026-10-05T05:05:45.480Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.StringEscapeTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.002,
+      "timestamp_utc": "2026-10-05T05:05:45.481Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.TapAccuracyTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 1.26,
+      "timestamp_utc": "2026-10-05T05:05:45.485Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.ThemeSerializationTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.058,
+      "timestamp_utc": "2026-10-05T05:05:46.747Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.V14TouchRoutingTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.169,
+      "timestamp_utc": "2026-10-05T05:05:46.807Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.V15HitTargetTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.8,
+      "timestamp_utc": "2026-10-05T05:05:46.978Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.V15LightEffectPrefsTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.059,
+      "timestamp_utc": "2026-10-05T05:05:47.780Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.V15NeonPaletteTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.054,
+      "timestamp_utc": "2026-10-05T05:05:47.841Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.V15PreviewRenderingTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 30.382,
+      "timestamp_utc": "2026-10-05T05:05:47.903Z"
+    },
+    {
+      "name": "org.fcitx.fcitx5.android.VerificationCodesTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 0.013,
+      "timestamp_utc": "2026-10-05T05:06:18.286Z"
+    }
+  ],
+  "archived_xml_sha256": {
+    "baseline/TEST-org.fcitx.fcitx5.android.TapAccuracyTest.xml": "2d486fe40090f20b67dfb7f07ea6010530c17c5f970e99c0ac47b87b1fbd3b83",
+    "baseline/TEST-org.fcitx.fcitx5.android.V15HitTargetTest.xml": "7c17df538a70ad4dfcd148af9834223eb305e86269dca367128c31ff008c3f0d",
+    "current/TEST-org.fcitx.fcitx5.android.TapAccuracyTest.xml": "0077b2c575b6c59910d91793e4cae1bf35b5310f7d745c9c84a33b8b388e9971",
+    "current/TEST-org.fcitx.fcitx5.android.SamWavePropagationTest.xml": "9ccac34c6b5a3649f44cdb45214dd9105ea461e3d251a6a68176021ad2710841",
+    "current/TEST-org.fcitx.fcitx5.android.KeyLegendInkTest.xml": "35dd089e4fc6b2c839db4d0dbe377dac81718d45386a8c43909267996aee6193",
+    "current/TEST-org.fcitx.fcitx5.android.SamKeyboardRenderingTest.xml": "82386e81fd61da9d4402523e7bcd92db54c976a35036ef630903903d3d9fe0cd"
+  }
+}
