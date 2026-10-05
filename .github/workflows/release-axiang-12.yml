@@ -1,0 +1,333 @@
+name: Build AXiang 1.2 release
+
+on:
+  push:
+    branches: [release/axiang-1.2]
+    paths: [.github/workflows/release-axiang-12.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: axiang-1.2-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'xisungod/fcitx5-android' && github.ref == 'refs/heads/release/axiang-1.2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      BASE_COMMIT: 2a038c9bb5360d6760666c3df564cab4c66d1564
+      SOURCE_RUN_ID: "37283910221"
+      SOURCE_ARTIFACT_ID: "11333514116"
+      SOURCE_ARTIFACT_NAME: axiang-pr-37283910221-arm64
+      SOURCE_APK_NAME: axiang-pr-arm64.apk
+      SOURCE_APK_SHA256: dd255bd528f6645ba71b61f9fcfc8e251a7f25beacac4f1f6c12c7c0c0e8e414
+      SOURCE_BRANCH: fix/sam-wave-and-touch-accuracy
+      SOURCE_WORKFLOW_PATH: .github/workflows/pull_request.yml
+      RELEASE_ID: "403565088"
+      RELEASE_TAG: axiang-v1.2
+      SIGNING_RELEASE_ID: "403565107"
+      SIGNING_RELEASE_TAG: axiang-signing-backup-local
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_NAME: "1.2"
+      BUILD_VERSION_CODE: "1200"
+      BUILD_COMMIT_HASH: 2a038c9bb5360d6760666c3df564cab4c66d1564
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Check out the exact verified source
+        uses: actions/checkout@v7
+        with:
+          ref: 2a038c9bb5360d6760666c3df564cab4c66d1564
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify source provenance and both unpublished releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_COMMIT"
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN_ID" > "$RUNNER_TEMP/source-run.json"
+          gh api "repos/$GH_REPO/actions/artifacts/$SOURCE_ARTIFACT_ID" > "$RUNNER_TEMP/source-artifact.json"
+          gh api "repos/$GH_REPO/releases/$RELEASE_ID" > "$RUNNER_TEMP/release.json"
+          gh api "repos/$GH_REPO/releases/$SIGNING_RELEASE_ID" > "$RUNNER_TEMP/signing-release.json"
+          python3 - <<'PY'
+          import datetime, json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          run = json.loads((root / 'source-run.json').read_text())
+          artifact = json.loads((root / 'source-artifact.json').read_text())
+          assert run['id'] == int(os.environ['SOURCE_RUN_ID'])
+          assert run['status'] == 'completed' and run['conclusion'] == 'success'
+          assert run['head_sha'] == os.environ['BASE_COMMIT']
+          assert run['head_branch'] == os.environ['SOURCE_BRANCH']
+          assert run['path'].split('@')[0] == os.environ['SOURCE_WORKFLOW_PATH']
+          assert run['repository']['full_name'] == os.environ['GH_REPO']
+          assert artifact['id'] == int(os.environ['SOURCE_ARTIFACT_ID'])
+          assert artifact['name'] == os.environ['SOURCE_ARTIFACT_NAME']
+          assert artifact['expired'] is False and artifact['size_in_bytes'] > 0
+          expires = datetime.datetime.fromisoformat(artifact['expires_at'].replace('Z', '+00:00'))
+          assert expires > datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15)
+          arun = artifact['workflow_run']
+          assert arun['id'] == run['id'] and arun['head_sha'] == run['head_sha']
+          assert arun['head_branch'] == run['head_branch']
+          assert arun['repository_id'] == arun['head_repository_id'] == run['repository']['id']
+          for filename, idvar, tagvar in [('release.json', 'RELEASE_ID', 'RELEASE_TAG'), ('signing-release.json', 'SIGNING_RELEASE_ID', 'SIGNING_RELEASE_TAG')]:
+              release = json.loads((root / filename).read_text())
+              assert release['id'] == int(os.environ[idvar])
+              assert release['tag_name'] == os.environ[tagvar]
+              assert release['draft'] is True and release['published_at'] is None
+          print('Exact successful source CI and unpublished release identities verified.')
+          PY
+
+      - name: Download the verified source APK by artifact identity
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ env.SOURCE_ARTIFACT_ID }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/source-apk
+
+      - name: Extract the exact native and offline inputs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, importlib.util, json, os, pathlib, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          source = root / 'source-apk' / os.environ['SOURCE_APK_NAME']
+          digest = lambda b: hashlib.sha256(b).hexdigest()
+          assert digest(source.read_bytes()) == os.environ['SOURCE_APK_SHA256']
+          with zipfile.ZipFile(source) as archive:
+              names = [n for n in archive.namelist() if n.startswith(('assets/', 'lib/')) and not n.endswith('/')]
+              assert len(names) == len(set(names))
+              assert any(n.startswith('assets/') for n in names) and any(n.startswith('lib/arm64-v8a/') for n in names)
+              assert all(not n.startswith('lib/') or n.startswith('lib/arm64-v8a/') for n in names)
+              assert not any('lmyy' in n.lower() or 'minirbt' in n.lower() for n in archive.namelist())
+              assert digest(archive.read('res/font/audiowide_regular.ttf')) == digest(pathlib.Path('app/src/main/res/font/audiowide_regular.ttf').read_bytes())
+              manifest = {n: digest(archive.read(n)) for n in sorted(names)}
+              (root / 'source-input-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+              for name in names:
+                  relative = pathlib.PurePosixPath(name)
+                  assert not relative.is_absolute() and '..' not in relative.parts
+                  target = root / 'release-prebuilt' / ('jniLibs/' + name[4:] if name.startswith('lib/') else name)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(archive.read(name))
+              provenance = json.loads(archive.read('assets/asr/SOURCE.json'))
+          spec = importlib.util.spec_from_file_location('prepare_asr', 'scripts/prepare-axiang-asr.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          cache = root / 'release-runtime-cache'
+          cache.mkdir()
+          aar = module.fetch(module.DOWNLOADS['runtime'], cache, False)
+          with zipfile.ZipFile(aar) as archive:
+              jar = archive.read('classes.jar')
+          assert digest(jar) == provenance['compile_jar']['sha256']
+          destination = pathlib.Path('app/libs/sherpa-onnx-1.13.8.jar')
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          destination.write_bytes(jar)
+          print('Every input asset and native library extracted from the verified source APK.')
+          PY
+          cat > "$RUNNER_TEMP/release-rebuild.init.gradle" <<'GRADLE'
+          import groovy.json.JsonSlurper
+          def inputRoot = new File(System.getenv('RUNNER_TEMP'), 'release-prebuilt')
+          def secretFile = new File(System.getenv('RUNNER_TEMP'), 'release-signing/resolved.json')
+          gradle.beforeProject { p ->
+              ['com.android.application', 'com.android.library'].each { androidPlugin ->
+                  p.plugins.withId(androidPlugin) {
+                      p.extensions.getByName('androidComponents').finalizeDsl { dsl ->
+                          dsl.externalNativeBuild.cmake.path = null
+                          dsl.buildFeatures.prefab = false
+                          if (androidPlugin == 'com.android.library') dsl.buildFeatures.prefabPublishing = false
+                          if (p.path == ':app') {
+                              dsl.defaultConfig.applicationId = 'org.fcitx.fcitx5.android.axiang'
+                              dsl.sourceSets.getByName('main').assets.setSrcDirs([new File(inputRoot, 'assets')])
+                              dsl.sourceSets.getByName('main').jniLibs.setSrcDirs([new File(inputRoot, 'jniLibs')])
+                              dsl.packaging.jniLibs.keepDebugSymbols.add('**/*.so')
+                              def secret = new JsonSlurper().parse(secretFile)
+                              def signing = dsl.signingConfigs.maybeCreate('axiangPersistentRelease')
+                              signing.storeFile = new File(secret.key_file as String)
+                              signing.storePassword = secret.password as String
+                              signing.keyAlias = secret.alias as String
+                              signing.keyPassword = secret.password as String
+                              dsl.buildTypes.getByName('release').signingConfig = signing
+                          }
+                      }
+                  }
+              }
+          }
+          GRADLE
+          mkdir -p app/src/main/res/raw
+          cat > app/src/main/res/raw/axiang_release_keep.xml <<'XML'
+          <resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@font/audiowide_regular,@raw/audiowide_ofl,@raw/aboutlibraries" />
+          XML
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android
+        uses: android-actions/setup-android@v4
+
+      - name: Install the pinned Android tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Resolve a persistent signing key without exposing secrets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXISTING_SIGN_KEY: ${{ secrets.XUANCAI_SIGN_KEY_BASE64 }}
+          EXISTING_SIGN_PASSWORD: ${{ secrets.XUANCAI_SIGN_KEY_PWD }}
+          EXISTING_SIGN_ALIAS: ${{ secrets.XUANCAI_SIGN_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY'
+          import base64, datetime, hashlib, json, os, pathlib, secrets, subprocess, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'release-signing'
+          root.mkdir(mode=0o700)
+          route = 'repos/' + os.environ['GH_REPO'] + '/releases/' + os.environ['SIGNING_RELEASE_ID']
+          def release():
+              data = json.loads(subprocess.check_output(['gh', 'api', route]))
+              assert data['draft'] is True and data['published_at'] is None
+              assert data['tag_name'] == os.environ['SIGNING_RELEASE_TAG']
+              return data
+          backup = release()
+          matches = [a for a in backup['assets'] if a['name'] == 'axiang-release-signing.zip']
+          assert len(matches) <= 1
+          values = [os.environ.get(k, '') for k in ['EXISTING_SIGN_KEY', 'EXISTING_SIGN_PASSWORD', 'EXISTING_SIGN_ALIAS']]
+          if any(values) and not all(values):
+              raise SystemExit('Signing configuration is incomplete; provide all three repository signing secrets.')
+          key = root / 'key.p12'
+          password_file = root / 'password'
+          generated = False
+          if all(values):
+              mode = 'repository-secrets'
+              key.write_bytes(base64.b64decode(values[0], validate=True))
+              password, alias = values[1:]
+          elif matches:
+              mode = 'private-draft-backup'
+              asset = matches[0]
+              assert asset['state'] == 'uploaded' and asset['digest'].startswith('sha256:')
+              subprocess.run(['gh', 'release', 'download', os.environ['SIGNING_RELEASE_TAG'], '--pattern', 'axiang-release-signing.zip', '--dir', str(root)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              blob = (root / 'axiang-release-signing.zip').read_bytes()
+              assert hashlib.sha256(blob).hexdigest() == asset['digest'].split(':', 1)[1]
+              with zipfile.ZipFile(root / 'axiang-release-signing.zip') as archive:
+                  assert sorted(archive.namelist()) == ['key.p12', 'signing.json']
+                  metadata = json.loads(archive.read('signing.json'))
+                  assert metadata['schema'] == 1
+                  raw = archive.read('key.p12')
+                  assert hashlib.sha256(raw).hexdigest() == metadata['keystore_sha256']
+                  key.write_bytes(raw)
+                  password, alias = metadata['password'], metadata['alias']
+          else:
+              mode = 'private-draft-backup'
+              generated = True
+              password, alias = secrets.token_urlsafe(48), 'axiang-release'
+              password_file.write_text(password)
+              password_file.chmod(0o600)
+              subprocess.run(['keytool', '-genkeypair', '-alias', alias, '-keystore', str(key), '-storetype', 'PKCS12', '-storepass:file', str(password_file), '-keypass:file', str(password_file), '-keyalg', 'RSA', '-keysize', '3072', '-validity', '10000', '-dname', 'CN=AXiang, OU=Android, O=AXiang'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+          key.chmod(0o600)
+          password_file.write_text(password)
+          password_file.chmod(0o600)
+          cert = subprocess.check_output(['keytool', '-exportcert', '-alias', alias, '-keystore', str(key), '-storepass:file', str(password_file)], stderr=subprocess.DEVNULL)
+          cert_sha = hashlib.sha256(cert).hexdigest()
+          if generated:
+              metadata = {'schema': 1, 'alias': alias, 'password': password, 'keystore_sha256': hashlib.sha256(key.read_bytes()).hexdigest(), 'certificate_sha256': cert_sha, 'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+              (root / 'signing.json').write_text(json.dumps(metadata))
+              (root / 'signing.json').chmod(0o600)
+              with zipfile.ZipFile(root / 'axiang-release-signing.zip', 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                  archive.write(key, 'key.p12')
+                  archive.write(root / 'signing.json', 'signing.json')
+              (root / 'axiang-release-signing.zip').chmod(0o600)
+              release()
+              subprocess.run(['gh', 'release', 'upload', os.environ['SIGNING_RELEASE_TAG'], str(root / 'axiang-release-signing.zip')], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              current = release()
+              asset = next(a for a in current['assets'] if a['name'] == 'axiang-release-signing.zip')
+              assert asset['state'] == 'uploaded'
+              assert asset['digest'] == 'sha256:' + hashlib.sha256((root / 'axiang-release-signing.zip').read_bytes()).hexdigest()
+          elif not all(values):
+              assert cert_sha == metadata['certificate_sha256']
+          release()
+          resolved = {'key_file': str(key), 'password': password, 'alias': alias}
+          (root / 'resolved.json').write_text(json.dumps(resolved))
+          (root / 'resolved.json').chmod(0o600)
+          (pathlib.Path(os.environ['RUNNER_TEMP']) / 'signing-public.json').write_text(json.dumps({'mode': mode, 'certificate_sha256': cert_sha}, indent=2) + '\n')
+          print('Persistent signing prepared; certificate SHA256:', cert_sha)
+          PY
+
+      - name: Restore public dependencies without uploading signing or build caches
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+          add-job-summary: never
+          add-job-summary-as-pr-comment: never
+
+      - name: Build the signed Release APK
+        run: ./gradlew --no-daemon -I "$RUNNER_TEMP/release-rebuild.init.gradle" :app:assembleRelease -x :app:generateDataDescriptor
+
+      - name: Verify identity, signature, font, and every offline input
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/release/*.apk)
+          test "${#apks[@]}" -eq 1
+          mkdir -p "$RUNNER_TEMP/release-delivery"
+          cp "${apks[0]}" "$RUNNER_TEMP/release-delivery/axiang-input-1.2-arm64.apk"
+          sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/release-delivery/axiang-input-1.2-arm64.apk"
+          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/release-delivery/axiang-input-1.2-arm64.apk" --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" --expected-main-package org.fcitx.fcitx5.android.axiang --expected-version-name 1.2 --expected-version-code 1200 --expected-app-label AXiang
+          python3 - <<'PY'
+          import hashlib, importlib.util, json, os, pathlib, re, subprocess, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          output = root / 'release-delivery/axiang-input-1.2-arm64.apk'
+          expected = json.loads((root / 'source-input-manifest.json').read_text())
+          signing = json.loads((root / 'signing-public.json').read_text())
+          sdk = pathlib.Path(os.environ['ANDROID_HOME']) / 'build-tools/36.1.0'
+          certs = subprocess.check_output([str(sdk / 'apksigner'), 'verify', '--print-certs', str(output)], text=True)
+          digests = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$', certs, re.MULTILINE)
+          assert [d.lower() for d in digests] == [signing['certificate_sha256']]
+          spec = importlib.util.spec_from_file_location('verify_apk', 'scripts/verify-xuancai-rime-package.py')
+          # This CLI executes on import, so separately inspect the binary manifest.
+          manifest_xml = subprocess.check_output([str(sdk / 'aapt'), 'dump', 'xmltree', str(output), 'AndroidManifest.xml'], text=True)
+          assert not re.search(r'android:debuggable[^\n]*0xffffffff', manifest_xml)
+          sha = lambda b: hashlib.sha256(b).hexdigest()
+          with zipfile.ZipFile(output) as archive:
+              names = archive.namelist()
+              assert len(names) == len(set(names))
+              actual = {n: sha(archive.read(n)) for n in names if n.startswith(('assets/', 'lib/')) and not n.endswith('/')}
+              assert actual == expected, 'Release changed the native/assets file set or bytes'
+              assert not any('lmyy' in n.lower() or 'minirbt' in n.lower() for n in names)
+              assert sha(archive.read('res/font/audiowide_regular.ttf')) == sha(pathlib.Path('app/src/main/res/font/audiowide_regular.ttf').read_bytes())
+              assert archive.read('res/raw/audiowide_ofl.txt') == pathlib.Path('app/src/main/res/raw/audiowide_ofl.txt').read_bytes()
+              libraries = json.loads(archive.read('res/raw/aboutlibraries.json'))
+              assert any('audiowide' in str(item).lower() for item in libraries['libraries'])
+          report = {'version_name': '1.2', 'version_code': 1200, 'package': 'org.fcitx.fcitx5.android.axiang', 'variant': 'release', 'source_commit': os.environ['BASE_COMMIT'], 'source_run_id': int(os.environ['SOURCE_RUN_ID']), 'source_artifact_id': int(os.environ['SOURCE_ARTIFACT_ID']), 'source_apk_sha256': os.environ['SOURCE_APK_SHA256'], 'apk_sha256': sha(output.read_bytes()), 'apk_bytes': output.stat().st_size, 'asset_count': sum(n.startswith('assets/') for n in actual), 'native_count': sum(n.startswith('lib/') for n in actual), 'all_input_bytes_identical': True, 'network_permission': False, 'minirbt_included': False, 'font': 'Audiowide (OFL)', 'signing': signing}
+          (root / 'release-delivery/build-verification.json').write_text(json.dumps(report, indent=2) + '\n')
+          print('Signed non-debuggable Release identity and all original input bytes verified.')
+          PY
+          cd "$RUNNER_TEMP/release-delivery"
+          sha256sum axiang-input-1.2-arm64.apk build-verification.json > SHA256SUMS.txt
+
+      - name: Upload only public deliverables to the 1.2 draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.draft')" = true
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.tag_name')" = "$RELEASE_TAG"
+          test "$(gh api "repos/$GH_REPO/releases/$SIGNING_RELEASE_ID" --jq '.draft')" = true
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/release-delivery/axiang-input-1.2-arm64.apk" "$RUNNER_TEMP/release-delivery/build-verification.json" "$RUNNER_TEMP/release-delivery/SHA256SUMS.txt"
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.draft')" = true
+          test "$(gh api "repos/$GH_REPO/releases/$SIGNING_RELEASE_ID" --jq '.draft')" = true
+
+      - name: Remove all private signing inputs and build state
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/release-signing" app/build .gradle build-logic/.gradle
+          rm -f "$RUNNER_TEMP/signing-release.json" "$RUNNER_TEMP/release-rebuild.init.gradle"
