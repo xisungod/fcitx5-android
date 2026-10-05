@@ -1,14 +1,21 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 package org.fcitx.fcitx5.android.input.voice
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RadialGradient
+import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.SweepGradient
 import android.graphics.Typeface
 import android.graphics.drawable.RippleDrawable
+import android.os.Build
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -20,6 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
@@ -30,6 +38,7 @@ import org.fcitx.fcitx5.android.utils.alpha
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import kotlin.math.min
+import kotlin.math.sin
 
 /** The session owns editor-bound live transcription; this window only controls its lifetime. */
 class OfflineDictationWindow(
@@ -84,25 +93,28 @@ internal class OfflineDictationUi(
 ) {
     private val match = ViewGroup.LayoutParams.MATCH_PARENT
     private val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
-    private val accentColor = if (theme.isDark) 0xFF83D8EF.toInt() else 0xFF287DA0.toInt()
+    private val accentColor = 0xFF79E8F8.toInt()
 
     private fun label(size: Float) = TextView(context).apply {
         textSize = size
         gravity = Gravity.CENTER
-        setTextColor(theme.keyTextColor)
+        setTextColor(0xFFEAF4FC.toInt())
+        includeFontPadding = false
     }
 
-    private val status = label(17f).apply {
+    private val status = label(18f).apply {
         tag = "dictation_status"
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        letterSpacing = 0.035f
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     }
     private val message = label(12f).apply {
         tag = "dictation_message"
-        setTextColor(theme.keyTextColor.alpha(0.6f))
-        setPadding(context.dp(4), context.dp(7), context.dp(4), 0)
+        setTextColor(0xFF8492A9.toInt())
+        maxLines = 4
+        setPadding(context.dp(8), context.dp(8), context.dp(8), 0)
     }
-    private val record = DictationControl(context, accentColor).apply {
+    private val record = DictationControl(context).apply {
         tag = "dictation_record"
         setOnClickListener {
             when (session.state.value.phase) {
@@ -118,11 +130,17 @@ internal class OfflineDictationUi(
         tag = "dictation_back"
         setText(R.string.back_to_keyboard)
         isAllCaps = false
-        textSize = 13f
+        textSize = 12f
         minHeight = 0
         minimumHeight = 0
-        setTextColor(theme.keyTextColor.alpha(0.65f))
-        background = RippleDrawable(ColorStateList.valueOf(accentColor.alpha(0.1f)), null, null)
+        setTextColor(0xFF8B9AB1.toInt())
+        setPadding(context.dp(16), 0, context.dp(16), 0)
+        compoundDrawablePadding = context.dp(7)
+        val icon = AppCompatResources.getDrawable(context, R.drawable.ic_baseline_keyboard_24)!!.mutate()
+        icon.setTint(0xFF8B9AB1.toInt())
+        icon.setBounds(0, 0, context.dp(17), context.dp(17))
+        setCompoundDrawables(icon, null, null, null)
+        background = RippleDrawable(ColorStateList.valueOf(accentColor.alpha(0.09f)), null, null)
         setOnClickListener {
             session.cancel()
             onReturn()
@@ -133,12 +151,15 @@ internal class OfflineDictationUi(
         tag = "offline_dictation"
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
-        setPadding(context.dp(20), context.dp(10), context.dp(20), context.dp(5))
-        setBackgroundColor(theme.keyboardColor)
+        setPadding(context.dp(24), context.dp(6), context.dp(24), context.dp(5))
+        // A focused listening surface stays dark even when the typing theme is light.
+        setBackgroundColor(if (theme.isDark) 0xFF070B13.toInt() else 0xFF0A0F19.toInt())
+        addView(record, LinearLayout.LayoutParams(context.dp(192), 0, 1f))
         addView(status, LinearLayout.LayoutParams(match, wrap))
         addView(message, LinearLayout.LayoutParams(match, wrap))
-        addView(record, LinearLayout.LayoutParams(match, 0, 1f))
-        addView(back, LinearLayout.LayoutParams(context.dp(144), context.dp(40)))
+        addView(back, LinearLayout.LayoutParams(wrap, context.dp(44)).apply {
+            topMargin = context.dp(5)
+        })
     }
 
     init { render(session.state.value) }
@@ -163,58 +184,178 @@ internal class OfflineDictationUi(
             OfflineDictationPhase.Error -> R.string.offline_dictation_ui_error_hint
         })
         val running = state.phase == OfflineDictationPhase.Preparing || state.phase == OfflineDictationPhase.Recording
-        record.contentDescription = context.getString(if (running)
-            R.string.offline_dictation_ui_stop else R.string.offline_dictation_ui_start)
+        record.contentDescription = when (state.phase) {
+            OfflineDictationPhase.Finishing, OfflineDictationPhase.Unavailable -> status.text
+            else -> context.getString(if (running) R.string.offline_dictation_ui_stop
+                else R.string.offline_dictation_ui_start)
+        }
         record.isEnabled = state.phase != OfflineDictationPhase.Unavailable &&
             state.phase != OfflineDictationPhase.Finishing
-        record.running = running
+        record.phase = state.phase
         record.invalidate()
     }
 }
 
-/** A real microphone/stop affordance, with a quiet halo instead of a simulated waveform. */
-private class DictationControl(context: Context, private val accentColor: Int) : View(context) {
-    var running = false
+/** The quiet breathing rim communicates recording state, never a simulated microphone level. */
+private class DictationControl(context: Context) : View(context) {
+    var phase = OfflineDictationPhase.Ready
+        set(value) {
+            if (field == value) return
+            field = value
+            syncAnimation()
+            invalidate()
+        }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bounds = RectF()
     private val microphone = AppCompatResources.getDrawable(context, R.drawable.ic_offline_mic_24)!!.mutate()
+    private val cyan = 0xFF79E8F8.toInt()
+    private val violet = 0xFFB399FF.toInt()
+    private var radius = 0f
+    private var halo: Shader? = null
+    private var surface: Shader? = null
+    private var rim: Shader? = null
+    private var shine: Shader? = null
+    private val born = SystemClock.uptimeMillis()
+    private fun appMotionEnabled() = runCatching {
+        !AppPrefs.getInstance().advanced.disableAnimation.getValue()
+    }.getOrDefault(true)
+    private var loopReady = false
+    private val frameTick = object : Runnable {
+        override fun run() {
+            if (!shouldAnimate()) return
+            invalidate()
+            postDelayed(this, 50L)
+        }
+    }
 
     init {
         isClickable = true
         isFocusable = true
+        loopReady = true
+    }
+
+    private fun shouldAnimate(): Boolean =
+        (phase == OfflineDictationPhase.Preparing || phase == OfflineDictationPhase.Recording ||
+            phase == OfflineDictationPhase.Finishing) &&
+        isShown && isAttachedToWindow && windowVisibility == VISIBLE &&
+        appMotionEnabled() &&
+        (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
+
+    private fun syncAnimation() {
+        if (!loopReady) return
+        removeCallbacks(frameTick)
+        if (shouldAnimate()) postDelayed(frameTick, 50L)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        syncAnimation()
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(frameTick)
+        super.onDetachedFromWindow()
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        syncAnimation()
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        syncAnimation()
+    }
+
+    override fun drawableStateChanged() {
+        super.drawableStateChanged()
+        invalidate()
     }
 
     override fun getAccessibilityClassName(): CharSequence = android.widget.ImageButton::class.java.name
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        val x = w / 2f
+        val y = h / 2f
+        radius = min(context.dp(54).toFloat(), min(w, h) * 0.32f)
+        if (radius <= 0f) return
+        halo = RadialGradient(x, y, radius * 1.53f,
+            intArrayOf(0x006ECDF1, 0x206ACDEC, 0x08795FE6, Color.TRANSPARENT),
+            floatArrayOf(0f, 0.65f, 0.84f, 1f), Shader.TileMode.CLAMP)
+        surface = RadialGradient(x - radius * 0.4f, y - radius * 0.48f, radius * 1.85f,
+            intArrayOf(0xFF203D51.toInt(), 0xFF101D32.toInt(), 0xFF171426.toInt()),
+            floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        rim = SweepGradient(x, y,
+            intArrayOf(0xFF6DC0F5.toInt(), violet, 0xFF6172C6.toInt(), cyan, 0xFF6DC0F5.toInt()),
+            floatArrayOf(0f, 0.24f, 0.48f, 0.76f, 1f))
+        shine = LinearGradient(x - radius, y - radius, x + radius, y + radius,
+            intArrayOf(0xFFE0FCFF.toInt(), 0x80A5D8F4.toInt(), 0xFFBBA5FF.toInt()),
+            floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP)
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (radius <= 0f) return
         val x = width / 2f
         val y = height / 2f
-        val radius = min(context.dp(48).toFloat(), min(width, height) * 0.36f)
-        if (radius <= 0f) return
-        val opacity = if (isEnabled) 1f else 0.35f
+        val running = phase == OfflineDictationPhase.Preparing || phase == OfflineDictationPhase.Recording
+        val busy = phase == OfflineDictationPhase.Finishing
+        val animate = shouldAnimate()
+        val pulse = if (animate) ((sin((SystemClock.uptimeMillis() - born) / 2400.0 * Math.PI * 2) + 1) / 2).toFloat() else 0.35f
+        val opacity = if (phase == OfflineDictationPhase.Unavailable) 0.4f else 1f
+        val press = if (isPressed && isEnabled) 0.97f else 1f
+        val checkpoint = canvas.save()
+        canvas.scale(press, press, x, y)
+
         paint.style = Paint.Style.FILL
-        paint.shader = RadialGradient(x, y, radius * 1.36f,
-            intArrayOf(accentColor.alpha(0.2f * opacity), accentColor.alpha(0f)),
-            floatArrayOf(0.5f, 1f), Shader.TileMode.CLAMP)
-        canvas.drawCircle(x, y, radius * 1.36f, paint)
-        paint.shader = null
-        paint.color = accentColor.alpha((if (isPressed) 0.27f else 0.14f) * opacity)
+        paint.shader = halo
+        paint.alpha = ((0.75f + pulse * 0.25f) * opacity * 255).toInt()
+        canvas.drawCircle(x, y, radius * 1.53f, paint)
+        paint.shader = surface
+        paint.alpha = (opacity * 255).toInt()
         canvas.drawCircle(x, y, radius, paint)
+
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = context.dp(1.5f).toFloat()
-        paint.color = accentColor.alpha(0.65f * opacity)
+        paint.shader = rim
+        paint.strokeWidth = context.dp(1.25f).toFloat()
+        paint.alpha = (opacity * (0.66f + pulse * 0.18f) * 255).toInt()
         canvas.drawCircle(x, y, radius, paint)
+        paint.shader = null
+        paint.color = 0xFF89C4E4.toInt().alpha(0.085f * opacity)
+        paint.strokeWidth = context.dp(0.7f).toFloat()
+        canvas.drawCircle(x, y, radius * 0.86f, paint)
+
+        // Two small light accents give the orb direction without a busy radar or fake waveform.
+        val orbit = radius * 1.14f
+        bounds.set(x - orbit, y - orbit, x + orbit, y + orbit)
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.strokeWidth = context.dp(1.4f).toFloat()
+        paint.color = cyan.alpha(0.62f * opacity)
+        canvas.drawArc(bounds, 215f, 24f, false, paint)
+        paint.color = violet.alpha(0.54f * opacity)
+        canvas.drawArc(bounds, 38f, 17f, false, paint)
+        paint.strokeCap = Paint.Cap.BUTT
+
         paint.style = Paint.Style.FILL
+        paint.shader = shine
+        paint.alpha = (opacity * 255).toInt()
         if (running) {
-            val half = radius * 0.24f
-            paint.color = accentColor.alpha(opacity)
-            canvas.drawRoundRect(x - half, y - half, x + half, y + half,
-                context.dp(4).toFloat(), context.dp(4).toFloat(), paint)
+            val half = radius * 0.19f
+            val rounding = radius * 0.065f
+            canvas.drawRoundRect(x - half, y - half, x + half, y + half, rounding, rounding, paint)
+        } else if (busy) {
+            val dot = radius * 0.038f
+            for (i in -1..1) canvas.drawCircle(x + radius * 0.18f * i, y, dot, paint)
         } else {
-            val half = (radius * 0.43f).toInt()
+            paint.shader = null
+            val half = (radius * 0.32f).toInt()
             microphone.setBounds(x.toInt() - half, y.toInt() - half, x.toInt() + half, y.toInt() + half)
-            microphone.setTint(accentColor.alpha(opacity))
+            microphone.setTint(0xFFD8F6FF.toInt().alpha(opacity))
             microphone.draw(canvas)
         }
+        paint.shader = null
+        paint.alpha = 255
+        canvas.restoreToCount(checkpoint)
+        // Only the small control redraws; the backdrop and labels stay still.
     }
 }

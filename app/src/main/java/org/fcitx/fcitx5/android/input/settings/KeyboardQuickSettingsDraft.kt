@@ -6,6 +6,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.PressColorPalette
+import org.fcitx.fcitx5.android.data.theme.KeyMotionSettings
 
 /** Editing a keyboard panel must not rebuild its owning InputView before Done is tapped. */
 internal class KeyboardQuickSettingsDraft(
@@ -23,6 +24,7 @@ internal class KeyboardQuickSettingsDraft(
         val candidateGlow: Boolean,
         val idleBreathing: Boolean,
         val keyMotion: ThemePrefs.KeyMotionEffect,
+        val motionSettings: KeyMotionSettings,
         val numberRow: Boolean,
         val popup: Boolean,
         val hapticMode: InputFeedbackMode,
@@ -43,12 +45,22 @@ internal class KeyboardQuickSettingsDraft(
         theme.pressGlowBrightness.getValue(),
         theme.pressGlowReach.getValue(), theme.pressKeyRetreatTime.getValue(),
         theme.pressGlowOnCandidates.getValue(), theme.idleBreathing.getValue(),
-        theme.keyMotionEffect.getValue(), theme.portraitNumberRow.getValue(),
+        theme.keyMotionEffect.getValue(), KeyMotionSettings(
+            pressAmplitude = theme.pressMotionAmplitude.getValue(),
+            pressDuration = theme.pressMotionDuration.getValue(),
+            reboundAmplitude = theme.reboundMotionAmplitude.getValue(),
+            reboundDuration = theme.reboundMotionDuration.getValue()
+        ).normalized(), theme.portraitNumberRow.getValue(),
         keyboard.popupOnKeyPress.getValue(), keyboard.hapticOnKeyPress.getValue(),
         keyboard.hapticStrength.getValue()
     )
 
     var values = original
+
+    /** Reset only the four motion controls; the rest of this staged panel is unchanged. */
+    fun resetMotionSettings() {
+        values = values.copy(motionSettings = KeyMotionSettings())
+    }
 
     fun currentColors(accentColor: Int): IntArray = when (values.colorMode) {
         ThemePrefs.PressColorMode.Random -> PressColorPalette.presetColors(values.palette, theme, accentColor)
@@ -58,8 +70,8 @@ internal class KeyboardQuickSettingsDraft(
 
     /** No lifecycle callback saves this draft. Back and switching panels discard it. */
     fun apply(): Boolean {
-        if (values == original) return false
-        val next = values
+        val next = values.copy(motionSettings = values.motionSettings.normalized())
+        if (next == original) return false
         val editor = storage.edit()
         fun bool(pref: ManagedPreference.PBool, before: Boolean, after: Boolean) {
             if (before != after) editor.putBoolean(pref.key, after)
@@ -77,12 +89,21 @@ internal class KeyboardQuickSettingsDraft(
         bool(theme.pressGlowOnCandidates, original.candidateGlow, next.candidateGlow)
         bool(theme.idleBreathing, original.idleBreathing, next.idleBreathing)
         if (original.keyMotion != next.keyMotion) editor.putString(theme.keyMotionEffect.key, next.keyMotion.name)
+        int(theme.pressMotionAmplitude, original.motionSettings.pressAmplitude,
+            next.motionSettings.pressAmplitude, KeyMotionSettings.PRESS_AMPLITUDE_RANGE)
+        int(theme.pressMotionDuration, original.motionSettings.pressDuration,
+            next.motionSettings.pressDuration, KeyMotionSettings.PRESS_DURATION_RANGE)
+        int(theme.reboundMotionAmplitude, original.motionSettings.reboundAmplitude,
+            next.motionSettings.reboundAmplitude, KeyMotionSettings.REBOUND_AMPLITUDE_RANGE)
+        int(theme.reboundMotionDuration, original.motionSettings.reboundDuration,
+            next.motionSettings.reboundDuration, KeyMotionSettings.REBOUND_DURATION_RANGE)
         bool(theme.portraitNumberRow, original.numberRow, next.numberRow)
         bool(keyboard.popupOnKeyPress, original.popup, next.popup)
         if (original.hapticMode != next.hapticMode) editor.putString(keyboard.hapticOnKeyPress.key, next.hapticMode.name)
         int(keyboard.hapticStrength, original.hapticStrength, next.hapticStrength, 0..100)
         // SharedPreferences updates every changed value before notifying listeners. In particular,
         // a theme listener rebuilding the IME sees the entire new setup, never a partial one.
+        values = next
         original = next
         editor.apply()
         return true

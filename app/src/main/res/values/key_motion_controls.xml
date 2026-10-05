@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="key_motion_controls_title">Key feel</string>
+    <string name="key_motion_controls_reset">Reset key feel</string>
+    <string name="key_motion_preview_label">Try key press and rebound</string>
+    <string name="key_motion_preview_hint">Hold to press down; release to rebound.</string>
+    <string name="key_motion_press_amplitude">Press amount</string>
+    <string name="key_motion_rebound_amplitude">Rebound amount</string>
+    <string name="key_motion_press_duration">Press time</string>
+    <string name="key_motion_rebound_duration">Rebound time</string>
+    <string name="key_motion_value_percent">%1$d%%</string>
+    <string name="key_motion_value_ms">≈ %1$d ms</string>
+    <string name="key_motion_timing_hint">Rebound time includes rising and settling after release; typing is never delayed. Amount also changes vertical movement.</string>
+    <string name="key_motion_controls_requires_press">Select “%1$s” to adjust key feel.</string>
+</resources>

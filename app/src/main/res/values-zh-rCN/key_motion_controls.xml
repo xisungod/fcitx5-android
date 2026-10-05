@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="key_motion_controls_title">按键手感</string>
+    <string name="key_motion_controls_reset">重置手感</string>
+    <string name="key_motion_preview_label">试按并松开，预览按压与回弹</string>
+    <string name="key_motion_preview_hint">按住看下压，松手看回弹。</string>
+    <string name="key_motion_press_amplitude">按压幅度</string>
+    <string name="key_motion_rebound_amplitude">回弹幅度</string>
+    <string name="key_motion_press_duration">按下时间</string>
+    <string name="key_motion_rebound_duration">回弹时间</string>
+    <string name="key_motion_value_percent">%1$d%%</string>
+    <string name="key_motion_value_ms">约 %1$d 毫秒</string>
+    <string name="key_motion_timing_hint">回弹时间包含松手后弹起和归位；不会延迟输入。幅度也影响上下位移。</string>
+    <string name="key_motion_controls_requires_press">选择“%1$s”后可调整手感。</string>
+</resources>

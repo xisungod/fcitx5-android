@@ -203,7 +203,7 @@ class AutoScaleTextView @JvmOverloads constructor(
             translate(baselineX, baselineY)
             scale(textScaleX, textScaleY)
             if (contrastOutlineWidth > 0f) {
-                // Keep the glyph readable while its fill changes above a lit key.
+                // Keep the unchanged glyph fill readable above a lit key.
                 // The outline is constant through the entire press and release.
                 val originalStyle = paint.style
                 val originalWidth = paint.strokeWidth

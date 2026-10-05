@@ -503,7 +503,7 @@ class KeyboardVisualRegressionTest {
             val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, bounds.exactCenterX(), bounds.exactCenterY(), 0)
             keyboard.dispatchTouchEvent(down)
             down.recycle()
-            render(keyboard) // first pass lets the legend switch its ink
+            render(keyboard).recycle() // Draw the bright face without mutating the legend ink.
             val lit = render(keyboard)
             val face = lit.getPixel(bounds.left + 10, bounds.top + 10)
             assertTrue("A bright key face must not be dimmed by its own dark background",
@@ -514,11 +514,13 @@ class KeyboardVisualRegressionTest {
                 if (minOf(Color.red(old), Color.green(old), Color.blue(old)) >= 242) {
                     whitePixels++
                     val pixel = lit.getPixel(x, y)
-                    // A high-luminance cyan face must use dark ink; saturated blue uses white ink.
-                    assertTrue("The character must stay above the colour, in dark ink on a bright key",
-                        maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) <= 90)
+                    // Colour stays below the original light glyph, including on bright cyan.
+                    assertTrue("The character must keep its light fill above the coloured face",
+                        minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) >= 242)
                 }
             }
+            assertEquals("A coloured face must not invert its theme legend",
+                ThemePreset.XuancaiBlackV09.keyTextColor, (key as TextKeyView).mainText.currentTextColor)
             assertTrue(whitePixels > 5)
             save(lit, "key-surface-before-character")
             keyboard.onDetach()

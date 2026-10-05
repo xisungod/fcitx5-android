@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.IdleBreathingTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-05T01:24:24.910Z" hostname="1860ba65b9a5" time="0.004">
+  <properties/>
+  <testcase name="customCycleAndBrightnessRespectIdleDelay" classname="org.fcitx.fcitx5.android.IdleBreathingTest" time="0.001"/>
+  <testcase name="invalidImportedTimingValuesCannotDivideByZeroOrEscapeBrightnessBounds" classname="org.fcitx.fcitx5.android.IdleBreathingTest" time="0.0"/>
+  <testcase name="rapidTypingMaintainsContinuousExitAndNeverStartsIdleWhileHeld" classname="org.fcitx.fcitx5.android.IdleBreathingTest" time="0.001"/>
+  <testcase name="inactivityDeadlineStopsFramesUntilNewInputOrKeyboardReopens" classname="org.fcitx.fcitx5.android.IdleBreathingTest" time="0.0"/>
+  <testcase name="longExitFadeDoesNotJumpBackToBrightWithShortIdleDelay" classname="org.fcitx.fcitx5.android.IdleBreathingTest" time="0.0"/>
+  <testcase name="heldKeyStopsIdleTimersUntilReleasedAndHiddenStopsEverything" classname="org.fcitx.fcitx5.android.IdleBreathingTest" time="0.001"/>
+  <testcase name="configurableEntryFadeAndExitFadeHaveIndependentDurations" classname="org.fcitx.fcitx5.android.IdleBreathingTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

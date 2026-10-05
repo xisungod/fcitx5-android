@@ -30,6 +30,7 @@ import androidx.core.view.updateLayoutParams
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.data.theme.KeyMotionSettings
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs.PunctuationPosition
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
@@ -73,7 +74,7 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
     internal fun floatingFaceOpacity(): Float =
         if (depthAnimationsAllowed()) pressDepth.currentFaceOpacity() else 0f
 
-    private val pressDepth = KeyPressDepth()
+    private val pressDepth = KeyPressDepth(KeyMotionSettings.from(ThemeManager.prefs))
     private var depthFrameScheduled = false
     private val depthFrame = object : Runnable {
         override fun run() {
@@ -92,6 +93,12 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         !AppPrefs.getInstance().advanced.disableAnimation.getValue() &&
             (!ThemeManager.prefs.effectsFollowSystemAnimation.getValue() ||
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
+
+    internal fun setDepthConfiguration(settings: KeyMotionSettings) {
+        pressDepth.configure(settings)
+        invalidateKeySurface()
+        if (pressDepth.isTransitioning()) scheduleDepthFrame()
+    }
 
     internal fun setDepthPressed(pressed: Boolean) {
         if (!depthAnimationsAllowed()) {
@@ -178,13 +185,16 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             }
             // The touch cell and popup anchor do not move. Use only the spare
             // key margins so both the compressed and raised cap stay in this cell.
-            val scaleGain = min(KeyPressDepth.SCALE_GAIN,
+            val settings = pressDepth.configuration
+            val pressLoss = settings.pressAmplitude / 100f
+            val scaleGain = min(settings.reboundAmplitude / 100f,
                 min(hMargin * 1.5f / width.coerceAtLeast(1), vMargin.toFloat() / height.coerceAtLeast(1)))
-            val scale = 1f + KeyPressDepth.scaleDelta(lift) * (scaleGain / KeyPressDepth.SCALE_GAIN)
-            val rise = min(dp(2.5f), (vMargin - height * scaleGain / 2f - dp(0.5f)).coerceAtLeast(0f))
-            val sink = min(dp(1.5f), (vMargin - dp(1f)).coerceAtLeast(0f))
-            // A quadratic displacement joins down/up with the same slope at zero.
-            val translation = -(rise + sink) * lift / 2f + (sink - rise) * lift * lift / 2f
+            val scale = 1f + KeyPressDepth.scaleDelta(lift, pressLoss, scaleGain)
+            val rise = min(dp(2.5f) * settings.reboundAmplitude / 3f,
+                (vMargin - height * scaleGain / 2f - dp(0.5f)).coerceAtLeast(0f))
+            val sink = min(dp(1.5f) * settings.pressAmplitude / 8f,
+                (vMargin - dp(1f)).coerceAtLeast(0f))
+            val translation = KeyPressDepth.translation(lift, sink, rise)
             val saved = canvas.save()
             try {
                 // Background, full coloured face and glyph move as one object.

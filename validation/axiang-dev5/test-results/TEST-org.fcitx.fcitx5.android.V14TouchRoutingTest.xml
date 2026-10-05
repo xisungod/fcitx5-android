@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.V14TouchRoutingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-05T01:25:03.142Z" hostname="1860ba65b9a5" time="0.238">
+  <properties/>
+  <testcase name="aFinalUpRetargetedToAnotherLetterCannotLeaveThatNewKeyHeld" classname="org.fcitx.fcitx5.android.V14TouchRoutingTest" time="0.082"/>
+  <testcase name="cancelEndsAllPointersAndCannotReleaseAnImmediatelyFollowingPress" classname="org.fcitx.fcitx5.android.V14TouchRoutingTest" time="0.077"/>
+  <testcase name="aSecondFingerAndItsReleaseCannotEndTheFirstFingersHeldLight" classname="org.fcitx.fcitx5.android.V14TouchRoutingTest" time="0.076"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

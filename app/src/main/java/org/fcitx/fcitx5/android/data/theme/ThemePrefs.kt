@@ -205,6 +205,16 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     val keyMotionEffect = enumList(R.string.key_motion_effect, "key_motion_effect", KeyMotionEffect.Press)
 
+    // The keyboard panel stages these values and saves them together on Done.
+    val pressMotionAmplitude = ManagedPreference.PInt(sharedPreferences, "press_motion_amplitude", 8)
+        .also { it.register() }
+    val pressMotionDuration = ManagedPreference.PInt(sharedPreferences, "press_motion_duration", 180)
+        .also { it.register() }
+    val reboundMotionAmplitude = ManagedPreference.PInt(sharedPreferences, "rebound_motion_amplitude", 3)
+        .also { it.register() }
+    val reboundMotionDuration = ManagedPreference.PInt(sharedPreferences, "rebound_motion_duration", 1000)
+        .also { it.register() }
+
     val keyExitStyle = enumList(
         R.string.key_exit_style, "key_exit_style", KeyExitStyle.Dim,
         enableUiOn = { pressEffect.getValue() }

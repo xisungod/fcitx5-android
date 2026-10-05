@@ -259,7 +259,7 @@ class KeyboardControlsPreviewTest {
                     doneBounds.top >= 0 && doneBounds.bottom <= barHeight)
             assertTrue("The settings must genuinely require vertical scrolling",
                 ui.root.getChildAt(0).height > ui.root.height)
-            for (tag in listOf("quick_ripple_shape", "quick_idle_breathing")) {
+            for (tag in listOf("quick_motion_preview")) {
                 val control = ui.root.findViewWithTag<View>(tag)
                 val bounds = Rect().also { control.getDrawingRect(it); ui.root.offsetDescendantRectToMyCoords(control, it) }
                 assertTrue("$tag must be reachable on the first panel screen", bounds.top >= 0 && bounds.bottom <= panelHeight)
@@ -268,6 +268,9 @@ class KeyboardControlsPreviewTest {
             save(root, "settings-top")
 
             for ((tag, name) in listOf(
+                "quick_press_amplitude" to "settings-press-motion",
+                "quick_rebound_amplitude" to "settings-rebound-motion",
+                "quick_idle_breathing" to "settings-breathing",
                 "quick_haptic_mode" to "settings-feedback",
                 "quick_palettes" to "settings-palettes",
                 "quick_ripple_shape" to "settings-ripple-shape",
@@ -275,7 +278,17 @@ class KeyboardControlsPreviewTest {
             )) {
                 val control = ui.root.findViewWithTag<View>(tag)
                 assertTrue("A settings control must be laid out: $tag", control.width > 0 && control.height > 0)
-                ui.root.scrollTo(0, (control.top - activity.dp(38)).coerceAtLeast(0))
+                val contentBounds = Rect().also {
+                    control.getDrawingRect(it)
+                    ui.root.offsetDescendantRectToMyCoords(control, it)
+                }
+                ui.root.scrollTo(0, (contentBounds.top - activity.dp(38)).coerceAtLeast(0))
+                if (tag == "quick_ripple_shape" || tag == "quick_idle_breathing") {
+                    val visible = Rect()
+                    assertTrue("$tag must stay accessible inside the keyboard after scrolling",
+                        control.getGlobalVisibleRect(visible))
+                    assertEquals("$tag must have its full touch height visible", control.height, visible.height())
+                }
                 save(root, name)
             }
             ui.root.scrollTo(0, ui.root.getChildAt(0).height)

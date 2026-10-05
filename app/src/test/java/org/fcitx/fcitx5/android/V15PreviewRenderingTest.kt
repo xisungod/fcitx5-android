@@ -555,7 +555,7 @@ class V15PreviewRenderingTest {
                 }
             }
             layout(root)
-            render(root).recycle() // The real legend changes ink in response to the new face light.
+            render(root).recycle() // Draw the production surface and its stable legend ink.
             val firstKey = if (frame == 0) renderedKeys.values.first {
                 (it.def as? KeyDef.Appearance.Text)?.displayText == "L"
             } else null
@@ -1386,6 +1386,8 @@ class V15PreviewRenderingTest {
                 save(image, "$folder/frame-%03d".format(frame))
                 previews.assertUnscaled()
                 touched.forEach { (label, key) ->
+                    assertEquals("$folder/$label at ${elapsed}ms must preserve its theme legend colour",
+                        theme.keyTextColor, key.mainText.currentTextColor)
                     val actual = legendGeometry(key, root)
                     assertStableLegend("$folder/$label at ${elapsed}ms", geometry.getValue(label), actual)
                     geometryRows.add("$frame,$elapsed,$label,${actual.keyBounds.left},${actual.keyBounds.top},${actual.keyBounds.right},${actual.keyBounds.bottom}," +

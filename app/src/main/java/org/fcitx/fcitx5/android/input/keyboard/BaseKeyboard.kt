@@ -233,16 +233,6 @@ abstract class BaseKeyboard(
         motionLifecycleReady = true
     }
 
-    private val originalLegendInk = android.util.SparseIntArray()
-
-    /** Follow the fading face continuously instead of snapping black/white at one threshold. */
-    private fun updateLegendInk(key: KeyView, brightness: Float) {
-        val text = (key as? TextKeyView)?.mainText ?: return
-        if (originalLegendInk.indexOfKey(key.id) < 0) originalLegendInk.put(key.id, text.currentTextColor)
-        val ink = KeyLegendInk.color(brightness, originalLegendInk.get(key.id))
-        if (text.currentTextColor != ink) text.setTextColor(ink)
-    }
-
     private fun createKeyView(def: KeyDef): KeyView {
         return when (def.appearance) {
             is KeyDef.Appearance.AltText -> AltTextKeyView(context, theme, def.appearance)
@@ -259,7 +249,9 @@ abstract class BaseKeyboard(
                 surfaceKeys.add(this)
                 (this as? TextKeyView)?.mainText?.contrastOutlineWidth = dp(0.8f)
                 keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
-                    updateLegendInk(this, effect.drawKeySurface(canvas, id, width, height, hMargin, vMargin))
+                    // Keep the theme's legend colour steady throughout press and release.
+                    // A thin constant outline preserves legibility over bright key faces.
+                    effect.drawKeySurface(canvas, id, width, height, hMargin, vMargin)
                 }
             }
             soundEffect = when (def) {

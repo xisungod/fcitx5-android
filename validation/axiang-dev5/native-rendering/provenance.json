@@ -1,0 +1,83 @@
+{
+  "source_commit": "3dcaa4dedc7aaed1d716ada529dd06b3d4095033",
+  "renderer": "Robolectric NATIVE, actual Android UI",
+  "soft_mist_fade_ms": 900,
+  "includes_user_reference_media": false,
+  "files": [
+    {
+      "source": "v15-continuous-f-off/frame-000.png",
+      "file": "default-mist-000.png",
+      "sha256": "df98873a8cd2e11b701de8c7417a71a3ac5cabf9fe2091acbeaac63073fb12ed"
+    },
+    {
+      "source": "v15-continuous-f-off/frame-003.png",
+      "file": "default-mist-003.png",
+      "sha256": "702f54b679abb3920ad843820e7a542edf327d9634dbaf476a92812740f9f480"
+    },
+    {
+      "source": "v15-continuous-f-off/frame-015.png",
+      "file": "default-mist-015.png",
+      "sha256": "1d3af136d9dd0385a650a4245e9c33aa60c5ab6feb902dbaf41fc002985e7c4f"
+    },
+    {
+      "source": "v15-continuous-f-off/frame-090.png",
+      "file": "default-mist-090.png",
+      "sha256": "1fec3b066ed9df60d02dd8f9ab1c21bfd459a77058584f395b86c976cb662da7"
+    },
+    {
+      "source": "v15-continuous-f-off/canvas-motion.csv",
+      "file": "default-mist-canvas-motion.csv",
+      "sha256": "117e76d75c4ff44e61545306f5860a7f7f417ee475bf5f05628d65107ec8800a"
+    },
+    {
+      "source": "v15-continuous-f-off/geometry.csv",
+      "file": "default-mist-geometry.csv",
+      "sha256": "5ba0e7322be11a7ee7915e471d57f9c92954b2bbfa580dce13fa75ecd5b56de7"
+    },
+    {
+      "source": "v15-continuous-f-off/ink.csv",
+      "file": "default-mist-ink.csv",
+      "sha256": "868d9506e46504fd4c0408ae6f5c12de112c0a7466951f8b48366e0e1c2902b9"
+    },
+    {
+      "source": "v15-continuous-f-off/motion.csv",
+      "file": "default-mist-motion.csv",
+      "sha256": "92ae90bbf13f7e199b76c0f33f5b4063527a5f4f9aa1702e6c9995483da31ab2"
+    },
+    {
+      "source": "v15-continuous-f-off/preview.txt",
+      "file": "default-mist-preview.txt",
+      "sha256": "36118d801177e920c85fd94f38f35645edb0df00f195a1d709e7b441d0797d96"
+    },
+    {
+      "source": "v15-continuous-f-off/visibility.csv",
+      "file": "default-mist-visibility.csv",
+      "sha256": "384314a0176ca0ca761b21fd9fdc27628a41bdcc413b938831f0c689f4e43981"
+    },
+    {
+      "source": "keyboard-controls/settings-top.png",
+      "file": "settings-top.png",
+      "sha256": "ef03203180a0a0faefc6f670935905f3260af8ba023be37c6749651da0e9ff5b"
+    },
+    {
+      "source": "keyboard-controls/settings-press-motion.png",
+      "file": "settings-press-motion.png",
+      "sha256": "377205009865685b41e1f0bf9bd853ae3b0d55cc36de75e8f83b0973db177805"
+    },
+    {
+      "source": "offline-dictation/listening.png",
+      "file": "dictation-listening.png",
+      "sha256": "4e1dcaac61856dfd041df5b279c44e8311bcfd83d3c198a1045ecdafdd822fad"
+    },
+    {
+      "source": "offline-dictation/finishing.png",
+      "file": "dictation-finishing.png",
+      "sha256": "9f5a3dbdff681a692024a603a195f8ccb7c062601a9c793f656e349262c403f5"
+    },
+    {
+      "source": "offline-dictation/unavailable-short-keyboard.png",
+      "file": "dictation-unavailable-short-keyboard.png",
+      "sha256": "96197306b3ca7aeda3f2a05e42c2a0f9824b14f0201e76d6bfbe94f05863a255"
+    }
+  ]
+}

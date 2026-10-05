@@ -1,0 +1,23 @@
+Samsung reference glyph observations (limited to the supplied clips)
+
+Read-only visual review of the two locally supplied videos. No reference video,
+frame, crop, or other user media is included in this text evidence artifact.
+The recordings are camera footage at 30 fps; compression, viewing angle, and
+finger occlusion prevent exact RGB or touch-boundary measurements.
+
+1234.mp4, frame 160 (5.333 s): the small pink/purple actual a key has a light
+letter. Its separate cyan popup above the key has a dark a. Popup lettering
+must not be confused with the actual key-face lettering.
+
+1234.mp4, frame 171 (5.700 s): the compressed purple n key visibly retains a
+light n. At frame 177 (5.900 s), the returning dark n key still has a light n.
+These visible states show changing key-face color/geometry without a matching
+light-to-dark inversion of the actual key's letter.
+
+aff2c57d36cbdeed42f096651aaf92c8.mp4, frame 231 (7.700 s): the visible green r
+and x key faces also have light glyphs while surrounding effects remain lit.
+
+Conclusion: the sampled visible events support keeping actual key-face glyph
+color steady through press/release. They do not establish behavior for every
+Samsung keyboard, theme, effect setting, key, or touch phase. They also do not
+establish exact foreground colors or a universal Samsung rendering rule.

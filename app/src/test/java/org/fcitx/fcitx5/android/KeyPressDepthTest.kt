@@ -21,6 +21,7 @@ import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
+import org.fcitx.fcitx5.android.data.theme.KeyMotionSettings
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
@@ -298,6 +299,197 @@ class KeyPressDepthTest {
         assertFalse(depth.isTransitioning())
     }
 
+    @Test
+    fun independentAmplitudeEndpointsHaveMonotoneScaleAndTravelWithMatchingNeutralSlopes() {
+        for (press in listOf(2, 8, 16)) for (rebound in listOf(1, 3, 6)) {
+            val a = press / 100f
+            val b = rebound / 100f
+            assertEquals(-a, KeyPressDepth.scaleDelta(-1f, a, b), 0.000001f)
+            assertEquals(b, KeyPressDepth.scaleDelta(1f, a, b), 0.000001f)
+            val sink = 1.5f * press / 8f
+            val rise = 2.5f * rebound / 3f
+            assertEquals(sink, KeyPressDepth.translation(-1f, sink, rise), 0.000001f)
+            assertEquals(-rise, KeyPressDepth.translation(1f, sink, rise), 0.000001f)
+            var previousScale = -a
+            var previousTravel = sink
+            for (i in -999..1000) {
+                val lift = i / 1000f
+                val scale = KeyPressDepth.scaleDelta(lift, a, b)
+                val travel = KeyPressDepth.translation(lift, sink, rise)
+                assertTrue("Selected amplitudes cannot reverse the scale path", scale >= previousScale - 0.000001f)
+                assertTrue("Selected amplitudes cannot reverse the vertical path", travel <= previousTravel + 0.000001f)
+                previousScale = scale
+                previousTravel = travel
+            }
+            val epsilon = 0.0001f
+            assertEquals(KeyPressDepth.scaleDelta(-epsilon, a, b) / -epsilon,
+                KeyPressDepth.scaleDelta(epsilon, a, b) / epsilon, 0.0001f)
+            assertEquals(KeyPressDepth.translation(-epsilon, sink, rise) / -epsilon,
+                KeyPressDepth.translation(epsilon, sink, rise) / epsilon, 0.002f)
+        }
+    }
+
+    @Test
+    fun configuredTimesChangeBothPhasesAndFastPressSlowReleaseNeverClipsOrBouncesTwice() {
+        var now = 0L
+        val fast = KeyPressDepth(KeyMotionSettings(pressDuration = 60, reboundDuration = 400)) { now }
+        val slow = KeyPressDepth(KeyMotionSettings(pressDuration = 300, reboundDuration = 1800)) { now }
+        fast.pressed(); slow.pressed()
+        now = 100
+        assertEquals(-1f, fast.currentLift(), 0f)
+        assertFalse(fast.isTransitioning())
+        assertTrue(slow.currentLift() > -0.95f)
+        assertTrue(slow.isTransitioning())
+        now = 400
+        fast.released(); slow.released()
+        now = 900
+        assertFalse("400ms release has finished", fast.isTransitioning())
+        assertTrue("1800ms release retains its own tail", slow.isTransitioning())
+        now = 2500
+        assertFalse(slow.isTransitioning())
+
+        now = 0
+        val settings = KeyMotionSettings(pressDuration = 60, reboundDuration = 1800)
+        val depth = KeyPressDepth(settings) { now }
+        val skippedFrames = KeyPressDepth(settings) { now }
+        depth.pressed(); skippedFrames.pressed()
+        now = 7
+        val position = depth.currentLift()
+        val speed = depth.currentVelocity()
+        depth.released(); skippedFrames.released()
+        assertEquals(position, depth.currentLift(), 0f)
+        assertEquals("The safety brake must not inject a velocity impulse", speed, depth.currentVelocity(), 0f)
+        var peaks = 0
+        var previousSpeed = speed
+        var minimum = position
+        for (elapsed in 1..2200) {
+            now = 7L + elapsed
+            val lift = depth.currentLift()
+            val velocity = depth.currentVelocity()
+            minimum = minOf(minimum, lift)
+            assertTrue("No hard boundary plateau is needed during this short touch", lift > -0.999f && lift < 0.999f)
+            if (previousSpeed > 0f && velocity <= 0f) peaks++
+            previousSpeed = velocity
+            if (elapsed == 700) {
+                assertEquals("Skipping brake and peak gives the identical analytic state", depth.currentLift(), skippedFrames.currentLift(), 0f)
+                assertEquals(depth.currentVelocity(), skippedFrames.currentVelocity(), 0f)
+                assertEquals(depth.currentFaceOpacity(), skippedFrames.currentFaceOpacity(), 0f)
+            }
+        }
+        assertTrue("Inertia continues briefly downwards instead of snapping on UP", minimum < position - 0.05f)
+        assertEquals("The full release has exactly one positive peak", 1, peaks)
+        assertFalse(depth.isTransitioning())
+        assertEquals(0f, depth.currentLift(), 0f)
+    }
+
+    @Test
+    fun slowingTheLivePreviewPreservesFullRiseColourAndDoesNotRelightAFadingCap() {
+        for (delayAfterRelease in listOf(50L, 140L)) {
+            var now = 0L
+            val settings = KeyMotionSettings(reboundDuration = 400)
+            val depth = KeyPressDepth(settings) { now }
+            depth.pressed()
+            now = 200
+            depth.released()
+            now += delayAfterRelease
+            val position = depth.currentLift()
+            val velocity = depth.currentVelocity()
+            val opacity = depth.currentFaceOpacity()
+            depth.configure(settings.copy(reboundDuration = 1800))
+            assertEquals(position, depth.currentLift(), 0f)
+            assertEquals(velocity, depth.currentVelocity(), 0f)
+            assertEquals("Changing duration cannot extinguish or relight the cap", opacity, depth.currentFaceOpacity(), 0f)
+            val phase: Any = ReflectionHelpers.getField(depth, "phase")
+            assertEquals("This fixture must exercise the conditional inertia brake", "Brake", phase.toString())
+            var previousOpacity = opacity
+            repeat(2200) {
+                now++
+                val nextOpacity = depth.currentFaceOpacity()
+                if (delayAfterRelease == 50L && depth.currentVelocity() > 0f) {
+                    assertEquals("Upward braking is still part of the full-colour rise", 1f, nextOpacity, 0f)
+                }
+                assertTrue("Neither brake transition can make a fading face bright again", nextOpacity <= previousOpacity + 0.000001f)
+                previousOpacity = nextOpacity
+            }
+            assertEquals(0f, depth.currentFaceOpacity(), 0f)
+            assertFalse(depth.isTransitioning())
+        }
+    }
+
+    @Test
+    fun repeatedDurationChangesDuringTheUpperBrakeKeepItsRiseFullColour() {
+        var now = 0L
+        val initial = KeyMotionSettings(reboundDuration = 400)
+        val depth = KeyPressDepth(initial) { now }
+        depth.pressed()
+        now = 200
+        depth.released()
+        now = 250
+        depth.configure(initial.copy(reboundDuration = 1800))
+        val phase: Any = ReflectionHelpers.getField(depth, "phase")
+        assertEquals("The first change must enter upper braking before the peak", "Brake", phase.toString())
+        for (duration in listOf(1700, 1600, 1800)) {
+            now++
+            val position = depth.currentLift()
+            val velocity = depth.currentVelocity()
+            assertTrue(velocity > 0f)
+            depth.configure(initial.copy(reboundDuration = duration))
+            assertEquals(position, depth.currentLift(), 0f)
+            assertEquals(velocity, depth.currentVelocity(), 0f)
+            assertEquals("Retargeting an upward brake cannot prematurely fade its face", 1f,
+                depth.currentFaceOpacity(), 0f)
+        }
+        var previousOpacity = 1f
+        var previousVelocity = depth.currentVelocity()
+        var peaks = 0
+        repeat(2200) {
+            now++
+            val opacity = depth.currentFaceOpacity()
+            val velocity = depth.currentVelocity()
+            if (velocity > 0f) assertEquals(1f, opacity, 0f)
+            if (previousVelocity > 0f && velocity <= 0f) peaks++
+            assertTrue(opacity <= previousOpacity + 0.000001f)
+            previousOpacity = opacity
+            previousVelocity = velocity
+        }
+        assertEquals(1, peaks)
+        assertEquals(0f, depth.currentFaceOpacity(), 0f)
+        assertFalse(depth.isTransitioning())
+    }
+
+    @Test
+    fun extremeTimeAndAmplitudeChoicesPreserveRepressPositionAndVelocity() {
+        for (pressDuration in listOf(60, 300)) for (reboundDuration in listOf(400, 1800)) {
+            var now = 0L
+            val depth = KeyPressDepth(KeyMotionSettings(16, pressDuration, 1, reboundDuration)) { now }
+            for (duration in listOf(7, 0, 20, 60, 10, 40, 150, 5)) {
+                val moving = depth.isTransitioning()
+                val position = depth.currentLift()
+                val speed = depth.currentVelocity()
+                depth.pressed()
+                if (moving) {
+                    assertEquals(position, depth.currentLift(), 0f)
+                    assertEquals(speed, depth.currentVelocity(), 0f)
+                }
+                repeat(duration) { now++; assertTrue(depth.currentLift() in -1f..1f) }
+                val upPosition = depth.currentLift()
+                val upSpeed = depth.currentVelocity()
+                depth.released()
+                assertEquals(upPosition, depth.currentLift(), 0f)
+                assertEquals(upSpeed, depth.currentVelocity(), 0f)
+                repeat(35) {
+                    now++
+                    depth.currentLift()
+                    val rawPosition: Double = ReflectionHelpers.getField(depth, "position")
+                    assertTrue("The model itself stays bounded, before defensive drawing clamp", rawPosition in -1.000001..1.000001)
+                }
+            }
+            now += 2500
+            assertEquals(0f, depth.currentLift(), 0f)
+            assertFalse(depth.isTransitioning())
+        }
+    }
+
     private class Harness(
         mode: ThemePrefs.KeyMotionEffect = ThemePrefs.KeyMotionEffect.Press,
         appAnimationsDisabled: Boolean = false,
@@ -305,7 +497,8 @@ class KeyPressDepthTest {
         savedRetreat: Int = 100,
         shape: ThemePrefs.RippleShape = ThemePrefs.RippleShape.SoftMist,
         singleColor: Int = 0xFFFF243F.toInt(),
-        waveFade: Int = 520
+        waveFade: Int = 520,
+        motion: KeyMotionSettings = KeyMotionSettings()
     ) {
         init {
             ShadowChoreographer.setPaused(true)
@@ -333,6 +526,10 @@ class KeyPressDepthTest {
             setting(p.keyColorStyle, ThemePrefs.KeyColorStyle.Fill)
             setting(p.keyExitStyle, ThemePrefs.KeyExitStyle.Dim)
             setting(p.keyMotionEffect, mode)
+            setting(p.pressMotionAmplitude, motion.pressAmplitude)
+            setting(p.pressMotionDuration, motion.pressDuration)
+            setting(p.reboundMotionAmplitude, motion.reboundAmplitude)
+            setting(p.reboundMotionDuration, motion.reboundDuration)
             setting(p.effectsFollowSystemAnimation, false)
             setting(p.keyBorder, true)
             setting(p.keyBorderStroke, false)
@@ -576,6 +773,47 @@ class KeyPressDepthTest {
             assertFixedGeometry(h, key, outer, anchor)
             assertEquals(listOf("a"), h.typed)
         } finally { h.finish() }
+    }
+
+    @Test
+    fun persistedAmplitudeEndpointsChangeTheActualCanvasWithoutChangingInputOrHitBounds() {
+        val measured = mutableListOf<Pair<Float, Float>>()
+        for (settings in listOf(KeyMotionSettings(2, 180, 1, 1000), KeyMotionSettings(16, 180, 6, 1000))) {
+            val h = Harness(motion = settings)
+            try {
+                val key = h.key("A")
+                val outer = h.outerBounds(key)
+                val anchor = Rect(key.bounds)
+                val matrixValues = FloatArray(9)
+                var scale = 1f
+                key.keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
+                    @Suppress("DEPRECATION")
+                    val matrix = canvas.matrix
+                    matrix.getValues(matrixValues)
+                    scale = matrixValues[Matrix.MSCALE_X]
+                    val cap = floatArrayOf(key.hMargin.toFloat(), key.vMargin.toFloat(),
+                        (width - key.hMargin).toFloat(), (height - key.vMargin + 1).toFloat())
+                    matrix.mapPoints(cap)
+                    assertTrue("Even maximum amplitude keeps the cap inside its own cell",
+                        cap[0] >= 0f && cap[1] >= 0f && cap[2] <= width && cap[3] <= height)
+                }
+                h.event(MotionEvent.ACTION_DOWN, 7 to "A")
+                h.advance(220)
+                h.render(key).recycle()
+                val pressedScale = scale
+                assertEquals(1f - settings.pressAmplitude / 100f, pressedScale, 0.00001f)
+                h.event(MotionEvent.ACTION_UP, 7 to "A")
+                assertEquals(listOf("a"), h.typed)
+                h.advance(200)
+                h.render(key).recycle()
+                val reboundScale = scale
+                assertTrue(reboundScale > 1f)
+                assertFixedGeometry(h, key, outer, anchor)
+                measured += pressedScale to reboundScale
+            } finally { h.finish() }
+        }
+        assertTrue("Press slider visibly changes the actual keycap", measured[0].first - measured[1].first > 0.13f)
+        assertTrue("Rebound slider changes the real geometry rather than only its label", measured[1].second - measured[0].second > 0.015f)
     }
 
     @Test
