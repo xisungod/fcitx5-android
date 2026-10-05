@@ -7,8 +7,8 @@
     <string name="keyboard_width_size_summary">Larger left and right margins make the keyboard narrower. A usable width is retained on small screens.</string>
     <string name="haptic_strength">Vibration strength (0 = off)</string>
     <string name="haptic_strength_summary">0 turns off all keyboard vibrations. On devices with amplitude control, higher values give stronger feedback. Other devices keep system feedback. Existing feedback is kept until you adjust this control.</string>
-    <string name="app_name_release">Fcitx5</string>
-    <string name="app_name_debug">Fcitx5 (Debug)</string>
+    <string name="app_name_release">AXiang</string>
+    <string name="app_name_debug">AXiang</string>
     <string name="save">Save</string>
     <string name="input_methods">Input Methods</string>
     <string name="add_input_method">Add Input Method</string>
@@ -31,15 +31,15 @@
     <string name="undo">Undo</string>
     <string name="delete_and_sync_data">Delete and sync runtime data</string>
     <string name="delete_and_sync_data_message">Delete current data directory and synchronize from assets bundled in app</string>
-    <string name="enable_ime">Enable Input Method</string>
-    <string name="enable_ime_hint">Enable &lt;b>%1$s&lt;/b> in Language and input settings</string>
-    <string name="select_ime">Select Input Method</string>
-    <string name="select_ime_hint">Select &lt;b>%1$s&lt;/b> as your default input method</string>
+    <string name="enable_ime">Enable AXiang</string>
+    <string name="enable_ime_hint">Open the system keyboard settings and enable &lt;b>%1$s&lt;/b>.</string>
+    <string name="select_ime">Choose AXiang</string>
+    <string name="select_ime_hint">Choose &lt;b>%1$s&lt;/b> from the keyboard list to start typing.</string>
     <string name="next">Next</string>
     <string name="prev">Prev</string>
     <string name="done">Done</string>
-    <string name="setup_keyboard">Finish setting up the keyboard</string>
-    <string name="setup_channel">Setup Wizard</string>
+    <string name="setup_keyboard">Finish setting up AXiang</string>
+    <string name="setup_channel">AXiang setup</string>
     <string name="pinyin_dict">Pinyin Dictionaries</string>
     <string name="reloading">Reloading</string>
     <string name="importing">Importing</string>
@@ -58,8 +58,8 @@
     <string name="expanded_candidate_style_flexbox">Flexbox</string>
     <string name="no_more_input_methods">No more input methods to switch</string>
     <string name="add_more_input_methods">Would you like to add more input methods?</string>
-    <string name="about">About</string>
-    <string name="faq">FAQ</string>
+    <string name="about">About AXiang</string>
+    <string name="faq">Help and feedback</string>
     <string name="current_version">Current version</string>
     <string name="real_time_logs">Real-time logs</string>
     <string name="developer">Developer</string>
@@ -174,7 +174,7 @@
     <string name="choose_input_method">Choose input method</string>
     <string name="edit_clipboard">Edit clipboard</string>
     <string name="clipboard_edit_text_hint">Clipboard content</string>
-    <string name="config_addon_not_loaded">No configuration options available, maybe this addon is disabled when fcitx starts?</string>
+    <string name="config_addon_not_loaded">No settings are available. This extension may be disabled.</string>
     <string name="portrait">Portrait</string>
     <string name="landscape">Landscape</string>
     <string name="keyboard_bottom_padding">Keyboard bottom padding</string>
@@ -244,8 +244,8 @@
     <string name="path_conflict">Path \"%1$s\" is already owned by %2$s</string>
     <string name="main_program">main program</string>
     <string name="edit_theme">Edit Theme</string>
-    <string name="fcitx_daemon">Fcitx Daemon</string>
-    <string name="restarting_fcitx">Restarting Fcitx</string>
+    <string name="fcitx_daemon">AXiang input service</string>
+    <string name="restarting_fcitx">Restarting AXiang</string>
     <string name="plugin_needs_reload">Plugin changes detected, click here to reload</string>
     <string name="no_plugins">No plugins available</string>
     <string name="removed_n_items">Removed %1$d item(s)</string>
@@ -260,7 +260,7 @@
     <string name="reset_keyboard_on_focus_change">Switch back to keyboard when the focus changes</string>
     <string name="export_user_data">Export user data</string>
     <string name="import_user_data">Import user data</string>
-    <string name="exception_user_data_filename">The filename extension of %1$s does not indicate fcitx5-android user data</string>
+    <string name="exception_user_data_filename">The filename extension of %1$s does not indicate AXiang user data</string>
     <string name="exception_user_data_metadata">Unable to find metadata of user data</string>
     <string name="exception_user_data_package_name_mismatch">User data does not match current application</string>
     <string name="user_data_imported">User data on %1$s has been imported, restarting…</string>
@@ -300,8 +300,8 @@
     <string name="candidates_padding">Candidate word padding</string>
     <string name="candidates_window_min_width">Candidate window minimum width</string>
     <string name="candidates_window_padding">Candidate window padding</string>
-    <string name="restart_fcitx_instance">Restart fcitx instance</string>
-    <string name="restart_fcitx_instance_confirm">Fcitx instance will be destroyed and reinitialized. Proceed?</string>
+    <string name="restart_fcitx_instance">Restart input service</string>
+    <string name="restart_fcitx_instance_confirm">The input service will restart. Continue?</string>
     <string name="ignore_system_window_insets">Ignore system WindowInsets</string>
     <string name="browse_user_data_dir">Browse user data directory</string>
     <string name="haptic_on_repeat">Haptic feedback on key repeat</string>

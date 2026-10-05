@@ -128,6 +128,7 @@ class KeyboardMotionControlsTest {
         init {
             activity.setContentView(container)
             controller.visible()
+            ui.root.findViewWithTag<View>("quick_open_feel").performClick()
             advance(32)
             val width = activity.dp(360)
             val height = activity.dp(270)

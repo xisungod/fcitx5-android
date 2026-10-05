@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ax_settings_title">设置</string>
+    <string name="ax_settings_tagline">你的键盘，按你的习惯</string>
+    <string name="ax_settings_search">搜索设置</string>
+    <string name="ax_settings_no_results">没有找到相关设置，试试“键盘”“震动”或“备份”</string>
+    <string name="ax_settings_clear_search">清除搜索</string>
+    <string name="ax_settings_daily">个性外观</string>
+    <string name="ax_settings_input">输入体验</string>
+    <string name="ax_settings_general">通用</string>
+    <string name="ax_settings_appearance">主题外观</string>
+    <string name="ax_settings_appearance_summary">键盘配色与背景</string>
+    <string name="ax_settings_effects">按键光效</string>
+    <string name="ax_settings_effects_summary">SAM 水波与配色</string>
+    <string name="ax_settings_layout">键盘与布局</string>
+    <string name="ax_settings_layout_summary">高度、宽度、字母显示与手势</string>
+    <string name="ax_settings_feedback">声音与振动</string>
+    <string name="ax_settings_feedback_summary">按键音效、音量与震动强度</string>
+    <string name="ax_settings_typing">输入与候选</string>
+    <string name="ax_settings_typing_summary">模糊音、个人词库与候选排布</string>
+    <string name="ax_settings_clipboard_summary">历史记录、粘贴建议与验证码</string>
+    <string name="ax_settings_symbols_summary">常用符号与表情偏好</string>
+    <string name="ax_settings_data">数据与兼容</string>
+    <string name="ax_settings_data_summary">备份、恢复与设备兼容设置</string>
+    <string name="ax_settings_tools">扩展与高级</string>
+    <string name="ax_settings_tools_summary">输入方案、引擎选项与诊断工具</string>
+    <string name="ax_settings_about">关于 AXiang</string>
+    <string name="ax_settings_about_summary">版本、反馈与开源致谢</string>
+    <string name="ax_settings_engine_hint">这里是输入引擎和外接键盘的高级选项，日常使用可在设置首页调整。</string>
+    <string name="ax_settings_engines">输入引擎</string>
+    <string name="ax_settings_utilities">工具</string>
+    <string name="ax_settings_quick_tip">打字时，打开键盘工具栏即可使用快捷设置</string>
+</resources>

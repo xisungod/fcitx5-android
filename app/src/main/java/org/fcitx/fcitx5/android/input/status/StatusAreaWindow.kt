@@ -69,7 +69,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
 
     private val staticEntries by lazy {
         arrayOf(
-            StatusAreaEntry.Android(context.getString(R.string.keyboard_quick_settings), R.drawable.ic_baseline_palette_24, KeyboardSettings),
+            StatusAreaEntry.Android(context.getString(R.string.axiang_quick_title), R.drawable.ic_baseline_palette_24, KeyboardSettings),
             StatusAreaEntry.Android(context.getString(R.string.ripple_shape), R.drawable.ic_baseline_auto_awesome_24, RippleShape),
             StatusAreaEntry.Android(context.getString(if (ThemeManager.prefs.idleBreathing.getValue())
                 R.string.keyboard_menu_breathing_on else R.string.keyboard_menu_breathing_off),

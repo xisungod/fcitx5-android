@@ -39,6 +39,7 @@ import androidx.autofill.inline.common.TextViewStyle
 import androidx.autofill.inline.common.ViewStyle
 import androidx.autofill.inline.v1.InlineSuggestionUi
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnLayout
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineStart
@@ -224,6 +225,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         inputDeviceMgr.setInputView(newInputView)
         inputView = newInputView
         return newInputView
+    }
+
+    /** Resolve the current view after a settings save may have rebuilt the keyboard. */
+    fun showKeyboardHeightEditor() {
+        if (!::decorView.isInitialized) return
+        // Theme saves queue their rebuild on this same view. Resolve the new keyboard after it,
+        // then wait for real bounds instead of using the detached keyboard or screen estimates.
+        decorView.post {
+            val current = inputView ?: return@post
+            current.doOnLayout {
+                if (inputView === current && current.isShown) current.showKeyboardHeightEditor()
+            }
+        }
     }
 
     private fun replaceCandidateView(theme: Theme): CandidatesView {

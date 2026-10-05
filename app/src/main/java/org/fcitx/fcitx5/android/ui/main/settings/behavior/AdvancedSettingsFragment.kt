@@ -121,7 +121,7 @@ class AdvancedSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
                     save()
                 }
                 exportTimestamp = System.currentTimeMillis()
-                exportLauncher.launch("fcitx5-android_${iso8601UTCDateTime(exportTimestamp)}.zip")
+                exportLauncher.launch("AXiang_${iso8601UTCDateTime(exportTimestamp)}.zip")
             }
         }
         screen.addPreference(R.string.import_user_data) {

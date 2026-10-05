@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="axiang_brand_name">AXiang</string>
+    <string name="axiang_brand_tagline">A keyboard that feels like yours</string>
+    <string name="axiang_about_app">AXiang</string>
+    <string name="axiang_about_project">Project and feedback</string>
+    <string name="axiang_about_project_summary">Source code, releases and issue reports</string>
+    <string name="axiang_about_privacy">Privacy and data</string>
+    <string name="axiang_about_privacy_summary">Local input, permissions and data controls</string>
+    <string name="axiang_about_privacy_message">Typing and speech recognition run on this device. This build does not request Internet permission. Links you choose to open are handled by your browser.\n\nMicrophone access is used when you start voice input. Verification-code detection uses SMS permission only when you enable that optional feature. You can change permissions in system settings.\n\nKeyboard preferences, learned input data and enabled clipboard history are stored locally. Clipboard history can be cleared in the keyboard’s clipboard panel. Backups you export may contain personal data; choose where you save and share them.\n\nAndroid may show a standard warning when any keyboard is enabled. Review the permissions and use the features you need.</string>
+    <string name="axiang_about_credits">Open-source acknowledgements</string>
+    <string name="axiang_about_credits_summary">Built on Fcitx5 for Android, Rime, sherpa-onnx and other open-source projects. Original copyrights and component licenses are retained.</string>
+    <string name="axiang_about_legal">Licenses and acknowledgements</string>
+    <string name="axiang_about_license_summary">AXiang app source: LGPL-2.1-or-later</string>
+    <string name="axiang_about_build">Build details</string>
+    <string name="axiang_about_build_summary">Version code and diagnostic information</string>
+    <string name="axiang_build_details">Version: %1$s\nVersion code: %2$d\nPackage: %3$s\nBuild type: %4$s\nCommit: %5$s\nBuilt: %6$s</string>
+    <string name="axiang_setup_step">STEP %1$d / %2$d</string>
+    <string name="axiang_setup_enable_title">Make room for a better typing experience</string>
+    <string name="axiang_setup_select_title">Your keyboard is ready</string>
+</resources>

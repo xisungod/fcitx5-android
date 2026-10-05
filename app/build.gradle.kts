@@ -68,7 +68,7 @@ android {
             // Application ID and signing follow the shared application convention.
             resValue("mipmap", "app_icon", "@mipmap/ic_launcher_debug")
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
-            resValue("string", "app_name", "阿翔输入法")
+            resValue("string", "app_name", "@string/app_name_debug")
         }
     }
 

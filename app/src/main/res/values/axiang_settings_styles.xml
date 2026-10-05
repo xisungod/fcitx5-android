@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AXiang" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/ax_settings_surface</item>
+        <item name="colorPrimaryDark">@color/ax_settings_background</item>
+        <item name="colorAccent">@color/ax_settings_accent</item>
+        <item name="android:colorAccent">@color/ax_settings_accent</item>
+        <item name="android:colorPrimary">@color/ax_settings_surface</item>
+        <item name="android:windowBackground">@color/ax_settings_background</item>
+        <item name="android:colorBackground">@color/ax_settings_background</item>
+        <item name="android:textColorPrimary">@color/ax_settings_primary_text</item>
+        <item name="android:textColorSecondary">@color/ax_settings_secondary_text</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="colorControlNormal">@color/ax_settings_secondary</item>
+        <item name="android:colorControlNormal">@color/ax_settings_secondary</item>
+        <item name="colorControlActivated">@color/ax_settings_accent</item>
+        <item name="android:colorControlActivated">@color/ax_settings_accent</item>
+        <item name="colorControlHighlight">@color/ax_settings_ripple</item>
+        <item name="preferenceTheme">@style/AXiang.PreferenceTheme</item>
+        <item name="alertDialogTheme">@style/AXiang.DialogTheme</item>
+    </style>
+
+    <style name="AXiang.DialogTheme" parent="Theme.AppCompat.DayNight.Dialog.Alert">
+        <item name="colorAccent">@color/ax_settings_accent</item>
+        <item name="android:colorAccent">@color/ax_settings_accent</item>
+        <item name="android:windowBackground">@drawable/ax_settings_dialog_background</item>
+        <item name="android:colorBackground">@color/ax_settings_surface</item>
+        <item name="android:textColorPrimary">@color/ax_settings_primary_text</item>
+        <item name="android:textColorSecondary">@color/ax_settings_secondary_text</item>
+    </style>
+
+    <style name="AXiang.ToolbarTitle" parent="TextAppearance.AppCompat.Title">
+        <item name="android:textColor">@color/ax_settings_text</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="AXiang.PreferenceTheme" parent="PreferenceThemeOverlay">
+        <item name="preferenceStyle">@style/AXiang.Preference</item>
+        <item name="preferenceScreenStyle">@style/AXiang.Preference</item>
+        <item name="preferenceCategoryStyle">@style/AXiang.PreferenceCategory</item>
+        <item name="dialogPreferenceStyle">@style/AXiang.DialogPreference</item>
+        <item name="editTextPreferenceStyle">@style/AXiang.EditTextPreference</item>
+        <item name="checkBoxPreferenceStyle">@style/AXiang.CheckBoxPreference</item>
+        <item name="switchPreferenceCompatStyle">@style/AXiang.SwitchPreferenceCompat</item>
+        <item name="switchPreferenceStyle">@style/AXiang.SwitchPreference</item>
+        <item name="preferenceCategoryTitleTextColor">@color/ax_settings_secondary</item>
+    </style>
+
+    <style name="AXiang.Preference" parent="Preference.Material">
+        <item name="android:layout">@layout/ax_settings_preference</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+    </style>
+
+    <style name="AXiang.DialogPreference" parent="Preference.DialogPreference.Material">
+        <item name="android:layout">@layout/ax_settings_preference</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+    </style>
+
+    <style name="AXiang.EditTextPreference" parent="Preference.DialogPreference.EditTextPreference.Material">
+        <item name="android:layout">@layout/ax_settings_preference</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+    </style>
+
+    <style name="AXiang.CheckBoxPreference" parent="Preference.CheckBoxPreference.Material">
+        <item name="android:layout">@layout/ax_settings_preference</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+    </style>
+
+    <style name="AXiang.SwitchPreferenceCompat" parent="Preference.SwitchPreferenceCompat.Material">
+        <item name="android:layout">@layout/ax_settings_preference</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+    </style>
+
+    <style name="AXiang.SwitchPreference" parent="Preference.SwitchPreference.Material">
+        <item name="android:layout">@layout/ax_settings_preference</item>
+        <item name="singleLineTitle">false</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+    </style>
+
+    <style name="AXiang.PreferenceCategory" parent="Preference.Category.Material">
+        <item name="android:layout">@layout/ax_settings_preference_category</item>
+        <item name="iconSpaceReserved">false</item>
+        <item name="allowDividerAbove">false</item>
+        <item name="allowDividerBelow">false</item>
+    </style>
+</resources>

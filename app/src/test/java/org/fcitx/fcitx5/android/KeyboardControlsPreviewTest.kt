@@ -17,6 +17,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ScrollView
 import androidx.activity.ComponentActivity
 import androidx.appcompat.widget.SwitchCompat
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -231,7 +232,7 @@ class KeyboardControlsPreviewTest {
         val ui = KeyboardQuickSettingsUi(activity, theme, draft, disableAnimation = false,
             onDone = {}, onCancel = {}, onHeight = {}, onMore = {})
         val title = TitleUi(activity, theme).apply {
-            setTitle(activity.getString(R.string.keyboard_quick_settings))
+            setTitle(activity.getString(R.string.axiang_quick_title))
             addExtension(ui.extension, showTitle = true)
         }
         val width = activity.dp(360)
@@ -257,42 +258,40 @@ class KeyboardControlsPreviewTest {
             assertTrue("Done must stay inside the fixed title bar",
                 doneBounds.left >= 0 && doneBounds.right <= width &&
                     doneBounds.top >= 0 && doneBounds.bottom <= barHeight)
-            assertTrue("The settings must genuinely require vertical scrolling",
-                ui.root.getChildAt(0).height > ui.root.height)
-            for (tag in listOf("quick_motion_preview")) {
+            fun click(tag: String) {
+                assertTrue(ui.root.findViewWithTag<View>(tag).performClick())
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(32))
+                layout(root, width, barHeight + panelHeight)
+            }
+            for (tag in listOf("quick_number_row", "quick_popup", "quick_haptic", "quick_press_effect",
+                "quick_height", "quick_open_effects", "quick_open_feel", "quick_key_width_expand", "quick_more", "quick_cancel")) {
                 val control = ui.root.findViewWithTag<View>(tag)
                 val bounds = Rect().also { control.getDrawingRect(it); ui.root.offsetDescendantRectToMyCoords(control, it) }
-                assertTrue("$tag must be reachable on the first panel screen", bounds.top >= 0 && bounds.bottom <= panelHeight)
+                assertTrue("$tag must fit the first panel without scrolling", bounds.top >= 0 && bounds.bottom <= panelHeight)
+                assertTrue("$tag must have at least a 44 dp hit target", control.height >= activity.dp(44))
             }
+            assertFalse("Fine motion controls should not crowd the shortcut homepage",
+                ui.root.findViewWithTag<View>("quick_motion_preview").isShown)
             assertNull("Engine maintenance is not a common keyboard control", ui.root.findViewWithTag<View>("quick_rime"))
-            save(root, "settings-top")
+            save(root, "settings-home")
 
-            for ((tag, name) in listOf(
-                "quick_press_amplitude" to "settings-press-motion",
-                "quick_rebound_amplitude" to "settings-rebound-motion",
-                "quick_idle_breathing" to "settings-breathing",
-                "quick_haptic_mode" to "settings-feedback",
-                "quick_palettes" to "settings-palettes",
-                "quick_ripple_shape" to "settings-ripple-shape",
-                "quick_key_motion" to "settings-effects"
+            for ((entry, page, name) in listOf(
+                Triple("quick_open_feel", "quick_page_feel", "settings-feel"),
+                Triple("quick_open_effects", "quick_page_effects", "settings-effects"),
+                Triple("quick_key_width_expand", "quick_page_width", "settings-width")
             )) {
-                val control = ui.root.findViewWithTag<View>(tag)
-                assertTrue("A settings control must be laid out: $tag", control.width > 0 && control.height > 0)
-                val contentBounds = Rect().also {
-                    control.getDrawingRect(it)
-                    ui.root.offsetDescendantRectToMyCoords(control, it)
-                }
-                ui.root.scrollTo(0, (contentBounds.top - activity.dp(38)).coerceAtLeast(0))
-                if (tag == "quick_ripple_shape" || tag == "quick_idle_breathing") {
-                    val visible = Rect()
-                    assertTrue("$tag must stay accessible inside the keyboard after scrolling",
-                        control.getGlobalVisibleRect(visible))
-                    assertEquals("$tag must have its full touch height visible", control.height, visible.height())
-                }
+                click(entry)
+                val scroll = ui.root.findViewWithTag<ScrollView>(page)
+                assertTrue(scroll.isShown)
                 save(root, name)
+                scroll.scrollTo(0, scroll.getChildAt(0).height)
+                val more = ui.root.findViewWithTag<View>("quick_more")
+                val visible = Rect()
+                assertTrue("More settings remains accessible while details scroll", more.getGlobalVisibleRect(visible))
+                assertEquals(more.height, visible.height())
+                save(root, "$name-bottom")
+                click("quick_page_back")
             }
-            ui.root.scrollTo(0, ui.root.getChildAt(0).height)
-            save(root, "settings-bottom")
             val unchangedStorage = storage.all.toMap()
             val originalNumberRow = draft.values.numberRow
             ui.root.findViewWithTag<SwitchCompat>("quick_number_row").isChecked = !originalNumberRow

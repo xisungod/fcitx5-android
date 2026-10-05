@@ -28,6 +28,8 @@ import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonListFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.AdvancedSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.CandidatesSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.FeedbackSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.TypingSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.SymbolSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.global.GlobalConfigFragment
@@ -74,6 +76,15 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object VirtualKeyboard : SettingsRoute()
+
+    @Serializable
+    data object Feedback : SettingsRoute()
+
+    @Serializable
+    data object Typing : SettingsRoute()
+
+    @Serializable
+    data object EngineTools : SettingsRoute()
 
     @Serializable
     data object CandidatesWindow : SettingsRoute()
@@ -191,7 +202,7 @@ sealed class SettingsRoute : Parcelable {
             /* ========== Index ========== */
 
             fragment<MainFragment, Index> {
-                label = ctx.getString(R.string.app_name)
+                label = ctx.getString(R.string.ax_settings_title)
             }
 
             /* ========== Fcitx ========== */
@@ -215,7 +226,16 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.light_effect_settings)
             }
             fragment<KeyboardSettingsFragment, VirtualKeyboard> {
-                label = ctx.getString(R.string.virtual_keyboard)
+                label = ctx.getString(R.string.ax_settings_layout)
+            }
+            fragment<FeedbackSettingsFragment, Feedback> {
+                label = ctx.getString(R.string.ax_settings_feedback)
+            }
+            fragment<TypingSettingsFragment, Typing> {
+                label = ctx.getString(R.string.ax_settings_typing)
+            }
+            fragment<EngineToolsFragment, EngineTools> {
+                label = ctx.getString(R.string.ax_settings_tools)
             }
             fragment<CandidatesSettingsFragment, CandidatesWindow> {
                 label = ctx.getString(R.string.candidates_window)
@@ -230,7 +250,7 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.plugins)
             }
             fragment<AdvancedSettingsFragment, Advanced> {
-                label = ctx.getString(R.string.advanced)
+                label = ctx.getString(R.string.ax_settings_data)
             }
             fragment<DeveloperFragment, Developer> {
                 label = ctx.getString(R.string.developer)
@@ -239,7 +259,7 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.license)
             }
             fragment<AboutFragment, About> {
-                label = ctx.getString(R.string.about)
+                label = ctx.getString(R.string.ax_settings_about)
             }
 
             /* ========== External ========== */

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="axiang_keyboard_dimensions">键盘尺寸</string>
+    <string name="axiang_keyboard_display">按键与工具栏</string>
+    <string name="axiang_keyboard_gestures">手势与长按</string>
+    <string name="axiang_keyboard_haptics">按键震动</string>
+    <string name="axiang_keyboard_sound">按键声音</string>
+    <string name="axiang_keyboard_haptic_details">震动细节</string>
+    <string name="axiang_keyboard_other">其他设置</string>
+    <string name="axiang_keyboard_related">相关设置</string>
+    <string name="axiang_keyboard_layout_entry">布局与手势</string>
+    <string name="axiang_keyboard_feedback_entry">声音与震动</string>
+    <string name="axiang_keyboard_typing_entry">输入习惯</string>
+    <string name="axiang_typing_fuzzy">模糊音</string>
+    <string name="axiang_typing_dictionary">个人词库</string>
+    <string name="axiang_typing_candidates">候选词布局</string>
+    <string name="axiang_typing_behavior">输入辅助</string>
+    <string name="axiang_typing_fuzzy_nl">n / l</string>
+    <string name="axiang_typing_fuzzy_zh">z / zh、c / ch、s / sh</string>
+    <string name="axiang_typing_fuzzy_ang">an / ang</string>
+    <string name="axiang_typing_apply">应用模糊音设置</string>
+    <string name="axiang_typing_apply_summary">切换到内置中文输入方案后，点此更新配置并使模糊音生效。</string>
+    <string name="axiang_typing_candidate_window_entry">悬浮候选窗</string>
+</resources>
