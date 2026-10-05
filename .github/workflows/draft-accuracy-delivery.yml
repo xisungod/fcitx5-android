@@ -1,0 +1,284 @@
+name: Deliver accuracy test to draft release
+
+on:
+  push:
+    branches: [delivery/accuracy-test-1]
+    paths: [.github/workflows/draft-accuracy-delivery.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: draft-accuracy-test-1-delivery
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    if: github.repository == 'xisungod/fcitx5-android' && github.ref == 'refs/heads/delivery/accuracy-test-1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      BASE_COMMIT: 2a038c9bb5360d6760666c3df564cab4c66d1564
+      OVERLAY_SHA256: 73215f55285e13d5446edc7294425f1a9191db02998ef41724dc6f43864a07bf
+      FONT_SHA256: f0084dbd967c0d5f899a85e1fee5501da33d4c726e9372c566aef4dfa98f6008
+      SOURCE_APK_SHA256: dd255bd528f6645ba71b61f9fcfc8e251a7f25beacac4f1f6c12c7c0c0e8e414
+      SOURCE_RUN_ID: "37283910221"
+      SOURCE_ARTIFACT_ID: "11333514116"
+      SOURCE_ARTIFACT_NAME: axiang-pr-37283910221-arm64
+      SOURCE_APK_NAME: axiang-pr-arm64.apk
+      SOURCE_BRANCH: fix/sam-wave-and-touch-accuracy
+      SOURCE_WORKFLOW_PATH: .github/workflows/pull_request.yml
+      RELEASE_ID: "403526801"
+      RELEASE_TAG: accuracy-test.1-local
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "4"
+      BUILD_VERSION_NAME: accuracy-test.1
+      BUILD_COMMIT_HASH: 2a038c9-accuracy-test.1-draft
+      XUANCAI_APP_SUFFIX: .axiang.accuracy
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check out the verified source base
+        uses: actions/checkout@v7
+        with:
+          ref: 2a038c9bb5360d6760666c3df564cab4c66d1564
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Read source overlay from the unpublished draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_COMMIT"
+          gh api "repos/$GH_REPO/releases/$RELEASE_ID" > "$RUNNER_TEMP/font-release.json"
+          python3 - <<'PY'
+          import base64, hashlib, io, json, os, pathlib, zipfile
+          release = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'font-release.json').read_text())
+          assert release['draft'] is True and release['id'] == int(os.environ['RELEASE_ID'])
+          assert release['tag_name'] == os.environ['RELEASE_TAG']
+          begin = '<!-- AXIANG_PRIVATE_FONT_OVERLAY_START\n'
+          end = '\nAXIANG_PRIVATE_FONT_OVERLAY_END -->'
+          body = release['body']
+          assert body.count(begin) == body.count(end) == 1
+          raw = base64.b64decode(body.split(begin, 1)[1].split(end, 1)[0], validate=True)
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          assert digest(raw) == os.environ['OVERLAY_SHA256'], 'Overlay checksum mismatch'
+          allowed = {
+              'app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyLegendTypeface.kt',
+              'app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/KeyView.kt',
+              'app/src/main/java/org/fcitx/fcitx5/android/input/keyboard/PinyinT9Keyboard.kt',
+              'app/src/test/java/org/fcitx/fcitx5/android/SamKeyboardRenderingTest.kt',
+              'app/licenses/libraries/lmyy-theme-reference.json',
+              'app/src/main/res/font/lmyy_theme_latin.ttf',
+              'app/src/main/res/raw/lmyy_theme_notice.txt',
+          }
+          removed = {
+              'app/licenses/libraries/audiowide.json',
+              'app/src/main/res/font/audiowide_regular.ttf',
+              'app/src/main/res/raw/audiowide_ofl.txt',
+          }
+          with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+              assert set(archive.namelist()) == allowed | {'font-overlay.json'}
+              assert len(archive.namelist()) == len(allowed) + 1
+              manifest = json.loads(archive.read('font-overlay.json'))
+              assert manifest['base_commit'] == os.environ['BASE_COMMIT']
+              assert manifest['font_sha256'] == os.environ['FONT_SHA256']
+              assert set(manifest['files']) == allowed and set(manifest['remove']) == removed
+              contents = {name: archive.read(name) for name in allowed}
+              assert all(digest(data) == manifest['files'][name] for name, data in contents.items())
+              assert digest(contents['app/src/main/res/font/lmyy_theme_latin.ttf']) == os.environ['FONT_SHA256']
+              for name, data in contents.items():
+                  destination = pathlib.Path(name)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(data)
+              for name in removed:
+                  pathlib.Path(name).unlink()
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'font-release.json').unlink()
+          print('Pinned font source overlay verified and applied without publishing its contents.')
+          PY
+
+      - name: Verify the fresh public CI source and artifact provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN_ID" > "$RUNNER_TEMP/source-ci-run.json"
+          gh api "repos/$GH_REPO/actions/artifacts/$SOURCE_ARTIFACT_ID" > "$RUNNER_TEMP/source-ci-artifact.json"
+          python3 - <<'PY'
+          import datetime, json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          run = json.loads((root / 'source-ci-run.json').read_text())
+          artifact = json.loads((root / 'source-ci-artifact.json').read_text())
+          assert run['id'] == int(os.environ['SOURCE_RUN_ID'])
+          assert run['status'] == 'completed' and run['conclusion'] == 'success', 'Public CI must succeed first'
+          assert run['head_sha'] == os.environ['BASE_COMMIT'], 'CI source head does not match checkout'
+          assert run['head_branch'] == os.environ['SOURCE_BRANCH'], 'Unexpected public source branch'
+          assert run['path'].split('@')[0] == os.environ['SOURCE_WORKFLOW_PATH']
+          assert run['repository']['full_name'] == os.environ['GH_REPO']
+          assert artifact['id'] == int(os.environ['SOURCE_ARTIFACT_ID'])
+          assert artifact['name'] == os.environ['SOURCE_ARTIFACT_NAME']
+          assert artifact['expired'] is False and artifact['size_in_bytes'] > 0
+          expiry = datetime.datetime.fromisoformat(artifact['expires_at'].replace('Z', '+00:00'))
+          assert expiry > datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15), 'Artifact expires too soon'
+          source = artifact['workflow_run']
+          assert source['id'] == run['id'] and source['head_sha'] == run['head_sha']
+          assert source['head_branch'] == run['head_branch']
+          assert source['repository_id'] == source['head_repository_id'] == run['repository']['id']
+          print('Successful public CI, exact source head/branch, artifact identity and expiry verified.')
+          PY
+
+      - name: Download the newly verified native and offline inputs
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ env.SOURCE_ARTIFACT_ID }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/font-source-apk
+
+      - name: Extract exact input assets and obtain only the compile-time speech JAR
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, importlib.util, json, os, pathlib, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          source = root / 'font-source-apk' / os.environ['SOURCE_APK_NAME']
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          assert digest(source.read_bytes()) == os.environ['SOURCE_APK_SHA256']
+          with zipfile.ZipFile(source) as archive:
+              inputs = [n for n in archive.namelist() if n.startswith(('assets/', 'lib/')) and not n.endswith('/')]
+              assert len(inputs) == len(set(inputs)), 'Duplicate asset/native entries'
+              assert any(n.startswith('assets/') for n in inputs) and any(n.startswith('lib/arm64-v8a/') for n in inputs)
+              assert all(not n.startswith('lib/') or n.startswith('lib/arm64-v8a/') for n in inputs)
+              assert not any(n.startswith('res/font/lmyy_') for n in archive.namelist()), 'Public source APK unexpectedly contains private font'
+              input_manifest = {name: digest(archive.read(name)) for name in sorted(inputs)}
+              (root / 'native-input-manifest.json').write_text(json.dumps(input_manifest, indent=2) + '\n')
+              for name in inputs:
+                  relative = pathlib.PurePosixPath(name)
+                  assert '..' not in relative.parts and not relative.is_absolute()
+                  destination = root / 'font-prebuilt' / ('jniLibs/' + name[4:] if name.startswith('lib/') else name)
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(archive.read(name))
+              provenance = json.loads(archive.read('assets/asr/SOURCE.json'))
+          spec = importlib.util.spec_from_file_location('prepare_asr', 'scripts/prepare-axiang-asr.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          cache = root / 'font-runtime-cache'
+          cache.mkdir()
+          # The helper has no runtime-only CLI. Reuse its pinned fetch function;
+          # do not download models or replace any verified native libraries.
+          aar = module.fetch(module.DOWNLOADS['runtime'], cache, False)
+          with zipfile.ZipFile(aar) as archive:
+              jar = archive.read('classes.jar')
+          assert digest(jar) == provenance['compile_jar']['sha256']
+          destination = pathlib.Path('app/libs/sherpa-onnx-1.13.8.jar')
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          destination.write_bytes(jar)
+          asset_count = sum(n.startswith('assets/') for n in inputs)
+          native_count = sum(n.startswith('lib/') for n in inputs)
+          print(f'Verified current public source APK, {asset_count} assets, {native_count} native libraries, and pinned compile-time JAR.')
+          PY
+          cat > "$RUNNER_TEMP/font-rebuild.init.gradle" <<'GRADLE'
+          def verifiedInput = new File(System.getenv('RUNNER_TEMP'), 'font-prebuilt')
+          gradle.beforeProject { p ->
+              ['com.android.application', 'com.android.library'].each { androidPlugin ->
+                  p.plugins.withId(androidPlugin) {
+                      p.extensions.getByName('androidComponents').finalizeDsl { dsl ->
+                          dsl.externalNativeBuild.cmake.path = null
+                          dsl.buildFeatures.prefab = false
+                          if (androidPlugin == 'com.android.library') dsl.buildFeatures.prefabPublishing = false
+                          if (p.path == ':app') {
+                              dsl.sourceSets.getByName('main').assets.setSrcDirs([new File(verifiedInput, 'assets')])
+                              dsl.sourceSets.getByName('main').jniLibs.setSrcDirs([new File(verifiedInput, 'jniLibs')])
+                              dsl.packaging.jniLibs.keepDebugSymbols.add('**/*.so')
+                          }
+                      }
+                  }
+              }
+          }
+          GRADLE
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android
+        uses: android-actions/setup-android@v4
+
+      - name: Install the pinned platform and build tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Restore public Gradle dependencies without saving private build outputs
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+          add-job-summary: never
+          add-job-summary-as-pr-comment: never
+
+      - name: Compile Kotlin and font resources using verified native inputs
+        run: ./gradlew --no-daemon -I "$RUNNER_TEMP/font-rebuild.init.gradle" :app:assembleDebug -x :app:generateDataDescriptor
+
+      - name: Verify the APK signature, identity, every reused input, and font
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/debug/*.apk)
+          test "${#apks[@]}" -eq 1
+          mkdir -p "$RUNNER_TEMP/font-delivery"
+          cp "${apks[0]}" "$RUNNER_TEMP/font-delivery/axiang-accuracy-test.1-arm64.apk"
+          sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/font-delivery/axiang-accuracy-test.1-arm64.apk"
+          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/font-delivery/axiang-accuracy-test.1-arm64.apk" \
+            --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" \
+            --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" \
+            --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE" --expected-app-label AXiang
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          source = root / 'font-source-apk' / os.environ['SOURCE_APK_NAME']
+          output = root / 'font-delivery/axiang-accuracy-test.1-arm64.apk'
+          expected_inputs = json.loads((root / 'native-input-manifest.json').read_text())
+          assert digest(source.read_bytes()) == os.environ['SOURCE_APK_SHA256']
+          with zipfile.ZipFile(source) as old, zipfile.ZipFile(output) as new:
+              select = lambda apk: {n for n in apk.namelist() if n.startswith(('assets/', 'lib/')) and not n.endswith('/')}
+              inputs = select(old)
+              assert inputs == select(new), 'Native/assets file list changed'
+              assert len(new.namelist()) == len(set(new.namelist())), 'Duplicate final APK entry'
+              assert inputs == set(expected_inputs), 'Input manifest file list changed'
+              assert all(digest(old.read(n)) == digest(new.read(n)) == expected_inputs[n] for n in inputs), 'Current public CI native/assets bytes changed'
+              assert digest(new.read('res/font/lmyy_theme_latin.ttf')) == os.environ['FONT_SHA256']
+              assert not any('audiowide' in n.lower() for n in new.namelist())
+              assert new.read('res/raw/lmyy_theme_notice.txt') == pathlib.Path('app/src/main/res/raw/lmyy_theme_notice.txt').read_bytes()
+              about = json.loads(new.read('res/raw/aboutlibraries.json'))
+              assert b'audiowide' not in new.read('res/raw/aboutlibraries.json').lower()
+              reference = next(item for item in about['libraries'] if item['uniqueId'] == 'local-reference/lmyy-theme-latin')
+              assert not reference.get('licenses') and 'Restricted reference asset' in reference['description']
+          asset_count = sum(n.startswith('assets/') for n in inputs)
+          native_count = sum(n.startswith('lib/') for n in inputs)
+          print(f'All {asset_count} current assets and {native_count} native libraries are byte-identical; font and attribution verified.')
+          PY
+          cd "$RUNNER_TEMP/font-delivery"
+          sha256sum axiang-accuracy-test.1-arm64.apk > SHA256SUMS.txt
+
+      - name: Deliver exclusively as unpublished draft release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.draft')" = true
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.tag_name')" = "$RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/font-delivery/axiang-accuracy-test.1-arm64.apk" "$RUNNER_TEMP/font-delivery/SHA256SUMS.txt" --clobber
+          test "$(gh api "repos/$GH_REPO/releases/$RELEASE_ID" --jq '.draft')" = true
+
+      - name: Remove private inputs from the ephemeral runner
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/font-release.json"
+          rm -rf "$RUNNER_TEMP/font-delivery"
+          git restore app
+          git clean -fd -- app/licenses/libraries/lmyy-theme-reference.json app/src/main/res/font/lmyy_theme_latin.ttf app/src/main/res/raw/lmyy_theme_notice.txt
