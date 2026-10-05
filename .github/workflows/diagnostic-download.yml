@@ -1,0 +1,106 @@
+name: AXiang diagnostic download preparation
+
+on:
+  push:
+    branches: ["delivery/axiang-diagnostics-1"]
+
+concurrency:
+  group: axiang-diagnostic-download-1
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    if: github.repository == 'xisungod/fcitx5-android' && github.ref == 'refs/heads/delivery/axiang-diagnostics-1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "1"
+      BUILD_VERSION_NAME: "1.2-diagnostic.1"
+      BUILD_COMMIT_HASH: ${{ github.sha }}
+      XUANCAI_APP_SUFFIX: .axiang.diagnostics
+      RELEASE_TAG: axiang-diagnostics-1.2-diagnostic.1
+    steps:
+      - name: Check out the isolated diagnostic source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Prepare Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install the pinned SDK tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Prepare Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Verify and extract stable 1.2 native libraries and complete assets
+        run: |
+          python3 scripts/prepare-axiang-diagnostic-delivery.py prepare \
+            --work "$RUNNER_TEMP/axiang-diagnostic-build"
+
+      - name: Compile diagnostics and run the unchanged full JVM suite
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 \
+            -I "$RUNNER_TEMP/axiang-diagnostic-build/diagnostics.init.gradle" \
+            :app:assembleDebug :app:testDebugUnitTest \
+            -x :app:generateDataDescriptor \
+            -x :app:installFcitxComponent \
+            -x :app:deleteFcitxComponentExcludeFiles \
+            2>&1 | tee "$RUNNER_TEMP/axiang-diagnostic-build/build.log"
+
+      - name: Verify the APK, byte-identical data, actual signature and 401 passing tests
+        run: |
+          python3 scripts/prepare-axiang-diagnostic-delivery.py verify \
+            --work "$RUNNER_TEMP/axiang-diagnostic-build" \
+            --output "$RUNNER_TEMP/axiang-diagnostic-delivery" \
+            --expected-tests 401
+          cp docs/axiang/diagnostic-phone-test.md "$RUNNER_TEMP/axiang-diagnostic-delivery/phone-test-guide.md"
+          git diff --binary 2a038c9bb5360d6760666c3df564cab4c66d1564 "$GITHUB_SHA" \
+            -- app scripts/touch-diagnostics > "$RUNNER_TEMP/axiang-diagnostic-delivery/diagnostics-only.patch"
+
+      - name: Upload only to the existing diagnostic draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/403885138" \
+            > "$RUNNER_TEMP/axiang-diagnostic-build/release-before-upload.json"
+          python3 - "$RUNNER_TEMP/axiang-diagnostic-build/release-before-upload.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          release = json.loads(Path(sys.argv[1]).read_text())
+          if release.get('tag_name') != 'axiang-diagnostics-1.2-diagnostic.1' or release.get('draft') is not True:
+              raise SystemExit('Refusing upload: expected the existing, still-draft diagnostic release')
+          PY
+          gh release upload "$RELEASE_TAG" \
+            "$RUNNER_TEMP/axiang-diagnostic-delivery/AXiang-1.2-diagnostic.1-arm64.apk" \
+            "$RUNNER_TEMP/axiang-diagnostic-delivery/SHA256SUMS.txt" \
+            "$RUNNER_TEMP/axiang-diagnostic-delivery/build-verification.json" \
+            "$RUNNER_TEMP/axiang-diagnostic-delivery/unit-test-summary.json" \
+            "$RUNNER_TEMP/axiang-diagnostic-delivery/prebuilt-manifest.json" \
+            "$RUNNER_TEMP/axiang-diagnostic-delivery/phone-test-guide.md" \
+            "$RUNNER_TEMP/axiang-diagnostic-delivery/diagnostics-only.patch" \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Preserve verification results and a backup of the diagnostic package
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-diagnostic-1-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/axiang-diagnostic-delivery/
+            ${{ runner.temp }}/axiang-diagnostic-build/build.log
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
