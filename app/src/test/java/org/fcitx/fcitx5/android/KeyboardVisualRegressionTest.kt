@@ -835,7 +835,7 @@ class KeyboardVisualRegressionTest {
     }
 
     @Test
-    fun finalUpCanSelectANewLetterWithoutMoveButCannotTriggerAFunctionKey() {
+    fun finalUpPreservesTheInitialLetterWithoutMoveAndCannotTriggerAFunctionKey() {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val activity = controller.get()
         activity.setTheme(R.style.Theme_InputViewTheme)
@@ -858,10 +858,11 @@ class KeyboardVisualRegressionTest {
         touch(MotionEvent.ACTION_DOWN, key("G"))
         touch(MotionEvent.ACTION_UP, key("H"))
         assertEquals(1, actions.size)
-        assertEquals("h", (actions.single() as KeyAction.FcitxKeyAction).act)
+        assertEquals("An UP alone cannot turn a normal tap into a slide", "g",
+            (actions.single() as KeyAction.FcitxKeyAction).act)
         val effect = ReflectionHelpers.getField<Any>(keyboard, "pressEffectLayer")
         val breathing = ReflectionHelpers.getField<Any>(effect, "breathing")
-        assertFalse("Lift-off retargeting must release the breathing envelope",
+        assertFalse("Lift-off must release the breathing envelope",
             ReflectionHelpers.getField<Boolean>(breathing, "touching"))
         actions.clear()
         touch(MotionEvent.ACTION_DOWN, key("G"))

@@ -59,6 +59,8 @@ class V15LightEffectPrefsTest {
         assertEquals(50, prefs.pressKeyHoldTime.getValue())
         assertEquals(ThemePrefs.KeyMotionEffect.Press, prefs.keyMotionEffect.getValue())
         assertEquals(100, prefs.pressKeyRetreatTime.getValue())
+        assertEquals(80, prefs.samKeyHoldTime.getValue())
+        assertEquals(800, prefs.samKeyRetreatTime.getValue())
         assertEquals(400, prefs.pressExpansionTime.getValue())
         assertEquals(40, prefs.pressWaveHoldTime.getValue())
         assertEquals(900, prefs.pressFadeOutTime.getValue())
@@ -128,12 +130,34 @@ class V15LightEffectPrefsTest {
     }
 
     @Test
+    fun samColourTimingsHaveIndependentDefaultsAndPreserveBothModesSavedValues() {
+        val stored = storage("sam-independent-key-colour")
+        stored.edit().putInt("press_key_hold_time", 37).putInt("press_key_retreat_time", 1783).commit()
+        val before = stored.all.toMap()
+        val prefs = ThemePrefs(stored)
+        assertEquals(80, prefs.samKeyHoldTime.getValue())
+        assertEquals(800, prefs.samKeyRetreatTime.getValue())
+        assertEquals("Using Sam defaults must not migrate mist or fluid timing", before, stored.all)
+        prefs.samKeyHoldTime.setValue(130)
+        prefs.samKeyRetreatTime.setValue(1270)
+        val saved = stored.all.toMap()
+        val reopened = ThemePrefs(stored)
+        assertEquals(37, reopened.pressKeyHoldTime.getValue())
+        assertEquals(1783, reopened.pressKeyRetreatTime.getValue())
+        assertEquals(130, reopened.samKeyHoldTime.getValue())
+        assertEquals(1270, reopened.samKeyRetreatTime.getValue())
+        assertEquals(saved, stored.all)
+    }
+
+    @Test
     fun capTimingControlsAllowShortFlashesWhileKeepingLongCustomExits() {
         val prefs = ThemePrefs(storage("v15-neon-ranges"))
         val expected = mapOf(
             "press_ignition_time" to (30 to 300),
             "press_key_hold_time" to (20 to 1000),
             "press_key_retreat_time" to (20 to 5000),
+            "sam_key_hold_time" to (0 to 1000),
+            "sam_key_retreat_time" to (100 to 5000),
             "press_expansion_time" to (100 to 4000),
             "press_wave_hold_time" to (0 to 2000),
             "press_fade_out_time" to (100 to 5000)

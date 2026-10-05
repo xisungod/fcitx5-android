@@ -11,6 +11,7 @@ import android.view.ViewOutlineProvider
 import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
+import org.fcitx.fcitx5.android.input.keyboard.KeyLegendTypeface
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.constraintLayout
@@ -22,10 +23,11 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.view
 import splitties.views.gravityCenter
 
-class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radius: Float) : Ui {
+class PopupEntryUi(override val ctx: Context, private val theme: Theme, keyHeight: Int, radius: Float) : Ui {
 
     val textView = view(::AutoScaleTextView) {
         textSize = 30f
+        scaleMode = AutoScaleTextView.Mode.Proportional
         gravity = gravityCenter
         setTextColor(theme.popupTextColor)
         // Keep the lower part of the preview transparent: the real key face
@@ -49,6 +51,7 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
 
     internal val previewLifecycle = PopupPreviewLifecycle(root)
 
+    private val defaultTypeface = textView.typeface
     private val defaultBackground = theme.popupBackgroundColor
     private val defaultText = theme.popupTextColor
     private val defaultStroke = theme.dividerColor
@@ -72,6 +75,9 @@ class PopupEntryUi(override val ctx: Context, theme: Theme, keyHeight: Int, radi
     }
 
     fun setText(text: String) {
-        if (textView.text.toString() != text) textView.text = text
+        if (textView.text.toString() != text) {
+            textView.typeface = KeyLegendTypeface.resolve(ctx, theme, text, defaultTypeface)
+            textView.text = text
+        }
     }
 }

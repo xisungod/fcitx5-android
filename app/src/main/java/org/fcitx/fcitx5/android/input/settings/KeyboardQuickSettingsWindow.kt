@@ -214,6 +214,9 @@ internal class KeyboardQuickSettingsUi(
     private val breathingAvailability = label(context.getString(R.string.sam_idle_hint), 12f).apply {
         setTextColor(theme.keyTextColor.alpha(0.65f))
     }
+    private val legacyKeyTiming = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val samKeyTiming = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+    private val retreatHint = label("", 12f).apply { setTextColor(theme.keyTextColor.alpha(0.65f)) }
 
     private fun label(text: CharSequence, size: Float = 14f) = TextView(context).apply {
         this.text = text
@@ -450,6 +453,9 @@ internal class KeyboardQuickSettingsUi(
         breathingToggle?.isEnabled = !sam
         breathingToggle?.alpha = if (sam) 0.4f else 1f
         breathingAvailability.visibility = if (sam) View.VISIBLE else View.GONE
+        legacyKeyTiming.visibility = if (sam) View.GONE else View.VISIBLE
+        samKeyTiming.visibility = if (sam) View.VISIBLE else View.GONE
+        retreatHint.setText(if (sam) R.string.sam_key_timing_hint else R.string.keyboard_quick_settings_retreat_hint)
     }
 
     private fun addWidthControls() {
@@ -463,12 +469,13 @@ internal class KeyboardQuickSettingsUi(
 
     private fun slider(
         title: Int, key: String, value: Int, min: Int, max: Int, step: Int,
-        format: Int = R.string.keyboard_quick_settings_value_percent, update: (Int) -> Unit
+        format: Int = R.string.keyboard_quick_settings_value_percent,
+        parent: LinearLayout = content, update: (Int) -> Unit
     ) {
         val caption = label("${context.getString(title)} · ${context.getString(format, value)}")
         caption.setPadding(0, context.dp(8), 0, 0)
-        content.addView(caption, LinearLayout.LayoutParams(match, wrap))
-        content.addView(SeekBar(context).apply {
+        parent.addView(caption, LinearLayout.LayoutParams(match, wrap))
+        parent.addView(SeekBar(context).apply {
             tag = key
             contentDescription = context.getString(title)
             this.max = (max - min) / step
@@ -581,10 +588,20 @@ internal class KeyboardQuickSettingsUi(
         }
         slider(R.string.press_key_retreat_time, "quick_key_retreat", draft.values.keyRetreatTime,
             20, maxOf(500, draft.values.keyRetreatTime).coerceAtMost(5000), 10,
-            R.string.keyboard_quick_settings_value_ms) {
+            R.string.keyboard_quick_settings_value_ms, legacyKeyTiming) {
             draft.values = draft.values.copy(keyRetreatTime = it)
         }
-        note(R.string.keyboard_quick_settings_retreat_hint)
+        content.addView(legacyKeyTiming, LinearLayout.LayoutParams(match, wrap))
+        slider(R.string.sam_key_hold_time, "quick_sam_key_hold", draft.values.samKeyHoldTime,
+            0, 1000, 10, R.string.keyboard_quick_settings_value_ms, samKeyTiming) {
+            draft.values = draft.values.copy(samKeyHoldTime = it)
+        }
+        slider(R.string.sam_key_retreat_time, "quick_sam_key_retreat", draft.values.samKeyRetreatTime,
+            100, 5000, 10, R.string.keyboard_quick_settings_value_ms, samKeyTiming) {
+            draft.values = draft.values.copy(samKeyRetreatTime = it)
+        }
+        content.addView(samKeyTiming, LinearLayout.LayoutParams(match, wrap))
+        content.addView(retreatHint, LinearLayout.LayoutParams(match, wrap))
         slider(R.string.press_glow_brightness, "quick_glow_brightness", draft.values.glowBrightness, 0, 100, 5) {
             draft.values = draft.values.copy(glowBrightness = it)
         }

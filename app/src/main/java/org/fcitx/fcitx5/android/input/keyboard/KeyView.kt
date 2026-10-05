@@ -375,8 +375,11 @@ open class TextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.Text) 
         text = def.displayText
         setTextSize(TypedValue.COMPLEX_UNIT_DIP, def.textSize)
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
-        // keep original typeface, apply textStyle only
-        setTypeface(typeface, def.textStyle)
+        setTypeface(KeyLegendTypeface.resolve(context, theme, text, typeface), def.textStyle)
+        if (KeyLegendTypeface.usesDisplayFont(theme, text)) {
+            // Wide rounded letters still fit narrow user-configured key cells.
+            scaleMode = AutoScaleTextView.Mode.Proportional
+        }
         setTextColor(
             when (def.variant) {
                 Variant.Normal -> theme.keyTextColor
@@ -403,8 +406,8 @@ class AltTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.AltText)
         isFocusable = false
         // TODO hardcoded alt text size
         setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.666667f)
-        setTypeface(typeface, Typeface.BOLD)
         text = def.altText
+        setTypeface(KeyLegendTypeface.resolve(context, theme, text, typeface), Typeface.BOLD)
         textDirection = View.TEXT_DIRECTION_FIRST_STRONG_LTR
         setTextColor(
             when (def.variant) {

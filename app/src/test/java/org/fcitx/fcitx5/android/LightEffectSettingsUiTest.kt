@@ -402,6 +402,7 @@ class LightEffectSettingsUiTest {
 
     @Test fun quickerDefaultIgnitionIsAdjustableWithoutOverwritingASavedTiming() {
         val prefs = ThemeManager.prefs
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
         assertTrue(prefs.pressIgnitionTime.sharedPreferences.edit().remove(prefs.pressIgnitionTime.key).commit())
         assertEquals(40, prefs.pressIgnitionTime.getValue())
         val ui = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
@@ -420,6 +421,69 @@ class LightEffectSettingsUiTest {
         val reopened = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
         assertEquals("Opening the new page preserves the user's saved 100ms", 100, prefs.pressIgnitionTime.getValue())
         assertEquals(7, reopened.durationControls.getValue(prefs.pressIgnitionTime.key).slider.progress)
+    }
+
+    @Test fun samTimingControlsUseIndependentColoursAndImmediateWaveTimingAcrossModeChanges() {
+        val controller = activity()
+        val prefs = ThemeManager.prefs
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.Sam)
+        prefs.samKeyHoldTime.setValue(80)
+        prefs.samKeyRetreatTime.setValue(800)
+        prefs.pressKeyHoldTime.setValue(37)
+        prefs.pressKeyRetreatTime.setValue(1783)
+        val stored = prefs.pressEffect.sharedPreferences
+        val before = stored.all.toMap()
+        val ui = LightEffectSettingsUi(controller.get())
+        try {
+            controller.get().setContentView(ui.root)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("Opening timing settings cannot normalize saved values", before, stored.all)
+            fun visible(pref: org.fcitx.fcitx5.android.data.prefs.ManagedPreference.PInt) =
+                ui.durationControls.getValue(pref.key).root.visibility == View.VISIBLE
+            assertTrue(visible(prefs.samKeyHoldTime))
+            assertTrue(visible(prefs.samKeyRetreatTime))
+            assertFalse(visible(prefs.pressKeyHoldTime))
+            assertFalse(visible(prefs.pressKeyRetreatTime))
+            assertFalse(visible(prefs.pressIgnitionTime))
+            assertEquals(ui.context.getString(R.string.light_effect_total, 2650),
+                ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
+            assertEquals(ui.context.getString(R.string.sam_wave_total_detail),
+                ui.root.findViewWithTag<TextView>("effect-total-detail").text.toString())
+            val hold = ui.durationControls.getValue(prefs.samKeyHoldTime.key)
+            val fade = ui.durationControls.getValue(prefs.samKeyRetreatTime.key)
+            assertEquals(8, hold.slider.progress)
+            assertEquals(70, fade.slider.progress)
+            hold.slider.progress = 16
+            hold.commit()
+            fade.slider.progress = 130
+            fade.commit()
+            assertEquals(160, prefs.samKeyHoldTime.getValue())
+            assertEquals(1400, prefs.samKeyRetreatTime.getValue())
+            assertEquals(37, prefs.pressKeyHoldTime.getValue())
+            assertEquals(1783, prefs.pressKeyRetreatTime.getValue())
+            val selector = ui.root.findViewWithTag<Spinner>("effect-ripple-shape")
+            selector.setSelection(ThemePrefs.RippleShape.IrregularFluid.ordinal)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(visible(prefs.pressKeyHoldTime))
+            assertTrue(visible(prefs.pressKeyRetreatTime))
+            assertTrue(visible(prefs.pressIgnitionTime))
+            assertFalse(visible(prefs.samKeyHoldTime))
+            assertFalse(visible(prefs.samKeyRetreatTime))
+            assertEquals(ui.context.getString(R.string.light_effect_total, 2750),
+                ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
+            val legacy = ui.durationControls.getValue(prefs.pressKeyRetreatTime.key)
+            legacy.slider.progress = 21
+            legacy.commit()
+            assertEquals(230, prefs.pressKeyRetreatTime.getValue())
+            assertEquals(1400, prefs.samKeyRetreatTime.getValue())
+            selector.setSelection(ThemePrefs.RippleShape.Sam.ordinal)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(visible(prefs.samKeyRetreatTime))
+            assertEquals(130, fade.slider.progress)
+        } finally {
+            ui.dismissDialogs()
+            controller.pause().stop().destroy()
+        }
     }
 
     @Test fun openingRandomModeDisplaysItsActualLegacyPaletteWithoutChangingPreferences() {
@@ -573,6 +637,7 @@ class LightEffectSettingsUiTest {
         val controller = activity()
         val activity = controller.get()
         val prefs = ThemeManager.prefs
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
         prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Custom)
         prefs.pressUserColors.setValue(PressColorPalette.encode(intArrayOf(0xFF18FFC1.toInt(), 0xFFD96EFF.toInt(),
             0xFFFF8A32.toInt(), 0xFF00DAFF.toInt(), 0xFFFF3FA5.toInt(), 0xFFB1FF42.toInt())))

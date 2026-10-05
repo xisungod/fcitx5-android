@@ -267,19 +267,31 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     val pressIgnitionTime = int(
         R.string.press_ignition_time, "press_ignition_time", 40, 30, 300, "ms", 10,
-        enableUiOn = { pressEffect.getValue() }
+        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() != RippleShape.Sam }
     )
 
     val pressKeyHoldTime = int(
         R.string.press_key_hold_time, "press_key_hold_time", 50, 20, 1000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() }
+        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() != RippleShape.Sam }
     )
 
     val pressKeyRetreatTime = int(
         // Existing installs without an explicit value pick up the softer default.
         // Preserve every saved value, including a deliberately chosen 30ms.
         R.string.press_key_retreat_time, "press_key_retreat_time", 100, 20, 5000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() }
+        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() != RippleShape.Sam }
+    )
+
+    // Sam leaves an independent colour tail after release; saved mist/fluid timings
+    // remain untouched when switching modes or upgrading an existing installation.
+    val samKeyHoldTime = int(
+        R.string.sam_key_hold_time, "sam_key_hold_time", 80, 0, 1000, "ms", 10,
+        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() == RippleShape.Sam }
+    )
+
+    val samKeyRetreatTime = int(
+        R.string.sam_key_retreat_time, "sam_key_retreat_time", 800, 100, 5000, "ms", 10,
+        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() == RippleShape.Sam }
     )
 
     val pressExpansionTime = int(

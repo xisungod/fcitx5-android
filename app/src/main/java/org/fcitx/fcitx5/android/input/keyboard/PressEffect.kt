@@ -93,8 +93,10 @@ internal class PressEffect(
     coordinatePalette: Boolean = true,
     private val rippleShape: org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape =
         org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.SoftMist,
-    /** Default floating motion owns the cap's lifetime; other actions keep their configured exit. */
-    private val keyFloatOpacity: ((Int) -> Float)? = null
+    /** Floating motion keeps colour visible through the rise; Sam also has its own release tail. */
+    private val keyFloatOpacity: ((Int) -> Float)? = null,
+    samKeyHoldTimeMs: Int = 80,
+    samKeyRetreatTimeMs: Int = 800
 ) {
 
     private val samGlare = rippleShape == org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.Sam
@@ -117,16 +119,18 @@ internal class PressEffect(
     private val glowReach = glowReachPercent.coerceIn(10, 100) / 100f
     private val maxRadius: Float get() = max(BASE_RADIUS_DP * density, host.height * 1.15f) * sizeScale * 0.85f * glowReach
     private val flashRadius = FLASH_RADIUS_DP * density
-    // Sam is a separate rapid, broad glare profile. Saved mist timings continue
-    // to belong to mist/fluid rather than slowing this mode into the same effect.
-    private val expansionDuration = if (samGlare) 260L else expansionTimeMs.coerceIn(100, 4000).toLong()
+    // Shape changes the spatial profile, while the visible timing controls keep
+    // their actual millisecond meaning in every mode. Sam ignites immediately.
+    private val expansionDuration = expansionTimeMs.coerceIn(100, 4000).toLong()
     private val ignitionDuration = if (samGlare) 0L else ignitionTimeMs.coerceIn(30, 300).toLong()
-    private val waveHoldDuration = if (samGlare) 40L else waveHoldTimeMs.coerceIn(0, 2000).toLong()
-    private val fadeDuration = if (samGlare) 700L else fadeOutTimeMs.coerceIn(100, 5000).toLong()
+    private val waveHoldDuration = waveHoldTimeMs.coerceIn(0, 2000).toLong()
+    private val fadeDuration = fadeOutTimeMs.coerceIn(100, 5000).toLong()
     private val fadeStart = ignitionDuration + expansionDuration + waveHoldDuration
     private val waveDuration = fadeStart + fadeDuration
     private val keyHoldDuration = keyHoldTimeMs.coerceIn(20, 1000).toLong()
     private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(20, 5000).toLong()
+    private val samKeyHoldDuration = samKeyHoldTimeMs.coerceIn(0, 1000).toLong()
+    private val samKeyRetreatDuration = samKeyRetreatTimeMs.coerceIn(100, 5000).toLong()
     private val duration = max(waveDuration, keyHoldDuration + keyRetreatDuration)
     private val keyFlashTextures = KEY_FLASH_TEXTURES
     private val underStrength = if (lightLegends) 1f else 0.9f
@@ -137,19 +141,22 @@ internal class PressEffect(
 
     /** returns (alpha, retreat 0..1) of the key face, or null once the face is gone */
     private fun keyEnvelope(r: PressEffectTrail.Ripple, now: Long): Float {
+        if (samGlare) {
+            envelopeRetreat = 0f
+            if (r.releasedAt < 0L) return 0.92f
+            val released = (now - r.releasedAt).coerceAtLeast(0L).toFloat()
+            val tail = 1f - smoothstep(samKeyHoldDuration.toFloat(),
+                (samKeyHoldDuration + samKeyRetreatDuration).toFloat(), released)
+            val motion = if (holdWhilePressed && r.keyFill)
+                keyFloatOpacity?.invoke(r.keyId)?.coerceIn(0f, 1f) ?: 0f else 0f
+            // Geometry may land first or last depending on the motion settings.
+            // Neither clock can cut off the other; subsequent keys own neither.
+            return 0.92f * max(motion, tail)
+        }
         if (holdWhilePressed && r.keyFill && keyFloatOpacity != null) {
             // The real KeyView supplies its own per-key elevation/fade state.
-            // Sam also follows the rise and landing: a fixed 180ms fade could
-            // otherwise black out the cap before its actual rebound peak.
             envelopeRetreat = 0f
             return 0.92f * keyFloatOpacity.invoke(r.keyId).coerceIn(0f, 1f)
-        }
-        if (samGlare) {
-            // Other motion modes retain Sam's short local cap trail, independent
-            // of the broad under-key light. Only floating caps need motion-linked colour.
-            envelopeRetreat = 0f
-            return if (r.releasedAt < 0L) 0.92f
-                else 0.92f * (1f - smoothstep(0f, 180f, (now - r.releasedAt).toFloat()))
         }
         val elapsed = (now - r.start).coerceAtLeast(0L)
         if (!holdWhilePressed) {
@@ -705,9 +712,9 @@ internal class PressEffect(
             if (elapsed >= waveDuration) return 0f
             val onset = 0.20f + 0.80f * smoothstep(0f, 32f, elapsed.toFloat())
             val end = fadeEnvelope(r)
-            // No hard ring or white flash: a saturated field opens in a couple
-            // of display frames and loses exposure continuously after its spread.
-            return 1.35f * onset * end * end
+            // Keep the selected fade duration perceptible, including its tail.
+            // Squaring this envelope used to spend most of the tail nearly dark.
+            return 1.35f * onset * end
         }
         val spread = elapsed - ignitionDuration
         if (spread < 0L || elapsed >= waveDuration) return 0f
@@ -1089,20 +1096,23 @@ internal class PressEffect(
             val phase = (frameTime - ripple.start).toFloat() / 820f + ripple.shape * 0.83f
             node.x = ripple.x + ripple.driftX * progress * 0.18f
             node.y = ripple.y + ripple.driftY * progress * 0.18f
-            // Broad elliptical glare, with a full soft core. The surrounding
-            // opaque black keycaps reveal its connected network in the gaps.
+            // A broad, feathered front advances out from the cap. Its wake and
+            // compact source remain lit, so it never becomes an isolated outline.
+            // These are our design values, awaiting the user's reference comparison.
             node.halfWidth = min(ripple.flashWidth / 2f, pitch / 2f) + travel
             node.halfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.76f
             // Fast broad reach belongs to the dim shoulder. The much smaller
             // bright core remains attached to this particular touch location.
             node.coreHalfWidth = min(ripple.flashWidth / 2f, pitch / 2f) +
-                pitch * 1.7f * reach * ripple.size * progress
+                pitch * 0.72f * reach * ripple.size * progress
             node.coreHalfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) +
-                pitch * 1.65f * reach * ripple.size * progress
+                pitch * 0.70f * reach * ripple.size * progress
             node.candidateCoreHalfWidth = node.coreHalfWidth
             node.candidateCoreHalfHeight = node.coreHalfHeight
             node.corner = min(node.halfWidth, node.halfHeight)
             node.feather = 5f * density + travel * 0.18f
+            node.samFrontWidth = pitch * 0.32f + travel * 0.07f
+            node.samFrontStrength = 0.40f * (1f - 0.65f * smoothstep(0.65f, 1f, progress))
             node.bendX = travel * 0.018f
             node.bendY = travel * 0.014f
             node.curveX = kotlin.math.sin(phase)
@@ -1280,11 +1290,16 @@ internal class PressEffect(
                     val vertical = (node.dy[y] - node.columnBend[x]) / node.coreHalfHeight
                     val coreRadius = horizontal * horizontal + vertical * vertical
                     val coreDenominator = 1f + coreRadius
-                    val core = 0.72f / (coreDenominator * coreDenominator)
+                    val core = 0.68f / (coreDenominator * coreDenominator)
                     val outerX = (node.dx[x] - node.rowBend[y]) / node.halfWidth
                     val outerY = (node.dy[y] - node.columnBend[x]) / node.halfHeight
-                    val shoulder = 0.10f / (1f + 2f * (outerX * outerX + outerY * outerY))
-                    val exposure = (node.weight / 1.35f) * coverage * (core + shoulder - core * shoulder)
+                    val outerRadius = sqrt(outerX * outerX + outerY * outerY)
+                    val shoulder = 0.065f / (1f + 2f * outerRadius * outerRadius)
+                    val distanceFromFront = abs(outerRadius - 0.78f) * min(node.halfWidth, node.halfHeight)
+                    val front = node.samFrontStrength *
+                        (1f - smoothstep(0f, node.samFrontWidth, distanceFromFront))
+                    val wake = core + shoulder - core * shoulder
+                    val exposure = (node.weight / 1.35f) * coverage * (wake + front - wake * front)
                     // The strongest local source determines exposure; another
                     // distant shoulder cannot lift the whole scene to its peak.
                     // max is continuous as sources expand and fade, so their
@@ -1329,6 +1344,8 @@ internal class PressEffect(
         var skewX = 0f
         var skewY = 0f
         var fluidMix = 0f
+        var samFrontWidth = 0f
+        var samFrontStrength = 0f
         var fluidCos2 = 0f
         var fluidSin2 = 0f
         var fluidCos3 = 0f

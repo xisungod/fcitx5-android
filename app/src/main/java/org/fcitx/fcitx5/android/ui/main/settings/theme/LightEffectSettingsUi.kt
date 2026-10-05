@@ -74,6 +74,7 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
     private val modeSummary = text("", color = subdued)
     private val totalLabel = text("", 13f, accent).apply { tag = "effect-total-time" }
     private val totalDetailLabel = text("", 12f, subdued).apply { tag = "effect-total-detail" }
+    private val keyTimingHint = text("", 12f, subdued)
     val durationControls = linkedMapOf<String, EffectRangeControl>()
     var activeColorDialog: AlertDialog? = null
         private set
@@ -147,6 +148,7 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                     val selected = shapes[position]
                     if (prefs.rippleShape.getValue() != selected) prefs.rippleShape.setValue(selected)
+                    updateTimingVisibility()
                 }
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
@@ -162,13 +164,15 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
             Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
             Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 10),
             Range(R.string.light_effect_wave_fade, prefs.pressFadeOutTime, 100, 5000, 20),
-            Range(R.string.light_effect_face_hold, prefs.pressKeyHoldTime, 100, 1000, 20),
-            Range(R.string.light_effect_face_exit, prefs.pressKeyRetreatTime, 100, 5000, 20)
+            Range(R.string.light_effect_face_hold, prefs.pressKeyHoldTime, 20, 1000, 10),
+            Range(R.string.light_effect_face_exit, prefs.pressKeyRetreatTime, 20, 5000, 10),
+            Range(R.string.sam_key_hold_time, prefs.samKeyHoldTime, 0, 1000, 10),
+            Range(R.string.sam_key_retreat_time, prefs.samKeyRetreatTime, 100, 5000, 10)
         ).forEach { range -> addRange(animationCard, range, "ms") }
         body.addView(animationCard)
-        body.addView(text(context.getString(R.string.keyboard_quick_settings_retreat_hint), 12f, subdued),
+        body.addView(keyTimingHint,
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-        updateTotal()
+        updateTimingVisibility()
         section(R.string.light_effect_light)
         val lightCard = card()
         addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 100, 5), "%")
@@ -209,12 +213,26 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         parent.addView(control.root)
     }
 
+    private fun updateTimingVisibility() {
+        val sam = prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
+        listOf(prefs.pressIgnitionTime, prefs.pressKeyHoldTime, prefs.pressKeyRetreatTime).forEach {
+            durationControls[it.key]?.root?.visibility = if (sam) View.GONE else View.VISIBLE
+        }
+        listOf(prefs.samKeyHoldTime, prefs.samKeyRetreatTime).forEach {
+            durationControls[it.key]?.root?.visibility = if (sam) View.VISIBLE else View.GONE
+        }
+        keyTimingHint.setText(if (sam) R.string.sam_key_timing_hint else R.string.keyboard_quick_settings_retreat_hint)
+        updateTotal()
+    }
+
     private fun updateTotal() {
-        val ignition = prefs.pressIgnitionTime.getValue()
+        val sam = prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
+        val ignition = if (sam) 0 else prefs.pressIgnitionTime.getValue()
         totalLabel.text = context.getString(R.string.light_effect_total,
             ignition + prefs.pressExpansionTime.getValue() +
                 prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
-        totalDetailLabel.text = context.getString(R.string.light_effect_total_detail, ignition)
+        totalDetailLabel.text = if (sam) context.getString(R.string.sam_wave_total_detail)
+            else context.getString(R.string.light_effect_total_detail, ignition)
     }
 
     private fun renderColors() {

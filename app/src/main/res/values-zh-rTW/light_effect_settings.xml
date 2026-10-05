@@ -24,6 +24,10 @@
     <string name="light_effect_wave_fade">消失淡出</string>
     <string name="light_effect_face_hold">鍵面亮色保持</string>
     <string name="light_effect_face_exit">鍵面退場</string>
+    <string name="sam_key_hold_time">Sam 放開留色</string>
+    <string name="sam_key_retreat_time">Sam 餘色淡出</string>
+    <string name="sam_key_timing_hint">Sam 回彈過程保持顏色，放開後的餘色獨立計時；柔霧、流體沿用原來的時長設定。</string>
+    <string name="sam_wave_total_detail">Sam 按下即擴散；波紋、鍵面餘色與回彈分別計時。</string>
     <string name="light_effect_total">一次波紋總時長：%1$d 毫秒</string>
     <string name="light_effect_total_detail">已含 %1$d 毫秒點亮；波紋與鍵面分別計時。</string>
     <string name="light_effect_light">柔光範圍</string>

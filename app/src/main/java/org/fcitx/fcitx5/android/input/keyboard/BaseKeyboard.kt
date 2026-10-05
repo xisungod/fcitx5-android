@@ -11,6 +11,7 @@ import android.graphics.Rect
 import android.os.Build
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import androidx.annotation.CallSuper
 import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -99,6 +100,8 @@ abstract class BaseKeyboard(
             ignitionTimeMs = p.pressIgnitionTime.getValue(),
             keyHoldTimeMs = p.pressKeyHoldTime.getValue(),
             keyRetreatTimeMs = p.pressKeyRetreatTime.getValue(),
+            samKeyHoldTimeMs = p.samKeyHoldTime.getValue(),
+            samKeyRetreatTimeMs = p.samKeyRetreatTime.getValue(),
             keySurfaceEffects = true,
             keyColorStyle = p.keyColorStyle.getValue().ordinal,
             keyCornerRadius = p.keyRadius.getValue() * resources.displayMetrics.density,
@@ -462,15 +465,25 @@ abstract class BaseKeyboard(
 
     private class TouchTarget(val view: KeyView, val hitRect: Rect)
 
-    /**
-     * HashMap of [PointerId (Int)][MotionEvent.getPointerId] to [TouchTarget]
-     * for custom touch event dispatching
-     */
-    private val touchTargets = hashMapOf<Int, TouchTarget>()
+    private class TouchContact(
+        var target: TouchTarget,
+        val downX: Float,
+        val downY: Float,
+        val slideThreshold: Float,
+        var sliding: Boolean = false
+    )
+
+    /** Each pointer keeps its own original touch and deliberate-slide state. */
+    private val touchTargets = hashMapOf<Int, TouchContact>()
+    private val slideTouchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+
+    private fun beginTouch(event: MotionEvent, index: Int, target: TouchTarget): TouchContact =
+        TouchContact(target, event.getX(index), event.getY(index),
+            maxOf(slideTouchSlop * 1.5f, minOf(target.hitRect.width(), target.hitRect.height()) * 0.45f))
 
     private fun releaseAllTouchTargets() {
         touchTargets.forEach {
-            val keyView = it.value.view
+            val keyView = it.value.target.view
             keyView.cancelGestures()
             onPopupAction(PopupAction.DismissAction(keyView.id))
         }
@@ -526,23 +539,37 @@ abstract class BaseKeyboard(
             y >= target.hitRect.top - margin && y < target.hitRect.bottom + margin
     }
 
-    private fun switchSlideTarget(event: MotionEvent, index: Int, old: TouchTarget, next: TouchTarget) {
+    private fun startsDeliberateSlide(event: MotionEvent, index: Int, contact: TouchContact, next: TouchTarget): Boolean {
+        val dx = event.getX(index) - contact.downX
+        val dy = event.getY(index) - contact.downY
+        if (dx * dx + dy * dy < contact.slideThreshold * contact.slideThreshold) return false
+        // Require entry into the neighbour's interior, not just a crossed border.
+        // This remains proportional after editing individual key widths.
+        val inset = minOf(dp(8f).toFloat(), minOf(next.hitRect.width(), next.hitRect.height()) * 0.22f)
+        return event.getX(index) >= next.hitRect.left + inset && event.getX(index) < next.hitRect.right - inset &&
+            event.getY(index) >= next.hitRect.top + inset && event.getY(index) < next.hitRect.bottom - inset
+    }
+
+    private fun switchSlideTarget(event: MotionEvent, index: Int, contact: TouchContact, next: TouchTarget) {
+        val old = contact.target
         old.view.cancelGestures()
         onPopupAction(PopupAction.DismissAction(old.view.id))
-        touchTargets[event.getPointerId(index)] = next
+        contact.target = next
+        contact.sliding = true
         illuminateKey(event, index, next)
         dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, index, next)
     }
 
-    private fun releaseTouch(event: MotionEvent, index: Int, target: TouchTarget) {
-        // A small lift-off drift must not discard a letter. If Android batches away
-        // the last MOVE, resolve a deliberate slide from the final UP coordinates.
+    private fun releaseTouch(event: MotionEvent, index: Int, contact: TouchContact) {
+        val target = contact.target
+        // UP never starts a slide: lift-off drift cannot replace a fast tap with
+        // its neighbour. Only an established MOVE gesture follows a final UP.
         if (slideSelectionEnabled && canRetargetPendingTap(target.view) &&
             !withinSlideTolerance(event, index, target)) {
             val next = findTouchTarget(event, index)
             if (next != null && canSlideSelect(next.view)) {
-                switchSlideTarget(event, index, target, next)
-                dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, next)
+                if (contact.sliding && next.view !== target.view) switchSlideTarget(event, index, contact, next)
+                dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, contact.target)
             } else {
                 target.view.cancelGestures()
                 onPopupAction(PopupAction.DismissAction(target.view.id))
@@ -697,7 +724,7 @@ abstract class BaseKeyboard(
                     releaseAllTouchTargets()
                     val pid = event.getPointerId(0)
                     val target = findTouchTarget(event, 0) ?: return false
-                    touchTargets[pid] = target
+                    touchTargets[pid] = beginTouch(event, 0, target)
                     dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, 0, target)
                     return true
                 }
@@ -708,23 +735,27 @@ abstract class BaseKeyboard(
                     // Return has one long-press state. An extra finger must not reset it
                     // and turn the final release into a Send/Search/Done action.
                     if (target.view.id == R.id.button_return &&
-                        touchTargets.values.any { it.view === target.view }) return true
-                    touchTargets[pid] = target
+                        touchTargets.values.any { it.target.view === target.view }) return true
+                    touchTargets[pid] = beginTouch(event, i, target)
                     dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, i, target)
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     for (i in 0 until event.pointerCount) {
                         val pid = event.getPointerId(i)
-                        val target = touchTargets[pid] ?: continue
+                        val contact = touchTargets[pid] ?: continue
+                        val target = contact.target
                         if (slideSelectionEnabled && canRetargetPendingTap(target.view)) {
                             val next = findTouchTarget(event, i)
                             // Do not send a tiny excursion to the child: its gesture
                             // detector would permanently mark this tap as cancelled.
                             if (next?.view !== target.view && withinSlideTolerance(event, i, target)) continue
                             if (next != null && next.view !== target.view && canSlideSelect(next.view)) {
+                                // Suppress an unintentional excursion before forwarding to
+                                // the child, which otherwise permanently cancels the tap.
+                                if (!contact.sliding && !startsDeliberateSlide(event, i, contact, next)) continue
                                 // Cancel without an UP: intermediate letters must never be committed.
-                                switchSlideTarget(event, i, target, next)
+                                switchSlideTarget(event, i, contact, next)
                                 continue
                             }
                         }
