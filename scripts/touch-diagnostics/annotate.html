@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AXiang · 触摸回放标注</title>
+<style>
+:root{font:15px/1.65 system-ui,sans-serif;color:#202839;background:#f4f6fa}*{box-sizing:border-box}body{margin:0}main{max-width:1100px;margin:24px auto;padding:0 20px}h1{font-size:25px;margin:0 0 8px}p{margin:8px 0;color:#546176}.panel{background:#fff;border:1px solid #e0e5ee;border-radius:16px;padding:20px;margin:16px 0}.row{display:flex;gap:12px;align-items:end;flex-wrap:wrap}label{display:grid;gap:4px;flex:1;min-width:120px}input,select,textarea,button{font:inherit;padding:9px 12px;border:1px solid #cbd3e1;border-radius:8px;background:#fff;color:inherit}button{cursor:pointer;flex:none}button.primary{background:#3958ce;color:#fff;border-color:#3958ce}button:disabled{opacity:.45;cursor:default}textarea{width:100%;min-height:66px}small{color:#657084}.status{min-height:24px;overflow-wrap:anywhere}.error{color:#a82630}.split{display:grid;grid-template-columns:1fr 1fr;gap:20px}canvas{max-width:100%;background:#f4f6fa;border-radius:12px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:7px;text-align:left;border-bottom:1px solid #e8edf5}td{overflow-wrap:anywhere}th{color:#657084}.scroll{max-height:280px;overflow:auto}code{font-size:13px}#raw{white-space:pre-wrap;max-height:200px;overflow:auto;font:12px/1.5 monospace}.pill{display:inline-block;padding:2px 8px;background:#eef2ff;border-radius:6px}#labels button{padding:2px 8px;font-size:12px}@media(max-width:700px){.split{grid-template-columns:1fr}main{padding:0 12px}.panel{padding:15px}}
+</style>
+<main>
+<h1>AXiang · 触摸回放标注</h1>
+<p>在本机选择诊断文件、检查触摸轨迹，再明确标注这段输入原本想打的拼音和汉字。此页面不发送网络请求。</p>
+<section class="panel">
+<div class="row"><label>诊断文件（JSONL）<input id="file" type="file" accept=".jsonl,.ndjson,.json,application/x-ndjson"></label><label>已有标注（可选）<input id="labelsFile" type="file" accept=".json,application/json" disabled></label></div>
+<p id="status" class="status">尚未载入文件。未确认的片段不会计入准确率。</p>
+</section>
+<section class="panel" id="editor" hidden>
+<div class="row"><label>输入会话<select id="session"></select></label><label>片段起点<select id="start"></select></label><label>片段终点<select id="end"></select></label><button id="show">查看片段</button></div>
+<p id="rangeSummary"></p>
+<div class="split"><div><label>查看片段中的触摸<select id="inspect"></select></label><canvas id="canvas" width="520" height="330" aria-label="键位、按下和抬手轨迹"></canvas><small>蓝点：DOWN；红点：UP；连线：移动轨迹。按实际记录的键位绘制。</small></div><div><div class="scroll"><table><thead><tr><th>触摸</th><th>模式</th><th>DOWN → 提交键</th><th>实际动作</th></tr></thead><tbody id="traces"></tbody></table></div><details><summary>选中触摸的原始记录</summary><pre id="raw"></pre></details></div></div>
+<div class="row" style="margin-top:16px"><label>目标拼音<input id="pinyin" autocomplete="off" spellcheck="false" placeholder="例如 jingchanghui"></label><label>目标汉字（候选评测需要）<input id="han" autocomplete="off" placeholder="例如 经常会"></label><label>标注状态<select id="confirmed"><option value="pending">待确认</option><option value="confirmed">已明确确认目标</option></select></label></div>
+<label style="margin-top:10px">备注<textarea id="note" placeholder="可说明出错位置；删除重打本身不能证明目标。"></textarea></label>
+<p><button id="add" class="primary">保存这段标注</button> <small>保存到页面内存；使用下方导出按钮写出标注文件。</small></p>
+</section>
+<section class="panel"><div class="row"><strong>已保存标注</strong><button id="download" class="primary" disabled>导出标注 JSON</button></div><div class="scroll"><table><thead><tr><th>片段</th><th>目标拼音 / 汉字</th><th>状态</th><th></th></tr></thead><tbody id="labels"></tbody></table></div></section>
+<p><small>标注文件通过诊断文件的 SHA-256 与原记录关联。切换诊断文件会清空当前页面标注，请先导出。这里展示的是记录和人工目标；触摸 A/B 与候选回放由配套脚本分别运行。</small></p>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+let records=[],traces=[],group=[],selected=[],annotations=[],sourceHash='',sourceName='';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function status(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error)}
+function actions(trace){return(trace.actions||[]).map(a=>a.act||a.sym||a.type||'?').join(' ')}
+function keyName(trace,id){const key=(trace.layout?.keys||[]).find(k=>String(k.id)===String(id));return key?.label||String(id??'?')}
+function contactSummary(trace){return(trace.contacts||[]).map(c=>`${keyName(trace,c.down_key)} → ${keyName(trace,c.up_key??c.down_key)}${c.cancelled?'（取消）':''}`).join('；')||'未记录接触摘要'}
+function mode(trace){return trace.boundary_settling?'开':'关'}
+function option(value,label){const node=document.createElement('option');node.value=String(value);node.textContent=label;return node}
+function setOptions(id,rows){$(id).replaceChildren(...rows.map(([v,t])=>option(v,t)))}
+function changeSession(){
+ group=traces.filter(r=>r.session===$('session').value);
+ const rows=group.map((r,i)=>[i,`${i+1} · ${mode(r.trace)} · ${actions(r.trace)||contactSummary(r.trace)}`]);
+ setOptions('start',rows);setOptions('end',rows);if(group.length)$('end').value='0';showRange();
+}
+function showRange(){
+ const begin=Number($('start').value),end=Number($('end').value);
+ if(end<begin){status('终点必须位于起点之后。',true);return}
+ selected=group.slice(begin,end+1);
+ $('rangeSummary').textContent=`已选择同一会话中连续的 ${selected.length} 次触摸（${begin+1}–${end+1}）。标注目标属于整段输入。`;
+ setOptions('inspect',selected.map((r,i)=>[i,`${begin+i+1} · ${actions(r.trace)||r.trace.id}`]));
+ $('traces').innerHTML=selected.map((r,i)=>`<tr><td>${begin+i+1}</td><td>${esc(mode(r.trace))}</td><td>${esc(contactSummary(r.trace))}</td><td>${esc(actions(r.trace))}</td></tr>`).join('');
+ inspect();status(`已载入 ${traces.length} 次触摸。请根据自己的意图标注目标。`);
+}
+function inspect(){
+ const record=selected[Number($('inspect').value)];if(!record)return;
+ const trace=record.trace;$('raw').textContent=JSON.stringify(trace,null,2);
+ const canvas=$('canvas'),ctx=canvas.getContext('2d'),layout=trace.layout||{};
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ if(!(layout.width>0&&layout.height>0)){ctx.fillText('此触摸没有可用布局。',15,25);return}
+ const scale=Math.min((canvas.width-20)/layout.width,(canvas.height-20)/layout.height),ox=(canvas.width-layout.width*scale)/2,oy=10;
+ ctx.font='13px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+ for(const key of layout.keys||[]){const r=key.rect;if(!Array.isArray(r)||r.length!==4)continue;ctx.fillStyle='#fff';ctx.strokeStyle='#cbd3e1';ctx.fillRect(ox+r[0]*scale,oy+r[1]*scale,(r[2]-r[0])*scale,(r[3]-r[1])*scale);ctx.strokeRect(ox+r[0]*scale,oy+r[1]*scale,(r[2]-r[0])*scale,(r[3]-r[1])*scale);ctx.fillStyle='#43516c';ctx.fillText(key.label||key.id,ox+(r[0]+r[2])*scale/2,oy+(r[1]+r[3])*scale/2)}
+ const points=new Map();
+ for(const event of trace.events||[]){
+  const samples=[...(event.history||[]),event];
+  for(const sample of samples)for(const pointer of sample.pointers||[]){
+   const list=points.get(pointer.id)||[];list.push({x:ox+pointer.x*scale,y:oy+pointer.y*scale,action:sample===event?event.action:2,isAction:sample===event&&(event.action_index??0)===(sample.pointers||[]).indexOf(pointer)});points.set(pointer.id,list);
+  }
+ }
+ for(const list of points.values()){
+  ctx.strokeStyle='#8199d4';ctx.lineWidth=1.7;ctx.beginPath();list.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
+  for(const p of list){const down=p.isAction&&(p.action===0||p.action===5),up=p.isAction&&(p.action===1||p.action===6);if(!down&&!up)continue;ctx.fillStyle=down?'#315ce0':'#e04b57';ctx.beginPath();ctx.arc(p.x,p.y,down?5:3.5,0,Math.PI*2);ctx.fill()}
+ }
+}
+function renderLabels(){
+ $('labels').innerHTML=annotations.map((a,i)=>`<tr><td>${a.trace_ids.length} 次触摸</td><td>${esc(a.target_pinyin)}<br>${esc(a.target_han)}</td><td>${a.status==='confirmed'?'已确认':'待确认'}</td><td><button data-delete="${i}">删除</button></td></tr>`).join('');
+ $('download').disabled=!sourceHash||!annotations.length;
+}
+function validateAnnotation(a,seen,occupied=new Set()){
+ if(!a||typeof a.id!=='string'||seen.has(a.id))throw Error('标注 ID 无效或重复。');seen.add(a.id);
+ if(!Array.isArray(a.trace_ids)||!a.trace_ids.length||new Set(a.trace_ids).size!==a.trace_ids.length)throw Error('标注触摸范围无效。');
+ if(a.trace_ids.some(id=>occupied.has(id)))throw Error('标注范围重叠；请修改已有标注或先删除，避免重复统计。');
+ const positions=a.trace_ids.map(id=>traces.findIndex(r=>r.trace.id===id));
+ if(positions.some(p=>p<0)||positions.some((p,i)=>i&&p!==positions[i-1]+1))throw Error('标注必须指向原文件中连续的触摸。');
+ const session=traces[positions[0]].session;if(positions.some(p=>traces[p].session!==session))throw Error('一个标注不能跨输入会话。');
+ const boundary=traces[positions[0]].trace.boundary_settling;if(positions.some(p=>traces[p].trace.boundary_settling!==boundary))throw Error('一个标注不能跨边界改判模式；请分别标注两次输入。');
+ const synthetic=positions.filter(p=>traces[p].trace.synthetic===true).length;
+ if(synthetic&&synthetic!==positions.length)throw Error('合成记录和真实记录必须分开标注。');
+ if(synthetic&&a.provenance!=='synthetic')throw Error('合成记录不能标为真实用户数据。');
+ if(typeof a.target_pinyin!=='string'||! /^[a-z]+(?:'[a-z]+)*$/.test(a.target_pinyin))throw Error('目标拼音只能含小写字母及音节间的隔音符号。');
+ if(!['pending','confirmed'].includes(a.status)||!['user_explicit','synthetic'].includes(a.provenance))throw Error('标注状态或来源无效。');
+ if(typeof a.target_han!=='string'||typeof a.note!=='string')throw Error('汉字目标和备注必须是文本。');
+ a.trace_ids.forEach(id=>occupied.add(id));
+}
+$('file').addEventListener('change',async()=>{
+ const file=$('file').files[0];if(!file)return;
+ if(annotations.length&&!window.confirm('载入新诊断文件会清空尚未导出的标注。继续吗？')){ $('file').value='';return }
+ try{
+  if(file.size>32*1024*1024)throw Error('文件超过 32 MiB，请先用配套脚本拆分。');
+  const bytes=await file.arrayBuffer();if(!crypto.subtle)throw Error('此浏览器无法计算文件校验值，请使用新版 Chrome、Edge 或 Firefox。');
+  const digest=await crypto.subtle.digest('SHA-256',bytes);sourceHash=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+  records=new TextDecoder('utf-8',{fatal:true}).decode(bytes).split(/\r?\n/).filter(l=>l.trim()).map((line,i)=>{try{return JSON.parse(line)}catch{throw Error(`第 ${i+1} 行不是有效 JSON。`)}});
+  traces=records.filter(r=>r.kind==='trace'&&r.schema===1&&r.trace&&typeof r.trace.id==='string');
+  if(!traces.length)throw Error('文件中没有 schema=1 的已完成触摸记录。');
+  if(new Set(traces.map(r=>r.trace.id)).size!==traces.length)throw Error('触摸 ID 重复，无法可靠关联目标。');
+  if(traces.some(r=>typeof r.session!=='string'||typeof r.trace.boundary_settling!=='boolean'))throw Error('触摸记录缺少会话或边界模式。');
+  sourceName=file.name;annotations=[];renderLabels();
+  setOptions('session',[...new Set(traces.map(r=>r.session))].map((s,i)=>[s,`会话 ${i+1}（${traces.filter(r=>r.session===s).length} 次触摸）`]));
+  $('editor').hidden=false;$('labelsFile').disabled=false;changeSession();
+ }catch(error){records=[];traces=[];selected=[];group=[];sourceHash='';annotations=[];$('editor').hidden=true;$('labelsFile').disabled=true;renderLabels();status(error.message,true)}
+});
+$('labelsFile').addEventListener('change',async()=>{
+ try{
+  const file=$('labelsFile').files[0];if(!file)return;
+  if(file.size>4*1024*1024)throw Error('标注文件超过 4 MiB。');
+  const doc=JSON.parse(await file.text());if(doc.schema!==1||doc.source_sha256!==sourceHash||!Array.isArray(doc.annotations))throw Error('标注文件格式或原文件校验值不匹配。');
+  const seen=new Set(),occupied=new Set();doc.annotations.forEach(a=>validateAnnotation(a,seen,occupied));annotations=doc.annotations;renderLabels();status(`已载入 ${annotations.length} 段标注。`);
+ }catch(error){status(error.message,true)}
+});
+$('session').addEventListener('change',changeSession);$('show').addEventListener('click',showRange);$('inspect').addEventListener('change',inspect);
+$('add').addEventListener('click',()=>{
+ try{
+  // Recompute the range so edits to selectors never annotate an older preview.
+  if(Number($('end').value)<Number($('start').value))throw Error('终点必须位于起点之后。');showRange();
+  const pinyin=$('pinyin').value.trim();
+  const ids=selected.map(r=>r.trace.id),existing=annotations.findIndex(a=>JSON.stringify(a.trace_ids)===JSON.stringify(ids));
+  const others=annotations.filter((_,i)=>i!==existing),annotation={id:existing<0?(crypto.randomUUID?crypto.randomUUID():`manual-${Date.now()}-${annotations.length}`):annotations[existing].id,trace_ids:ids,target_pinyin:pinyin,target_han:$('han').value.trim(),status:$('confirmed').value,provenance:selected.every(r=>r.trace.synthetic===true)?'synthetic':'user_explicit',note:$('note').value.trim()};
+  validateAnnotation(annotation,new Set(others.map(a=>a.id)),new Set(others.flatMap(a=>a.trace_ids)));if(existing<0)annotations.push(annotation);else annotations[existing]=annotation;renderLabels();status('标注已保存到页面内存。请导出后再关闭页面。');
+ }catch(error){status(error.message,true)}
+});
+$('labels').addEventListener('click',event=>{const index=event.target.dataset.delete;if(index!==undefined){annotations.splice(Number(index),1);renderLabels()}});
+$('download').addEventListener('click',()=>{
+ const doc={schema:1,source_sha256:sourceHash,annotations};const url=URL.createObjectURL(new Blob([JSON.stringify(doc,null,2)+'\n'],{type:'application/json'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=sourceName.replace(/\.[^.]+$/,'')+'-labels.json';anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('标注文件已导出；诊断原文件需保留用于回放。');
+});
+</script>
+</html>

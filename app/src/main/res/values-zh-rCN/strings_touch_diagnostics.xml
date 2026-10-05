@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="touch_diagnostic_section">输入诊断 · 对照实验</string>
+    <string name="touch_boundary_settling">自动边界改判</string>
+    <string name="touch_boundary_settling_summary">开启时保持当前行为；关闭时只停用早期边界改判，明确滑动选键与抬手提交保持原样。交替切换两种模式进行对照。</string>
+    <string name="touch_diagnostic_logging">记录本机输入诊断</string>
+    <string name="touch_diagnostic_logging_summary">默认关闭。记录触点、接触面积、压力、键位改判及已发出的按键动作。只采集普通文本框，排除密码、邮箱、网址与禁止个性化的输入框。仅保存在本机，最多 2 MiB，保留 7 天；不会自动上传。</string>
+    <string name="touch_diagnostic_status">本机诊断记录</string>
+    <string name="touch_diagnostic_status_summary">%1$d 个文件 · %2$d 条记录 · %3$d KiB\n负载过高时已丢弃 %4$d 条记录</string>
+    <string name="touch_diagnostic_storage_failed">部分诊断记录保存失败，正常输入不受影响。</string>
+    <string name="touch_diagnostic_export">预览并导出诊断</string>
+    <string name="touch_diagnostic_export_summary">先确认导出内容，再选择保存位置。导出的文本可能包含隐私信息。</string>
+    <string name="touch_diagnostic_empty">还没有本机诊断记录</string>
+    <string name="touch_diagnostic_export_preview">确认诊断导出内容</string>
+    <string name="touch_diagnostic_export_preview_message">%1$d 个文件，%2$d 条记录，%3$d KiB\n记录文件时间范围：%4$s\n\n包含触点、接触面积、压力、边界模式、键位改判及已发出的按键动作，可能透露你输入的内容。确认同意后才会保存到你选择的位置，不会自动上传。</string>
+    <string name="touch_diagnostic_export_consent">同意 · 选择保存位置</string>
+    <string name="touch_diagnostic_export_done">诊断记录已导出</string>
+    <string name="touch_diagnostic_export_failed">导出失败，或预览已被清空。请重新预览后再试。</string>
+    <string name="touch_diagnostic_clear">清空本机诊断</string>
+    <string name="touch_diagnostic_clear_summary">删除已保存记录，同时作废待导出的预览。</string>
+    <string name="touch_diagnostic_clear_message">删除全部本机诊断记录？已经导出的副本仍保留在你选择的保存位置。</string>
+    <string name="touch_diagnostic_clear_done">本机诊断已清空</string>
+    <string name="touch_diagnostic_clear_failed">未能清空全部诊断记录，请重试。</string>
+</resources>

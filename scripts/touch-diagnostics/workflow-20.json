@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "purpose": "Fixed live boundary-settling A/B prompts. Targets are explicit tasks, not inferred natural typing intent.",
+  "submission_policy": "current_up",
+  "settings": "Change only boundary_settling; keep keyboard dimensions, layout, dictionary, font, sampling and all other settings fixed.",
+  "sentences": [
+    {"id": 1, "target_han": "你好啊", "target_pinyin": "nihaoa", "first_mode": "on"},
+    {"id": 2, "target_han": "小姑娘", "target_pinyin": "xiaoguniang", "first_mode": "off"},
+    {"id": 3, "target_han": "经常会", "target_pinyin": "jingchanghui", "first_mode": "on"},
+    {"id": 4, "target_han": "能确定吗", "target_pinyin": "nengquedingma", "first_mode": "off"},
+    {"id": 5, "target_han": "这个问题怎么解决", "target_pinyin": "zhegewentizenmejiejue", "first_mode": "on"},
+    {"id": 6, "target_han": "我们明天见", "target_pinyin": "womenmingtianjian", "first_mode": "off"},
+    {"id": 7, "target_han": "今天晚上吃什么", "target_pinyin": "jintianwanshangchishenme", "first_mode": "on"},
+    {"id": 8, "target_han": "请帮我看一下", "target_pinyin": "qingbangwokanyixia", "first_mode": "off"},
+    {"id": 9, "target_han": "这是基本功能", "target_pinyin": "zheshijibengongneng", "first_mode": "on"},
+    {"id": 10, "target_han": "这里有几百个人", "target_pinyin": "zheliyoujibaigeren", "first_mode": "off"},
+    {"id": 11, "target_han": "两只黄鹂鸣翠柳", "target_pinyin": "liangzhihuanglimingcuiliu", "first_mode": "on"},
+    {"id": 12, "target_han": "一行白鹭上青天", "target_pinyin": "yihangbailushangqingtian", "first_mode": "off"},
+    {"id": 13, "target_han": "键盘用起来怎么样", "target_pinyin": "jianpanyongqilaizenmeyang", "first_mode": "on"},
+    {"id": 14, "target_han": "我现在准备出门", "target_pinyin": "woxianzaizhunbeichumen", "first_mode": "off"},
+    {"id": 15, "target_han": "不要忘记带钥匙", "target_pinyin": "buyaowangjidaiyaoshi", "first_mode": "on"},
+    {"id": 16, "target_han": "请登录账号", "target_pinyin": "qingdengluzhanghao", "first_mode": "off"},
+    {"id": 17, "target_han": "基本", "target_pinyin": "jb", "input_style": "initials_control", "first_mode": "on"},
+    {"id": 18, "target_han": "经常会", "target_pinyin": "jch", "input_style": "initials_control", "first_mode": "off"},
+    {"id": 19, "target_han": "今天心情很好", "target_pinyin": "jintianxinqinghenhao", "first_mode": "on"},
+    {"id": 20, "target_han": "谢谢你的帮助", "target_pinyin": "xiexienidebangzhu", "first_mode": "off"}
+  ],
+  "extra_controls_excluded_from_pinyin_accuracy": ["AXiang v1.2", "GitHub API", "Hello World 123"],
+  "acceptance": "Collect intended spelling before reviewing failures; manually confirm trace ranges. Compare input-letter errors separately from candidate Han accuracy. Preserve live first-mode counterbalancing; report real-user results separately from synthetic replay."
+}

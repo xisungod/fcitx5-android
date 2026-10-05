@@ -61,6 +61,7 @@ import org.fcitx.fcitx5.android.core.data.BuiltinRimeProfile
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -107,6 +108,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private lateinit var contentView: FrameLayout
     private var inputView: InputView? = null
     private var candidatesView: CandidatesView? = null
+    private val touchDiagnostics by lazy { TouchDiagnosticStore.get(this) }
+    private fun revokeTouchDiagnosticEditor() {
+        touchDiagnostics.updateEditor(null)
+    }
 
     private var offlineDictationEditorGeneration = 0L
     private var offlineDictationSession: OfflineDictationSession? = null
@@ -867,6 +872,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        touchDiagnostics.updateEditor(attribute)
         finishOfflineDictation()
         inputView?.cancelPendingEngineSwitch()
         inputView?.finishTransientEditors()
@@ -902,6 +908,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
+        touchDiagnostics.updateEditor(info)
         Timber.d("onStartInputView: restarting=$restarting")
         postFcitxJob {
             focus(true)
@@ -1199,6 +1206,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        revokeTouchDiagnosticEditor()
         finishOfflineDictation()
         heightEditorHandledBack = false
         inputView?.finishTransientEditors()
@@ -1218,6 +1226,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onWindowHidden() {
+        revokeTouchDiagnosticEditor()
         finishOfflineDictation()
         heightEditorHandledBack = false
         inputView?.finishTransientEditors()
@@ -1225,6 +1234,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInput() {
+        revokeTouchDiagnosticEditor()
         finishOfflineDictation()
         inputView?.cancelPendingEngineSwitch()
         Timber.d("onFinishInput")
@@ -1235,6 +1245,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
+        revokeTouchDiagnosticEditor()
         finishOfflineDictation()
         inputView?.cancelPendingEngineSwitch()
         cachedKeyEvents.evictAll()
@@ -1249,6 +1260,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onDestroy() {
+        revokeTouchDiagnosticEditor()
         finishOfflineDictation()
         if (::decorView.isInitialized) decorView.removeCallbacks(applyPendingTheme)
         pendingTheme = null

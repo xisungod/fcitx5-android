@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="touch_diagnostic_section">Typing diagnosis · experiment</string>
+    <string name="touch_boundary_settling">Automatic boundary retargeting</string>
+    <string name="touch_boundary_settling_summary">On keeps the current behavior. Off disables only early boundary retargeting; deliberate slide selection and release-to-submit stay the same. Switch between both modes for the comparison.</string>
+    <string name="touch_diagnostic_logging">Record local typing diagnostics</string>
+    <string name="touch_diagnostic_logging_summary">Off by default. Records touch coordinates, contact area, pressure, key changes and emitted key actions. Ordinary text fields only; excludes passwords, email addresses, URLs and private fields. Local storage only, up to 2 MiB, retained for seven days. Nothing is uploaded automatically.</string>
+    <string name="touch_diagnostic_status">Local diagnostic records</string>
+    <string name="touch_diagnostic_status_summary">%1$d files · %2$d records · %3$d KiB\n%4$d records dropped under load</string>
+    <string name="touch_diagnostic_storage_failed">Some diagnostic records could not be saved. Typing continues normally.</string>
+    <string name="touch_diagnostic_export">Preview and export diagnostics</string>
+    <string name="touch_diagnostic_export_summary">Review what the export contains, then choose a destination. The exported text may contain private information.</string>
+    <string name="touch_diagnostic_empty">No local diagnostic records yet</string>
+    <string name="touch_diagnostic_export_preview">Review diagnostic export</string>
+    <string name="touch_diagnostic_export_preview_message">%1$d files, %2$d records, %3$d KiB\nRecorded file range: %4$s\n\nIncludes touch coordinates, contact area, pressure, boundary mode, key changes and emitted key actions. These actions may reveal what you typed. Export only if you consent to saving this information at the destination you choose. No automatic upload occurs.</string>
+    <string name="touch_diagnostic_export_consent">I agree · choose destination</string>
+    <string name="touch_diagnostic_export_done">Diagnostic export saved</string>
+    <string name="touch_diagnostic_export_failed">Export failed or the preview was cleared. Preview again to retry.</string>
+    <string name="touch_diagnostic_clear">Clear local diagnostics</string>
+    <string name="touch_diagnostic_clear_summary">Delete stored diagnostic records and invalidate pending export previews.</string>
+    <string name="touch_diagnostic_clear_message">Delete all local diagnostic records? Copies you already exported remain at their chosen destinations.</string>
+    <string name="touch_diagnostic_clear_done">Local diagnostics cleared</string>
+    <string name="touch_diagnostic_clear_failed">Could not clear all diagnostic records. Please retry.</string>
+</resources>

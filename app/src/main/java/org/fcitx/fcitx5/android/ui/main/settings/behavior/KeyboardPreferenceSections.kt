@@ -17,6 +17,9 @@ internal object KeyboardPreferenceSections {
 
     const val APPLY_TYPING_KEY = "axiang_apply_typing"
     const val DICTIONARY_IMPORT_KEY = "rime_personal_dictionary_import"
+    const val TOUCH_DIAGNOSTIC_STATUS_KEY = "touch_diagnostic_status"
+    const val TOUCH_DIAGNOSTIC_EXPORT_KEY = "touch_diagnostic_export"
+    const val TOUCH_DIAGNOSTIC_CLEAR_KEY = "touch_diagnostic_clear"
 
     private data class Section(
         val page: Page,
@@ -49,7 +52,11 @@ internal object KeyboardPreferenceSections {
                 listOf(horizontalCandidateStyle.key, expandedCandidateStyle.key,
                     expandedCandidateGridSpanCount.key)),
             Section(Page.Typing, "typing_behavior", R.string.axiang_typing_behavior,
-                listOf(inlineSuggestions.key, focusChangeResetKeyboard.key))
+                listOf(inlineSuggestions.key, focusChangeResetKeyboard.key)),
+            Section(Page.Typing, "typing_touch_diagnostics", R.string.touch_diagnostic_section,
+                listOf(touchBoundarySettling.key, touchDiagnosticLogging.key,
+                    TOUCH_DIAGNOSTIC_STATUS_KEY, TOUCH_DIAGNOSTIC_EXPORT_KEY,
+                    TOUCH_DIAGNOSTIC_CLEAR_KEY))
         )
     }
 
