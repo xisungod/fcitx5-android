@@ -127,6 +127,11 @@ internal class PressEffect(
     private val fadeDuration = fadeOutTimeMs.coerceIn(100, 5000).toLong()
     private val fadeStart = ignitionDuration + expansionDuration + waveHoldDuration
     private val waveDuration = fadeStart + fadeDuration
+    // Let the source glow outlast the travelling front's initial expansion.
+    // At the defaults this holds through 120ms and retreats until 670ms, while
+    // the whole field still obeys the user's selected hold/fade lifetime.
+    private val samWakeHold = expansionDuration * 0.30f
+    private val samWakeRetreatEnd = expansionDuration + min(fadeDuration * 0.30f, expansionDuration * 0.75f)
     private val keyHoldDuration = keyHoldTimeMs.coerceIn(20, 1000).toLong()
     private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(20, 5000).toLong()
     private val samKeyHoldDuration = samKeyHoldTimeMs.coerceIn(0, 1000).toLong()
@@ -1113,9 +1118,12 @@ internal class PressEffect(
             node.feather = 5f * density + travel * 0.18f
             node.samFrontWidth = pitch * 0.85f + travel * 0.26f
             node.samFrontStrength = 0.62f * (1f - 0.18f * smoothstep(0.65f, 1f, progress))
-            // The wake clears from the source as the band leaves. Key-face
-            // colour has its own release clock and must not hold this centre lit.
-            node.samWakeStrength = 1f - 0.94f * smoothstep(0.40f, 1f, progress)
+            // A soft afterglow recedes on its own clock instead of hollowing out
+            // the centre as soon as the front reaches full size. It still dims
+            // beneath the outgoing band, without holding a bright static pool.
+            // Key-face colour keeps its independent release clock.
+            val elapsed = (frameTime - ripple.start).coerceAtLeast(0L).toFloat()
+            node.samWakeStrength = 1f - 0.94f * smoothstep(samWakeHold, samWakeRetreatEnd, elapsed)
             node.bendX = travel * 0.018f
             node.bendY = travel * 0.014f
             node.curveX = kotlin.math.sin(phase)

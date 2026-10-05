@@ -102,7 +102,7 @@ class SamWavePropagationTest {
             assertTrue("Light peaks at the farther location later, rather than only filling a growing pool: $near / $far",
                 far.first >= near.first + 60)
             assertTrue("Near pixels dim after the crest has moved outward", samples.last().second < near.second * 0.65f)
-            assertTrue("A coloured wake remains behind the front before its centre clears",
+            assertTrue("A coloured wake remains behind the travelling front",
                 samples.first { it.first == 300L }.second >= 5)
             File("build/outputs/effect-checks/sam-propagation/arrival.csv").writeText(
                 "time_ms,near_light,far_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
@@ -128,11 +128,39 @@ class SamWavePropagationTest {
                         longestRun >= 84)
                     assertTrue("The front retains a dark area ahead instead of lighting the entire field",
                         light(frame, 500) < peak * 0.15f)
-                    if (time == 400L) assertTrue("The source clears before the outgoing band; this is not a uniformly fading pool",
-                        light(frame, 120) < peak * 0.40f)
+                    if (time == 400L) assertTrue("The source retains a visible afterglow below the outgoing band: ${light(frame, 120)} / $peak",
+                        light(frame, 120) in (peak * 0.35f).toInt()..(peak * 0.90f).toInt())
                     save(frame, "wide-band-$time")
                 } finally { frame.recycle() }
             }
+        }
+    }
+
+    @Test
+    fun sourceAfterglowRetreatsGraduallyWhileTheFrontContinuesOutward() {
+        Field().use { field ->
+            val samples = listOf(160L, 240L, 320L, 400L, 500L, 650L, 900L, 1340L).map { time ->
+                val frame = field.render(time)
+                try {
+                    save(frame, "afterglow-$time")
+                    Triple(time, light(frame, 120), light(frame, 360))
+                } finally { frame.recycle() }
+            }
+            val early = samples.first().second
+            val expanded = samples.first { it.first == 400L }
+            val receding = samples.first { it.first == 650L }
+            assertTrue("The initial source is visibly lit: $early", early >= 100)
+            assertTrue("The centre is still coloured when expansion finishes: $expanded", expanded.second >= 60)
+            assertTrue("The centre has begun fading, leaving the outward motion visible: $early / $expanded",
+                expanded.second < early * 0.80f && expanded.third > expanded.second)
+            assertTrue("The source retreats instead of becoming a static bright pool: $receding",
+                receding.second < expanded.second * 0.35f && receding.third > receding.second * 2)
+            for ((previous, next) in samples.zipWithNext()) {
+                assertTrue("Afterglow fades smoothly without a later flash: $previous / $next", next.second <= previous.second + 2)
+            }
+            assertEquals("Source and front obey the full selected lifetime", Triple(1340L, 0, 0), samples.last())
+            File("build/outputs/effect-checks/sam-propagation/afterglow.csv").writeText(
+                "time_ms,source_light,front_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
         }
     }
 
@@ -154,7 +182,7 @@ class SamWavePropagationTest {
     fun selectedWaveFadeAndHoldAreVisibleAndEndAtTheirConfiguredTimes() {
         fun sample(fade: Int, hold: Int, time: Long): Int = Field(fade = fade, hold = hold).use { field ->
             val frame = field.render(time)
-            // Observe the outgoing band: the source now clears behind it.
+            // Observe the outgoing band independently of the source afterglow.
             try { light(frame, 360) } finally { frame.recycle() }
         }
         assertEquals("Short selected fade has ended", 0, sample(100, 40, 700))
