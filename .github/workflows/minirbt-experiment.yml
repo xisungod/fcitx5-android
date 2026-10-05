@@ -1,0 +1,575 @@
+name: Build AXiang MiniRBT experiment
+
+on:
+  push:
+    branches: [work/axiang-minirbt-experiment]
+    paths: [.github/workflows/minirbt-experiment.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: axiang-minirbt-experiment
+  cancel-in-progress: false
+
+jobs:
+  experiment:
+    if: github.repository == 'xisungod/fcitx5-android' && github.ref == 'refs/heads/work/axiang-minirbt-experiment'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SOURCE_COMMIT: 6ba28c89f73c8c1745dbed8d2302c8c1657a9291
+      VERIFIED_NATIVE_COMMIT: 2a038c9bb5360d6760666c3df564cab4c66d1564
+      SOURCE_RUN_ID: "37283910221"
+      SOURCE_ARTIFACT_ID: "11333514116"
+      SOURCE_ARTIFACT_NAME: axiang-pr-37283910221-arm64
+      SOURCE_APK_NAME: axiang-pr-arm64.apk
+      SOURCE_APK_SHA256: dd255bd528f6645ba71b61f9fcfc8e251a7f25beacac4f1f6c12c7c0c0e8e414
+      MODEL_RELEASE_ID: "403572093"
+      MODEL_ASSET_ID: "0"
+      MODEL_RELEASE_TAG: axiang-minirbt-h256-mlm-v1
+      MODEL_ASSET_NAME: axiang-minirbt-h256-mlm-fp32.zip
+      MODEL_SHA256: d88fde3cff6ab399eaca90f360f2668d8be60925537d4c7a403a8b35da0498aa
+      MODEL_BYTES: "38567708"
+      MODEL_MANIFEST_SHA256: ad0eb37d7492023da83c5812a8e4851201b994b3f33dc4631d0ad388cbd1fcd4
+      ALLOW_FROZEN_MODEL_REBUILD: "1"
+      TEST_RELEASE_ID: "403589450"
+      TEST_RELEASE_TAG: axiang-v1.2-minirbt.1
+      SIGNING_RELEASE_ID: "403565107"
+      SIGNING_RELEASE_TAG: axiang-signing-backup-local
+      SIGNING_CERTIFICATE_SHA256: fad5f7a0e1b7a0c5953d5941856477f533fac45f9ba44d626fc1f3200a954b0c
+      NDK_VERSION: "28.0.13004108"
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "1"
+      BUILD_COMMIT_HASH: 6ba28c89f73c8c1745dbed8d2302c8c1657a9291
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Check out the exact experiment source
+        uses: actions/checkout@v7
+        with:
+          ref: 6ba28c89f73c8c1745dbed8d2302c8c1657a9291
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify unchanged offline inputs and release identities
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          git merge-base --is-ancestor "$VERIFIED_NATIVE_COMMIT" "$SOURCE_COMMIT"
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN_ID" > "$RUNNER_TEMP/source-run.json"
+          gh api "repos/$GH_REPO/actions/artifacts/$SOURCE_ARTIFACT_ID" > "$RUNNER_TEMP/source-artifact.json"
+          gh api "repos/$GH_REPO/releases/$MODEL_RELEASE_ID" > "$RUNNER_TEMP/model-release.json"
+          if [ "$MODEL_ASSET_ID" != "0" ]; then
+            gh api "repos/$GH_REPO/releases/assets/$MODEL_ASSET_ID" > "$RUNNER_TEMP/model-asset.json"
+          fi
+          gh api "repos/$GH_REPO/releases/$TEST_RELEASE_ID" > "$RUNNER_TEMP/test-release.json"
+          gh api "repos/$GH_REPO/releases/$SIGNING_RELEASE_ID" > "$RUNNER_TEMP/signing-release.json"
+          python3 - <<'PY'
+          import datetime, hashlib, json, os, pathlib, re, subprocess
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          native = os.environ['VERIFIED_NATIVE_COMMIT']
+          source = os.environ['SOURCE_COMMIT']
+          scopes = ['scripts/rime', 'scripts/asr', 'scripts/prepare-axiang-asr.py',
+                    'scripts/check-axiang-asr.py', 'scripts/prepare-xuancai-rime.py',
+                    'scripts/precompile-xuancai-rime.py', 'scripts/build-axiang-typo-index.py',
+                    'scripts/check-axiang-typo-index.py', 'scripts/check-axiang-adjacent-correction.c',
+                    'scripts/check-axiang-rime-t9.c', 'scripts/check-xuancai-rime.c',
+                    'scripts/check-xuancai-rime-v08.c', 'app/src/main/assets', 'lib', '.gitmodules']
+          subprocess.run(['git', 'diff', '--exit-code', native, source, '--', *scopes], check=True)
+          changed_cpp = subprocess.check_output(['git', 'diff', '--name-only', native, source, '--',
+                                                'app/src/main/cpp'], text=True).splitlines()
+          assert all(path == 'app/src/main/cpp/CMakeLists.txt' or path.startswith('app/src/main/cpp/neural/')
+                     for path in changed_cpp), 'Existing native implementation changed'
+          versions = pathlib.Path('build-logic/convention/src/main/kotlin/Versions.kt')
+          base_versions = subprocess.check_output(['git', 'show', native + ':' + str(versions)], text=True)
+          expected_ndk = os.environ['NDK_VERSION']
+          for text in [base_versions, versions.read_text()]:
+              assert re.search(r'const val defaultNDK = "' + re.escape(expected_ndk) + '"', text)
+          run = json.loads((root / 'source-run.json').read_text())
+          artifact = json.loads((root / 'source-artifact.json').read_text())
+          assert run['id'] == int(os.environ['SOURCE_RUN_ID'])
+          assert run['status'] == 'completed' and run['conclusion'] == 'success'
+          assert run['head_sha'] == native and run['head_branch'] == 'fix/sam-wave-and-touch-accuracy'
+          assert run['path'].split('@')[0] == '.github/workflows/pull_request.yml'
+          assert run['repository']['full_name'] == os.environ['GH_REPO']
+          assert artifact['id'] == int(os.environ['SOURCE_ARTIFACT_ID'])
+          assert artifact['name'] == os.environ['SOURCE_ARTIFACT_NAME']
+          assert artifact['expired'] is False and artifact['size_in_bytes'] > 0
+          expiry = datetime.datetime.fromisoformat(artifact['expires_at'].replace('Z', '+00:00'))
+          assert expiry > datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)
+          arun = artifact['workflow_run']
+          assert arun['id'] == run['id'] and arun['head_sha'] == run['head_sha']
+          assert arun['head_branch'] == run['head_branch']
+          assert arun['repository_id'] == arun['head_repository_id'] == run['repository']['id']
+          for filename, idvar, tagvar in [('model-release.json', 'MODEL_RELEASE_ID', 'MODEL_RELEASE_TAG'),
+                                         ('test-release.json', 'TEST_RELEASE_ID', 'TEST_RELEASE_TAG'),
+                                         ('signing-release.json', 'SIGNING_RELEASE_ID', 'SIGNING_RELEASE_TAG')]:
+              release = json.loads((root / filename).read_text())
+              assert release['id'] == int(os.environ[idvar])
+              assert release['tag_name'] == os.environ[tagvar]
+              assert release['draft'] is True and release['published_at'] is None
+          release = json.loads((root / 'model-release.json').read_text())
+          matches = [item for item in release['assets'] if item['name'] == os.environ['MODEL_ASSET_NAME']]
+          assert len(matches) <= 1
+          explicit_id = int(os.environ['MODEL_ASSET_ID'])
+          if explicit_id:
+              asset = json.loads((root / 'model-asset.json').read_text())
+              assert len(matches) == 1 and asset['id'] == matches[0]['id'] == explicit_id
+          elif matches:
+              asset = matches[0]
+          else:
+              asset = None
+              assert os.environ['ALLOW_FROZEN_MODEL_REBUILD'] == '1', 'Model missing; explicit frozen rebuild required'
+          with pathlib.Path(os.environ['GITHUB_ENV']).open('a') as env:
+              if asset is None:
+                  env.write('MODEL_NEEDS_REBUILD=1\n')
+              else:
+                  assert asset['name'] == os.environ['MODEL_ASSET_NAME'] and asset['state'] == 'uploaded'
+                  assert asset['size'] == int(os.environ['MODEL_BYTES'])
+                  assert asset['digest'] == 'sha256:' + os.environ['MODEL_SHA256']
+                  env.write('MODEL_NEEDS_REBUILD=0\nMODEL_ASSET_ID=' + str(asset['id']) + '\n')
+          print('Pinned successful native CI, unchanged inputs, NDK and all draft identities verified.')
+          PY
+
+      - name: Download the exact verified native source APK
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ env.SOURCE_ARTIFACT_ID }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/source-apk
+
+      - name: Extract verified offline inputs and the compile-time speech JAR
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, importlib.util, json, os, pathlib, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          source = root / 'source-apk' / os.environ['SOURCE_APK_NAME']
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          assert digest(source.read_bytes()) == os.environ['SOURCE_APK_SHA256']
+          with zipfile.ZipFile(source) as archive:
+              names = [name for name in archive.namelist() if name.startswith(('assets/', 'lib/')) and not name.endswith('/')]
+              assert len(names) == len(set(names))
+              assert any(name.startswith('assets/') for name in names)
+              assert any(name.startswith('lib/arm64-v8a/') for name in names)
+              assert all(not name.startswith('lib/') or name.startswith('lib/arm64-v8a/') for name in names)
+              assert not any(name.startswith('assets/neural/') or 'lmyy' in name.lower() for name in archive.namelist())
+              assert digest(archive.read('res/font/audiowide_regular.ttf')) == digest(pathlib.Path('app/src/main/res/font/audiowide_regular.ttf').read_bytes())
+              manifest = {name: digest(archive.read(name)) for name in sorted(names)}
+              (root / 'source-input-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+              for name in names:
+                  relative = pathlib.PurePosixPath(name)
+                  assert not relative.is_absolute() and '..' not in relative.parts
+                  target = root / 'experiment-prebuilt' / ('jniLibs/' + name[4:] if name.startswith('lib/') else name)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(archive.read(name))
+              provenance = json.loads(archive.read('assets/asr/SOURCE.json'))
+          spec = importlib.util.spec_from_file_location('prepare_asr', 'scripts/prepare-axiang-asr.py')
+          helper = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(helper)
+          cache = root / 'experiment-runtime-cache'
+          cache.mkdir()
+          aar = helper.fetch(helper.DOWNLOADS['runtime'], cache, False)
+          with zipfile.ZipFile(aar) as archive:
+              jar = archive.read('classes.jar')
+          assert digest(jar) == provenance['compile_jar']['sha256']
+          destination = pathlib.Path('app/libs/sherpa-onnx-1.13.8.jar')
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          destination.write_bytes(jar)
+          print('All old asset/native bytes preserved; only the pinned speech compile JAR fetched.')
+          PY
+
+      - name: Download and validate the already exported model bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/model-download"
+          if [ "$MODEL_NEEDS_REBUILD" = "1" ]; then
+            test "$ALLOW_FROZEN_MODEL_REBUILD" = "1"
+            mkdir -p "$RUNNER_TEMP/experiment-checks"
+            python3 -m venv "$RUNNER_TEMP/minirbt-export-venv"
+            "$RUNNER_TEMP/minirbt-export-venv/bin/pip" install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+            "$RUNNER_TEMP/minirbt-export-venv/bin/pip" install transformers==4.48.3 onnx==1.17.0 onnxruntime==1.23.2 numpy==2.2.3
+            "$RUNNER_TEMP/minirbt-export-venv/bin/python" scripts/prepare-axiang-minirbt.py \
+              --source-cache "$RUNNER_TEMP/minirbt-source" --output-dir "$RUNNER_TEMP/model-rebuild" \
+              --frozen-manifest scripts/minirbt/manifest-fp32.json \
+              --expected-bundle-sha256 "$MODEL_SHA256" \
+              --bundle "$RUNNER_TEMP/model-download/$MODEL_ASSET_NAME"
+            "$RUNNER_TEMP/minirbt-export-venv/bin/python" scripts/check-axiang-minirbt.py \
+              --frozen-bundle-dir "$RUNNER_TEMP/model-rebuild/bundle" \
+              --reference-report scripts/minirbt/verification-fp32.json \
+              --output "$RUNNER_TEMP/experiment-checks/model-rebuild-inference.json"
+            test "$(gh api "repos/$GH_REPO/releases/$MODEL_RELEASE_ID" --jq '.draft')" = true
+            test "$(gh api "repos/$GH_REPO/releases/$MODEL_RELEASE_ID" --jq '.tag_name')" = "$MODEL_RELEASE_TAG"
+            (
+              cd "$RUNNER_TEMP/model-download"
+              sha256sum "$MODEL_ASSET_NAME" > MODEL-SHA256SUMS.txt
+            )
+            gh release upload "$MODEL_RELEASE_TAG" \
+              "$RUNNER_TEMP/model-download/$MODEL_ASSET_NAME" \
+              "$RUNNER_TEMP/model-download/MODEL-SHA256SUMS.txt" \
+              "$RUNNER_TEMP/experiment-checks/model-rebuild-inference.json"
+            gh api "repos/$GH_REPO/releases/$MODEL_RELEASE_ID" > "$RUNNER_TEMP/rebuilt-model-release.json"
+            python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          release = json.loads((root / 'rebuilt-model-release.json').read_text())
+          assert release['id'] == int(os.environ['MODEL_RELEASE_ID'])
+          assert release['draft'] is True and release['published_at'] is None
+          assert release['tag_name'] == os.environ['MODEL_RELEASE_TAG']
+          asset = next(item for item in release['assets'] if item['name'] == os.environ['MODEL_ASSET_NAME'])
+          assert asset['state'] == 'uploaded' and asset['size'] == int(os.environ['MODEL_BYTES'])
+          assert asset['digest'] == 'sha256:' + os.environ['MODEL_SHA256']
+          with pathlib.Path(os.environ['GITHUB_ENV']).open('a') as env:
+              env.write('MODEL_ASSET_ID=' + str(asset['id']) + '\n')
+          PY
+          else
+            gh release download "$MODEL_RELEASE_TAG" --pattern "$MODEL_ASSET_NAME" --dir "$RUNNER_TEMP/model-download"
+          fi
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, shutil, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          bundle = root / 'model-download' / os.environ['MODEL_ASSET_NAME']
+          digest = lambda data: hashlib.sha256(data).hexdigest()
+          assert bundle.stat().st_size == int(os.environ['MODEL_BYTES'])
+          assert digest(bundle.read_bytes()) == os.environ['MODEL_SHA256']
+          with zipfile.ZipFile(bundle) as archive:
+              assert sorted(archive.namelist()) == ['LICENSE', 'MODEL_CARD.md', 'manifest.json', 'model.onnx', 'vocab.txt']
+              manifest_data = archive.read('manifest.json')
+              assert digest(manifest_data) == os.environ['MODEL_MANIFEST_SHA256']
+              manifest = json.loads(manifest_data)
+              assert manifest['model_id'] == 'hfl/minirbt-h256'
+              assert manifest['revision'] == '446e1b4012b10946f479563005700c54c9db3f7c'
+              assert manifest['variant'] == 'fp32' and manifest['fine_tuned_for_ime'] is False
+              assert manifest['license'] == 'Apache-2.0' and manifest['onnx_opset'] == 17
+              assert manifest['vocabulary_size'] == manifest['checkpoint_vocabulary_size'] == 21128
+              assert manifest['input_names'] == ['input_ids', 'attention_mask', 'token_type_ids', 'masked_position', 'target_id']
+              assert manifest['output_name'] == 'log_prob'
+              for name, expected in manifest['files'].items():
+                  data = archive.read(name)
+                  assert len(data) == expected['bytes'] and digest(data) == expected['sha256']
+          destination = root / 'experiment-prebuilt/assets/neural' / os.environ['MODEL_ASSET_NAME']
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          shutil.copyfile(bundle, destination)
+          print('Pinned FP32 experiment ZIP and all internal model/license/vocabulary files verified.')
+          PY
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android
+        uses: android-actions/setup-android@v4
+
+      - name: Install platform tools and the original native compiler
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.1.0" "ndk;$NDK_VERSION"
+
+      - name: Compile only the new ARM64 JNI bridge
+        run: |
+          set -euo pipefail
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION"
+          toolchain="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          bridge="$RUNNER_TEMP/experiment-prebuilt/jniLibs/arm64-v8a/libaxiang-neural.so"
+          test -f "$RUNNER_TEMP/experiment-prebuilt/jniLibs/arm64-v8a/libc++_shared.so"
+          "$toolchain/aarch64-linux-android24-clang++" -std=c++17 -O2 -fPIC -shared \
+            -Wl,-z,max-page-size=16384 -Wl,--no-undefined -Wl,--as-needed \
+            -Wl,-soname,libaxiang-neural.so -nostdlib++ \
+            app/src/main/cpp/neural/mini-rbt-jni.cpp -lc++_shared -ldl -o "$bridge"
+          "$toolchain/llvm-readelf" -h -d -l "$bridge" > "$RUNNER_TEMP/neural-elf.txt"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re, subprocess
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          report = (root / 'neural-elf.txt').read_text()
+          assert re.search(r'Machine:\s+AArch64', report)
+          needed = sorted(re.findall(r'Shared library: \[([^\]]+)\]', report))
+          assert needed == ['libc++_shared.so', 'libc.so', 'libdl.so'], needed
+          assert 'libonnxruntime.so' not in needed, 'ORT must be reused through dlopen'
+          bridge = root / 'experiment-prebuilt/jniLibs/arm64-v8a/libaxiang-neural.so'
+          record = {'abi': 'arm64-v8a', 'android_api': 24, 'ndk': os.environ['NDK_VERSION'],
+                    'sha256': hashlib.sha256(bridge.read_bytes()).hexdigest(), 'bytes': bridge.stat().st_size,
+                    'needed': needed, 'reuse_original_onnxruntime': True, 'reuse_original_libcxx': True}
+          (root / 'neural-native-verification.json').write_text(json.dumps(record, indent=2) + '\n')
+          print('New ARM64 bridge compiled; dependencies are exactly reused libc++, libc and libdl.')
+          PY
+
+      - name: Resolve the existing persistent signing key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'experiment-signing'
+          root.mkdir(mode=0o700)
+          route = 'repos/' + os.environ['GH_REPO'] + '/releases/' + os.environ['SIGNING_RELEASE_ID']
+          backup = json.loads(subprocess.check_output(['gh', 'api', route]))
+          assert backup['id'] == int(os.environ['SIGNING_RELEASE_ID'])
+          assert backup['draft'] is True and backup['published_at'] is None
+          assert backup['tag_name'] == os.environ['SIGNING_RELEASE_TAG']
+          matches = [item for item in backup['assets'] if item['name'] == 'axiang-release-signing.zip']
+          assert len(matches) == 1, 'Existing persistent signing backup is required; never generate a new key'
+          asset = matches[0]
+          assert asset['state'] == 'uploaded' and asset['digest'].startswith('sha256:')
+          subprocess.run(['gh', 'release', 'download', os.environ['SIGNING_RELEASE_TAG'],
+                          '--pattern', 'axiang-release-signing.zip', '--dir', str(root)],
+                         check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+          blob = (root / 'axiang-release-signing.zip').read_bytes()
+          assert len(blob) == asset['size']
+          assert hashlib.sha256(blob).hexdigest() == asset['digest'].split(':', 1)[1]
+          with zipfile.ZipFile(root / 'axiang-release-signing.zip') as archive:
+              assert sorted(archive.namelist()) == ['key.p12', 'signing.json']
+              metadata = json.loads(archive.read('signing.json'))
+              assert metadata['schema'] == 1
+              raw = archive.read('key.p12')
+              assert hashlib.sha256(raw).hexdigest() == metadata['keystore_sha256']
+          key = root / 'key.p12'
+          password_file = root / 'password'
+          key.write_bytes(raw)
+          key.chmod(0o600)
+          password_file.write_text(metadata['password'])
+          password_file.chmod(0o600)
+          cert = subprocess.check_output(['keytool', '-exportcert', '-alias', metadata['alias'],
+                                          '-keystore', str(key), '-storepass:file', str(password_file)],
+                                         stderr=subprocess.DEVNULL)
+          cert_sha = hashlib.sha256(cert).hexdigest()
+          assert cert_sha == metadata['certificate_sha256']
+          assert cert_sha == os.environ['SIGNING_CERTIFICATE_SHA256']
+          resolved = {'key_file': str(key), 'password': metadata['password'], 'alias': metadata['alias']}
+          (root / 'resolved.json').write_text(json.dumps(resolved))
+          (root / 'resolved.json').chmod(0o600)
+          (pathlib.Path(os.environ['RUNNER_TEMP']) / 'signing-public.json').write_text(json.dumps({
+              'mode': 'existing-private-draft-backup', 'certificate_sha256': cert_sha}, indent=2) + '\n')
+          print('Existing release signing certificate verified:', cert_sha)
+          PY
+          cat > "$RUNNER_TEMP/experiment-rebuild.init.gradle" <<'GRADLE'
+          import groovy.json.JsonSlurper
+          def inputRoot = new File(System.getenv('RUNNER_TEMP'), 'experiment-prebuilt')
+          def secretFile = new File(System.getenv('RUNNER_TEMP'), 'experiment-signing/resolved.json')
+          gradle.beforeProject { p ->
+              ['com.android.application', 'com.android.library'].each { androidPlugin ->
+                  p.plugins.withId(androidPlugin) {
+                      p.extensions.getByName('androidComponents').finalizeDsl { dsl ->
+                          dsl.externalNativeBuild.cmake.path = null
+                          dsl.buildFeatures.prefab = false
+                          if (androidPlugin == 'com.android.library') dsl.buildFeatures.prefabPublishing = false
+                          if (p.path == ':app') {
+                              dsl.sourceSets.getByName('main').assets.setSrcDirs([new File(inputRoot, 'assets')])
+                              dsl.sourceSets.getByName('main').jniLibs.setSrcDirs([new File(inputRoot, 'jniLibs')])
+                              dsl.packaging.jniLibs.keepDebugSymbols.add('**/*.so')
+                              def secret = new JsonSlurper().parse(secretFile)
+                              def signing = dsl.signingConfigs.maybeCreate('axiangPersistentExperiment')
+                              signing.storeFile = new File(secret.key_file as String)
+                              signing.storePassword = secret.password as String
+                              signing.keyAlias = secret.alias as String
+                              signing.keyPassword = secret.password as String
+                              dsl.buildTypes.getByName('debug').signingConfig = signing
+                          }
+                      }
+                  }
+              }
+          }
+          GRADLE
+
+      - name: Restore public dependencies without saving signing or build outputs
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+          add-job-summary: never
+          add-job-summary-as-pr-comment: never
+
+      - name: Build bundled-model test mode and run the complete JVM suite
+        env:
+          AXIANG_BUNDLE_MINIRBT: "1"
+          BUILD_VERSION_NAME: 1.2-minirbt.1
+          XUANCAI_APP_SUFFIX: .axiang.minirbt
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache -I "$RUNNER_TEMP/experiment-rebuild.init.gradle" :app:assembleDebug :app:testDebugUnitTest -x :app:generateDataDescriptor
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/debug/*.apk)
+          test "${#apks[@]}" -eq 1
+          mkdir -p "$RUNNER_TEMP/experiment-delivery" "$RUNNER_TEMP/experiment-checks/bundled-jvm"
+          cp "${apks[0]}" "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt.1-arm64.apk"
+          cp -a app/build/test-results/testDebugUnitTest/. "$RUNNER_TEMP/experiment-checks/bundled-jvm/"
+
+      - name: Remove all generated app and shared module outputs between modes
+        run: |
+          set -euo pipefail
+          rm -rf app/build build lib/common/build lib/fcitx5/build lib/fcitx5-lua/build lib/libime/build lib/fcitx5-chinese-addons/build .gradle/configuration-cache
+
+      - name: Build explicit-download mode and rerun the complete JVM suite
+        env:
+          AXIANG_BUNDLE_MINIRBT: "0"
+          BUILD_VERSION_NAME: 1.2-minirbt-download.1
+          XUANCAI_APP_SUFFIX: .axiang.minirbt.download
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache -I "$RUNNER_TEMP/experiment-rebuild.init.gradle" :app:assembleDebug :app:testDebugUnitTest -x :app:generateDataDescriptor
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/debug/*.apk)
+          test "${#apks[@]}" -eq 1
+          mkdir -p "$RUNNER_TEMP/experiment-checks/download-jvm"
+          cp "${apks[0]}" "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt-download.1-arm64.apk"
+          cp -a app/build/test-results/testDebugUnitTest/. "$RUNNER_TEMP/experiment-checks/download-jvm/"
+
+      - name: Verify both APK identities, signatures, inputs and model inclusion
+        run: |
+          set -euo pipefail
+          sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt.1-arm64.apk"
+          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt-download.1-arm64.apk"
+          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt.1-arm64.apk" \
+            --bundled-rime --offline-dictation --model-download --aapt "$sdk_tools/aapt" \
+            --expected-main-package org.fcitx.fcitx5.android.axiang.minirbt \
+            --expected-version-name 1.2-minirbt.1 --expected-version-code 1 --expected-app-label AXiang
+          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt-download.1-arm64.apk" \
+            --bundled-rime --offline-dictation --model-download --aapt "$sdk_tools/aapt" \
+            --expected-main-package org.fcitx.fcitx5.android.axiang.minirbt.download \
+            --expected-version-name 1.2-minirbt-download.1 --expected-version-code 1 --expected-app-label AXiang
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re, subprocess, xml.etree.ElementTree as ET, zipfile
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          sha = lambda data: hashlib.sha256(data).hexdigest()
+          expected = json.loads((root / 'source-input-manifest.json').read_text())
+          native = json.loads((root / 'neural-native-verification.json').read_text())
+          signing = json.loads((root / 'signing-public.json').read_text())
+          sdk = pathlib.Path(os.environ['ANDROID_HOME']) / 'build-tools/36.1.0'
+          model_name = 'assets/neural/' + os.environ['MODEL_ASSET_NAME']
+          bridge_name = 'lib/arm64-v8a/libaxiang-neural.so'
+          cases = [('bundled', 'axiang-1.2-minirbt.1-arm64.apk', '1.2-minirbt.1', 'org.fcitx.fcitx5.android.axiang.minirbt'),
+                   ('download', 'axiang-1.2-minirbt-download.1-arm64.apk', '1.2-minirbt-download.1', 'org.fcitx.fcitx5.android.axiang.minirbt.download')]
+          reports = []
+          for mode, filename, version, package in cases:
+              output = root / 'experiment-delivery' / filename
+              certs = subprocess.check_output([str(sdk / 'apksigner'), 'verify', '--print-certs', str(output)], text=True)
+              certificate_digests = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$', certs, re.MULTILINE)
+              assert [digest.lower() for digest in certificate_digests] == [signing['certificate_sha256']]
+              with zipfile.ZipFile(output) as archive:
+                  names = archive.namelist()
+                  assert len(names) == len(set(names))
+                  actual = {name: sha(archive.read(name)) for name in names
+                            if name.startswith(('assets/', 'lib/')) and not name.endswith('/')}
+                  wanted = dict(expected)
+                  wanted[bridge_name] = native['sha256']
+                  if mode == 'bundled':
+                      wanted[model_name] = os.environ['MODEL_SHA256']
+                  assert actual == wanted, f'{mode}: unexpected changed or additional native/asset bytes'
+                  assert not any('lmyy' in name.lower() for name in names)
+                  assert sha(archive.read('res/font/audiowide_regular.ttf')) == sha(pathlib.Path('app/src/main/res/font/audiowide_regular.ttf').read_bytes())
+                  assert archive.read('res/raw/audiowide_ofl.txt') == pathlib.Path('app/src/main/res/raw/audiowide_ofl.txt').read_bytes()
+                  about = json.loads(archive.read('res/raw/aboutlibraries.json'))
+                  font = next(item for item in about['libraries'] if item['uniqueId'] == 'google/fonts/audiowide')
+                  assert font['name'] == 'Audiowide' and font.get('licenses')
+                  assert not any(item.get('uniqueId') == 'local-reference/lmyy-theme-latin' for item in about['libraries'])
+                  neural_attributions = {}
+                  for unique_id, expected_name, expected_version, license_id in [
+                      ('hfl/minirbt-h256', 'MiniRBT-H256', '446e1b4012b10946f479563005700c54c9db3f7c', 'Apache-2.0'),
+                      ('microsoft/onnxruntime/c-api', 'ONNX Runtime C API', '1.17.3', 'MIT')]:
+                      matches = [item for item in about['libraries'] if item.get('uniqueId') == unique_id]
+                      assert len(matches) == 1, f'{mode}: missing or duplicate neural attribution {unique_id}'
+                      item = matches[0]
+                      assert item['name'] == expected_name and item['artifactVersion'] == expected_version
+                      assert license_id in item.get('licenses', [])
+                      assert about['licenses'][license_id]['spdxId'] == license_id
+                      neural_attributions[unique_id] = {'name': expected_name, 'version': expected_version, 'license': license_id}
+                  if mode == 'download':
+                      assert not any(name.startswith('assets/neural/') for name in names)
+                      model_hash = 'b9db720f94a4c949eb8b9197b13e046b1aba320155ac2537543249e8d95f6a90'
+                      assert not any(sha(archive.read(name)) == model_hash for name in names if not name.endswith('/'))
+              suites = [ET.parse(path).getroot() for path in (root / 'experiment-checks' / (mode + '-jvm')).glob('TEST-*.xml')]
+              tests = sum(int(suite.attrib.get('tests', 0)) for suite in suites)
+              failures = sum(int(suite.attrib.get('failures', 0)) for suite in suites)
+              errors = sum(int(suite.attrib.get('errors', 0)) for suite in suites)
+              skipped = sum(int(suite.attrib.get('skipped', 0)) for suite in suites)
+              assert tests >= 399 and failures == errors == skipped == 0
+              suites_by_name = {suite.attrib['name']: suite for suite in suites}
+              assert len(suites_by_name) == len(suites), 'Duplicate suite reports could inflate the test count'
+              neural_suite_minimums = {
+                  'org.fcitx.fcitx5.android.NeuralCandidateCoordinatorTest': 9,
+                  'org.fcitx.fcitx5.android.RankedCandidateBatchTest': 6,
+                  'org.fcitx.fcitx5.android.MiniRbtTokenizerTest': 4,
+                  'org.fcitx.fcitx5.android.data.neural.MiniRbtModelStoreTest': 13,
+              }
+              neural_suite_counts = {}
+              for suite_name, minimum in neural_suite_minimums.items():
+                  assert suite_name in suites_by_name, f'{mode}: neural test suite not discovered: {suite_name}'
+                  count = int(suites_by_name[suite_name].attrib['tests'])
+                  assert count >= minimum, f'{mode}: neural test suite has fewer than {minimum} tests: {suite_name}'
+                  neural_suite_counts[suite_name] = count
+              reports.append({'mode': mode, 'file': filename, 'version_name': version, 'version_code': 1,
+                              'package': package, 'sha256': sha(output.read_bytes()), 'bytes': output.stat().st_size,
+                              'jvm_tests': tests, 'jvm_classes': len(suites), 'jvm_failures': failures,
+                              'jvm_errors': errors, 'jvm_skipped': skipped, 'original_assets_native_byte_identical': True,
+                              'neural_suite_tests': neural_suite_counts, 'neural_attributions': neural_attributions,
+                              'bundled_model': mode == 'bundled', 'model_sha256': os.environ['MODEL_SHA256'] if mode == 'bundled' else None,
+                              'signing_certificate_sha256': signing['certificate_sha256'], 'font': 'Audiowide (OFL)'})
+          report = {'source_commit': os.environ['SOURCE_COMMIT'], 'native_source_commit': os.environ['VERIFIED_NATIVE_COMMIT'],
+                    'source_run_id': int(os.environ['SOURCE_RUN_ID']), 'source_artifact_id': int(os.environ['SOURCE_ARTIFACT_ID']),
+                    'source_apk_sha256': os.environ['SOURCE_APK_SHA256'], 'model_asset_id': int(os.environ['MODEL_ASSET_ID']),
+                    'model_sha256': os.environ['MODEL_SHA256'], 'model_manifest_sha256': os.environ['MODEL_MANIFEST_SHA256'],
+                    'neural_native': native, 'apk_checks': reports, 'passed': True, 'real_phone_tested': False}
+          (root / 'experiment-delivery/build-verification.json').write_text(json.dumps(report, indent=2) + '\n')
+          (root / 'experiment-checks/build-verification.json').write_text(json.dumps(report, indent=2) + '\n')
+          print('Both complete test suites, persistent certificates, original inputs and model inclusion verified.')
+          PY
+          cd "$RUNNER_TEMP/experiment-delivery"
+          sha256sum axiang-1.2-minirbt.1-arm64.apk axiang-1.2-minirbt-download.1-arm64.apk build-verification.json > SHA256SUMS.txt
+
+      - name: Upload public verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-minirbt-experiment-checks-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/experiment-checks/
+            ${{ runner.temp }}/neural-elf.txt
+            ${{ runner.temp }}/neural-native-verification.json
+            ${{ runner.temp }}/source-input-manifest.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Deliver both APKs exclusively to the existing unpublished test draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/releases/$TEST_RELEASE_ID" --jq '.draft')" = true
+          test "$(gh api "repos/$GH_REPO/releases/$TEST_RELEASE_ID" --jq '.tag_name')" = "$TEST_RELEASE_TAG"
+          test "$(gh api "repos/$GH_REPO/releases/$SIGNING_RELEASE_ID" --jq '.draft')" = true
+          gh release upload "$TEST_RELEASE_TAG" \
+            "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt.1-arm64.apk" \
+            "$RUNNER_TEMP/experiment-delivery/axiang-1.2-minirbt-download.1-arm64.apk" \
+            "$RUNNER_TEMP/experiment-delivery/build-verification.json" \
+            "$RUNNER_TEMP/experiment-delivery/SHA256SUMS.txt" --clobber
+          test "$(gh api "repos/$GH_REPO/releases/$TEST_RELEASE_ID" --jq '.draft')" = true
+          test "$(gh api "repos/$GH_REPO/releases/$SIGNING_RELEASE_ID" --jq '.draft')" = true
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'experiment-delivery'
+          release = json.loads(subprocess.check_output(['gh', 'api', 'repos/' + os.environ['GH_REPO'] + '/releases/' + os.environ['TEST_RELEASE_ID']]))
+          assert release['draft'] is True and release['published_at'] is None
+          assert release['tag_name'] == os.environ['TEST_RELEASE_TAG']
+          for path in root.iterdir():
+              asset = next(item for item in release['assets'] if item['name'] == path.name)
+              assert asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size
+              assert asset['digest'] == 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+          print('Both APKs, evidence and checksums verified on the unpublished test draft.')
+          PY
+
+      - name: Remove private signing material and ephemeral build state
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/experiment-signing" app/build .gradle build-logic/.gradle
+          rm -f "$RUNNER_TEMP/signing-release.json" "$RUNNER_TEMP/experiment-rebuild.init.gradle"
