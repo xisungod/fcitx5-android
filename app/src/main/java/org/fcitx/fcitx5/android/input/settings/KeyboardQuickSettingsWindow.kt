@@ -204,6 +204,11 @@ internal class KeyboardQuickSettingsUi(
     private val motionAvailability = label("", 12f).apply {
         setTextColor(theme.keyTextColor.alpha(0.65f))
     }
+    private val widthEditor by lazy { KeyWidthEditor(context, theme, draft) }
+    private var breathingToggle: SwitchCompat? = null
+    private val breathingAvailability = label(context.getString(R.string.sam_idle_hint), 12f).apply {
+        setTextColor(theme.keyTextColor.alpha(0.65f))
+    }
 
     private fun label(text: CharSequence, size: Float = 14f) = TextView(context).apply {
         this.text = text
@@ -414,8 +419,8 @@ internal class KeyboardQuickSettingsUi(
         }, LinearLayout.LayoutParams(match, wrap))
     }
 
-    private fun toggle(title: Int, key: String, checked: Boolean, update: (Boolean) -> Unit) {
-        content.addView(SwitchCompat(context).apply {
+    private fun toggle(title: Int, key: String, checked: Boolean, update: (Boolean) -> Unit): SwitchCompat {
+        val view = SwitchCompat(context).apply {
             tag = key
             setText(title)
             textSize = 14f
@@ -430,7 +435,25 @@ internal class KeyboardQuickSettingsUi(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
                 intArrayOf(accentColor.alpha(0.4f), theme.keyTextColor.alpha(0.2f)))
             setOnCheckedChangeListener { _, value -> update(value) }
-        }, LinearLayout.LayoutParams(match, wrap))
+        }
+        content.addView(view, LinearLayout.LayoutParams(match, wrap))
+        return view
+    }
+
+    private fun updateEffectAvailability() {
+        val sam = draft.values.rippleShape == ThemePrefs.RippleShape.Sam
+        breathingToggle?.isEnabled = !sam
+        breathingToggle?.alpha = if (sam) 0.4f else 1f
+        breathingAvailability.visibility = if (sam) View.VISIBLE else View.GONE
+    }
+
+    private fun addWidthControls() {
+        val editor = widthEditor.root.apply { visibility = View.GONE }
+        content.addView(button(R.string.key_width_title) {
+            editor.visibility = if (editor.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            if (editor.visibility == View.VISIBLE) widthEditor.refresh()
+        }.apply { tag = "quick_key_width_expand" }, LinearLayout.LayoutParams(match, context.dp(44)))
+        content.addView(editor, LinearLayout.LayoutParams(match, wrap))
     }
 
     private fun slider(
@@ -524,14 +547,18 @@ internal class KeyboardQuickSettingsUi(
 
     init {
         addMotionControls()
+        addWidthControls()
         note(R.string.keyboard_quick_settings_hint)
         heading(R.string.keyboard_quick_settings_effects)
-        choice(R.string.ripple_shape, "quick_ripple_shape", ThemePrefs.RippleShape.entries.toTypedArray(), draft.values.rippleShape) {
+        choice(R.string.keyboard_effect_mode, "quick_ripple_shape", ThemePrefs.RippleShape.entries.toTypedArray(), draft.values.rippleShape) {
             draft.values = draft.values.copy(rippleShape = it)
+            updateEffectAvailability()
         }
-        toggle(R.string.idle_breathing, "quick_idle_breathing", draft.values.idleBreathing) {
+        breathingToggle = toggle(R.string.idle_breathing, "quick_idle_breathing", draft.values.idleBreathing) {
             draft.values = draft.values.copy(idleBreathing = it)
         }
+        content.addView(breathingAvailability, LinearLayout.LayoutParams(match, wrap))
+        updateEffectAvailability()
         colorModeSpinner = choice(R.string.press_color_mode, "quick_color_mode",
             ThemePrefs.PressColorMode.entries.toTypedArray(), draft.values.colorMode) {
             draft.values = draft.values.copy(colorMode = it)
@@ -568,6 +595,7 @@ internal class KeyboardQuickSettingsUi(
         heading(R.string.keyboard_quick_settings_layout)
         toggle(R.string.keyboard_quick_settings_number_row, "quick_number_row", draft.values.numberRow) {
             draft.values = draft.values.copy(numberRow = it)
+            widthEditor.refresh()
         }
         toggle(R.string.popup_on_key_press, "quick_popup", draft.values.popup) {
             draft.values = draft.values.copy(popup = it)

@@ -71,7 +71,7 @@ class KeyboardQuickSettingsDraftTest {
         assertTrue(reopened.values.pressEffect)
         assertTrue(reopened.values.numberRow)
         assertEquals(100, reopened.values.hapticStrength)
-        assertEquals(ThemePrefs.RippleShape.SoftMist, reopened.values.rippleShape)
+        assertEquals(ThemePrefs.RippleShape.Sam, reopened.values.rippleShape)
         assertEquals(KeyMotionSettings(), reopened.values.motionSettings)
         assertFalse(reopened.apply())
         assertEquals(0, stored.edits)
@@ -226,9 +226,9 @@ class KeyboardQuickSettingsDraftTest {
         theme.pressColorMode.setValue(ThemePrefs.PressColorMode.Custom)
         theme.pressUserColors.setValue("#18FFC1,#D96EFF")
         val draft = KeyboardQuickSettingsDraft(theme, keyboard)
-        assertEquals(ThemePrefs.RippleShape.SoftMist, draft.values.rippleShape)
+        assertEquals(ThemePrefs.RippleShape.Sam, draft.values.rippleShape)
         draft.values = draft.values.copy(rippleShape = ThemePrefs.RippleShape.IrregularFluid)
-        assertEquals("Selection alone must not rebuild the keyboard", ThemePrefs.RippleShape.SoftMist,
+        assertEquals("Selection alone must not rebuild the keyboard", ThemePrefs.RippleShape.Sam,
             theme.rippleShape.getValue())
         draft.apply()
         val reopened = KeyboardQuickSettingsDraft(ThemePrefs(stored), AppPrefs(stored).keyboard)

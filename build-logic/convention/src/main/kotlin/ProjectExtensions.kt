@@ -41,6 +41,11 @@ val Project.ndkVersion
 val Project.buildToolsVersion
     get() = ep("BUILD_TOOLS_VERSION", "buildTools") { Versions.defaultBuildTools }
 
+val Project.buildVersionCodeOverride: Int?
+    get() = epn("BUILD_VERSION_CODE", "buildVersionCode")?.let {
+        requireNotNull(it.toIntOrNull()?.takeIf { code -> code > 0 }) { "BUILD_VERSION_CODE must be a positive integer" }
+    }
+
 val Project.buildVersionName
     get() = ep("BUILD_VERSION_NAME", "buildVersionName") {
         Versions.baseVersionName

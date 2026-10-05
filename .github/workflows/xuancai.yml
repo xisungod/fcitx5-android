@@ -17,7 +17,8 @@ jobs:
       contents: read
     env:
       BUILD_ABI: arm64-v8a
-      BUILD_VERSION_NAME: "1.1-dev.5"
+      BUILD_VERSION_CODE: "823"
+      BUILD_VERSION_NAME: "1.1-dev.6"
       BUILD_COMMIT_HASH: ${{ github.sha }}
       XUANCAI_APP_SUFFIX: .axiang.dev.r${{ github.run_id }}
     steps:
@@ -121,7 +122,7 @@ jobs:
           "$SDK_TOOLS/apksigner" verify --verbose /tmp/axiang-dev/axiang-dev-input-arm64.apk
           "$SDK_TOOLS/aapt" dump badging /tmp/axiang-dev/axiang-dev-input-arm64.apk > /tmp/app-badging.txt
           sed -n '1,6p' /tmp/app-badging.txt
-          python3 /tmp/axiang-dev-scripts/verify-xuancai-rime-package.py /tmp/axiang-dev/axiang-dev-input-arm64.apk --bundled-rime --offline-dictation --aapt "$SDK_TOOLS/aapt" --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" --expected-version-name "$BUILD_VERSION_NAME"
+          python3 /tmp/axiang-dev-scripts/verify-xuancai-rime-package.py /tmp/axiang-dev/axiang-dev-input-arm64.apk --bundled-rime --offline-dictation --aapt "$SDK_TOOLS/aapt" --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE"
           cd /tmp/axiang-dev
           sha256sum *.apk > SHA256SUMS.txt
       - name: 保存开发验证包（不发布）

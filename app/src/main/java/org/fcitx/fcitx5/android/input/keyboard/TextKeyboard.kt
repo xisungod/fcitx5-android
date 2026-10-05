@@ -27,8 +27,9 @@ import splitties.views.imageResource
 @SuppressLint("ViewConstructor")
 class TextKeyboard(
     context: Context,
-    theme: Theme
-) : BaseKeyboard(context, theme, layoutFor(context)) {
+    theme: Theme,
+    useEffectTheme: Boolean = true
+) : BaseKeyboard(context, theme, layoutFor(context), useEffectTheme) {
 
     override val slideSelectionEnabled = true
 
@@ -46,7 +47,7 @@ class TextKeyboard(
         /** The space legend is an icon; language state has its own key. */
         fun spaceLabel(@Suppress("UNUSED_PARAMETER") english: Boolean): String = ""
 
-        private val NumberRow = "1234567890".map { digit ->
+        internal val NumberRow = "1234567890".map { digit ->
             KeyDef(
                 KeyDef.Appearance.Text(digit.toString(), 20f),
                 setOf(KeyDef.Behavior.Press(KeyAction.FcitxKeyAction(digit.toString()))),
@@ -134,6 +135,7 @@ class TextKeyboard(
 
     private var capsState: CapsState = CapsState.None
     private var englishMode = false
+    private var chineseMode = false
 
     private fun transformAlphabet(c: String): String {
         return when (capsState) {
@@ -143,14 +145,30 @@ class TextKeyboard(
     }
 
     private var punctuationMapping: Map<String, String> = mapOf()
-    private fun transformPunctuation(p: String) = if (englishMode) p else punctuationMapping.getOrDefault(p, p)
+    private fun chineseSentenceMark(p: String): String? = if (chineseMode) when (p) {
+        "." -> "。"
+        "," -> "，"
+        else -> null
+    } else null
+
+    private fun transformPunctuation(p: String) = when {
+        englishMode -> p
+        else -> chineseSentenceMark(p) ?: punctuationMapping.getOrDefault(p, p)
+    }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
         var transformed = action
         when (action) {
             is KeyAction.FcitxKeyAction -> when (source) {
                 KeyActionListener.Source.Keyboard -> {
-                    if (action.act.length == 1 && action.act[0].isLetter()) when (capsState) {
+                    val sentenceMark = chineseSentenceMark(action.act)
+                    if (sentenceMark != null) {
+                        // Rime owns its punctuation independently of Fcitx's mapping addon.
+                        // These two dedicated Chinese keys must match their visible labels,
+                        // even if Rime has retained an ASCII-punctuation option. The common
+                        // literal-commit route selects pending Chinese text before the mark.
+                        transformed = KeyAction.CommitAction(sentenceMark)
+                    } else if (action.act.length == 1 && action.act[0].isLetter()) when (capsState) {
                         CapsState.None -> {
                             transformed = action.copy(act = action.act.lowercase())
                         }
@@ -199,6 +217,7 @@ class TextKeyboard(
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
         englishMode = isEnglish(ime)
+        chineseMode = !englishMode && (ime.uniqueName == "rime" || ime.languageCode.startsWith("zh"))
         lang.contentDescription = if (englishMode) "English" else "中文"
         lang.mainText.text = if (englishMode) "英" else "中"
         capsState = CapsState.None
@@ -273,6 +292,7 @@ class TextKeyboard(
         `return`.updateLayoutParams<ConstraintLayout.LayoutParams> {
             matchConstraintPercentWidth = if (visible) 0.16f else 0.26f
         }
+        applyKeyWidths()
     }
 
     private fun updateAlphabetKeys() {

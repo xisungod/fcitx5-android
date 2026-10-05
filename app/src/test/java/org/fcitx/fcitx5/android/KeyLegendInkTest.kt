@@ -18,14 +18,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class KeyLegendInkTest {
     @Test
-    fun theFixedOutlineKeepsUnchangedLightGlyphsReadableOnBrightFacesWithoutChangingLayout() {
+    fun plainLightGlyphHasNoDarkContourOnAColouredKeyFace() {
         val text = AutoScaleTextView(RuntimeEnvironment.getApplication()).apply {
             this.text = "f"
             textSize = 36f
@@ -35,27 +34,21 @@ class KeyLegendInkTest {
         text.measure(View.MeasureSpec.makeMeasureSpec(80, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(80, View.MeasureSpec.EXACTLY))
         text.layout(0, 0, 80, 80)
-        val baseline = text.baseline
-        fun visiblePixels(): Int {
-            val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            canvas.drawColor(Color.WHITE)
-            text.draw(canvas)
-            var count = 0
-            for (y in 0 until 80) for (x in 0 until 80) {
-                if (abs(Color.red(bitmap.getPixel(x, y)) - 255) >= 60) count++
-            }
-            bitmap.recycle()
-            return count
+        val background = Color.rgb(20, 110, 130)
+        val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(background)
+        text.draw(canvas)
+        var lightPixels = 0
+        for (y in 0 until 80) for (x in 0 until 80) {
+            val pixel = bitmap.getPixel(x, y)
+            assertTrue("The glyph must never paint a dark stroke", Color.red(pixel) >= Color.red(background) &&
+                Color.green(pixel) >= Color.green(background) && Color.blue(pixel) >= Color.blue(background))
+            if (Color.red(pixel) > 230 && Color.green(pixel) > 230 && Color.blue(pixel) > 230) lightPixels++
         }
-        assertEquals("Matching white fill alone disappears", 0, visiblePixels())
-        // The production 0.8dp outline is 1.2px at the review keyboard's hdpi density.
-        text.contrastOutlineWidth = 1.2f
-        val readablePixels = visiblePixels()
-        assertTrue("A thin constant outline protects white glyphs on a bright face; strong pixels=$readablePixels", readablePixels > 15)
-        assertEquals(baseline, text.baseline)
-        assertEquals(80, text.measuredWidth)
-        assertEquals(80, text.measuredHeight)
-        assertFalse("Paint-only updates must not request another layout", text.isLayoutRequested)
+        assertTrue("The original light fill remains visible", lightPixels > 15)
+        assertEquals(0f, text.contrastOutlineWidth)
+        assertEquals(Color.WHITE, text.currentTextColor)
+        bitmap.recycle()
     }
 }

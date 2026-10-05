@@ -33,6 +33,16 @@ object ThemePreset {
         genericActiveForegroundColor = 0xfff5f5f7
     )
 
+    /** Sam's resting surface is one black plane; light reveals the gaps on touch. */
+    val Sam = XuancaiBlackV09.copy(
+        name = "sam",
+        keyBackgroundColor = 0xff000000.toInt(),
+        altKeyBackgroundColor = 0xff000000.toInt(),
+        accentKeyBackgroundColor = 0xff000000.toInt(),
+        spaceBarColor = 0xff000000.toInt(),
+        dividerColor = 0xff000000.toInt()
+    )
+
     val MaterialLight = Theme.Builtin(
         name = "MaterialLight",
         isDark = false,

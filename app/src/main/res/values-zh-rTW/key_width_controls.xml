@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="key_width_title">按鍵寬度 · 點開調整</string>
+    <string name="key_width_layout">選擇鍵盤配置</string>
+    <string name="key_width_layout_26">拼音／英文 26 鍵</string>
+    <string name="key_width_layout_t9">拼音九鍵</string>
+    <string name="key_width_layout_number">數字鍵盤</string>
+    <string name="key_width_layout_symbols">符號鍵盤</string>
+    <string name="key_width_hint">點選一個鍵，再調相對寬度；同排自動讓位，觸控區域同步變化。左側直欄各鍵寬度連動。點「完成」儲存。</string>
+    <string name="key_width_value">%1$s · 相對寬度 %2$d%%</string>
+    <string name="key_width_reset_key">還原此鍵</string>
+    <string name="key_width_reset_layout">還原本配置</string>
+    <string name="key_width_space">空白</string>
+    <string name="key_width_side_column">左側直欄</string>
+    <string name="keyboard_effect_mode">特效模式</string>
+    <string name="sam_idle_hint">sam 模式閒置時保持純黑面板，呼吸燈可在柔霧、流體模式使用。</string>
+</resources>

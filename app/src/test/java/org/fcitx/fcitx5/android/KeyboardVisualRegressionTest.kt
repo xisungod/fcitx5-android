@@ -1,6 +1,7 @@
 package org.fcitx.fcitx5.android
 
 import androidx.activity.ComponentActivity
+import androidx.core.graphics.ColorUtils
 import android.os.SystemClock
 import android.view.Gravity
 import org.fcitx.fcitx5.android.input.bar.RippleBarView
@@ -80,6 +81,7 @@ class KeyboardVisualRegressionTest {
         // existing backing store. Reset the actual store, not just this filename.
         val prefs = ThemeManager.prefs
         assertTrue(prefs.idleBreathing.sharedPreferences.edit().clear().commit())
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
         assertTrue("Every visual fixture must start with idle breathing enabled", prefs.idleBreathing.getValue())
     }
 
@@ -506,8 +508,10 @@ class KeyboardVisualRegressionTest {
             render(keyboard).recycle() // Draw the bright face without mutating the legend ink.
             val lit = render(keyboard)
             val face = lit.getPixel(bounds.left + 10, bounds.top + 10)
-            assertTrue("A bright key face must not be dimmed by its own dark background",
-                maxOf(Color.red(face), Color.green(face), Color.blue(face)) > 190)
+            assertTrue("The selected colour must paint above the black background",
+                maxOf(Color.red(face), Color.green(face), Color.blue(face)) > 100)
+            assertTrue("The complete cap is toned for clear white lettering without a black outline",
+                ColorUtils.calculateLuminance(face) <= 0.18 && ColorUtils.calculateContrast(Color.WHITE, face) >= 4.5)
             var whitePixels = 0
             for (y in bounds.top until bounds.bottom) for (x in bounds.left until bounds.right) {
                 val old = before.getPixel(x, y)

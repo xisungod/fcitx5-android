@@ -77,12 +77,17 @@ class SymbolKeyboard(
     }
 
     init {
-        val keys = arrangeGrid(Cells)
+        val keys = arrangeGrid(Cells, KeyWidthProfile.Symbols)
         keys.take(5).forEachIndexed { index, key ->
             key.contentDescription = SymbolCategory.entries[index].label
             if (SymbolCategory.entries[index] == state.category) {
                 // A distinct selected tab remains readable even with a black accent theme.
-                key.getChildAt(0).background = InsetDrawable(GradientDrawable().apply {
+                if (this@SymbolKeyboard.theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam) {
+                    (key as TextKeyView).mainText.apply {
+                        setTextColor(0xFFBA9BFF.toInt())
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    }
+                } else key.getChildAt(0).background = InsetDrawable(GradientDrawable().apply {
                     cornerRadius = key.radius
                     setColor(0xFF9974F5.toInt())
                 }, key.hMargin, key.vMargin, key.hMargin, key.vMargin)

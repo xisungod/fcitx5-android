@@ -29,6 +29,7 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.pow
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class)
@@ -106,6 +107,15 @@ class RippleShapeRenderingTest {
 
     private fun intensity(pixel: Int) = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
 
+    private fun luminance(pixel: Int): Double {
+        fun linear(value: Int): Double {
+            val channel = value / 255.0
+            return if (channel <= 0.04045) channel / 12.92 else ((channel + 0.055) / 1.055).pow(2.4)
+        }
+        return 0.2126 * linear(Color.red(pixel)) + 0.7152 * linear(Color.green(pixel)) +
+            0.0722 * linear(Color.blue(pixel))
+    }
+
     private fun difference(a: Bitmap, b: Bitmap): Double {
         var total = 0L
         for (y in 0 until a.height) for (x in 0 until a.width)
@@ -120,12 +130,12 @@ class RippleShapeRenderingTest {
     }
 
     @Test
-    fun existingPreferenceAndOmittedRendererOptionKeepTheCurrentMistExactly() {
+    fun requestedDefaultIsSamWhileExplicitLegacyMistRemainsUnchanged() {
         val storage = RuntimeEnvironment.getApplication().getSharedPreferences("ripple-shape-default", Context.MODE_PRIVATE)
         storage.edit().clear().commit()
         val prefs = ThemePrefs(storage)
-        assertEquals(ThemePrefs.RippleShape.SoftMist, prefs.rippleShape.getValue())
-        assertFalse("An upgrade must not persist a new choice implicitly", storage.contains("ripple_shape"))
+        assertEquals(ThemePrefs.RippleShape.Sam, prefs.rippleShape.getValue())
+        assertFalse("Reading defaults does not write preferences", storage.contains("ripple_shape"))
         prefs.rippleShape.setValue(ThemePrefs.RippleShape.IrregularFluid)
         assertEquals(ThemePrefs.RippleShape.IrregularFluid, ThemePrefs(storage).rippleShape.getValue())
         val omitted = Harness()
@@ -220,12 +230,12 @@ class RippleShapeRenderingTest {
                 val lower = b.getPixel(b.width / 2, b.height * 3 / 4)
                 val halfDifference = maxOf(abs(Color.red(upper) - Color.red(lower)),
                     abs(Color.green(upper) - Color.green(lower)), abs(Color.blue(upper) - Color.blue(lower)))
-                // The shared subtle top hot spot is allowed; a half-dark water
-                // level formerly differed by over 70 RGB levels and is not.
-                assertTrue("Upper and lower cap interiors must have comparable colour at ${time}ms", halfDifference <= 16)
+                assertEquals("The outline-free cap must have exactly one colour, without an upper shadow or hot spot at ${time}ms",
+                    0, halfDifference)
                 if (time <= 50) {
-                    assertTrue("The upper half immediately receives the normal full key colour", intensity(upper) > 220)
-                    assertTrue("The lower half has the same normal brightness", intensity(lower) > 220)
+                    assertTrue("The upper half immediately receives a visibly coloured cap", intensity(upper) > 100)
+                    assertTrue("The lower half has the same normal brightness", intensity(lower) > 100)
+                    assertTrue("White legends stay legible without black outlines", luminance(upper) <= 0.18)
                 }
                 if (time == 150L) assertTrue("Both face styles finish their configured release", a.sameAs(b))
                 val repeated = fluid.face(time)

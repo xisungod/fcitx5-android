@@ -9,6 +9,7 @@ import android.graphics.Color
 import android.os.Looper
 import android.view.View
 import android.widget.FrameLayout
+import androidx.core.graphics.ColorUtils
 import org.fcitx.fcitx5.android.input.keyboard.IdleBreathing
 import org.fcitx.fcitx5.android.input.keyboard.PressEffect
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
@@ -649,7 +650,9 @@ class PressEffectRenderingTest {
                     h.host.isAttachedToWindow && h.host.isShown && h.host.windowVisibility == View.VISIBLE)
                 val field = h.render(450)
                 val face = h.surface(keyId, 450).first
-                assertTrue("The press must reach the key surface before comparing peripheral light", peak(face) > 150)
+                assertTrue("The press must reach the key surface before comparing peripheral light", peak(face) > 100)
+                assertTrue("The cyan cap stays readable without a glyph outline",
+                    ColorUtils.calculateLuminance(face.getPixel(30, 35)) <= 0.18)
                 save(field, "glow-brightness-$brightness")
                 save(face, "glow-brightness-$brightness-key-face")
                 return field to face
@@ -671,7 +674,8 @@ class PressEffectRenderingTest {
         val peripheral = outsidePeak(bright.first)
         assertTrue("100 percent keeps visible travelling light outside the key (peak=$peripheral)", peripheral > 10)
         assertEquals("0 percent removes the travelling field", 0, outsidePeak(off.first))
-        assertTrue("Brightness affects glow only, preserving full key colour", peak(off.second) > 150)
+        assertTrue("Brightness affects the travelling glow only; every toned cap pixel stays identical",
+            off.second.sameAs(bright.second))
     }
 
     @Test
@@ -1051,10 +1055,12 @@ class PressEffectRenderingTest {
                 unpressedEdge in 11..45 && kotlin.math.abs(unpressedEdge - maximum(lit, 264, 100)) <= 4 &&
                     maximum(lit, 270, 100) > unpressedEdge + 70)
             assertTrue("The pressed left and right edges share their solid face colour without a dark stroke",
-                Color.green(lit.getPixel(273, 100)) >= Color.green(lit.getPixel(276, 100)) - 6 &&
+                    Color.green(lit.getPixel(273, 100)) >= Color.green(lit.getPixel(276, 100)) - 6 &&
                     Color.green(lit.getPixel(326, 100)) >= Color.green(lit.getPixel(324, 100)) - 6 &&
-                    maximum(lit, 273, 100) > 120)
-            assertTrue("The current exact key face still fills with its selected colour", maximum(lit, 311, 74) > 120)
+                    maximum(lit, 273, 100) > 75)
+            assertTrue("The current exact key face still fills with its selected colour", maximum(lit, 311, 74) > 75)
+            assertTrue("The uniformly toned face preserves white-letter contrast during its tail",
+                ColorUtils.calculateLuminance(lit.getPixel(311, 74)) <= 0.18)
             save(rest, "grid-key-caps-rest")
             save(lit, "grid-field-real-key-caps-400ms")
             save(previous, "grid-field-old-translucent-caps-400ms")
@@ -1429,7 +1435,11 @@ class PressEffectRenderingTest {
                             8 * 120 * 96 + 24 * 40 * 32)
                 assertTrue("The older grid adds at most one fixed-size bilinear merge",
                     org.robolectric.util.ReflectionHelpers.getField<Int>(shared, "mergedSamples") <= 120 * 96)
-                assertTrue("The newest cap does not share away its immediate brightness", peak(h.surface(1800 + i, time + 80).first) > 190)
+                val newestFace = h.surface(1800 + i, time + 80).first
+                assertTrue("The newest cap keeps its own visible colour despite the number of old waves", peak(newestFace) > 100)
+                assertTrue("Its colour also leaves the unoutlined white legend readable",
+                    ColorUtils.calculateLuminance(newestFace.getPixel(30, 35)) <= 0.18)
+                newestFace.recycle()
                 var visible = 0
                 for (y in 0 until image.height step 2) for (x in 0 until image.width step 2) {
                     val p = image.getPixel(x, y)

@@ -218,10 +218,24 @@ class PressColorSettingsTest {
                 assertEquals("The rendered bubble must retain that exact colour", tint, popupImage.getPixel(6, 26))
                 val actual = sample(render(), key)
                 val channels = intArrayOf(Color.red(tint), Color.green(tint), Color.blue(tint))
+                // The bubble keeps the user's exact RGB. A white-letter keycap
+                // now tones all channels together to stay readable without an
+                // outline; it must never drift to a different hue or local tint.
+                val dominant = channels.indices.maxBy { channels[it] }
+                val scale = (actual[dominant] - unlitFace[dominant] * 0.08f) /
+                    channels[dominant].coerceAtLeast(1)
+                assertTrue("The key retains a visible, uniformly toned version of its selected colour", scale in 0.30f..0.95f)
                 for (i in 0..2) {
-                    val expected = (channels[i] * 0.92f + unlitFace[i] * 0.08f).toInt()
-                    assertTrue("Real key face channel $i must follow the chosen RGB: ${actual.toList()}",
+                    val expected = (channels[i] * scale + unlitFace[i] * 0.08f).toInt()
+                    assertTrue("Real key face channel $i must preserve the chosen hue: ${actual.toList()}",
                         abs(actual[i] - expected) <= 8)
+                }
+                val face = Color.rgb(actual[0], actual[1], actual[2])
+                assertTrue("The toned cap keeps white lettering readable without a black outline",
+                    ColorUtils.calculateLuminance(face) <= 0.18 && ColorUtils.calculateContrast(Color.WHITE, face) >= 4.5)
+                if (ColorUtils.calculateLuminance(tint) <= 0.18) {
+                    for (i in 0..2) assertTrue("An already readable colour need not be darkened",
+                        abs(actual[i] - (channels[i] * 0.92f + unlitFace[i] * 0.08f).toInt()) <= 8)
                 }
                 return tint
             } finally {

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="key_width_title">按键宽度 · 点开调整</string>
+    <string name="key_width_layout">选择键盘布局</string>
+    <string name="key_width_layout_26">拼音／英文 26 键</string>
+    <string name="key_width_layout_t9">拼音九键</string>
+    <string name="key_width_layout_number">数字键盘</string>
+    <string name="key_width_layout_symbols">符号键盘</string>
+    <string name="key_width_hint">点选一个键，再调相对宽度；同排自动让位，触摸区域同步变化。左侧竖栏各键宽度联动。点「完成」保存。</string>
+    <string name="key_width_value">%1$s · 相对宽度 %2$d%%</string>
+    <string name="key_width_reset_key">恢复此键</string>
+    <string name="key_width_reset_layout">恢复本布局</string>
+    <string name="key_width_space">空格</string>
+    <string name="key_width_side_column">左侧竖栏</string>
+    <string name="keyboard_effect_mode">特效模式</string>
+    <string name="sam_idle_hint">sam 模式闲置时保持纯黑面板，呼吸灯可在柔雾、流体模式使用。</string>
+</resources>

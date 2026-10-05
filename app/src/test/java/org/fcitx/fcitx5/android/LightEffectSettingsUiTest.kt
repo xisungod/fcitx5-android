@@ -319,7 +319,7 @@ class LightEffectSettingsUiTest {
             val picker = shapeMenu.popupMenu!!
             val newShape = if (oldShape == ThemePrefs.RippleShape.SoftMist)
                 ThemePrefs.RippleShape.IrregularFluid else ThemePrefs.RippleShape.SoftMist
-            assertEquals(2, picker.menu.size())
+            assertEquals(ThemePrefs.RippleShape.entries.size, picker.menu.size())
             assertTrue(picker.menu.performIdentifierAction(newShape.ordinal + 1, 0))
             assertTrue("Choosing a shape returns to the keyboard for immediate feedback", windows.isAttached(keyboard))
             assertEquals(newShape, shapePref.getValue())

@@ -51,9 +51,13 @@ import kotlin.math.roundToInt
 
 abstract class BaseKeyboard(
     context: Context,
-    protected val theme: Theme,
-    private val keyLayout: List<List<KeyDef>>
+    sourceTheme: Theme,
+    private val keyLayout: List<List<KeyDef>>,
+    private val useEffectTheme: Boolean = true
 ) : ConstraintLayout(context) {
+
+    protected val theme = if (useEffectTheme) ThemeManager.keyboardTheme(sourceTheme) else sourceTheme
+    private val samMode = useEffectTheme && ThemeManager.prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
 
     var keyActionListener: KeyActionListener? = null
     internal var effectInvalidator: (() -> Unit)? = null
@@ -70,7 +74,7 @@ abstract class BaseKeyboard(
 
     /** colourful press effect (Keys Cafe style), drawn under and over the keys */
     private val pressEffectLayer: PressEffect? = ThemeManager.prefs.let { p ->
-        if (!p.pressEffect.getValue() && !p.idleBreathing.getValue()) null
+        if (!p.pressEffect.getValue() && (!p.idleBreathing.getValue() || samMode)) null
         else PressEffect(
             this,
             PressColorPalette.colorsFor(p, theme.accentKeyBackgroundColor),
@@ -80,7 +84,7 @@ abstract class BaseKeyboard(
             p.pressFadeOutTime.getValue(),
             p.pressEffectOverKeys.getValue(),
             p.pressEffect.getValue(),
-            p.idleBreathing.getValue(),
+            p.idleBreathing.getValue() && !samMode,
             IdleBreathing(
                 p.idleDelay.getValue().toLong(),
                 p.idleCycle.getValue().toLong(),
@@ -110,7 +114,7 @@ abstract class BaseKeyboard(
             glowBrightnessPercent = p.pressGlowBrightness.getValue(),
             waveHoldTimeMs = p.pressWaveHoldTime.getValue(),
             coordinatePalette = p.pressColorMode.getValue() == ThemePrefs.PressColorMode.Random,
-            rippleShape = p.rippleShape.getValue(),
+            rippleShape = if (useEffectTheme) p.rippleShape.getValue() else ThemePrefs.RippleShape.SoftMist,
             keyFloatOpacity = if (keyMotion == ThemePrefs.KeyMotionEffect.Press)
                 { keyId -> floatingKeys.get(keyId)?.floatingFaceOpacity() ?: 0f } else null
         )
@@ -118,6 +122,7 @@ abstract class BaseKeyboard(
 
     init {
         if (pressEffectLayer != null) setWillNotDraw(false)
+        if (samMode) setBackgroundColor(android.graphics.Color.BLACK)
     }
 
     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
@@ -247,10 +252,9 @@ abstract class BaseKeyboard(
             }
             pressEffectLayer?.let { effect ->
                 surfaceKeys.add(this)
-                (this as? TextKeyView)?.mainText?.contrastOutlineWidth = dp(0.8f)
                 keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
                     // Keep the theme's legend colour steady throughout press and release.
-                    // A thin constant outline preserves legibility over bright key faces.
+                    // The cap luminance is bounded; glyphs need no black contour.
                     effect.drawKeySurface(canvas, id, width, height, hMargin, vMargin)
                 }
             }

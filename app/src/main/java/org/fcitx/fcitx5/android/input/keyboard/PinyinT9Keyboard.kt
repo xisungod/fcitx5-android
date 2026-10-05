@@ -68,17 +68,18 @@ class PinyinT9Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, t
     val lang: TextKeyView by lazy { findViewById(R.id.button_lang) }
 
     init {
-        val keys = arrangeGrid(Cells)
+        val keys = arrangeGrid(Cells, KeyWidthProfile.T9)
         val strip = View(context).apply {
             isClickable = false
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
             background = InsetDrawable(GradientDrawable().apply {
                 cornerRadius = keys.first().radius
-                setColor(theme.keyBackgroundColor)
+                setColor(this@PinyinT9Keyboard.theme.keyBackgroundColor)
             }, backspace.hMargin, backspace.vMargin, backspace.hMargin, backspace.vMargin)
         }
         (keys.first().parent as ConstraintLayout).addView(strip, 0,
-            gridParams(KeyboardCell(0f, 0f, 0.14f, 0.75f)))
+            gridParams(KeyboardCell(0f, 0f,
+                (keys.first().layoutParams as ConstraintLayout.LayoutParams).matchConstraintPercentWidth, 0.75f)))
 
         // These numeric hints belong to the T9 layout, independently of the alphabet
         // keyboard's punctuation-position and top-number-row preferences.
@@ -95,7 +96,7 @@ class PinyinT9Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, t
                 text = digit.toString()
                 setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11f)
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(theme.altKeyTextColor)
+                setTextColor(this@PinyinT9Keyboard.theme.altKeyTextColor)
                 isClickable = false
                 isFocusable = false
                 importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO

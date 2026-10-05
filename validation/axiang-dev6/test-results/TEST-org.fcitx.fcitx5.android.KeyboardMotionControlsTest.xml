@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardMotionControlsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-05T02:30:04.240Z" hostname="1860ba65b9a5" time="2.398">
+  <properties/>
+  <testcase name="disposingHidingAndDetachingCancelThePreviewAndItsDelayedAccessibilityRelease" classname="org.fcitx.fcitx5.android.KeyboardMotionControlsTest" time="1.445"/>
+  <testcase name="fourRealSlidersStageTheirValuesAndRespectMotionAndGlobalAnimationSwitches" classname="org.fcitx.fcitx5.android.KeyboardMotionControlsTest" time="0.617"/>
+  <testcase name="theRealPreviewCompressesAndReboundsUsingStagedSettingsWithoutSavingOrNavigating" classname="org.fcitx.fcitx5.android.KeyboardMotionControlsTest" time="0.332"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

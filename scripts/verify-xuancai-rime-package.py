@@ -55,11 +55,11 @@ def descendants(node, name):
   yield from descendants(child,name)
 
 
-def inspect_apk(aapt, path, expected_label, expected_version_name='1.0', offline_dictation=False):
+def inspect_apk(aapt, path, expected_label, expected_version_name='1.0', offline_dictation=False, expected_version_code=822):
  badging=subprocess.check_output([aapt,'dump','badging',str(path)],text=True)
  package=re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'",badging,re.MULTILINE)
  require(package is not None,f'{path}: aapt did not report package/version fields')
- require(package[2]=='822',f'{path}: expected arm64 versionCode 822, got {package[2]}')
+ require(package[2]==str(expected_version_code),f'{path}: expected arm64 versionCode {expected_version_code}, got {package[2]}')
  require(package[3]==expected_version_name,f'{path}: expected versionName {expected_version_name}, got {package[3]}')
  labels=re.findall(r"^application-label(?:-[^:]+)?:'([^']*)'$",badging,re.MULTILINE)
  labels+=re.findall(r"^application: label='([^']*)'",badging,re.MULTILINE)
@@ -114,13 +114,13 @@ def verify_main_identity(main_package, main_manifest, expected_main_package):
  require(applications[0]['attrs'].get('android:allowBackup') is False,'Main APK must explicitly disable cloud backup')
 
 
-def verify_bundled_host(main_apk, aapt_override, apksigner_override, expected_main_package, expected_version_name, offline_dictation=False):
+def verify_bundled_host(main_apk, aapt_override, apksigner_override, expected_main_package, expected_version_name, offline_dictation=False, expected_version_code=822):
  aapt,apksigner=resolve_android_tools(aapt_override,apksigner_override)
- main_package,main_manifest=inspect_apk(aapt,main_apk,'阿翔输入法',expected_version_name,offline_dictation)
+ main_package,main_manifest=inspect_apk(aapt,main_apk,'阿翔输入法',expected_version_name,offline_dictation,expected_version_code)
  verify_main_identity(main_package,main_manifest,expected_main_package)
  signers=signer_certificates(apksigner,main_apk)
  microphone='explicit microphone permission for local dictation' if offline_dictation else 'no microphone permission'
- print(f'Single APK host verified: {main_package}; label, version {expected_version_name}, versionCode 822, arm64-v8a, no network permission or speech service, {microphone}, cloud backup disabled.')
+ print(f'Single APK host verified: {main_package}; label, version {expected_version_name}, versionCode {expected_version_code}, arm64-v8a, no network permission or speech service, {microphone}, cloud backup disabled.')
  print('APK signing certificate SHA-256: '+', '.join(sorted(signers)))
 
 
@@ -160,10 +160,10 @@ def verify_offline_dictation(apk):
  print(f'Offline speech CPU runtime, Chinese streaming ASR, local punctuation and {len(hashes)} source/license checksums verified.')
 
 
-def verify_host(main_apk, rime_apk, aapt_override, apksigner_override=None, expected_main_package=None, expected_version_name='1.0'):
+def verify_host(main_apk, rime_apk, aapt_override, apksigner_override=None, expected_main_package=None, expected_version_name='1.0', expected_version_code=822):
  aapt,apksigner=resolve_android_tools(aapt_override,apksigner_override)
- main_package,main_manifest=inspect_apk(aapt,main_apk,'阿翔输入法',expected_version_name)
- plugin_package,manifest=inspect_apk(aapt,rime_apk,'阿翔输入法 Rime',expected_version_name)
+ main_package,main_manifest=inspect_apk(aapt,main_apk,'阿翔输入法',expected_version_name,expected_version_code=expected_version_code)
+ plugin_package,manifest=inspect_apk(aapt,rime_apk,'阿翔输入法 Rime',expected_version_name,expected_version_code=expected_version_code)
  verify_main_identity(main_package,main_manifest,expected_main_package)
  base='org.fcitx.fcitx5.android'
  expected_plugin=base+'.plugin.rime'+main_package[len(base):]
@@ -178,7 +178,7 @@ def verify_host(main_apk, rime_apk, aapt_override, apksigner_override=None, expe
  main_signers=signer_certificates(apksigner,main_apk)
  plugin_signers=signer_certificates(apksigner,rime_apk)
  require(main_signers==plugin_signers,'Host and Rime APK signing certificates differ')
- print(f'Actual APK host verified: {main_package} / {plugin_package}; labels, no network/audio permissions or speech service, backup policy and plugin pairing match; version {expected_version_name}, versionCode 822, arm64-v8a.')
+ print(f'Actual APK host verified: {main_package} / {plugin_package}; labels, no network/audio permissions or speech service, backup policy and plugin pairing match; version {expected_version_name}, versionCode {expected_version_code}, arm64-v8a.')
  print('Paired APK signing certificate SHA-256: '+', '.join(sorted(main_signers)))
 
 
@@ -252,15 +252,16 @@ parser.add_argument('--aapt',help='Android SDK aapt executable for binary manife
 parser.add_argument('--apksigner',help='Android SDK apksigner executable; defaults to the binary beside aapt')
 parser.add_argument('--expected-main-package',help='Exact expected host application ID for an isolated development build')
 parser.add_argument('--expected-version-name',default='1.0',help='Exact expected Android versionName (default: 1.0)')
+parser.add_argument('--expected-version-code',type=int,default=822,help='Exact expected Android versionCode (default: 822)')
 parser.add_argument('--bundled-rime',action='store_true',help='Verify native Rime and all data directly inside the single main APK')
 parser.add_argument('--offline-dictation',action='store_true',help='Require the explicitly enabled local microphone feature; network/system recognition remains forbidden')
 args=parser.parse_args()
 require(not (args.bundled_rime and args.main_apk),'--bundled-rime accepts one main APK, not a separate Rime/main pair')
 require(not args.offline_dictation or args.bundled_rime,'--offline-dictation requires the single bundled main APK')
 if args.bundled_rime:
- verify_bundled_host(args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.offline_dictation)
+ verify_bundled_host(args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.offline_dictation,args.expected_version_code)
 elif args.main_apk:
- verify_host(args.main_apk,args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name)
+ verify_host(args.main_apk,args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.expected_version_code)
 
 with zipfile.ZipFile(args.rime_apk) as apk:
  assert apk.testzip() is None

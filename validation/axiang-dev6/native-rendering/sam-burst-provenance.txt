@@ -1,0 +1,17 @@
+source=actual Android TextKeyboard and PressEffect
+graphics=Robolectric NATIVE
+portrait_width_dp=360
+height_dp=288
+fps=60
+frames=109
+input=sam
+press_times_ms=0,120,240
+release_after_ms=50
+palette=production Cyberpunk random
+seed=1401
+ripple_shape=Sam
+idle_breathing_preference=true (Sam suppresses it)
+popup=false
+direct_native_frames=true
+interpolation=false
+physical_device_capture=false

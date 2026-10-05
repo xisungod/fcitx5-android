@@ -85,11 +85,11 @@ class NavigationBarManager {
             window.useSystemNavbarBackground(true)
             window.enforceNavbarContrast(false)
         }
-        update(window)
+        update(window, isVirtualKeyboard)
     }
 
-    private fun update(window: Window) {
-        val theme = ThemeManager.activeTheme
+    private fun update(window: Window, isVirtualKeyboard: Boolean) {
+        val theme = if (isVirtualKeyboard) ThemeManager.keyboardTheme(ThemeManager.activeTheme) else ThemeManager.activeTheme
         if (shouldUpdateNavbarForeground) {
             WindowCompat.getInsetsController(window, window.decorView)
                 .isAppearanceLightNavigationBars = !theme.isDark

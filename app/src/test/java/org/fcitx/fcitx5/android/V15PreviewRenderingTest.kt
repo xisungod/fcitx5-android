@@ -98,6 +98,7 @@ class V15PreviewRenderingTest {
         // registered ThemePrefs from another test class, backed by a different file.
         // Reset that actual file rather than leaving a previous palette/timing fixture active.
         ThemeManager.prefs.pressEffect.sharedPreferences.edit().clear().commit()
+        ThemeManager.prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
         assertEquals(ThemePrefs.PressColorMode.Random, ThemeManager.prefs.pressColorMode.getValue())
         assertEquals(ThemePrefs.PressEffectPalette.Cyberpunk, ThemeManager.prefs.pressEffectPalette.getValue())
     }

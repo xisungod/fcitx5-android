@@ -135,8 +135,9 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
 
     init {
         val prefs = ThemeManager.prefs
-        bordered = prefs.keyBorder.getValue()
-        borderStroke = prefs.keyBorderStroke.getValue()
+        val samMode = theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam
+        bordered = samMode || prefs.keyBorder.getValue()
+        borderStroke = !samMode && prefs.keyBorderStroke.getValue()
         rippled = prefs.keyRippleEffect.getValue()
         radius = dp(prefs.keyRadius.getValue().toFloat())
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -225,7 +226,11 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             id = def.viewId
         }
         // key border
-        if ((bordered && def.border != Border.Off) || def.border == Border.On) {
+        if (theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam) {
+            appearanceView.background = insetRadiusDrawable(hMargin, vMargin, radius, Color.BLACK)
+            appearanceView.padding = 0
+            appearanceView.foreground = null
+        } else if ((bordered && def.border != Border.Off) || def.border == Border.On) {
             val bkgColor = when (def.variant) {
                 Variant.Normal, Variant.AltForeground -> theme.keyBackgroundColor
                 Variant.Alternative -> theme.altKeyBackgroundColor

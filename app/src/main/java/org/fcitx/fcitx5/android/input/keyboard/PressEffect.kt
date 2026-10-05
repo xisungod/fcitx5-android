@@ -55,7 +55,7 @@ internal class PressEffect(
     fadeOutTimeMs: Int,
     overKeysPercent: Int,
     private val pressEnabled: Boolean,
-    private val idleEnabled: Boolean,
+    idleEnabled: Boolean,
     private val breathing: IdleBreathing,
     idleColors: IntArray,
     private val clock: () -> Long = UPTIME_CLOCK,
@@ -97,11 +97,16 @@ internal class PressEffect(
     private val keyFloatOpacity: ((Int) -> Float)? = null
 ) {
 
+    private val samGlare = rippleShape == org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.Sam
+    // Sam's black mask has no resting light, even when an older installation
+    // retains its breathing preference for the other two effects.
+    private val idleEnabled = idleEnabled && !samGlare
+    private val lightLegends = isDark || samGlare
     private val colors: IntArray =
-        (if (palette.isEmpty()) CYBERPUNK else palette).map { adapt(it, isDark) }.toIntArray()
+        (if (palette.isEmpty()) CYBERPUNK else palette).map { adapt(it, lightLegends) }.toIntArray()
     private val cyclicNeon = coordinatePalette && (palette.isEmpty() || palette.contentEquals(CYBERPUNK))
     private val coordinatedNeon = coordinatePalette && (cyclicNeon || PressColorPalette.isCoordinated(palette))
-    private val sharedFieldEnabled = keySurfaceEffects && exactKeyShape
+    private val sharedFieldEnabled = samGlare || (keySurfaceEffects && exactKeyShape)
     private val liquidKeyFaces = keySurfaceEffects && exactKeyShape && keyColorStyle == KEY_STYLE_FILL &&
         rippleShape == org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.IrregularFluid
 
@@ -112,17 +117,19 @@ internal class PressEffect(
     private val glowReach = glowReachPercent.coerceIn(10, 100) / 100f
     private val maxRadius: Float get() = max(BASE_RADIUS_DP * density, host.height * 1.15f) * sizeScale * 0.85f * glowReach
     private val flashRadius = FLASH_RADIUS_DP * density
-    private val expansionDuration = expansionTimeMs.coerceIn(100, 4000).toLong()
-    private val ignitionDuration = ignitionTimeMs.coerceIn(30, 300).toLong()
-    private val waveHoldDuration = waveHoldTimeMs.coerceIn(0, 2000).toLong()
-    private val fadeDuration = fadeOutTimeMs.coerceIn(100, 5000).toLong()
+    // Sam is a separate rapid, broad glare profile. Saved mist timings continue
+    // to belong to mist/fluid rather than slowing this mode into the same effect.
+    private val expansionDuration = if (samGlare) 260L else expansionTimeMs.coerceIn(100, 4000).toLong()
+    private val ignitionDuration = if (samGlare) 0L else ignitionTimeMs.coerceIn(30, 300).toLong()
+    private val waveHoldDuration = if (samGlare) 40L else waveHoldTimeMs.coerceIn(0, 2000).toLong()
+    private val fadeDuration = if (samGlare) 700L else fadeOutTimeMs.coerceIn(100, 5000).toLong()
     private val fadeStart = ignitionDuration + expansionDuration + waveHoldDuration
     private val waveDuration = fadeStart + fadeDuration
     private val keyHoldDuration = keyHoldTimeMs.coerceIn(20, 1000).toLong()
     private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(20, 5000).toLong()
     private val duration = max(waveDuration, keyHoldDuration + keyRetreatDuration)
     private val keyFlashTextures = KEY_FLASH_TEXTURES
-    private val underStrength = if (isDark) 1f else 0.9f
+    private val underStrength = if (lightLegends) 1f else 0.9f
     private val glowStrength = glowBrightnessPercent.coerceIn(0, 100) / 100f
     // Compatibility preference remains readable, but light never paints over glyphs.
     @Suppress("UNUSED_PARAMETER")
@@ -130,6 +137,14 @@ internal class PressEffect(
 
     /** returns (alpha, retreat 0..1) of the key face, or null once the face is gone */
     private fun keyEnvelope(r: PressEffectTrail.Ripple, now: Long): Float {
+        if (samGlare) {
+            // In the reference, only the directly held cap is coloured. Its
+            // black mask returns quickly while the much wider light keeps going.
+            // Cap motion is independent and still uses the user's motion controls.
+            envelopeRetreat = 0f
+            return if (r.releasedAt < 0L) 0.92f
+                else 0.92f * (1f - smoothstep(0f, 180f, (now - r.releasedAt).toFloat()))
+        }
         if (holdWhilePressed && r.keyFill && keyFloatOpacity != null) {
             // The real KeyView supplies its own per-key elevation/fade state.
             // Keep the full face shape while it descends, including installations
@@ -182,7 +197,9 @@ internal class PressEffect(
         for (i in 0 until ownedColorKeys.size()) forgetKeyColor(ownedColorKeys.keyAt(i))
         ownedColorKeys.clear()
     }
-    private val styles = Array(colors.size) { RipplePaints(colors[it]) }
+    private val styles = Array(colors.size) {
+        RipplePaints(colors[it], if (lightLegends) readableCapColor(colors[it]) else colors[it])
+    }
     private var lastColorIndex = -1
     private var cyberColorPosition = 0f
     private var lastShapeIndex = -1
@@ -318,7 +335,7 @@ internal class PressEffect(
         else choreographer.postFrameCallbackDelayed(frameCallback, delay)
     }
 
-    private class RipplePaints(color: Int) {
+    private class RipplePaints(color: Int, capColor: Int) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
             colorFilter = PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
         }
@@ -330,6 +347,12 @@ internal class PressEffect(
         val solidPaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
             it.style = Paint.Style.FILL
             it.color = color
+        }
+        // The whole cap receives one uniformly toned colour. Keeping this paint
+        // separate leaves the under-key neon fully saturated and bright.
+        val capPaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
+            it.style = Paint.Style.FILL
+            it.color = capColor
         }
         val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).also {
             it.shader = RadialGradient(0f, 0f, 1f, intArrayOf(0xCCFFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
@@ -581,15 +604,17 @@ internal class PressEffect(
         borderRect.set(-w / 2f, -h / 2f, w / 2f, h / 2f)
         // Every shape floats as one completely coloured cap. A ripple choice
         // must never turn its upper half into a dim "water level" or shadow.
-        style.solidPaint.alpha = (alpha * 255f).toInt()
-        canvas.drawRoundRect(borderRect, radius, radius, style.solidPaint)
-        // backlight hot spot near the top centre
-        val saved = canvas.save()
-        canvas.translate(0f, -h * 0.14f)
-        canvas.scale(w * 0.42f, h * 0.36f)
-        style.highlightPaint.alpha = (alpha * 0.08f * 255f).toInt()
-        canvas.drawCircle(0f, 0f, 1f, style.highlightPaint)
-        canvas.restoreToCount(saved)
+        style.capPaint.alpha = (alpha * 255f).toInt()
+        canvas.drawRoundRect(borderRect, radius, radius, style.capPaint)
+        if (!lightLegends) {
+            // A light theme uses dark lettering and can retain its subtle glint.
+            val saved = canvas.save()
+            canvas.translate(0f, -h * 0.14f)
+            canvas.scale(w * 0.42f, h * 0.36f)
+            style.highlightPaint.alpha = (alpha * 0.08f * 255f).toInt()
+            canvas.drawCircle(0f, 0f, 1f, style.highlightPaint)
+            canvas.restoreToCount(saved)
+        }
         if (liquidKeyFaces) drawLiquidEdge(canvas, r, style, alpha, w, h, radius, elapsed)
     }
 
@@ -633,7 +658,7 @@ internal class PressEffect(
     }
 
     /** Invoked by the key face after its dark background, before its character. */
-    /** returns how bright the key face is right now (0..1), so the legend can switch to dark ink */
+    /** Returns the current face brightness; the theme's legend colour stays fixed. */
     @Suppress("UNUSED_PARAMETER") // Inset arguments remain source-compatible with existing painters.
     fun drawKeySurface(canvas: Canvas, keyId: Int, width: Int, height: Int,
         horizontalInset: Int = 0, verticalInset: Int = 0): Float {
@@ -654,6 +679,7 @@ internal class PressEffect(
     private fun waveProgress(spread: Long): Float {
         val t = (spread.toFloat() / expansionDuration).coerceIn(0f, 1f)
         val remaining = 1f - t
+        if (samGlare) return smoothstep(0f, 1f, t)
         return 1f - remaining * remaining * remaining
     }
 
@@ -676,6 +702,14 @@ internal class PressEffect(
 
     private fun waveAlpha(r: PressEffectTrail.Ripple): Float {
         val elapsed = (frameTime - r.start).coerceAtLeast(0L)
+        if (samGlare) {
+            if (elapsed >= waveDuration) return 0f
+            val onset = 0.20f + 0.80f * smoothstep(0f, 32f, elapsed.toFloat())
+            val end = fadeEnvelope(r)
+            // No hard ring or white flash: a saturated field opens in a couple
+            // of display frames and loses exposure continuously after its spread.
+            return 1.35f * onset * end * end
+        }
         val spread = elapsed - ignitionDuration
         if (spread < 0L || elapsed >= waveDuration) return 0f
         val progress = waveProgress(spread)
@@ -719,7 +753,7 @@ internal class PressEffect(
         // The same envelope serves functional keys, including the release tail of a long hold.
         for (i in 0 until keyFaces.size) {
             val face = keyFaces[i]
-            if (!keySurfaceEffects || !face.keyFill || face.keyId < 0) {
+            if (!samGlare && (!keySurfaceEffects || !face.keyFill || face.keyId < 0)) {
                 drawKeyFlash(canvas, face, styles[face.colorIndex], (frameTime - face.start).coerceAtLeast(0L),
                     strength, face.x, face.y)
             }
@@ -946,7 +980,8 @@ internal class PressEffect(
                     }
                     // A spatial exposure ceiling is independent of source count:
                     // a new key cannot globally divide the already travelling front.
-                    val alpha = 0.88f * w / (0.55f + w) * candidate
+                    val alpha = if (samGlare) 0.96f * w / (0.30f + w) * candidate
+                        else 0.88f * w / (0.55f + w) * candidate
                     pixels[index] = ((alpha * 255f).toInt() shl 24) or
                         ((r * 255f).toInt().coerceIn(0, 255) shl 16) or
                         ((g * 255f).toInt().coerceIn(0, 255) shl 8) or
@@ -959,6 +994,10 @@ internal class PressEffect(
         private fun prepareNode(node: FieldNode, ripple: PressEffectTrail.Ripple, alpha: Float) {
             val spread = (frameTime - ripple.start - ignitionDuration).coerceAtLeast(0L)
             val progress = waveProgress(spread)
+            if (samGlare) {
+                prepareSamNode(node, ripple, alpha, progress)
+                return
+            }
             // Letter pitch, rather than total keyboard height, defines reach.
             // Removing the number row must not change how many neighbours glow.
             // Wide function keys retain their own immediate face, but do not
@@ -1031,6 +1070,37 @@ internal class PressEffect(
             val color = colors[ripple.colorIndex]
             // Reuse the fixed red buffer for weighted hue positions in the preset.
             // Arbitrary user palettes retain their original RGB interpolation.
+            node.red = if (coordinatedNeon) ripple.colorPosition else Color.red(color) / 255f
+            node.green = if (coordinatedNeon) 0f else Color.green(color) / 255f
+            node.blue = if (coordinatedNeon) 0f else Color.blue(color) / 255f
+        }
+
+        private fun prepareSamNode(node: FieldNode, ripple: PressEffectTrail.Ripple, alpha: Float, progress: Float) {
+            val pitch = logicalWidth / 10f
+            val reach = sqrt(sizeScale * glowReach)
+            val travel = pitch * 5.1f * reach * ripple.size * progress
+            val phase = (frameTime - ripple.start).toFloat() / 820f + ripple.shape * 0.83f
+            node.x = ripple.x + ripple.driftX * progress * 0.18f
+            node.y = ripple.y + ripple.driftY * progress * 0.18f
+            // Broad elliptical glare, with a full soft core. The surrounding
+            // opaque black keycaps reveal its connected network in the gaps.
+            node.halfWidth = min(ripple.flashWidth / 2f, pitch / 2f) + travel
+            node.halfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.76f
+            node.coreHalfWidth = min(ripple.flashWidth / 2f, pitch / 2f) + travel * 0.63f
+            node.coreHalfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.65f
+            node.candidateCoreHalfWidth = node.coreHalfWidth
+            node.candidateCoreHalfHeight = node.coreHalfHeight
+            node.corner = min(node.halfWidth, node.halfHeight)
+            node.feather = 5f * density + travel * 0.18f
+            node.bendX = travel * 0.018f
+            node.bendY = travel * 0.014f
+            node.curveX = kotlin.math.sin(phase)
+            node.skewX = cos(phase * 0.73f)
+            node.curveY = cos(phase * 0.81f)
+            node.skewY = kotlin.math.sin(phase * 0.67f)
+            node.fluidMix = 0f
+            node.weight = alpha
+            val color = colors[ripple.colorIndex]
             node.red = if (coordinatedNeon) ripple.colorPosition else Color.red(color) / 255f
             node.green = if (coordinatedNeon) 0f else Color.green(color) / 255f
             node.blue = if (coordinatedNeon) 0f else Color.blue(color) / 255f
@@ -1135,7 +1205,11 @@ internal class PressEffect(
                 val fluidBlend = node.fluidMix * (1f - node.candidateMix[y])
                 val dx = abs(node.dx[x] - node.rowBend[y]) - node.halfWidth + node.corner
                 val dy = abs(node.dy[y] - node.columnBend[x]) - node.halfHeight + node.corner
-                var distance = if (fluidBlend == 1f) 0f else
+                var distance = if (samGlare) {
+                    val u = (node.dx[x] - node.rowBend[y]) / node.halfWidth
+                    val v = (node.dy[y] - node.columnBend[x]) / node.halfHeight
+                    (sqrt(u * u + v * v) - 1f) * min(node.halfWidth, node.halfHeight)
+                } else if (fluidBlend == 1f) 0f else
                     (if (dx > 0f && dy > 0f) sqrt(dx * dx + dy * dy) else max(dx, dy)) - node.corner
                 var fluidDensity = 0f
                 if (fluidBlend > 0f) {
@@ -1186,7 +1260,14 @@ internal class PressEffect(
                 val feather = node.feather * (1f - 0.45f * fluidBlend)
                 val coverage = 1f - smoothstep(-feather * 0.20f, feather, distance)
                 if (coverage <= 0f) continue
-                val w = if (fluidBlend > 0f) node.weight * coverage * fluidDensity
+                val w = if (samGlare) {
+                    // A single press has a visibly stronger centre, not a flat
+                    // full-panel backlight. Repeated presses can still join into
+                    // the broad glare without shrinking its final footprint.
+                    val horizontal = (node.dx[x] - node.rowBend[y]) / node.coreHalfWidth
+                    val vertical = (node.dy[y] - node.columnBend[x]) / node.coreHalfHeight
+                    node.weight * coverage / (1f + 2.4f * (horizontal * horizontal + vertical * vertical))
+                } else if (fluidBlend > 0f) node.weight * coverage * fluidDensity
                     else if (node.candidateMix[y] > 0f) {
                         val compact = node.columnDensity[x] * node.rowDensity[y]
                         val bridge = node.candidateColumnDensity[x] * node.candidateRowDensity[y]
@@ -1424,6 +1505,26 @@ internal class PressEffect(
             hsv[1] = min(1f, hsv[1] * 1.1f)
             hsv[2] = hsv[2] * 0.86f
             return Color.HSVToColor(hsv)
+        }
+
+        /** Same hue across the entire cap; sufficient contrast without a glyph outline. */
+        private fun readableCapColor(color: Int): Int {
+            fun linear(channel: Float): Float = if (channel <= 0.04045f) channel / 12.92f
+                else ((channel + 0.055f) / 1.055f).pow(2.4f)
+            val red = Color.red(color) / 255f
+            val green = Color.green(color) / 255f
+            val blue = Color.blue(color) / 255f
+            fun luminance(scale: Float) = 0.2126f * linear(red * scale) +
+                0.7152f * linear(green * scale) + 0.0722f * linear(blue * scale)
+            if (luminance(1f) <= 0.18f) return color
+            var low = 0f
+            var high = 1f
+            repeat(12) {
+                val middle = (low + high) / 2f
+                if (luminance(middle) <= 0.18f) low = middle else high = middle
+            }
+            return Color.rgb((red * low * 255f).toInt(), (green * low * 255f).toInt(),
+                (blue * low * 255f).toInt())
         }
     }
 }

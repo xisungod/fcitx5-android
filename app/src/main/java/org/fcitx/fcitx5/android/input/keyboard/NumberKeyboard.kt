@@ -54,18 +54,19 @@ class NumberKeyboard(context: Context, theme: Theme) : BaseKeyboard(context, the
     val `return`: ImageKeyView by lazy { findViewById(R.id.button_return) }
 
     init {
-        val keys = arrangeGrid(Cells)
+        val keys = arrangeGrid(Cells, KeyWidthProfile.Number)
         val strip = View(context).apply {
             isClickable = false
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
             background = InsetDrawable(GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = keys.first().radius
-                setColor(theme.keyBackgroundColor)
+                setColor(this@NumberKeyboard.theme.keyBackgroundColor)
             }, backspace.hMargin, backspace.vMargin, backspace.hMargin, backspace.vMargin)
         }
         (keys.first().parent as ConstraintLayout).addView(strip, 0,
-            gridParams(KeyboardCell(0f, 0f, 0.14f, 0.75f)))
+            gridParams(KeyboardCell(0f, 0f,
+                (keys.first().layoutParams as ConstraintLayout.LayoutParams).matchConstraintPercentWidth, 0.75f)))
         space.setSpaceIcon()
         space.contentDescription = context.getString(R.string.space_key_label)
     }

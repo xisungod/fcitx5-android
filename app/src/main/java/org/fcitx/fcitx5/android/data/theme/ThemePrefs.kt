@@ -17,6 +17,21 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {
 
+    fun applySamDefaultOnce() {
+        // The requested dev.6 default also applies to upgrades once. Later mode
+        // choices survive process restarts, further updates, and backup restores.
+        if (!sharedPreferences.getBoolean("sam_mode_default_applied", false)) {
+            sharedPreferences.edit {
+                putString("ripple_shape", "Sam")
+                putBoolean("sam_mode_default_applied", true)
+            }
+        }
+    }
+
+    // Include the migration stamp in preference backups and device-protected storage.
+    private val samDefaultApplied = ManagedPreference.PBool(sharedPreferences, "sam_mode_default_applied", false)
+        .also { it.register() }
+
     private fun themePreference(
         @StringRes
         title: Int,
@@ -90,7 +105,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     enum class RippleShape(override val stringRes: Int) : ManagedPreferenceEnum {
         SoftMist(R.string.ripple_shape_soft_mist),
-        IrregularFluid(R.string.ripple_shape_irregular_fluid);
+        IrregularFluid(R.string.ripple_shape_irregular_fluid),
+        Sam(R.string.ripple_shape_sam);
     }
 
     val pressEffect = switch(
@@ -245,7 +261,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     )
 
     val rippleShape = enumList(
-        R.string.ripple_shape, "ripple_shape", RippleShape.SoftMist,
+        R.string.ripple_shape, "ripple_shape", RippleShape.Sam,
         enableUiOn = { pressEffect.getValue() }
     )
 
@@ -333,6 +349,10 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     }
 
     val keyRadius = int(R.string.key_radius, "key_radius", 5, 0, 48, "dp")
+
+    // The in-keyboard editor stages relative widths and commits them atomically on Done.
+    val keyWidthOverrides = ManagedPreference.PString(sharedPreferences, "key_width_overrides", "")
+        .also { it.register() }
 
     val textEditingButtonRadius =
         int(R.string.text_editing_button_radius, "text_editing_button_radius", 8, 0, 48, "dp")

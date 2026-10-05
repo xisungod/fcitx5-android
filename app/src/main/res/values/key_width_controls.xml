@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="key_width_title">Key widths · tap to adjust</string>
+    <string name="key_width_layout">Keyboard layout</string>
+    <string name="key_width_layout_26">26-key keyboard</string>
+    <string name="key_width_layout_t9">Pinyin 9-key</string>
+    <string name="key_width_layout_number">Number keypad</string>
+    <string name="key_width_layout_symbols">Symbol keyboard</string>
+    <string name="key_width_hint">Tap a key, then adjust its relative width. Neighbours share the row; touch areas follow. Keys in the left column share one width. Save with Done.</string>
+    <string name="key_width_value">%1$s · relative width %2$d%%</string>
+    <string name="key_width_reset_key">Reset this key</string>
+    <string name="key_width_reset_layout">Reset this layout</string>
+    <string name="key_width_space">Space</string>
+    <string name="key_width_side_column">Left column</string>
+    <string name="keyboard_effect_mode">Effect mode</string>
+    <string name="sam_idle_hint">sam rests on a pure black panel. Breathing is available in the other two modes.</string>
+</resources>

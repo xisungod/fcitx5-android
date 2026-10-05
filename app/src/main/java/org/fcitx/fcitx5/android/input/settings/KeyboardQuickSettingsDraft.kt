@@ -7,6 +7,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.PressColorPalette
 import org.fcitx.fcitx5.android.data.theme.KeyMotionSettings
+import org.fcitx.fcitx5.android.input.keyboard.KeyWidthSettings
 
 /** Editing a keyboard panel must not rebuild its owning InputView before Done is tapped. */
 internal class KeyboardQuickSettingsDraft(
@@ -25,6 +26,7 @@ internal class KeyboardQuickSettingsDraft(
         val idleBreathing: Boolean,
         val keyMotion: ThemePrefs.KeyMotionEffect,
         val motionSettings: KeyMotionSettings,
+        val keyWidths: KeyWidthSettings,
         val numberRow: Boolean,
         val popup: Boolean,
         val hapticMode: InputFeedbackMode,
@@ -50,7 +52,7 @@ internal class KeyboardQuickSettingsDraft(
             pressDuration = theme.pressMotionDuration.getValue(),
             reboundAmplitude = theme.reboundMotionAmplitude.getValue(),
             reboundDuration = theme.reboundMotionDuration.getValue()
-        ).normalized(), theme.portraitNumberRow.getValue(),
+        ).normalized(), KeyWidthSettings.parse(theme.keyWidthOverrides.getValue()), theme.portraitNumberRow.getValue(),
         keyboard.popupOnKeyPress.getValue(), keyboard.hapticOnKeyPress.getValue(),
         keyboard.hapticStrength.getValue()
     )
@@ -98,6 +100,14 @@ internal class KeyboardQuickSettingsDraft(
         int(theme.reboundMotionDuration, original.motionSettings.reboundDuration,
             next.motionSettings.reboundDuration, KeyMotionSettings.REBOUND_DURATION_RANGE)
         bool(theme.portraitNumberRow, original.numberRow, next.numberRow)
+        if (original.keyWidths != next.keyWidths) {
+            // Merge only edited keys, preserving unrelated widths changed while this panel was open.
+            var widths = KeyWidthSettings.parse(theme.keyWidthOverrides.getValue())
+            (original.keyWidths.overrides.keys + next.keyWidths.overrides.keys).forEach { id ->
+                if (original.keyWidths[id] != next.keyWidths[id]) widths = widths.withWidth(id, next.keyWidths[id])
+            }
+            editor.putString(theme.keyWidthOverrides.key, widths.encode())
+        }
         bool(keyboard.popupOnKeyPress, original.popup, next.popup)
         if (original.hapticMode != next.hapticMode) editor.putString(keyboard.hapticOnKeyPress.key, next.hapticMode.name)
         int(keyboard.hapticStrength, original.hapticStrength, next.hapticStrength, 0..100)

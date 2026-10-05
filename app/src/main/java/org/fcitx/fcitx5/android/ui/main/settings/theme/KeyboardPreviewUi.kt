@@ -185,7 +185,7 @@ class KeyboardPreviewUi(override val ctx: Context, val theme: Theme) : Ui {
             fakeInputView.removeView(fakeKeyboardWindow)
         }
         fakeKawaiiBar.backgroundColor = if (keyBorder) Color.TRANSPARENT else theme.barColor
-        fakeKeyboardWindow = TextKeyboard(ctx, theme).also {
+        fakeKeyboardWindow = TextKeyboard(ctx, theme, useEffectTheme = false).also {
             it.onAttach()
         }
         fakeInputView.apply {

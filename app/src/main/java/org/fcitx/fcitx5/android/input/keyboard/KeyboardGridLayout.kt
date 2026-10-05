@@ -10,6 +10,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.children
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import kotlin.math.roundToInt
 
 /** A key's touch rectangle, in fractions of the entire keyboard. */
@@ -20,7 +21,9 @@ internal data class KeyboardCell(val left: Float, val top: Float, val width: Flo
  * columns their own row heights. All keys remain direct children of its first row,
  * so BaseKeyboard's hit testing and press-light coordinates use the real geometry.
  */
-internal fun BaseKeyboard.arrangeGrid(cells: List<KeyboardCell>): List<KeyView> {
+internal fun BaseKeyboard.arrangeGrid(originalCells: List<KeyboardCell>, profile: KeyWidthProfile? = null): List<KeyView> {
+    val cells = if (profile == null) originalCells else KeyWidthGeometry.grid(profile, originalCells,
+        KeyWidthSettings.parse(ThemeManager.prefs.keyWidthOverrides.getValue()))
     val rows = children.filterIsInstance<ConstraintLayout>().toList()
     val keys = rows.flatMap { it.children.filterIsInstance<KeyView>().toList() }
     require(cells.size == keys.size)

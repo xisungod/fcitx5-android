@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ripple_shape">Ripple shape</string>
-    <string name="ripple_shape_soft_mist">Soft mist (default)</string>
-    <string name="ripple_shape_irregular_fluid">Irregular fluid</string>
+    <string name="ripple_shape_soft_mist">Mode 1 · Soft mist</string>
+    <string name="ripple_shape_irregular_fluid">Mode 2 · Fluid</string>
 </resources>

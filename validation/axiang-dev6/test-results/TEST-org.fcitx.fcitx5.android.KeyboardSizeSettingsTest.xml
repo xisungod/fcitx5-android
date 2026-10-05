@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardSizeSettingsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-05T02:30:06.828Z" hostname="1860ba65b9a5" time="1.13">
+  <properties/>
+  <testcase name="realHeightControlPersistsBothOrientationsAndChangesActualKeyGeometry" classname="org.fcitx.fcitx5.android.KeyboardSizeSettingsTest" time="0.509"/>
+  <testcase name="widthMarginsRemainUsableAfterMovingAnExistingPreferenceToASmallerScreen" classname="org.fcitx.fcitx5.android.KeyboardSizeSettingsTest" time="0.016"/>
+  <testcase name="untouchedPortraitDefaultsGainAboutTenPercentHeightAndExistingSavedSizesSurvive" classname="org.fcitx.fcitx5.android.KeyboardSizeSettingsTest" time="0.018"/>
+  <testcase name="hidingNumberRowPreservesEveryLetterRowsHeightAndRemovesItsSpace" classname="org.fcitx.fcitx5.android.KeyboardSizeSettingsTest" time="0.484"/>
+  <testcase name="directBootMirrorPreservesUntouchedAndExplicitVibrationStrength" classname="org.fcitx.fcitx5.android.KeyboardSizeSettingsTest" time="0.099"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+]]></system-err>
+</testsuite>

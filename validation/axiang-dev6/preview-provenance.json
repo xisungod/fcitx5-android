@@ -1,0 +1,22 @@
+{
+  "source_commit": "8681b465488a1c4c3cb650a156b89aa9a6e0f060",
+  "native_frame_count": 109,
+  "fps": 60,
+  "padding_frames": 48,
+  "duration": 2.6166666666666667,
+  "source": "actual Android TextKeyboard and PressEffect, Robolectric NATIVE",
+  "physical_device_capture": false,
+  "interpolation": false,
+  "outputs": [
+    {
+      "filename": "axiang-dev6-sam-preview.mp4",
+      "bytes": 94316,
+      "sha256": "e72c26f9bf548c98fb278a37908e5736053fae103aeb4b4964cd7d2c4338c2f3"
+    },
+    {
+      "filename": "axiang-dev6-key-width.png",
+      "bytes": 33502,
+      "sha256": "c4faaea1f03f271f6cb68225d43a611c58ddd0ef11c0dc5e708bf25f665f0444"
+    }
+  ]
+}

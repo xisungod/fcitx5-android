@@ -77,8 +77,8 @@ import timber.log.Timber
 class InputView(
     service: FcitxInputMethodService,
     fcitx: FcitxConnection,
-    theme: Theme
-) : BaseInputView(service, fcitx, theme) {
+    sourceTheme: Theme
+) : BaseInputView(service, fcitx, ThemeManager.keyboardTheme(sourceTheme)) {
 
     private val keyBorder by ThemeManager.prefs.keyBorder
 
