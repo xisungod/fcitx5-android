@@ -283,7 +283,7 @@ jobs:
           "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/release-delivery/axiang-input-1.2-arm64.apk"
           python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/release-delivery/axiang-input-1.2-arm64.apk" --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" --expected-main-package org.fcitx.fcitx5.android.axiang --expected-version-name 1.2 --expected-version-code 1200 --expected-app-label AXiang
           python3 - <<'PY'
-          import hashlib, importlib.util, json, os, pathlib, re, subprocess, zipfile
+          import hashlib, json, os, pathlib, re, subprocess, zipfile
           root = pathlib.Path(os.environ['RUNNER_TEMP'])
           output = root / 'release-delivery/axiang-input-1.2-arm64.apk'
           expected = json.loads((root / 'source-input-manifest.json').read_text())
@@ -292,8 +292,6 @@ jobs:
           certs = subprocess.check_output([str(sdk / 'apksigner'), 'verify', '--print-certs', str(output)], text=True)
           digests = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$', certs, re.MULTILINE)
           assert [d.lower() for d in digests] == [signing['certificate_sha256']]
-          spec = importlib.util.spec_from_file_location('verify_apk', 'scripts/verify-xuancai-rime-package.py')
-          # This CLI executes on import, so separately inspect the binary manifest.
           manifest_xml = subprocess.check_output([str(sdk / 'aapt'), 'dump', 'xmltree', str(output), 'AndroidManifest.xml'], text=True)
           assert not re.search(r'android:debuggable[^\n]*0xffffffff', manifest_xml)
           sha = lambda b: hashlib.sha256(b).hexdigest()
@@ -303,11 +301,34 @@ jobs:
               actual = {n: sha(archive.read(n)) for n in names if n.startswith(('assets/', 'lib/')) and not n.endswith('/')}
               assert actual == expected, 'Release changed the native/assets file set or bytes'
               assert not any('lmyy' in n.lower() or 'minirbt' in n.lower() for n in names)
-              assert sha(archive.read('res/font/audiowide_regular.ttf')) == sha(pathlib.Path('app/src/main/res/font/audiowide_regular.ttf').read_bytes())
-              assert archive.read('res/raw/audiowide_ofl.txt') == pathlib.Path('app/src/main/res/raw/audiowide_ofl.txt').read_bytes()
-              libraries = json.loads(archive.read('res/raw/aboutlibraries.json'))
-              assert any('audiowide' in str(item).lower() for item in libraries['libraries'])
+              # AAPT2/R8 may shorten packaged resource paths. Verify retained
+              # resources by their exact bytes, independent of their ZIP names.
+              resource_names = [n for n in names if n.startswith('res/') and not n.endswith('/')]
+              resource_hashes = {n: sha(archive.read(n)) for n in resource_names}
+              font_sha = sha(pathlib.Path('app/src/main/res/font/audiowide_regular.ttf').read_bytes())
+              ofl_sha = sha(pathlib.Path('app/src/main/res/raw/audiowide_ofl.txt').read_bytes())
+              font_resources = [n for n, digest in resource_hashes.items() if digest == font_sha]
+              ofl_resources = [n for n, digest in resource_hashes.items() if digest == ofl_sha]
+              assert font_resources, 'Audiowide font bytes are missing from optimized resources'
+              assert ofl_resources, 'Audiowide OFL notice bytes are missing from optimized resources'
+              about_resources = []
+              for name in resource_names:
+                  if archive.getinfo(name).file_size > 2 * 1024 * 1024:
+                      continue
+                  try:
+                      libraries = json.loads(archive.read(name))
+                  except (UnicodeDecodeError, json.JSONDecodeError):
+                      continue
+                  if not isinstance(libraries, dict) or not isinstance(libraries.get('libraries'), list):
+                      continue
+                  matches = [item for item in libraries['libraries'] if isinstance(item, dict) and item.get('uniqueId') == 'google/fonts/audiowide']
+                  if matches:
+                      assert len(matches) == 1 and matches[0].get('name') == 'Audiowide' and matches[0].get('licenses')
+                      assert not any(isinstance(item, dict) and item.get('uniqueId') == 'local-reference/lmyy-theme-latin' for item in libraries['libraries'])
+                      about_resources.append(name)
+              assert len(about_resources) == 1, 'Audiowide attribution is missing or ambiguous in optimized resources'
           report = {'version_name': '1.2', 'version_code': 1200, 'package': 'org.fcitx.fcitx5.android.axiang', 'variant': 'release', 'source_commit': os.environ['BASE_COMMIT'], 'source_run_id': int(os.environ['SOURCE_RUN_ID']), 'source_artifact_id': int(os.environ['SOURCE_ARTIFACT_ID']), 'source_apk_sha256': os.environ['SOURCE_APK_SHA256'], 'apk_sha256': sha(output.read_bytes()), 'apk_bytes': output.stat().st_size, 'asset_count': sum(n.startswith('assets/') for n in actual), 'native_count': sum(n.startswith('lib/') for n in actual), 'all_input_bytes_identical': True, 'network_permission': False, 'minirbt_included': False, 'font': 'Audiowide (OFL)', 'signing': signing}
+          report['font_resources'] = {'font_sha256': font_sha, 'font_paths': font_resources, 'ofl_sha256': ofl_sha, 'ofl_paths': ofl_resources, 'attribution_paths': about_resources}
           (root / 'release-delivery/build-verification.json').write_text(json.dumps(report, indent=2) + '\n')
           print('Signed non-debuggable Release identity and all original input bytes verified.')
           PY
