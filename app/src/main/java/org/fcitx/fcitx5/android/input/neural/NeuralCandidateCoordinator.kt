@@ -76,7 +76,7 @@ internal class NeuralCandidateCoordinator(
                 // protected when there is no meaningful committed Chinese context.
                 val protectFirst = !source.originalWords.first().comment.contains("纠错") ||
                     context.codePoints().filter {
-                        Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN
+                        RankedCandidateBatch.isHanCodePoint(it)
                     }.count() < 4
                 val result = source.rerank(nextGeneration + 1, indices, scores, protectFirst)
                 if (result.isReordered) {

@@ -80,17 +80,32 @@ class RankedCandidateBatch private constructor(
             expected.text == actual.text && expected.comment == actual.comment &&
             expected.spaceBetweenComment == actual.spaceBetweenComment
 
+        /** Numeric ranges support API 23 without newer Unicode classification APIs. */
+        fun isHanCodePoint(codePoint: Int): Boolean = codePoint == 0x3005 || codePoint == 0x3007 ||
+            codePoint == 0x303B || // Ideographic iteration marks and ideographic zero.
+            codePoint in 0x3400..0x4DBF || // Extension A.
+            codePoint in 0x4E00..0x9FFF || // Unified ideographs.
+            codePoint in 0xF900..0xFAFF || // Compatibility ideographs.
+            codePoint in 0x20000..0x2A6DF || // Extension B.
+            codePoint in 0x2A700..0x2B73F || // Extension C.
+            codePoint in 0x2B740..0x2B81F || // Extension D.
+            codePoint in 0x2B820..0x2CEAF || // Extension E.
+            codePoint in 0x2CEB0..0x2EBEF || // Extension F.
+            codePoint in 0x2F800..0x2FA1F || // Compatibility supplement.
+            codePoint in 0x30000..0x3134F || // Extension G.
+            codePoint in 0x31350..0x323AF // Extension H.
+
         fun original(generation: Long, words: Array<CandidateWord>, preedit: String = "") =
             RankedCandidateBatch(generation, words.toList(), words.indices.toList(), preedit)
 
         /** Equal length avoids promoting a short prefix over an already complete sentence. */
         fun scoringIndices(words: List<CandidateWord>): List<Int> {
             val length = words.firstOrNull()?.text?.codePointCount(0, words.first().text.length) ?: return emptyList()
-            if (length !in 2..8 || !words.first().text.codePoints().allMatch {
-                    Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }) return emptyList()
+            if (length !in 2..8 || !words.first().text.codePoints().allMatch { isHanCodePoint(it) })
+                return emptyList()
             return words.take(6).mapIndexedNotNull { index, word ->
                 index.takeIf { word.text.codePointCount(0, word.text.length) == length &&
-                    word.text.codePoints().allMatch { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN } }
+                    word.text.codePoints().allMatch { isHanCodePoint(it) } }
             }
         }
     }

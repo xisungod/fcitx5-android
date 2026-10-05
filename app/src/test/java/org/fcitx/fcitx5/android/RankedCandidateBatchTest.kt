@@ -79,4 +79,19 @@ class RankedCandidateBatchTest {
         assertEquals(listOf(0, 2, 4, 5), RankedCandidateBatch.scoringIndices(native))
         assertTrue(RankedCandidateBatch.scoringIndices(listOf(CandidateWord("", "hello", ""))).isEmpty())
     }
+
+    @Test fun hanFilteringSupportsSupplementaryIdeographsAndRejectsLatinAndEmoji() {
+        listOf(0x4E2D, 0x3400, 0x20000, 0x2A700, 0x2B740, 0x2B820, 0x2CEB0,
+            0x30000, 0x31350, 0xF900, 0x2F800, 0x3005, 0x3007, 0x303B).forEach {
+            assertTrue("Expected ideograph U+${it.toString(16)}", RankedCandidateBatch.isHanCodePoint(it))
+        }
+        listOf('a'.code, '9'.code, 0x1F600, 0xD800, 0x2A6E0, -1, 0x110000).forEach {
+            assertFalse("Expected non-ideograph U+${it.toString(16)}", RankedCandidateBatch.isHanCodePoint(it))
+        }
+        val supplementaryHan = String(Character.toChars(0x20000)) + "汉"
+        val emoji = String(Character.toChars(0x1F600)) + "汉"
+        val candidates = listOf(supplementaryHan, "普通", "a汉", emoji)
+            .map { CandidateWord("", it, "") }
+        assertEquals(listOf(0, 1), RankedCandidateBatch.scoringIndices(candidates))
+    }
 }
