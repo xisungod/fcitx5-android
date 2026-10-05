@@ -30,6 +30,7 @@ add_subdirectory(po)
 add_subdirectory(androidfrontend)
 add_subdirectory(androidkeyboard)
 add_subdirectory(androidnotification)
+add_subdirectory(neural)
 
 # Build the same pinned Rime addon and install its complete offline data into
 # the main app. There is no dependency on the optional plugin APK at runtime.

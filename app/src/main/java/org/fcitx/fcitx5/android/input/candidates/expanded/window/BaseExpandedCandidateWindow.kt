@@ -76,6 +76,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     final override fun onCreateView(): View {
         candidateLayout = onCreateCandidateLayout().apply {
+            recyclerView.addOnItemTouchListener(horizontalCandidate.candidateTouchListener())
             scrollableTabs.apply {
                 adapter = tabsAdapter
                 layoutManager = verticalLayoutManager()
@@ -139,10 +140,13 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                 enablePlaceholders = false
             ),
             pagingSourceFactory = {
+                val head = horizontalCandidate.rankedBatch
                 CandidatesPagingSource(
                     fcitx,
                     total = horizontalCandidate.adapter.total,
-                    offset = adapter.offset
+                    offset = adapter.offset,
+                    rankedHead = head,
+                    isCurrent = { head.generation == horizontalCandidate.rankedBatch.generation }
                 )
             }
         )
@@ -179,10 +183,10 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     fun bindCandidateUiViewHolder(holder: CandidateViewHolder) {
         holder.itemView.setOnClickListener {
-            fcitx.launchOnReady { it.select(holder.idx) }
+            horizontalCandidate.selectBoundCandidate(holder)
         }
         holder.itemView.setOnLongClickListener {
-            inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)
+            horizontalCandidate.showBoundCandidateActions(holder)
             true
         }
     }

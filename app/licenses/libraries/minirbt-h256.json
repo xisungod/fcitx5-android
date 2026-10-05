@@ -1,0 +1,11 @@
+{
+    "uniqueId": "hfl/minirbt-h256",
+    "artifactVersion": "446e1b4012b10946f479563005700c54c9db3f7c",
+    "description": "Pretrained Chinese MiniRBT-H256 masked language model from HFL/iFLYTEK. Used for optional on-device experimental candidate ranking, without IME fine-tuning. The model download and bundled test package retain the upstream model card and Apache-2.0 LICENSE from iflytek/MiniRBT revision baef787a1cee4fdc4051083943a460807e7b8a86.",
+    "name": "MiniRBT-H256",
+    "website": "https://huggingface.co/hfl/minirbt-h256",
+    "tag": "model",
+    "licenses": [
+        "Apache-2.0"
+    ]
+}

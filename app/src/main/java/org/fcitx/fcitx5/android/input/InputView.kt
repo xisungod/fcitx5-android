@@ -500,12 +500,21 @@ class InputView(
         broadcaster.onSelectionUpdate(start, end)
     }
 
+    internal fun invalidateNeuralCandidates() {
+        horizontalCandidate.invalidateNeuralCandidates()
+    }
+
+    internal fun beginNeuralInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        horizontalCandidate.onStartInput(info, capFlags)
+    }
+
     @RequiresApi(Build.VERSION_CODES.R)
     fun handleInlineSuggestions(response: InlineSuggestionsResponse): Boolean {
         return kawaiiBar.handleInlineSuggestions(response)
     }
 
     override fun onDetachedFromWindow() {
+        horizontalCandidate.closeNeuralCandidates()
         cancelPendingEngineSwitch()
         cancelKeyboardHeightEditor()
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)

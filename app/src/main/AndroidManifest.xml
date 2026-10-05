@@ -15,8 +15,8 @@
     <!-- Used only after an explicit local dictation start; no speech service or network. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
-    <!-- Keep the input method offline. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- Used only for the user's explicit optional-model download. Typing stays on device. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- optional, off by default: read verification codes from incoming SMS, on device only -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

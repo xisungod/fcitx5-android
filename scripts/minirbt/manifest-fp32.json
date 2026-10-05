@@ -1,0 +1,69 @@
+{
+  "format_version": 1,
+  "model_id": "hfl/minirbt-h256",
+  "revision": "446e1b4012b10946f479563005700c54c9db3f7c",
+  "license": "Apache-2.0",
+  "license_source_revision": "baef787a1cee4fdc4051083943a460807e7b8a86",
+  "experiment": "pretrained-mlm-pseudo-log-likelihood",
+  "fine_tuned_for_ime": false,
+  "variant": "fp32",
+  "parameters": 10366856,
+  "onnx_opset": 17,
+  "max_sequence_length": 96,
+  "max_context_tokens": 48,
+  "input_names": [
+    "input_ids",
+    "attention_mask",
+    "token_type_ids",
+    "masked_position",
+    "target_id"
+  ],
+  "input_type": "int64",
+  "output_name": "log_prob",
+  "output_type": "float32",
+  "output_shape": [
+    "batch"
+  ],
+  "vocabulary_size": 21128,
+  "special_tokens": {
+    "[PAD]": 0,
+    "[UNK]": 100,
+    "[CLS]": 101,
+    "[SEP]": 102,
+    "[MASK]": 103
+  },
+  "candidate_score": "mean masked-token log probability; mask candidate tokens only",
+  "source_sha256": {
+    "config.json": "02cc77ba23f292bf5265d76fff662ae8a8057bf85ee9723ba30342bf9ed30746",
+    "README.md": "667be60e0b89d63d308d3d1e76f906d056ad4a2c56e6a2f785544098e220f3eb",
+    "vocab.txt": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c",
+    "pytorch_model.bin": "6728ca573fd5197f28198eb7e6119a76e4d5dc626f953fca8c0dc5ba2798f9fc",
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "files": {
+    "LICENSE": {
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357
+    },
+    "MODEL_CARD.md": {
+      "sha256": "667be60e0b89d63d308d3d1e76f906d056ad4a2c56e6a2f785544098e220f3eb",
+      "bytes": 974
+    },
+    "model.onnx": {
+      "sha256": "b9db720f94a4c949eb8b9197b13e046b1aba320155ac2537543249e8d95f6a90",
+      "bytes": 41591359
+    },
+    "vocab.txt": {
+      "sha256": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c",
+      "bytes": 109540
+    }
+  },
+  "validation": {
+    "host_only": true,
+    "report_sha256": "e0945f19aaa9b244c3aa46dce86767d2d9904da7e53a00dc434b4937d4042813",
+    "fp32_torch_max_abs_error": 0.00017547607421875,
+    "int8_fp32_max_abs_error": 1.0824785232543945,
+    "top_candidate_agreement": 1.0
+  },
+  "checkpoint_vocabulary_size": 21128
+}

@@ -66,6 +66,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val rimeFuzzyNl = switch(R.string.rime_fuzzy_nl, "rime_fuzzy_nl", false)
         val rimeFuzzyZh = switch(R.string.rime_fuzzy_zh, "rime_fuzzy_zh", false)
         val rimeFuzzyAng = switch(R.string.rime_fuzzy_ang, "rime_fuzzy_ang", false)
+        val miniRbtEnabled = switch(R.string.minirbt_enabled, "minirbt_enabled", false)
         val hapticOnKeyPress =
             enumList(
                 R.string.button_haptic_feedback,

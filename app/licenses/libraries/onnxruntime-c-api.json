@@ -1,0 +1,11 @@
+{
+    "uniqueId": "microsoft/onnxruntime/c-api",
+    "artifactVersion": "1.17.3",
+    "description": "ONNX Runtime C API header used by the local MiniRBT JNI bridge. Copyright Microsoft Corporation. The MIT license is retained in app/src/main/cpp/neural/onnxruntime-LICENSE.txt. The bridge requests C API version 17 and reuses the runtime already distributed with offline speech; this entry describes the header and introduces no additional runtime binary.",
+    "name": "ONNX Runtime C API",
+    "website": "https://github.com/microsoft/onnxruntime/tree/v1.17.3/include/onnxruntime/core/session",
+    "tag": "native",
+    "licenses": [
+        "MIT"
+    ]
+}

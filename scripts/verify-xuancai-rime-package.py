@@ -55,7 +55,7 @@ def descendants(node, name):
   yield from descendants(child,name)
 
 
-def inspect_apk(aapt, path, expected_label, expected_version_name='1.0', offline_dictation=False, expected_version_code=822):
+def inspect_apk(aapt, path, expected_label, expected_version_name='1.0', offline_dictation=False, expected_version_code=822, model_download=False):
  badging=subprocess.check_output([aapt,'dump','badging',str(path)],text=True)
  package=re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'",badging,re.MULTILINE)
  require(package is not None,f'{path}: aapt did not report package/version fields')
@@ -73,7 +73,8 @@ def inspect_apk(aapt, path, expected_label, expected_version_name='1.0', offline
  require(len(manifests)==1,f'{path}: expected one AndroidManifest root')
  require(manifests[0]['attrs'].get('package')==package[1],f'{path}: binary manifest package disagrees with badging')
  permissions={node['attrs'].get('android:name','') for node in manifests[0]['children'] if node['name'].startswith('uses-permission')}
- require('android.permission.INTERNET' not in permissions,f'{path}: online permission is forbidden')
+ require(('android.permission.INTERNET' in permissions)==model_download,
+  f'{path}: Internet permission must match the explicit optional model-download feature')
  if offline_dictation:
   require('android.permission.RECORD_AUDIO' in permissions,f'{path}: local dictation must declare microphone permission')
  else:
@@ -114,13 +115,14 @@ def verify_main_identity(main_package, main_manifest, expected_main_package):
  require(applications[0]['attrs'].get('android:allowBackup') is False,'Main APK must explicitly disable cloud backup')
 
 
-def verify_bundled_host(main_apk, aapt_override, apksigner_override, expected_main_package, expected_version_name, offline_dictation=False, expected_version_code=822, expected_app_label='AXiang'):
+def verify_bundled_host(main_apk, aapt_override, apksigner_override, expected_main_package, expected_version_name, offline_dictation=False, expected_version_code=822, expected_app_label='AXiang', model_download=False):
  aapt,apksigner=resolve_android_tools(aapt_override,apksigner_override)
- main_package,main_manifest=inspect_apk(aapt,main_apk,expected_app_label,expected_version_name,offline_dictation,expected_version_code)
+ main_package,main_manifest=inspect_apk(aapt,main_apk,expected_app_label,expected_version_name,offline_dictation,expected_version_code,model_download)
  verify_main_identity(main_package,main_manifest,expected_main_package)
  signers=signer_certificates(apksigner,main_apk)
  microphone='explicit microphone permission for local dictation' if offline_dictation else 'no microphone permission'
- print(f'Single APK host verified: {main_package}; label, version {expected_version_name}, versionCode {expected_version_code}, arm64-v8a, no network permission or speech service, {microphone}, cloud backup disabled.')
+ network='permission for explicit optional model download' if model_download else 'no network permission'
+ print(f'Single APK host verified: {main_package}; label, version {expected_version_name}, versionCode {expected_version_code}, arm64-v8a, {network}, no speech service, {microphone}, cloud backup disabled.')
  print('APK signing certificate SHA-256: '+', '.join(sorted(signers)))
 
 
@@ -256,11 +258,13 @@ parser.add_argument('--expected-version-name',default='1.0',help='Exact expected
 parser.add_argument('--expected-version-code',type=int,default=822,help='Exact expected Android versionCode (default: 822)')
 parser.add_argument('--bundled-rime',action='store_true',help='Verify native Rime and all data directly inside the single main APK')
 parser.add_argument('--offline-dictation',action='store_true',help='Require the explicitly enabled local microphone feature; network/system recognition remains forbidden')
+parser.add_argument('--model-download',action='store_true',help='Allow Internet permission solely for the user-triggered optional neural-model download')
 args=parser.parse_args()
 require(not (args.bundled_rime and args.main_apk),'--bundled-rime accepts one main APK, not a separate Rime/main pair')
 require(not args.offline_dictation or args.bundled_rime,'--offline-dictation requires the single bundled main APK')
+require(not args.model_download or args.bundled_rime,'--model-download requires the single bundled main APK')
 if args.bundled_rime:
- verify_bundled_host(args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.offline_dictation,args.expected_version_code,args.expected_app_label)
+ verify_bundled_host(args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.offline_dictation,args.expected_version_code,args.expected_app_label,args.model_download)
 elif args.main_apk:
  verify_host(args.main_apk,args.rime_apk,args.aapt,args.apksigner,args.expected_main_package,args.expected_version_name,args.expected_version_code,args.expected_app_label)
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="minirbt_section">Experimental features</string>
+    <string name="minirbt_enabled">Local candidate ranking</string>
+    <string name="minirbt_enabled_summary">Try local language scoring to adjust candidate order. Results are experimental; input stays on this device.</string>
+    <string name="minirbt_model">Language model</string>
+    <string name="minirbt_download">Download language model</string>
+    <string name="minirbt_download_summary">Optional download, approximately %1$s MB. Input is never uploaded. Enable candidate ranking after downloading.</string>
+    <string name="minirbt_ready">Model ready</string>
+    <string name="minirbt_ready_summary">Stored on this device. Enable the switch above to use it.</string>
+    <string name="minirbt_active_summary">Local candidate ranking is enabled. Switch it off to restore the standard order.</string>
+    <string name="minirbt_verifying">Preparing model…</string>
+    <string name="minirbt_downloading">Downloading · %1$d%%</string>
+    <string name="minirbt_cancel">Tap to cancel</string>
+    <string name="minirbt_retry">Download failed · retry</string>
+    <string name="minirbt_retry_summary">Check your connection and try again. Standard typing remains available.</string>
+    <string name="minirbt_invalid">Model could not be prepared · retry</string>
+    <string name="minirbt_invalid_summary">The model failed verification. It has not been enabled.</string>
+    <string name="minirbt_delete">Delete downloaded model</string>
+    <string name="minirbt_delete_summary">Turn off local candidate ranking and free its storage.</string>
+    <string name="minirbt_delete_message">Delete the local language model? You can download it again later.</string>
+    <string name="minirbt_need_model">Download the model before enabling local candidate ranking.</string>
+</resources>

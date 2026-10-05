@@ -20,12 +20,12 @@ import javax.xml.parsers.DocumentBuilderFactory
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class)
 class AppOfflinePrivacyTest {
-    @Test fun localDictationCanRequestMicrophoneButCannotUseTheNetwork() {
+    @Test fun optionalModelDownloadCanUseNetworkAndLocalDictationRequiresMicrophone() {
         val app = RuntimeEnvironment.getApplication()
         @Suppress("DEPRECATION")
         val permissions = app.packageManager.getPackageInfo(app.packageName,
             PackageManager.GET_PERMISSIONS).requestedPermissions.orEmpty().toSet()
-        assertFalse("The keyboard must remain offline", Manifest.permission.INTERNET in permissions)
+        assertTrue("The optional model needs an explicit package download", Manifest.permission.INTERNET in permissions)
         assertTrue("On-device dictation requires the explicit microphone permission", Manifest.permission.RECORD_AUDIO in permissions)
     }
 

@@ -9,6 +9,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.core.FcitxAPI
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
@@ -70,7 +72,7 @@ class CommonKeyActionListener :
             // Chinese: select 1st candidate, except prediction candidates
             if (clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()) {
                 // preedit not empty, maybe there are candidates to select ...
-                select(0)
+                if (!horizontalCandidate.selectPreferredCandidate(this)) select(0)
             }
         } else {
             // Other languages: commit preedit as-is
@@ -89,12 +91,16 @@ class CommonKeyActionListener :
 
     val listener by lazy {
         KeyActionListener { action, _ ->
+            if (locksCandidateChoice(action)) horizontalCandidate.freezeNeuralOrder()
             when (action) {
                 is FcitxKeyAction -> service.postFcitxJob {
                     sendKey(action.act, action.states.states, action.code)
                 }
                 is SymAction -> service.postFcitxJob {
-                    sendKey(action.sym, action.states)
+                    // Space chooses the same original native candidate shown as the optional
+                    // neural first choice. Return and all other keys retain engine semantics.
+                    if (!isPlainCandidateSpace(action) ||
+                        !horizontalCandidate.selectPreferredCandidate(this)) sendKey(action.sym, action.states)
                 }
                 is CommitAction -> service.postFcitxJob {
                     commitAndReset()
@@ -180,5 +186,15 @@ class CommonKeyActionListener :
                 else -> {}
             }
         }
+    }
+
+    companion object {
+        internal fun isPlainCandidateSpace(action: SymAction): Boolean =
+            action.sym.sym == FcitxKeyMapping.FcitxKey_space &&
+                action.states.states and KeyState.SimpleMask.state == 0u
+
+        internal fun locksCandidateChoice(action: KeyAction): Boolean =
+            action is CommitAction || action is QuickPhraseAction || action is UnicodeAction ||
+                (action is SymAction && isPlainCandidateSpace(action))
     }
 }

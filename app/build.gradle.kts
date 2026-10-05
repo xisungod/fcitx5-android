@@ -22,6 +22,7 @@ android {
                 targets(
                     // jni
                     "native-lib",
+                    "axiang-neural",
                     // copy fcitx5 built-in addon libraries
                     "copy-fcitx5-modules",
                     // android specific modules
@@ -57,6 +58,7 @@ android {
         resValues = true
     }
 
+
     buildTypes {
         release {
             resValue("mipmap", "app_icon", "@mipmap/ic_launcher")
@@ -73,6 +75,11 @@ android {
     }
 
     androidResources {
+        if (providers.environmentVariable("AXIANG_BUNDLE_MINIRBT").orNull != "1") {
+            // AAPT ignores the optional model directory in normal builds,
+            // including when delivery builds supply verified asset roots.
+            ignoreAssetsPattern = (ignoreAssetsPattern ?: "") + ":neural"
+        }
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = true
     }
@@ -102,6 +109,13 @@ generateDataDescriptor {
     // Fcitx's data directory or include it in the input-method configuration export.
     excludes.addAll(provider {
         fileTree("src/main/assets/asr").files.map {
+            it.relativeTo(file("src/main/assets")).invariantSeparatorsPath
+        }
+    })
+    // Optional neural models stay outside the engine data export. Production
+    // builds exclude all bundled model bytes; tests may opt in explicitly.
+    excludes.addAll(provider {
+        fileTree("src/main/assets/neural").files.map {
             it.relativeTo(file("src/main/assets")).invariantSeparatorsPath
         }
     })

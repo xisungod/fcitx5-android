@@ -17,6 +17,8 @@ internal object KeyboardPreferenceSections {
 
     const val APPLY_TYPING_KEY = "axiang_apply_typing"
     const val DICTIONARY_IMPORT_KEY = "rime_personal_dictionary_import"
+    const val MINIRBT_MODEL_KEY = "minirbt_model_status"
+    const val MINIRBT_DELETE_KEY = "minirbt_model_delete"
 
     private data class Section(
         val page: Page,
@@ -49,7 +51,9 @@ internal object KeyboardPreferenceSections {
                 listOf(horizontalCandidateStyle.key, expandedCandidateStyle.key,
                     expandedCandidateGridSpanCount.key)),
             Section(Page.Typing, "typing_behavior", R.string.axiang_typing_behavior,
-                listOf(inlineSuggestions.key, focusChangeResetKeyboard.key))
+                listOf(inlineSuggestions.key, focusChangeResetKeyboard.key)),
+            Section(Page.Typing, "typing_experimental", R.string.minirbt_section,
+                listOf(miniRbtEnabled.key, MINIRBT_MODEL_KEY, MINIRBT_DELETE_KEY))
         )
     }
 

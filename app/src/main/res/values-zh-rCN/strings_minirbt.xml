@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="minirbt_section">实验功能</string>
+    <string name="minirbt_enabled">本地候选优化</string>
+    <string name="minirbt_enabled_summary">尝试用本地语言模型调整候选顺序。效果仍在测试，输入内容仅在本机处理。</string>
+    <string name="minirbt_model">语言模型</string>
+    <string name="minirbt_download">下载语言模型</string>
+    <string name="minirbt_download_summary">可选下载，约 %1$s MB。不会上传输入内容，下载后可开启候选优化。</string>
+    <string name="minirbt_ready">模型已就绪</string>
+    <string name="minirbt_ready_summary">已保存在本机。打开上方开关后使用。</string>
+    <string name="minirbt_active_summary">本地候选优化已开启。关闭开关即可恢复标准候选顺序。</string>
+    <string name="minirbt_verifying">正在准备模型…</string>
+    <string name="minirbt_downloading">正在下载 · %1$d%%</string>
+    <string name="minirbt_cancel">点击取消下载</string>
+    <string name="minirbt_retry">下载失败 · 点击重试</string>
+    <string name="minirbt_retry_summary">请检查网络后重试，正常打字不受影响。</string>
+    <string name="minirbt_invalid">模型准备失败 · 点击重试</string>
+    <string name="minirbt_invalid_summary">模型未通过完整性检查，候选优化没有启用。</string>
+    <string name="minirbt_delete">删除本地模型</string>
+    <string name="minirbt_delete_summary">关闭候选优化，并释放模型占用的空间。</string>
+    <string name="minirbt_delete_message">删除本机语言模型？之后可以重新下载。</string>
+    <string name="minirbt_need_model">请先下载语言模型，再开启本地候选优化。</string>
+</resources>

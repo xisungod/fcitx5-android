@@ -49,6 +49,7 @@ import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
@@ -202,6 +203,25 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun resetComposingState() {
         composing.clear()
         composingText = FormattedText.Empty
+    }
+
+    /** A short committed prefix for optional local inference, excluding live composition. */
+    internal fun neuralContextBeforeComposition(): String {
+        if (!prefs.keyboard.miniRbtEnabled.getValue() ||
+            capabilityFlags.has(CapabilityFlag.PasswordOrSensitive) ||
+            currentInputSelection.isNotEmpty()) return ""
+        val live = composingText.toString()
+        if (live.length > 64) return ""
+        val composingBeforeCursor = if (composing.isNotEmpty()) {
+            val cursor = currentInputSelection.start
+            if (cursor !in composing.start..composing.end) return ""
+            (cursor - composing.start).coerceAtMost(live.length)
+        } else 0
+        val before = currentInputConnection?.getTextBeforeCursor(48 + composingBeforeCursor, 0)
+            ?.toString() ?: return ""
+        val suffix = live.take(composingBeforeCursor)
+        if (!before.endsWith(suffix)) return ""
+        return before.dropLast(composingBeforeCursor).takeLast(48)
     }
 
     private var cursorUpdateIndex: Int = 0
@@ -879,6 +899,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         updateSmsCodeReceiver()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
+        inputView?.beginNeuralInput(attribute, flags)
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -1018,6 +1039,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             return // do nothing if prediction matches
         } else {
             // cursor update can't match any prediction: it's treated as a user input
+            inputView?.invalidateNeuralCandidates()
             selection.resetTo(newSelStart, newSelEnd)
             if (offlineDictationSession != null) {
                 // A user cursor move invalidates the dictation range as well as a focus change.
@@ -1199,6 +1221,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        inputView?.invalidateNeuralCandidates()
         finishOfflineDictation()
         heightEditorHandledBack = false
         inputView?.finishTransientEditors()
@@ -1218,6 +1241,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onWindowHidden() {
+        inputView?.invalidateNeuralCandidates()
         finishOfflineDictation()
         heightEditorHandledBack = false
         inputView?.finishTransientEditors()
@@ -1225,6 +1249,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInput() {
+        inputView?.invalidateNeuralCandidates()
         finishOfflineDictation()
         inputView?.cancelPendingEngineSwitch()
         Timber.d("onFinishInput")
@@ -1235,6 +1260,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onUnbindInput() {
+        inputView?.invalidateNeuralCandidates()
         finishOfflineDictation()
         inputView?.cancelPendingEngineSwitch()
         cachedKeyEvents.evictAll()

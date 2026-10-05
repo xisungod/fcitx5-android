@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -27,6 +28,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.navbarFrameHeight
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
+import org.fcitx.fcitx5.android.input.neural.RankedCandidateBatch
 import splitties.views.dsl.core.withTheme
 import kotlin.math.max
 
@@ -67,20 +69,34 @@ abstract class BaseInputView(
             }
         }
 
-    private fun triggerCandidateAction(idx: Int, actionIdx: Int) {
-        fcitx.runIfReady { triggerCandidateAction(idx, actionIdx) }
+    private fun triggerCandidateAction(idx: Int, actionIdx: Int,
+        isCurrent: () -> Boolean, expectedWord: CandidateWord?) {
+        service.postFcitxJob {
+            if (!isCurrent()) return@postFcitxJob
+            // Floating candidates use page-relative indices, while getCandidates is global.
+            // Content validation applies to the bulk horizontal/expanded callers only.
+            val matches = expectedWord == null ||
+                RankedCandidateBatch.sameNativeWord(expectedWord, getCandidates(idx, 1).firstOrNull())
+            if (isCurrent() && matches) triggerCandidateAction(idx, actionIdx)
+        }
     }
 
     private var candidateActionMenu: PopupMenu? = null
 
     val themedContext = context.withTheme(R.style.Theme_InputViewTheme)
 
-    fun showCandidateActionMenu(idx: Int, text: String, view: View) {
+    fun showCandidateActionMenu(idx: Int, text: String, view: View, isCurrent: () -> Boolean = { true },
+        expectedWord: CandidateWord? = null) {
         candidateActionMenu?.dismiss()
         candidateActionMenu = null
         service.lifecycleScope.launch {
-            val actions = fcitx.runOnReady { getCandidateActions(idx) }
-            if (actions.isEmpty()) return@launch
+            val actions = fcitx.runOnReady {
+                val matches = expectedWord == null ||
+                    RankedCandidateBatch.sameNativeWord(expectedWord, getCandidates(idx, 1).firstOrNull())
+                if (!isCurrent() || !matches) emptyArray()
+                else getCandidateActions(idx)
+            }
+            if (actions.isEmpty() || !isCurrent()) return@launch
             InputFeedbacks.hapticFeedback(view, longPress = true)
             candidateActionMenu = PopupMenu(themedContext, view).apply {
                 menu.add(buildSpannedString {
@@ -99,7 +115,7 @@ abstract class BaseInputView(
                 }
                 actions.forEach { action ->
                     menu.item(action.text) {
-                        triggerCandidateAction(idx, action.id)
+                        triggerCandidateAction(idx, action.id, isCurrent, expectedWord)
                     }
                 }
                 setOnDismissListener {
