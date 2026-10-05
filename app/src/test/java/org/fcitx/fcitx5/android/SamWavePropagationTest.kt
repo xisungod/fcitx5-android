@@ -102,9 +102,37 @@ class SamWavePropagationTest {
             assertTrue("Light peaks at the farther location later, rather than only filling a growing pool: $near / $far",
                 far.first >= near.first + 60)
             assertTrue("Near pixels dim after the crest has moved outward", samples.last().second < near.second * 0.65f)
-            assertTrue("A coloured wake remains behind the front", samples.last().second >= 5)
+            assertTrue("A coloured wake remains behind the front before its centre clears",
+                samples.first { it.first == 300L }.second >= 5)
             File("build/outputs/effect-checks/sam-propagation/arrival.csv").writeText(
                 "time_ms,near_light,far_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
+        }
+    }
+
+    @Test
+    fun travellingBandStaysBroadAndVisibleBeyondItsInitialBurst() {
+        Field().use { field ->
+            for (time in listOf(240L, 400L)) {
+                val frame = field.render(time)
+                try {
+                    val profile = (180..480).map { x -> x to light(frame, x) }
+                    val peak = profile.maxOf { it.second }
+                    var run = 0
+                    var longestRun = 0
+                    for ((_, value) in profile) {
+                        run = if (value >= peak * 0.55f) run + 1 else 0
+                        longestRun = maxOf(longestRun, run)
+                    }
+                    assertTrue("The travelling band remains visible at $time ms: $peak", peak >= 80)
+                    assertTrue("Light spans neighbouring gaps instead of a thin outline at $time ms: $longestRun px",
+                        longestRun >= 84)
+                    assertTrue("The front retains a dark area ahead instead of lighting the entire field",
+                        light(frame, 500) < peak * 0.15f)
+                    if (time == 400L) assertTrue("The source clears before the outgoing band; this is not a uniformly fading pool",
+                        light(frame, 120) < peak * 0.40f)
+                    save(frame, "wide-band-$time")
+                } finally { frame.recycle() }
+            }
         }
     }
 
@@ -126,7 +154,8 @@ class SamWavePropagationTest {
     fun selectedWaveFadeAndHoldAreVisibleAndEndAtTheirConfiguredTimes() {
         fun sample(fade: Int, hold: Int, time: Long): Int = Field(fade = fade, hold = hold).use { field ->
             val frame = field.render(time)
-            try { light(frame, 155) } finally { frame.recycle() }
+            // Observe the outgoing band: the source now clears behind it.
+            try { light(frame, 360) } finally { frame.recycle() }
         }
         assertEquals("Short selected fade has ended", 0, sample(100, 40, 700))
         assertTrue("A long selected fade keeps a visible tail", sample(900, 40, 1000) >= 15)

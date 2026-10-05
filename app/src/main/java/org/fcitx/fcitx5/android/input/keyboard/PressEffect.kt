@@ -1096,23 +1096,26 @@ internal class PressEffect(
             val phase = (frameTime - ripple.start).toFloat() / 820f + ripple.shape * 0.83f
             node.x = ripple.x + ripple.driftX * progress * 0.18f
             node.y = ripple.y + ripple.driftY * progress * 0.18f
-            // A broad, feathered front advances out from the cap. Its wake and
-            // compact source remain lit, so it never becomes an isolated outline.
-            // These are our design values, awaiting the user's reference comparison.
+            // A broad band advances between black caps and leaves connected
+            // colour behind it. Keep its later travel visible: a narrow, weakening
+            // crest reads as a faint outline instead of the reference's moving wash.
             node.halfWidth = min(ripple.flashWidth / 2f, pitch / 2f) + travel
             node.halfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.76f
             // Fast broad reach belongs to the dim shoulder. The much smaller
             // bright core remains attached to this particular touch location.
             node.coreHalfWidth = min(ripple.flashWidth / 2f, pitch / 2f) +
-                pitch * 0.72f * reach * ripple.size * progress
+                pitch * 0.90f * reach * ripple.size * progress
             node.coreHalfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) +
-                pitch * 0.70f * reach * ripple.size * progress
+                pitch * 0.88f * reach * ripple.size * progress
             node.candidateCoreHalfWidth = node.coreHalfWidth
             node.candidateCoreHalfHeight = node.coreHalfHeight
             node.corner = min(node.halfWidth, node.halfHeight)
             node.feather = 5f * density + travel * 0.18f
-            node.samFrontWidth = pitch * 0.32f + travel * 0.07f
-            node.samFrontStrength = 0.40f * (1f - 0.65f * smoothstep(0.65f, 1f, progress))
+            node.samFrontWidth = pitch * 0.85f + travel * 0.26f
+            node.samFrontStrength = 0.62f * (1f - 0.18f * smoothstep(0.65f, 1f, progress))
+            // The wake clears from the source as the band leaves. Key-face
+            // colour has its own release clock and must not hold this centre lit.
+            node.samWakeStrength = 1f - 0.94f * smoothstep(0.40f, 1f, progress)
             node.bendX = travel * 0.018f
             node.bendY = travel * 0.014f
             node.curveX = kotlin.math.sin(phase)
@@ -1294,11 +1297,11 @@ internal class PressEffect(
                     val outerX = (node.dx[x] - node.rowBend[y]) / node.halfWidth
                     val outerY = (node.dy[y] - node.columnBend[x]) / node.halfHeight
                     val outerRadius = sqrt(outerX * outerX + outerY * outerY)
-                    val shoulder = 0.065f / (1f + 2f * outerRadius * outerRadius)
+                    val shoulder = 0.13f / (1f + 2f * outerRadius * outerRadius)
                     val distanceFromFront = abs(outerRadius - 0.78f) * min(node.halfWidth, node.halfHeight)
                     val front = node.samFrontStrength *
                         (1f - smoothstep(0f, node.samFrontWidth, distanceFromFront))
-                    val wake = core + shoulder - core * shoulder
+                    val wake = (core + shoulder - core * shoulder) * node.samWakeStrength
                     val exposure = (node.weight / 1.35f) * coverage * (wake + front - wake * front)
                     // The strongest local source determines exposure; another
                     // distant shoulder cannot lift the whole scene to its peak.
@@ -1346,6 +1349,7 @@ internal class PressEffect(
         var fluidMix = 0f
         var samFrontWidth = 0f
         var samFrontStrength = 0f
+        var samWakeStrength = 1f
         var fluidCos2 = 0f
         var fluidSin2 = 0f
         var fluidCos3 = 0f
