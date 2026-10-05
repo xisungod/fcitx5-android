@@ -282,7 +282,7 @@ jobs:
           toolchain="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
           bridge="$RUNNER_TEMP/experiment-prebuilt/jniLibs/arm64-v8a/libaxiang-neural.so"
           test -f "$RUNNER_TEMP/experiment-prebuilt/jniLibs/arm64-v8a/libc++_shared.so"
-          "$toolchain/aarch64-linux-android24-clang++" -std=c++17 -O2 -fPIC -shared \
+          "$toolchain/aarch64-linux-android23-clang++" -std=c++17 -O2 -fPIC -shared \
             -Wl,-z,max-page-size=16384 -Wl,--no-undefined -Wl,--as-needed \
             -Wl,-soname,libaxiang-neural.so -nostdlib++ \
             app/src/main/cpp/neural/mini-rbt-jni.cpp -lc++_shared -ldl -o "$bridge"
@@ -296,7 +296,7 @@ jobs:
           assert needed == ['libc++_shared.so', 'libc.so', 'libdl.so'], needed
           assert 'libonnxruntime.so' not in needed, 'ORT must be reused through dlopen'
           bridge = root / 'experiment-prebuilt/jniLibs/arm64-v8a/libaxiang-neural.so'
-          record = {'abi': 'arm64-v8a', 'android_api': 24, 'ndk': os.environ['NDK_VERSION'],
+          record = {'abi': 'arm64-v8a', 'android_api': 23, 'ndk': os.environ['NDK_VERSION'],
                     'sha256': hashlib.sha256(bridge.read_bytes()).hexdigest(), 'bytes': bridge.stat().st_size,
                     'needed': needed, 'reuse_original_onnxruntime': True, 'reuse_original_libcxx': True}
           (root / 'neural-native-verification.json').write_text(json.dumps(record, indent=2) + '\n')
