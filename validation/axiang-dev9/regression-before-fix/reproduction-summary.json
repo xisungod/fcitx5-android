@@ -1,0 +1,19 @@
+{
+  "stage": "Before the SwitchCompat themed-context fix; these expected failures are not part of the final passing test count",
+  "tests": 2,
+  "failures": [
+    {
+      "test": "animatedToolsMenuOpensRealSettingsAndBackKeepsTheInputShellVisible",
+      "type": "java.lang.NullPointerException",
+      "message": "java.lang.NullPointerException: Cannot invoke \"java.lang.CharSequence.length()\" because \"<parameter1>\" is null",
+      "switch_makeLayout_in_stack": true
+    },
+    {
+      "test": "settingsWidgetsConstructAttachAndInteractUsingOnlyTheImeServiceTheme",
+      "type": "java.lang.NullPointerException",
+      "message": "java.lang.NullPointerException: Cannot invoke \"java.lang.CharSequence.length()\" because \"<parameter1>\" is null",
+      "switch_makeLayout_in_stack": true
+    }
+  ],
+  "source_xml_sha256": "3ad3946e834cee8b07f95871cb9021d8f142f1cd86068bed7448f2f3a23e3568"
+}

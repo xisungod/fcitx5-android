@@ -16,6 +16,12 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardSizePolicy
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.PinyinT9Keyboard
+import org.fcitx.fcitx5.android.input.keyboard.SymbolKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.SymbolKeyboardState
+import org.fcitx.fcitx5.android.input.keyboard.SymbolHistory
 import org.fcitx.fcitx5.android.ui.main.settings.TwinSeekBarPreference
 import org.fcitx.fcitx5.android.ui.main.settings.DialogSeekBarPreference
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardQuickControls
@@ -75,12 +81,52 @@ class KeyboardSizeSettingsTest {
                 assertEquals(after.height, after.getChildAt(3).bottom)
                 assertEquals("Only one row should disappear", before.getChildAt(0).height.toDouble(),
                     (before.height - after.height).toDouble(), 1.0)
-                assertEquals(baseHeight, KeyboardSizePolicy.heightForLayout(baseHeight, true, false, false))
+                assertEquals("A numeric page must not restore the removed row as extra height", after.height,
+                    KeyboardSizePolicy.heightForLayout(baseHeight, true, false, false))
                 assertEquals(baseHeight, KeyboardSizePolicy.heightForLayout(baseHeight, false, true, false))
             }
         } finally {
             keyboards.forEach { it.onDetach() }
             p.portraitNumberRow.setValue(old)
+        }
+    }
+
+    @Test fun numberT9AndSymbolPagesShareTheAlphabetHeightWithoutStretchingAtThe123Switch() {
+        val context = RuntimeEnvironment.getApplication()
+        val p = ThemeManager.prefs
+        val before = p.portraitNumberRow.getValue()
+        val keyboards = mutableListOf<BaseKeyboard>()
+        val history = SymbolHistory(context.getSharedPreferences("height-symbol-history", Context.MODE_PRIVATE))
+        try {
+            for (numberRow in listOf(false, true)) {
+                p.portraitNumberRow.setValue(numberRow)
+                // A user's existing global percentage still determines the base height.
+                val base = 450
+                val expected = if (numberRow) 450 else 360
+                val text = TextKeyboard(context, ThemePreset.XuancaiBlackV09).also { keyboards += it }
+                val numbers = NumberKeyboard(context, ThemePreset.XuancaiBlackV09).also { keyboards += it }
+                val t9 = PinyinT9Keyboard(context, ThemePreset.XuancaiBlackV09).also { keyboards += it }
+                val symbols = SymbolKeyboard(context, ThemePreset.XuancaiBlackV09, SymbolKeyboardState(), history)
+                    .also { keyboards += it }
+                listOf(text, numbers, t9, symbols).forEach { keyboard ->
+                    val pageHeight = KeyboardSizePolicy.heightForLayout(base, true, keyboard === text, numberRow)
+                    layout(keyboard, 359, pageHeight)
+                    assertEquals("Changing keyboard pages must retain the same outer height", expected, keyboard.height)
+                }
+                assertEquals("Numeric keys use four rows within the same height", expected / 4.0,
+                    numbers.backspace.height.toDouble(), 1.0)
+                assertEquals("The bottom numeric row ends at the shared keyboard edge", expected,
+                    numbers.`return`.bottom)
+                for (portrait in listOf(true, false)) for (customBase in listOf(233, 421, 708)) {
+                    val alphabet = KeyboardSizePolicy.heightForLayout(customBase, portrait, true, numberRow)
+                    val numeric = KeyboardSizePolicy.heightForLayout(customBase, portrait, false, numberRow)
+                    assertEquals("Saved custom heights and orientation must apply equally to every page", alphabet, numeric)
+                    if (!portrait) assertEquals("Landscape keeps its own saved height", customBase, numeric)
+                }
+            }
+        } finally {
+            keyboards.forEach { it.onDetach() }
+            p.portraitNumberRow.setValue(before)
         }
     }
 

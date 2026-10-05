@@ -1,0 +1,17 @@
+source=actual Android TextKeyboard/KeyView/PressEffect
+graphics=Robolectric NATIVE
+portrait_width_dp=360
+height_px=346
+density=1.5
+number_row=false
+fps=60
+frames=85
+input=f
+down_ms=0
+up_ms=50
+colour=#00F0FF
+recorded_transform=unmodified production key surface Canvas
+colour_measurement=actual transformed upper-quarter cap pixel away from glyph
+direct_native_frames=true
+interpolation=false
+physical_device_capture=false

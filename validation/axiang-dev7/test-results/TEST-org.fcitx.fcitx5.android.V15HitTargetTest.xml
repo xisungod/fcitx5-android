@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.V15HitTargetTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:19:59.316Z" hostname="1860ba65b9a5" time="1.08">
+  <properties/>
+  <testcase name="allLetterCentresRemainAccurateAtDifferentSizesWithAndWithoutTheDigitRow" classname="org.fcitx.fcitx5.android.V15HitTargetTest" time="0.563"/>
+  <testcase name="slidingToAnotherLetterCommitsOnlyTheFinalSelectionAtEitherHeight" classname="org.fcitx.fcitx5.android.V15HitTargetTest" time="0.149"/>
+  <testcase name="visualHorizontalKeyGapsBelongToTheAdjacentFullTouchCells" classname="org.fcitx.fcitx5.android.V15HitTargetTest" time="0.186"/>
+  <testcase name="actualMistypedSpellingReachesTheEngineUnaltered" classname="org.fcitx.fcitx5.android.V15HitTargetTest" time="0.081"/>
+  <testcase name="overlappingThumbsWithNonConsecutivePointerIdsDoNotLoseLetters" classname="org.fcitx.fcitx5.android.V15HitTargetTest" time="0.078"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

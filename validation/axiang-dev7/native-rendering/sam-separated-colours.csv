@@ -1,0 +1,4 @@
+region,time_ms,visible_gap_pixels,pixels_closer_to_own_colour
+old_before,150,3936,3936
+old_after,300,3890,3890
+new_after,300,3927,3927

@@ -381,7 +381,7 @@ class InputView(
         windowManager.attachWindow(KeyboardWindow)
         val portrait = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
         val numberRow = ThemeManager.prefs.portraitNumberRow.getValue()
-        val rows = if (portrait && textKeyboardLayout && !numberRow) 4 else 5
+        val rows = if (portrait && !numberRow) 4 else 5
         val availableHeight = height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
         val bottomInset = (bottomPaddingSpace.layoutParams as LayoutParams).bottomMargin.coerceAtLeast(0)
         val maximum = (availableHeight - dp(KawaiiBarComponent.HEIGHT) - keyboardBottomPaddingPx -

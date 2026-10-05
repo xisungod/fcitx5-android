@@ -1,0 +1,7 @@
+{
+  "verified": true,
+  "basis": "Final strict package verifier output in apk-verifier.txt",
+  "verifier_log_sha256": "72f4f494594e528351181594a5e414c81a48d19e28fae8d0406f51e4b6e94bea",
+  "rime_descriptor_file_hashes": 151,
+  "asr_source_license_checksums": 22
+}

@@ -1,0 +1,62 @@
+{
+  "source_commit": "ba8a9560861ea485bda68997140d43532ba8a8cf",
+  "renderer": "actual Android TextKeyboard, KeyView and PressEffect, Robolectric NATIVE",
+  "user_media_included": false,
+  "physical_device_capture": false,
+  "files": [
+    {
+      "source": "dev8-sam/single/frame-000.png",
+      "file": "single-down-000ms.png",
+      "bytes": 20264,
+      "sha256": "ed037a159df59705068b8386edb9fca40ef4d055b44ad5fc31c525c1d39c375d"
+    },
+    {
+      "source": "dev8-sam/single/frame-003.png",
+      "file": "single-release-050ms.png",
+      "bytes": 23875,
+      "sha256": "d02c200a5371f4b4d336f47c16ad82df98e47cd5274d731b46456ac673995952"
+    },
+    {
+      "source": "dev8-sam/single/frame-012.png",
+      "file": "single-rebound-200ms.png",
+      "bytes": 37508,
+      "sha256": "bef727c05350621e73c3a5e7dfa290917cc83213c46a2c98662e078019b33a5f"
+    },
+    {
+      "source": "dev8-sam/single/frame-036.png",
+      "file": "single-landing-600ms.png",
+      "bytes": 30581,
+      "sha256": "11a02a68cff34a016d0d5b6467999f7e969936d614486567aa844d2897326a50"
+    },
+    {
+      "source": "dev8-sam/burst/frame-050.png",
+      "file": "burst-050.png",
+      "bytes": 57577,
+      "sha256": "9c81ac61a5368d876889eab15d2969dcad5f910336291f57adacade9d521cd49"
+    },
+    {
+      "source": "dev8-sam/single/motion.csv",
+      "file": "single-motion.csv",
+      "bytes": 3331,
+      "sha256": "1c948251372ea22c666545b0deef0f95b62bc85bda31af5a42922cfcbcdc0f7e"
+    },
+    {
+      "source": "dev8-sam/single/provenance.txt",
+      "file": "single-provenance.txt",
+      "bytes": 421,
+      "sha256": "54b2360be31345b0e549ffe213b041efd76a437ccc14f5b0b76a92da7550a744"
+    },
+    {
+      "source": "dev8-sam/burst/metrics.csv",
+      "file": "burst-metrics.csv",
+      "bytes": 5357,
+      "sha256": "ca05cbbfb00a3357b3c317eeba70413a566150ab6e7b72af3f82b2bed43d7d03"
+    },
+    {
+      "source": "dev8-sam/burst/provenance.txt",
+      "file": "burst-provenance.txt",
+      "bytes": 604,
+      "sha256": "32326dc9936ae76904d98175a336f1f97c9ba0a4316d7759ed221d77e6145d53"
+    }
+  ]
+}

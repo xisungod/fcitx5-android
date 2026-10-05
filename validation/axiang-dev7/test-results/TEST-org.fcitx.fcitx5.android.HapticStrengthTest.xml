@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.HapticStrengthTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:18:58.392Z" hostname="1860ba65b9a5" time="0.985">
+  <properties/>
+  <testcase name="hardwareWithoutAmplitudeControlKeepsExistingSystemAndCustomDurationPaths" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.076"/>
+  <testcase name="confirmingActualDialogAtDefaultHundredPersistsExplicitStrengthWithoutInitialMutation" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.63"/>
+  <testcase name="mapperKeepsTheEntireExplicitRangeMonotonicIncludingHundred" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.021"/>
+  <testcase name="explicitlySavedHundredRemainsOnTheSameAmplitudeScaleAsNinetyNine" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.024"/>
+  <testcase name="customPulseIsPreservedAtHundredAndScaledWithoutChangingStoredDurationOrAmplitude" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.054"/>
+  <testcase name="absentStrengthKeepsLegacySystemFeedbackAndSavedValuesUnchanged" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.036"/>
+  <testcase name="zeroSuppressesSystemCustomLongReleaseAndRepeatedFeedbackWithoutProbingHardware" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.036"/>
+  <testcase name="nonzeroStrengthStillRespectsDisabledModeSystemPreferenceAndKeyUpGate" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.025"/>
+  <testcase name="halfStrengthProducesScaledPulsesForDefaultDurationIncludingLongAndRelease" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.037"/>
+  <testcase name="absentStrengthPreservesLegacyCustomDurationAndDefaultAmplitudeWithoutMigration" classname="org.fcitx.fcitx5.android.HapticStrengthTest" time="0.037"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+]]></system-err>
+</testsuite>

@@ -43,7 +43,7 @@ internal class KeyPressDepth(
 
     // Design values, not inferred Samsung constants. UP changes the spring target
     // immediately; even a zero-duration tap reaches one visible peak around 190ms.
-    private val pressFrequency get() = 48.0 * 180.0 / configuration.pressDuration
+    private val pressFrequency get() = 32.0 * 180.0 / configuration.pressDuration
     private val reboundTarget = 0.75
     private val reboundFrequency get() = 20.0 * 1000.0 / configuration.reboundDuration
     private val reboundDamping = 0.55
@@ -101,9 +101,8 @@ internal class KeyPressDepth(
         if (held) return
         val now = clock().toDouble()
         sample(now)
-        // Only a resting key gets the immediate default 4% compression seed. Repeated touches
-        // inherit the current signed position and speed without an artificial kick.
-        if (phase == Phase.Rest) position = -0.5
+        // Colour supplies immediate DOWN feedback. Geometry starts from its
+        // actual position and velocity, including rest, without a compression jump.
         held = true
         startMotion(Phase.Pressed, now)
     }

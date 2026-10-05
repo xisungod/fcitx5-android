@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" tests="16" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:49:33.996Z" hostname="1860ba65b9a5" time="7.188">
+  <properties/>
+  <testcase name="rapidTapsKeepEveryLetterDespiteSmallLiftOffDrift" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.203"/>
+  <testcase name="hidingLanguageKeepsSpaceCenteredAndTheWholeBottomRowTouchable" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.193"/>
+  <testcase name="continuousTypingRendersRealKeyColoursPopupsAndRecordedRimeCandidates" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="3.583"/>
+  <testcase name="symbolPageOpensWithPunctuationAndCommitsTheDisplayedSymbol" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.148"/>
+  <testcase name="finalUpCanSelectANewLetterWithoutMoveButCannotTriggerAFunctionKey" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.207"/>
+  <testcase name="draggingAcrossLettersUpdatesPreviewAndOnlyCommitsTheReleaseKey" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.256"/>
+  <testcase name="oldHighlightReproducesTheRectangleSoThePixelCheckIsSensitive" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.053"/>
+  <testcase name="sendEditorShowsTheSwooshInTheLargerActualKeyAndKeepsReturnDispatch" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.663"/>
+  <testcase name="keyColourIsAboveItsBackgroundAndBelowTheWhiteCharacter" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.114"/>
+  <testcase name="languageKeyMatchesEngineEnglishUsesLowercaseAndShiftStillTypesUppercase" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.064"/>
+  <testcase name="samsungKeycapsHaveVisibleGapsButNoDeadTouchZonesAndSpaceUsesAnIcon" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.138"/>
+  <testcase name="popupCommitsEnglishEllipsisAsTextAndKeepsSinglePunctuationAsKeys" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.028"/>
+  <testcase name="holdingSpaceThenDraggingMovesCursorWithoutTypingASpace" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.092"/>
+  <testcase name="largeCandidatesScrollAndRealUiRendersBothLanguageStates" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="1.002"/>
+  <testcase name="twoThumbsKeepIndependentTargetsWhileOneFingerSlides" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.085"/>
+  <testcase name="realKeyboardBreathesBeforeAnyTouchAndFunctionKeysHaveNoPressedRectangle" classname="org.fcitx.fcitx5.android.KeyboardVisualRegressionTest" time="0.333"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

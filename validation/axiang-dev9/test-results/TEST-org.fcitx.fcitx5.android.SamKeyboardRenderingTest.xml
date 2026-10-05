@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-05T04:23:17.524Z" hostname="1860ba65b9a5" time="9.978">
+  <properties/>
+  <testcase name="actualSamCapCompressesContinuouslyAndRemainsVisibleThroughItsRebound" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="1.999"/>
+  <testcase name="idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindBlackCaps" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="0.409"/>
+  <testcase name="oldModesRemainVisuallyDistinctAndDisabledOrDetachedSamStopsDrawing" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="0.415"/>
+  <testcase name="continuousTypingExportsRealFramesAndEachLetterKeepsItsOwnTail" classname="org.fcitx.fcitx5.android.SamKeyboardRenderingTest" time="7.147"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

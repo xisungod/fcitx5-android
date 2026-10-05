@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.RimePersonalDictionaryTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-05T04:23:15.777Z" hostname="1860ba65b9a5" time="0.057">
+  <properties/>
+  <testcase name="emptyOverweightAndUnknownStoredFormatsAreRejected" classname="org.fcitx.fcitx5.android.RimePersonalDictionaryTest" time="0.014"/>
+  <testcase name="repeatedImportsMergeAndReplaceOnlyMatchingWordAndCode" classname="org.fcitx.fcitx5.android.RimePersonalDictionaryTest" time="0.017"/>
+  <testcase name="malformedLineReportsItsOriginalLineAndCannotInjectYaml" classname="org.fcitx.fcitx5.android.RimePersonalDictionaryTest" time="0.0"/>
+  <testcase name="utf8EntriesNormalizeCodesAndPreservePersonalWords" classname="org.fcitx.fcitx5.android.RimePersonalDictionaryTest" time="0.025"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

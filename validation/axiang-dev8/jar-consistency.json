@@ -1,0 +1,12 @@
+{
+  "KeyPressDepth.class": {
+    "compile_sha256": "cfbc74cd44253ee282883427861fb1bc17134861f714ab86c653da03b80f0345",
+    "runtime_sha256": "cfbc74cd44253ee282883427861fb1bc17134861f714ab86c653da03b80f0345",
+    "match": true
+  },
+  "PressEffect.class": {
+    "compile_sha256": "313c8dbdd279001db4bf1173e15b4b0de7546d4442f3956820bc6c0230554e5e",
+    "runtime_sha256": "313c8dbdd279001db4bf1173e15b4b0de7546d4442f3956820bc6c0230554e5e",
+    "match": true
+  }
+}

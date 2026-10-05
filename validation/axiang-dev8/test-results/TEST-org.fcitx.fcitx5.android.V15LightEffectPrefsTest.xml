@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:50:22.346Z" hostname="1860ba65b9a5" time="0.101">
+  <properties/>
+  <testcase name="upgradePreservesSavedTimingAndArbitraryUserColoursExactly" classname="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" time="0.023"/>
+  <testcase name="newInstallationUsesFloatingMotionAboveTheLongerMistTail" classname="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" time="0.02"/>
+  <testcase name="capTimingControlsAllowShortFlashesWhileKeepingLongCustomExits" classname="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" time="0.031"/>
+  <testcase name="upgradeUsesTheSofterDefaultButPreservesAnExplicitThirtyMillisecondExit" classname="org.fcitx.fcitx5.android.V15LightEffectPrefsTest" time="0.023"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

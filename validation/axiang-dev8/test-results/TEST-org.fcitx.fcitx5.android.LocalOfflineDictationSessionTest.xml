@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:49:49.646Z" hostname="1860ba65b9a5" time="0.077">
+  <properties/>
+  <testcase name="queuedPartialAndFinalCallbacksCannotWriteAfterSessionCloses" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.057"/>
+  <testcase name="stopUnblocksAudioAndDeliversPartialThenPunctuatedFinalText" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.003"/>
+  <testcase name="changedEditorRejectsFinishedTextAndStopsSession" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.002"/>
+  <testcase name="microphoneStartFailureReleasesLoadedModelAndReturnsActionableError" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.002"/>
+  <testcase name="closeInvalidatesARecordingSessionAndReleasesBothResources" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.006"/>
+  <testcase name="openingThePanelDoesNotLoadTheModelOrCaptureAudio" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.001"/>
+  <testcase name="cancellationDuringSlowModelLoadNeverOpensTheMicrophone" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.001"/>
+  <testcase name="emptyRecognitionFinishesWithoutInventingWords" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.001"/>
+  <testcase name="stopDuringPreparationCannotStartMicrophoneLater" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.001"/>
+  <testcase name="unsupportedDeviceCannotStartEvenWithPermission" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.0"/>
+  <testcase name="deniedPermissionRequestsAccessWithoutStartingAudioOrLoadingModel" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.001"/>
+  <testcase name="cancelDuringDecodingSuppressesLateTextAndFinalization" classname="org.fcitx.fcitx5.android.LocalOfflineDictationSessionTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

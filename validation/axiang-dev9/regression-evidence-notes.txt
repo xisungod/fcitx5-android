@@ -1,0 +1,5 @@
+本轮源码 cc34351599b265a0e4a45bf61d194b0aa4e9366f。
+regression-before-fix/ 保存 SwitchCompat 主题上下文修复前的两项 IME service 测试失败记录，均在 SwitchCompat.makeLayout 复现空指针；这些预期失败不计入最终通过测试统计。
+最终通过记录仅取最终完整构建生成的 test-results/ XML。
+jar-consistency.json 记录本轮五个生产类编译输出与测试运行时 JAR 的字节哈希相等。
+两张九键滑动图片来自项目测试原生绘制，不是用户参考媒体或真机截图；本轮不生成视频。

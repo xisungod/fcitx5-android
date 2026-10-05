@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyWidthControlsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:19:14.238Z" hostname="1860ba65b9a5" time="3.532">
+  <properties/>
+  <testcase name="boundedWeightsReflowWithoutCollapsingNeighboursAndResetOnlyTheChosenLayout" classname="org.fcitx.fcitx5.android.KeyWidthControlsTest" time="0.029"/>
+  <testcase name="editorSelectsIndividualKeysStagesWidthsAndSwitchesBreathingWithTheEffectMode" classname="org.fcitx.fcitx5.android.KeyWidthControlsTest" time="2.227"/>
+  <testcase name="fourRealLayoutsMoveTheirTouchBoundariesAndRemainATiledKeyboard" classname="org.fcitx.fcitx5.android.KeyWidthControlsTest" time="1.244"/>
+  <testcase name="draftCancellationAndDonePreserveOtherLayoutsAndConcurrentEdits" classname="org.fcitx.fcitx5.android.KeyWidthControlsTest" time="0.028"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

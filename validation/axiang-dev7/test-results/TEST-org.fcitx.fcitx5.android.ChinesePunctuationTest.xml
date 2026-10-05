@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.ChinesePunctuationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:18:47.505Z" hostname="1860ba65b9a5" time="3.346">
+  <properties/>
+  <testcase name="languageChangesImmediatelyRestoreAsciiInEnglishAndChineseMarksOnReturn" classname="org.fcitx.fcitx5.android.ChinesePunctuationTest" time="2.612"/>
+  <testcase name="decimalKeyAndExplicitSymbolChoicesRemainLiteralInChineseMode" classname="org.fcitx.fcitx5.android.ChinesePunctuationTest" time="0.446"/>
+  <testcase name="chineseKeysPreviewsAndCommitsAgreeWithoutFcitxMappingOrWithStaleAsciiMapping" classname="org.fcitx.fcitx5.android.ChinesePunctuationTest" time="0.267"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

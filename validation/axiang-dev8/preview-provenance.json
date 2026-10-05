@@ -1,0 +1,21 @@
+{
+  "source_commit": "ba8a9560861ea485bda68997140d43532ba8a8cf",
+  "native_frame_count": 212,
+  "fps": 60,
+  "padding_frames": 72,
+  "duration": 4.733333333333333,
+  "source": "actual Android TextKeyboard, KeyView and PressEffect, Robolectric NATIVE",
+  "sequences": [
+    "single F key: DOWN 0ms, UP 50ms, through 1400ms",
+    "12-key continuous input at 80ms intervals, through 2100ms"
+  ],
+  "physical_device_capture": false,
+  "interpolation": false,
+  "outputs": [
+    {
+      "filename": "axiang-dev8-key-motion-preview.mp4",
+      "bytes": 170967,
+      "sha256": "69dcc2e734da63a4501f532669491a89d4c982bda60ac0d1b558d6a8a170283f"
+    }
+  ]
+}

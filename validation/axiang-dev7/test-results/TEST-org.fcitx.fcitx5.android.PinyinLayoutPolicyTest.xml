@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.PinyinLayoutPolicyTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:19:35.692Z" hostname="1860ba65b9a5" time="0.032">
+  <properties/>
+  <testcase name="ordinaryTextFlagsDoNotDisablePinyinAndTheExplicit26RouteRemainsDistinct" classname="org.fcitx.fcitx5.android.PinyinLayoutPolicyTest" time="0.027"/>
+  <testcase name="asciiIndicatorsOverrideTheT9SchemaName" classname="org.fcitx.fcitx5.android.PinyinLayoutPolicyTest" time="0.005"/>
+  <testcase name="passwordsEmailAndUrisNeverExposeThePinyinKeypad" classname="org.fcitx.fcitx5.android.PinyinLayoutPolicyTest" time="0.0"/>
+  <testcase name="numericPasswordSignedDecimalAndPhoneFieldsKeepTheNumberRoute" classname="org.fcitx.fcitx5.android.PinyinLayoutPolicyTest" time="0.0"/>
+  <testcase name="theActualSchemaSelectsT9AndSwitchingBackOrUsingAnotherEngineRestores26Keys" classname="org.fcitx.fcitx5.android.PinyinLayoutPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

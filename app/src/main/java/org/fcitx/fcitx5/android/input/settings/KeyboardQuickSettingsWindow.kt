@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.view.Gravity
+import android.view.ContextThemeWrapper
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -197,6 +198,10 @@ internal class KeyboardQuickSettingsUi(
     private val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
     private val accentColor = if (theme.isDark) 0xFF90C9FF.toInt() else 0xFF356FA5.toInt()
     private val accent = ColorStateList.valueOf(accentColor)
+    // IME views use DeviceDefault.Settings, which has no AppCompat switch styles.
+    // An Activity can accidentally supply those missing values; the service cannot.
+    // Keep the service context and supply complete switch drawables/text attributes.
+    private val switchContext = ContextThemeWrapper(context, R.style.Theme_FcitxAppTheme)
     private var disposed = false
     private val motionPreview = KeyMotionPreview(context, theme).apply { tag = "quick_motion_preview" }
     private val motionControls = mutableListOf<View>()
@@ -420,7 +425,7 @@ internal class KeyboardQuickSettingsUi(
     }
 
     private fun toggle(title: Int, key: String, checked: Boolean, update: (Boolean) -> Unit): SwitchCompat {
-        val view = SwitchCompat(context).apply {
+        val view = SwitchCompat(switchContext).apply {
             tag = key
             setText(title)
             textSize = 14f

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:19:18.836Z" hostname="1860ba65b9a5" time="0.11">
+  <properties/>
+  <testcase name="unchangedEditorPreservesExistingSizesOutsideNewDragBounds" classname="org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest" time="0.019"/>
+  <testcase name="landscapeAndPortraitSaveIndependentlyAndOnlyOnDone" classname="org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest" time="0.02"/>
+  <testcase name="boundsPreserveUsableRowsAndLeaveSpaceAboveTheKeyboard" classname="org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest" time="0.013"/>
+  <testcase name="resetIsADraftAndCancelKeepsTheOriginalHeight" classname="org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest" time="0.015"/>
+  <testcase name="noNumberRowPreviewAndSavedLayoutHaveExactlyTheSameHeight" classname="org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest" time="0.02"/>
+  <testcase name="adjustingHeightFromTheNumericPageReopensAtTheSameHeightOnLetters" classname="org.fcitx.fcitx5.android.KeyboardHeightAdjustmentTest" time="0.019"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -18,6 +18,12 @@ import splitties.views.imageResource
 /** Large 1–9 keypad with an independent arithmetic strip and dedicated 0. */
 @SuppressLint("ViewConstructor")
 class NumberKeyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, Layout) {
+    override val slideSelectionEnabled = true
+
+    override fun canSlideSelect(key: KeyView): Boolean {
+        val text = (key.def as? KeyDef.Appearance.Text)?.displayText ?: return false
+        return text.length == 1 && text[0] in '0'..'9'
+    }
 
     companion object {
         const val Name = "Number"

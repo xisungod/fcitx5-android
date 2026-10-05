@@ -9,6 +9,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.os.Looper
 import android.os.SystemClock
@@ -28,6 +29,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardSizePolicy
 import org.fcitx.fcitx5.android.input.keyboard.PressEffect
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
@@ -89,19 +91,21 @@ class SamKeyboardRenderingTest {
         if (view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
 
     private fun intensity(pixel: Int) = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
-    private fun coloured(pixel: Int): Boolean = intensity(pixel) >= 25 &&
-        intensity(pixel) - minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel)) >= 12
+    private fun chroma(pixel: Int) = intensity(pixel) - minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+    private fun coloured(pixel: Int): Boolean = intensity(pixel) >= 25 && chroma(pixel) >= 12
 
     private fun save(image: Bitmap, name: String) {
-        val file = File("build/outputs/effect-checks/dev6-sam/$name.png")
+        val file = File("build/outputs/effect-checks/dev8-sam/$name.png")
         file.parentFile.mkdirs()
         file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    private inner class Keyboard(shape: ThemePrefs.RippleShape, randomColours: Boolean = false) : AutoCloseable {
+    private inner class Keyboard(shape: ThemePrefs.RippleShape, randomColours: Boolean = false,
+        numberRow: Boolean = true, customColours: String? = null) : AutoCloseable {
         private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val activity = controller.get()
         val root = FrameLayout(activity)
+        val pixelHeight = KeyboardSizePolicy.heightForLayout(root.dp(288), true, true, numberRow)
         val keyboard: TextKeyboard
         val effect: PressEffect
         val keys: List<KeyView>
@@ -117,19 +121,24 @@ class SamKeyboardRenderingTest {
             prefs.rippleShape.setValue(shape)
             // Deliberately ON: Sam must remain black even after upgrading a saved breathing setting.
             prefs.idleBreathing.setValue(true)
-            prefs.pressColorMode.setValue(if (randomColours) ThemePrefs.PressColorMode.Random else ThemePrefs.PressColorMode.Single)
+            prefs.pressColorMode.setValue(when {
+                customColours != null -> ThemePrefs.PressColorMode.Custom
+                randomColours -> ThemePrefs.PressColorMode.Random
+                else -> ThemePrefs.PressColorMode.Single
+            })
+            if (customColours != null) prefs.pressUserColors.setValue(customColours)
             prefs.pressSingleColor.setValue(Color.parseColor("#00F0FF"))
-            prefs.portraitNumberRow.setValue(true)
+            prefs.portraitNumberRow.setValue(numberRow)
             AppPrefs.getInstance().keyboard.popupOnKeyPress.setValue(false)
             activity.setTheme(R.style.Theme_InputViewTheme)
             // The activity owns a full-window host. Keep the recorded keyboard in
             // a fixed-size child so later Android traversals cannot resize the
             // review root from keyboard height to the entire activity window.
             activity.setContentView(FrameLayout(activity).apply {
-                addView(root, FrameLayout.LayoutParams(root.dp(360), root.dp(288)))
+                addView(root, FrameLayout.LayoutParams(root.dp(360), pixelHeight))
             })
             keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
-            root.addView(keyboard, FrameLayout.LayoutParams(root.dp(360), root.dp(288)))
+            root.addView(keyboard, FrameLayout.LayoutParams(root.dp(360), pixelHeight))
             keyboard.keyActionListener = KeyActionListener { action, _ ->
                 if (action is KeyAction.FcitxKeyAction) typed.append(action.act)
             }
@@ -155,7 +164,7 @@ class SamKeyboardRenderingTest {
 
         private fun layout() {
             root.measure(View.MeasureSpec.makeMeasureSpec(root.dp(360), View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(root.dp(288), View.MeasureSpec.EXACTLY))
+                View.MeasureSpec.makeMeasureSpec(pixelHeight, View.MeasureSpec.EXACTLY))
             root.layout(0, 0, root.measuredWidth, root.measuredHeight)
         }
 
@@ -176,10 +185,39 @@ class SamKeyboardRenderingTest {
 
         fun frame(): Bitmap {
             assertEquals("The actual portrait keyboard keeps its measured width", root.dp(360), root.width)
-            assertEquals("Activity traversals must preserve the keyboard-height review surface", root.dp(288), root.height)
+            assertEquals("Activity traversals must preserve the keyboard-height review surface", pixelHeight, root.height)
             return Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888).also {
                 Canvas(it).apply { drawColor(Color.BLACK); root.draw(this) }
             }
+        }
+
+        /** Observe the real appearance Canvas while its normal black mask, fill and glyphs draw. */
+        fun motionFrame(key: KeyView): MotionFrame {
+            val painter = key.keySurfacePainter
+            var scale = Float.NaN
+            var centreY = Float.NaN
+            var sampleX = Float.NaN
+            var sampleY = Float.NaN
+            return try {
+                key.keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
+                    @Suppress("DEPRECATION")
+                    val matrix = Matrix(canvas.matrix)
+                    val values = FloatArray(9).also(matrix::getValues)
+                    scale = values[Matrix.MSCALE_X]
+                    val points = floatArrayOf(width / 2f, height / 2f, width / 2f, height / 4f)
+                    matrix.mapPoints(points)
+                    centreY = points[1]
+                    sampleX = points[2]
+                    sampleY = points[3]
+                    painter?.draw(canvas, width, height)
+                }
+                val image = frame()
+                assertTrue("The actual key surface must draw through the recorded transform", scale.isFinite())
+                val x = sampleX.toInt()
+                val y = sampleY.toInt()
+                assertTrue(x in 0 until image.width && y in 0 until image.height)
+                MotionFrame(image, scale, centreY, image.getPixel(x, y), key.floatingFaceOpacity())
+            } finally { key.keySurfacePainter = painter }
         }
 
         fun withoutLegends(): Bitmap {
@@ -235,6 +273,78 @@ class SamKeyboardRenderingTest {
         }
     }
 
+    private data class MotionFrame(val image: Bitmap, val scale: Float, val centreY: Float,
+        val actualCapColour: Int, val modelOpacity: Float)
+
+    @Test
+    fun actualSamCapCompressesContinuouslyAndRemainsVisibleThroughItsRebound() {
+        Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false).use { board ->
+            val key = board.letters.getValue("f")
+            val idle = board.motionFrame(key)
+            save(idle.image, "single/idle")
+            val baselineY = idle.centreY
+            assertEquals(1f, idle.scale, 0.00001f)
+            idle.image.recycle()
+            val rows = ArrayList<String>()
+            var earlyScale = 1f
+            var previousTime = -1L
+            var released = false
+            board.touch("f", MotionEvent.ACTION_DOWN)
+            for (index in 0..84) {
+                val time = index * 1000L / 60
+                if (!released && time >= 50) {
+                    board.go(50)
+                    board.touch("f", MotionEvent.ACTION_UP, 0)
+                    released = true
+                    assertEquals("Input finishes on UP, independently of the visible rebound", "f", board.typed.toString())
+                }
+                board.go(time)
+                val observed = board.motionFrame(key)
+                val capLight = intensity(observed.actualCapColour)
+                val capChroma = chroma(observed.actualCapColour)
+                try {
+                    save(observed.image, "single/frame-%03d".format(index))
+                    board.assertReadable(observed.image, "f")
+                    rows.add("$index,$time,${observed.scale},${observed.centreY},$capLight,$capChroma,${observed.modelOpacity}")
+                    if (time == 0L) {
+                        assertEquals("A resting key must not jump to a compressed size on DOWN", 1f, observed.scale, 0.00001f)
+                        assertEquals("The cap starts from its real resting position", baselineY, observed.centreY, 0.00001f)
+                        assertTrue("Immediate feedback comes from the actual coloured face", capLight >= 30 && capChroma >= 12)
+                    }
+                    if (time == 16L) {
+                        assertTrue("The first display frame already shows smooth compression", observed.scale < 0.998f && observed.scale > 0.98f)
+                        assertTrue("The real cap moves down as it compresses", observed.centreY > baselineY)
+                        earlyScale = observed.scale
+                    }
+                    if (time == 33L) assertTrue("The second display frame continues down rather than remaining at an instant seed", observed.scale < earlyScale)
+                    if (time in 233L..350L) {
+                        assertTrue("The cap visibly rises above rest after UP", observed.scale > 1.005f && observed.centreY < baselineY)
+                        assertTrue("The Sam coloured cap remains visible during the real rise and landing, after the old 180ms cutoff", capLight >= 30 && capChroma >= 12)
+                    }
+                    if (time == 500L) assertTrue("The soft landing still has a visible coloured face", capLight >= 20 && capChroma >= 10)
+                    assertTrue(time > previousTime)
+                    previousTime = time
+                } finally { observed.image.recycle() }
+            }
+            board.assertBlackSurface("Single tap completes its physical landing")
+            val restored = board.motionFrame(key)
+            try {
+                assertEquals(1f, restored.scale, 0f)
+                assertEquals(baselineY, restored.centreY, 0f)
+                assertEquals(0, intensity(restored.actualCapColour))
+            } finally { restored.image.recycle() }
+            File("build/outputs/effect-checks/dev8-sam/single/motion.csv").writeText(
+                "frame,time_ms,actual_canvas_scale,actual_cap_centre_y,actual_cap_max_rgb,actual_cap_chroma,model_face_opacity\n" + rows.joinToString("\n") + "\n")
+            File("build/outputs/effect-checks/dev8-sam/single/provenance.txt").writeText(
+                "source=actual Android TextKeyboard/KeyView/PressEffect\ngraphics=Robolectric NATIVE\n" +
+                    "portrait_width_dp=360\nheight_px=${board.pixelHeight}\ndensity=${board.root.resources.displayMetrics.density}\n" +
+                    "number_row=false\nfps=60\nframes=85\ninput=f\ndown_ms=0\nup_ms=50\n" +
+                    "colour=#00F0FF\nrecorded_transform=unmodified production key surface Canvas\n" +
+                    "colour_measurement=actual transformed upper-quarter cap pixel away from glyph\n" +
+                    "direct_native_frames=true\ninterpolation=false\nphysical_device_capture=false\n")
+        }
+    }
+
     @Test
     fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindBlackCaps() {
         Keyboard(ThemePrefs.RippleShape.Sam).use { board ->
@@ -277,47 +387,156 @@ class SamKeyboardRenderingTest {
         }
     }
 
+    private data class GapLevels(
+        val total: Int, val coloured: Int, val dark: Int, val bright: Int, val nearPeak: Int,
+        val p10: Int, val p50: Int, val p90: Int, val peak: Int
+    ) {
+        fun csv() = "$total,$coloured,$dark,$bright,$nearPeak,$p10,$p50,$p90,$peak"
+    }
+
+    /** Pixel distributions are recorded for review, independently of the renderer's exposure formula. */
+    private fun gapLevels(frame: Bitmap, mask: BooleanArray): GapLevels {
+        val histogram = IntArray(256)
+        var total = 0
+        var colouredCount = 0
+        for (y in 0 until frame.height) for (x in 0 until frame.width) if (mask[y * frame.width + x]) {
+            val pixel = frame.getPixel(x, y)
+            histogram[intensity(pixel)]++
+            total++
+            if (coloured(pixel)) colouredCount++
+        }
+        fun percentile(percent: Int): Int {
+            var count = 0
+            for (value in histogram.indices) {
+                count += histogram[value]
+                if (count * 100 >= total * percent) return value
+            }
+            return 255
+        }
+        return GapLevels(total, colouredCount, histogram.take(17).sum(), histogram.drop(160).sum(),
+            histogram.drop(210).sum(), percentile(10), percentile(50), percentile(90), histogram.indexOfLast { it > 0 })
+    }
+
+    /** A fixed two-colour setting isolates spatial colour retention from random palette changes. */
+    private fun separatedColoursRetainTheirOwnRegions() {
+        Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, customColours = "#FF3355,#18FFC1").use { board ->
+            val mask = board.gapMask()
+            board.touch("q", MotionEvent.ACTION_DOWN)
+            val firstColour = requireNotNull(PressEffect.colorForKey(board.letters.getValue("q").id))
+            board.go(50)
+            board.touch("q", MotionEvent.ACTION_UP, 0)
+            board.go(150)
+            val before = board.frame()
+            save(before, "separated-before-second-key-150ms")
+            board.touch("p", MotionEvent.ACTION_DOWN)
+            val secondColour = requireNotNull(PressEffect.colorForKey(board.letters.getValue("p").id))
+            assertNotEquals("The controlled adjacent presses must use different colours", firstColour, secondColour)
+            board.go(200)
+            board.touch("p", MotionEvent.ACTION_UP, 150)
+            board.go(300)
+            val after = board.frame()
+            try {
+                save(after, "separated-both-regions-300ms")
+                board.assertReadable(after, "q")
+                board.assertReadable(after, "p")
+                fun colourDistance(pixel: Int, colour: Int): Float {
+                    val a = intensity(pixel).coerceAtLeast(1).toFloat()
+                    val b = intensity(colour).coerceAtLeast(1).toFloat()
+                    return abs(Color.red(pixel) / a - Color.red(colour) / b) +
+                        abs(Color.green(pixel) / a - Color.green(colour) / b) +
+                        abs(Color.blue(pixel) / a - Color.blue(colour) / b)
+                }
+                fun matchingRegion(frame: Bitmap, source: String, expected: Int, other: Int): Pair<Int, Int> {
+                    val cell = board.bounds(board.letters.getValue(source))
+                    // Examine a physical neighbourhood of one key pitch, using only
+                    // gutters so bright caps/letters cannot substitute for the field.
+                    val region = Rect(cell).apply { inset(-cell.width(), -cell.height() / 2) }
+                    var eligible = 0
+                    var matching = 0
+                    for (y in region.top.coerceAtLeast(0) until region.bottom.coerceAtMost(frame.height))
+                        for (x in region.left.coerceAtLeast(0) until region.right.coerceAtMost(frame.width)) {
+                            val pixel = frame.getPixel(x, y)
+                            if (!mask[y * frame.width + x] || !coloured(pixel)) continue
+                            eligible++
+                            if (colourDistance(pixel, expected) < colourDistance(pixel, other)) matching++
+                        }
+                    return eligible to matching
+                }
+                val original = matchingRegion(before, "q", firstColour, secondColour)
+                val old = matchingRegion(after, "q", firstColour, secondColour)
+                val fresh = matchingRegion(after, "p", secondColour, firstColour)
+                assertTrue("The original key must first produce a measurable local coloured field", original.first > 0)
+                assertTrue("The older local glow remains visible after a distant press", old.first > 0)
+                assertTrue("The new key also produces its own local glow", fresh.first > 0)
+                assertTrue("Most of the older left-hand region keeps its own hue rather than following the new key", old.second * 2 > old.first)
+                assertTrue("Most of the new right-hand region receives the new key's hue", fresh.second * 2 > fresh.first)
+                File("build/outputs/effect-checks/dev8-sam/separated-colours.csv").writeText(
+                    "region,time_ms,visible_gap_pixels,pixels_closer_to_own_colour\n" +
+                        "old_before,150,${original.first},${original.second}\n" +
+                        "old_after,300,${old.first},${old.second}\n" +
+                        "new_after,300,${fresh.first},${fresh.second}\n")
+            } finally { before.recycle(); after.recycle() }
+        }
+    }
+
     @Test
     fun continuousTypingExportsRealFramesAndEachLetterKeepsItsOwnTail() {
-        Keyboard(ThemePrefs.RippleShape.Sam, randomColours = true).use { board ->
+        separatedColoursRetainTheirOwnRegions()
+        Keyboard(ThemePrefs.RippleShape.Sam, randomColours = true, numberRow = false).use { board ->
             data class Gesture(val time: Long, val letter: String, val action: Int, val down: Long)
-            val input = listOf("s", "a", "m")
+            val input = listOf("q", "p", "a", "l", "z", "m", "w", "o", "s", "k", "x", "n")
+            val presses = input.indices.map { it * 80L }
             val gestures = input.flatMapIndexed { index, letter -> listOf(
-                Gesture(index * 120L, letter, MotionEvent.ACTION_DOWN, index * 120L),
-                Gesture(index * 120L + 50, letter, MotionEvent.ACTION_UP, index * 120L)) }
+                Gesture(presses[index], letter, MotionEvent.ACTION_DOWN, presses[index]),
+                Gesture(presses[index] + 50, letter, MotionEvent.ACTION_UP, presses[index])) }
             var next = 0
+            var focusIndex = 0
             val metrics = ArrayList<String>()
+            val levelsByTime = ArrayList<Pair<Long, GapLevels>>()
             val mask = board.gapMask()
-            for (index in 0..108) {
+            board.frame().also { save(it, "burst/idle"); it.recycle() }
+            for (index in 0..126) {
                 val time = index * 1000L / 60
                 while (next < gestures.size && gestures[next].time <= time) {
                     val gesture = gestures[next++]
                     board.go(gesture.time)
                     board.touch(gesture.letter, gesture.action, gesture.down)
+                    if (gesture.action == MotionEvent.ACTION_DOWN) focusIndex = input.indexOf(gesture.letter)
                 }
                 board.go(time)
-                val frame = board.frame()
+                val firstKeyMotion = board.motionFrame(board.letters.getValue("q"))
+                val frame = firstKeyMotion.image
                 try {
                     save(frame, "burst/frame-%03d".format(index))
-                    input.forEach { board.assertReadable(frame, it) }
-                    var illuminated = 0
-                    for (y in 0 until frame.height) for (x in 0 until frame.width)
-                        if (mask[y * frame.width + x] && coloured(frame.getPixel(x, y))) illuminated++
-                    metrics.add("$index,$time,$illuminated")
-                    if (time in 120..220) assertTrue("The preceding S face must not be cancelled when A begins",
-                        board.letters.getValue("s").floatingFaceOpacity() > 0f)
+                    // Test the current and preceding real glyphs, rather than paying
+                    // for twelve hidden-glyph reference draws on every exported frame.
+                    board.assertReadable(frame, input[focusIndex])
+                    if (focusIndex > 0) board.assertReadable(frame, input[focusIndex - 1])
+                    val levels = gapLevels(frame, mask)
+                    levelsByTime.add(time to levels)
+                    metrics.add("$index,$time,${levels.csv()}")
+                    if (time in 80..300) {
+                        assertTrue("The preceding Q face motion must not be cancelled when another key begins",
+                            firstKeyMotion.modelOpacity > 0f)
+                        assertTrue("The preceding Q must retain a visibly coloured real cap during later presses",
+                            coloured(firstKeyMotion.actualCapColour))
+                    }
                 } finally { frame.recycle() }
             }
-            assertEquals("All real touch events still enter text in sequence", "sam", board.typed.toString())
+            assertEquals("All rapid cross-key touches still enter text in sequence", input.joinToString(""), board.typed.toString())
+            assertTrue("Dense typing must leave visible light outside the actual keycaps", levelsByTime.any { it.second.coloured > 0 })
+            assertTrue("The final sampled gaps return to black after both light and cap motion finish",
+                levelsByTime.filter { it.first >= 2050 }.all { it.second.peak == 0 })
             board.assertBlackSurface("End of sequential typing")
-            File("build/outputs/effect-checks/dev6-sam/burst/metrics.csv").writeText(
-                "frame,time_ms,coloured_gap_pixels\n" + metrics.joinToString("\n") + "\n")
-            File("build/outputs/effect-checks/dev6-sam/burst/provenance.txt").writeText(
+            File("build/outputs/effect-checks/dev8-sam/burst/metrics.csv").writeText(
+                "frame,time_ms,gap_pixels,coloured_gap_pixels,dark_le16,bright_ge160,near_peak_ge210,p10,p50,p90,peak\n" + metrics.joinToString("\n") + "\n")
+            File("build/outputs/effect-checks/dev8-sam/burst/provenance.txt").writeText(
                 "source=actual Android TextKeyboard and PressEffect\ngraphics=Robolectric NATIVE\n" +
-                    "portrait_width_dp=360\nheight_dp=288\nfps=60\nframes=109\n" +
-                    "input=sam\npress_times_ms=0,120,240\nrelease_after_ms=50\n" +
-                    "palette=production Cyberpunk random\nseed=1401\nripple_shape=Sam\n" +
+                    "portrait_width_dp=360\nheight_px=${board.pixelHeight}\ndensity=${board.root.resources.displayMetrics.density}\nbase_height_dp=288\nfps=60\nframes=127\n" +
+                    "input=${input.joinToString("")}\npress_times_ms=${presses.joinToString(",")}\nrelease_after_ms=50\n" +
+                    "portrait_number_row=false\npalette=production Cyberpunk random\nseed=1401\nripple_shape=Sam\n" +
                     "idle_breathing_preference=true (Sam suppresses it)\npopup=false\n" +
+                    "gap_metrics=fixed physical gaps outside all resting cap interiors; no glyphs or deliberately hidden cap drawings\n" +
                     "direct_native_frames=true\ninterpolation=false\nphysical_device_capture=false\n")
         }
     }

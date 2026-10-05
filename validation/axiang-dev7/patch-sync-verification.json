@@ -1,0 +1,60 @@
+{
+  "source_commit": "ea30e4c9023f980f5f1598fb3fbc121223564717",
+  "source_tree": "eb5c4f1fa94426b6fd4321d0769a6114ab83c9bd",
+  "previous_source": "8681b465488a1c4c3cb650a156b89aa9a6e0f060",
+  "distribution_base": "c4a9e57df73ff4f2456f86ae8fcf329fb615a9fb",
+  "remote_base": "f498094e3828d9518c496ce515b214864f4e5361",
+  "remote_base_tree": "5edccdd49710eef3f7d13c985b0b878447f81139",
+  "cumulative_source_paths": 289,
+  "manifest": {
+    "format": 1,
+    "source_commit": "ea30e4c9023f980f5f1598fb3fbc121223564717",
+    "base_commit": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
+    "patch_bytes": 1737809,
+    "patch_sha256": "c18df68476160b6df98f298043c1d2707d614d61e46afdec2c25033d58758b8b",
+    "gzip_sha256": "7eb813e2e19d6282ebdd0570e26d2aed079b7377c9401d47b8caeec88d421f64",
+    "parts": [
+      {
+        "file": "axiang.patch.gz.part01",
+        "bytes": 65536,
+        "sha256": "2420efdc788d32f51e33583a3c6d36015f630ad1f41fc0715a31c0a7c91836f1"
+      },
+      {
+        "file": "axiang.patch.gz.part02",
+        "bytes": 65536,
+        "sha256": "de22f9a256e4e52f0486327a39317ea12540a440d220f6f78427394f3b2b273a"
+      },
+      {
+        "file": "axiang.patch.gz.part03",
+        "bytes": 65536,
+        "sha256": "767f9e61e30d27951833c557cd28f87b9323e255987ef4fbd159c5f57a248fa1"
+      },
+      {
+        "file": "axiang.patch.gz.part04",
+        "bytes": 65536,
+        "sha256": "0cbd45b738b8789448496d5eecc455de59f5711325ac4c3c8c34f802c54aa678"
+      },
+      {
+        "file": "axiang.patch.gz.part05",
+        "bytes": 65536,
+        "sha256": "cfb8b50dc7ad95c818fae7405cbe75425f3cc3dd71e0c7af176a8c459950ec93"
+      },
+      {
+        "file": "axiang.patch.gz.part06",
+        "bytes": 65536,
+        "sha256": "fc8a2abdc9a3ef8c3060d9a67e06495fdf1c474b1bfadf82a45dd60eef078627"
+      },
+      {
+        "file": "axiang.patch.gz.part07",
+        "bytes": 65536,
+        "sha256": "d8e76e54c1e8aff305c07e4a10c8ecec4360935c7a874d9b3543759cee8961a3"
+      },
+      {
+        "file": "axiang.patch.gz.part08",
+        "bytes": 31183,
+        "sha256": "a71f39183cf1556f24b5178ac209b6c7014b86d91cab922f2023cc769f96cbbd"
+      }
+    ]
+  },
+  "patch_reconstructs_exact_source_tree": true
+}

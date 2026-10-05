@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.IconBrandingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:48:52.904Z" hostname="1860ba65b9a5" time="2.031">
+  <properties/>
+  <testcase name="api23LoadsEveryLegacyLauncherResourceWithoutAdaptiveOrGradientSupport" classname="org.fcitx.fcitx5.android.IconBrandingTest" time="1.055"/>
+  <testcase name="adaptiveDebugReleaseAndCompatibilityIconsUseOneBrandAndExportNativePreviews" classname="org.fcitx.fcitx5.android.IconBrandingTest" time="0.413"/>
+  <testcase name="foregroundKeepsAClearCounterKeyboardCueAndAdaptiveSafeArea" classname="org.fcitx.fcitx5.android.IconBrandingTest" time="0.388"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

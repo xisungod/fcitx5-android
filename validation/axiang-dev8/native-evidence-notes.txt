@@ -1,0 +1,12 @@
+dev.8 动作证据说明
+
+固定源码：ba8a9560861ea485bda68997140d43532ba8a8cf。
+绘制来源为实际 Android TextKeyboard、KeyView 与 PressEffect，经 Robolectric NATIVE 输出；这些是项目原生帧，不是真机录屏，没有帧间插值。
+
+单键序列：F 键在 0ms 按下、50ms 松开，持续采样至 1400ms，共 85 帧。
+连按序列：12 个键以 80ms 间隔依次输入，持续采样至 2100ms，共 127 帧。
+合计 212 个原生帧，60fps；交付预览添加静止停留共 72 帧，便于观察，预览时长约 4.73 秒。视频本体不纳入 GitHub 候选，只记录其来源及 SHA-256。
+
+本轮首次测试曾使用过期的 Gradle runtime JAR。清理构建生成物后的最终运行确认 KeyPressDepth.class 与 PressEffect.class 的编译输出和运行时 JAR 字节哈希分别相等；详见 jar-consistency.json。最终测试记录只采用清理后的完整运行，不使用首跑结果。
+
+最终验收会把上述证据与同一源码提交的测试 XML、APK 身份及签名记录共同核对。原生绘制审查不代替实际手机上的手感与兼容性体验。

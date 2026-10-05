@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyPressDepthTest" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:19:01.142Z" hostname="1860ba65b9a5" time="13.09">
+  <properties/>
+  <testcase name="hidingACachedKeyboardCancelsItsHeldCompressionWithoutCommittingAndShowingStartsAtRest" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.319"/>
+  <testcase name="extremeTimeAndAmplitudeChoicesPreserveRepressPositionAndVelocity" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.03"/>
+  <testcase name="slowingTheLivePreviewPreservesFullRiseColourAndDoesNotRelightAFadingCap" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.017"/>
+  <testcase name="realMotionOffAndDisabledAnimationsLeaveTheKeyUnchanged" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.69"/>
+  <testcase name="realZeroAndShortTouchesCommitImmediatelyAndStillShowCompressionThenRebound" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.245"/>
+  <testcase name="disablingAnimationsDuringAHoldResetsEveryActionOnReleaseWithoutAnotherAnimation" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.568"/>
+  <testcase name="theFirstFrameCompressesAndEvenZeroDurationTouchesReboundOnceWithoutAColourGap" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.015"/>
+  <testcase name="repressPreservesPositionAndVelocityAcrossTheRisePeakAndLanding" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.014"/>
+  <testcase name="rapidRemashingPreservesMotionAndStillFinishesWithoutEscapingItsDrawingRange" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.012"/>
+  <testcase name="actualTextKeyboardShowsDifferentFluidBoundariesForTheSavedShapeWithTheSameColourAndTouches" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="7.486"/>
+  <testcase name="releaseReboundsAboveRestThenKeepsAColouredTailWithoutASecondBounce" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.015"/>
+  <testcase name="independentAmplitudeEndpointsHaveMonotoneScaleAndTravelWithMatchingNeutralSlopes" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.014"/>
+  <testcase name="persistedAmplitudeEndpointsChangeTheActualCanvasWithoutChangingInputOrHitBounds" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.193"/>
+  <testcase name="aNewKeyDoesNotCancelThePreviousReboundAndFramesCanSkipTheExactPeak" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.012"/>
+  <testcase name="realPressCompressesThenReboundsTheBackgroundAndCharacterTogetherEvenWithAllLightsOff" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.139"/>
+  <testcase name="actualRedTextKeyboardCompressesAndReboundsLThenAWithImmediateInputForOldFadeSettings" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="3.141"/>
+  <testcase name="realSameKeyPointersReleaseOnlyTheLastFingerAndDetachResetsHeldDepth" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.128"/>
+  <testcase name="configuredTimesChangeBothPhasesAndFastPressSlowReleaseNeverClipsOrBouncesTwice" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.018"/>
+  <testcase name="repressAtTheNeutralCrossingDoesNotTurnItIntoAnIdleKey" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.011"/>
+  <testcase name="repeatedDurationChangesDuringTheUpperBrakeKeepItsRiseFullColour" classname="org.fcitx.fcitx5.android.KeyPressDepthTest" time="0.012"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

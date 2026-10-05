@@ -137,20 +137,19 @@ internal class PressEffect(
 
     /** returns (alpha, retreat 0..1) of the key face, or null once the face is gone */
     private fun keyEnvelope(r: PressEffectTrail.Ripple, now: Long): Float {
+        if (holdWhilePressed && r.keyFill && keyFloatOpacity != null) {
+            // The real KeyView supplies its own per-key elevation/fade state.
+            // Sam also follows the rise and landing: a fixed 180ms fade could
+            // otherwise black out the cap before its actual rebound peak.
+            envelopeRetreat = 0f
+            return 0.92f * keyFloatOpacity.invoke(r.keyId).coerceIn(0f, 1f)
+        }
         if (samGlare) {
-            // In the reference, only the directly held cap is coloured. Its
-            // black mask returns quickly while the much wider light keeps going.
-            // Cap motion is independent and still uses the user's motion controls.
+            // Other motion modes retain Sam's short local cap trail, independent
+            // of the broad under-key light. Only floating caps need motion-linked colour.
             envelopeRetreat = 0f
             return if (r.releasedAt < 0L) 0.92f
                 else 0.92f * (1f - smoothstep(0f, 180f, (now - r.releasedAt).toFloat()))
-        }
-        if (holdWhilePressed && r.keyFill && keyFloatOpacity != null) {
-            // The real KeyView supplies its own per-key elevation/fade state.
-            // Keep the full face shape while it descends, including installations
-            // whose saved legacy retreat was only 30 or 100 milliseconds.
-            envelopeRetreat = 0f
-            return 0.92f * keyFloatOpacity.invoke(r.keyId).coerceIn(0f, 1f)
         }
         val elapsed = (now - r.start).coerceAtLeast(0L)
         if (!holdWhilePressed) {
@@ -854,11 +853,15 @@ internal class PressEffect(
         private val green = FloatArray(FIELD_PIXELS)
         private val blue = FloatArray(FIELD_PIXELS)
         private val weight = FloatArray(FIELD_PIXELS)
+        // Sam separates visible light from colour mixing. Overlapping weak
+        // shoulders must not accumulate into a uniformly bright keyboard.
+        private val samExposure = if (samGlare) FloatArray(FIELD_PIXELS) else null
         private val pixels = IntArray(FIELD_PIXELS)
         private val oldRed = FloatArray(FIELD_OLD_PIXELS)
         private val oldGreen = FloatArray(FIELD_OLD_PIXELS)
         private val oldBlue = FloatArray(FIELD_OLD_PIXELS)
         private val oldWeight = FloatArray(FIELD_OLD_PIXELS)
+        private val oldSamExposure = if (samGlare) FloatArray(FIELD_OLD_PIXELS) else null
         private val oldX = IntArray(FIELD_WIDTH)
         private val oldY = IntArray(FIELD_HEIGHT)
         private val oldMixX = FloatArray(FIELD_WIDTH)
@@ -904,6 +907,7 @@ internal class PressEffect(
             java.util.Arrays.fill(green, 0f)
             java.util.Arrays.fill(blue, 0f)
             java.util.Arrays.fill(weight, 0f)
+            samExposure?.let { java.util.Arrays.fill(it, 0f) }
             sourceCount = 0
             visitedSamples = 0
             mergedSamples = 0
@@ -920,7 +924,7 @@ internal class PressEffect(
             val cellHeight = bounds.height() / FIELD_HEIGHT
             val directStart = if (hasOlder) 1 else 0
             for (i in directStart until sourceCount) accumulate(nodes[i], FIELD_WIDTH, FIELD_HEIGHT,
-                cellWidth, cellHeight, red, green, blue, weight)
+                cellWidth, cellHeight, red, green, blue, weight, samExposure)
             if (coordinatedNeon) {
                 // Smooth hue numerators/weights before colour lookup. Otherwise
                 // a narrow lime-to-cyan edge can still turn grey when Android
@@ -945,7 +949,7 @@ internal class PressEffect(
                 for (x in 0 until FIELD_WIDTH) {
                     val index = y * FIELD_WIDTH + x
                     val w = weight[index]
-                    if (w <= 0.001f || candidate <= 0f) {
+                    if (w <= (if (samGlare) 0.000001f else 0.001f) || candidate <= 0f) {
                         pixels[index] = 0
                         continue
                     }
@@ -969,18 +973,21 @@ internal class PressEffect(
                         r = (Color.red(from) + (Color.red(to) - Color.red(from)) * mix) / 255f
                         g = (Color.green(from) + (Color.green(to) - Color.green(from)) * mix) / 255f
                         b = (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * mix) / 255f
-                        val high = max(r, max(g, b))
-                        val low = min(r, min(g, b))
-                        val chroma = (high - low).coerceAtLeast(0.001f)
-                        // Pure neon leaves enough chroma for the final bitmap filter,
-                        // including lime/orange/cyan transitions at feathered edges.
-                        r = (r - low) / chroma
-                        g = (g - low) / chroma
-                        b = (b - low) / chroma
+                        if (!samGlare) {
+                            val high = max(r, max(g, b))
+                            val low = min(r, min(g, b))
+                            val chroma = (high - low).coerceAtLeast(0.001f)
+                            // The original two modes keep their pure neon path.
+                            // Sam retains the palette's own RGB/chroma so its
+                            // weak light does not become a harsh coloured grid.
+                            r = (r - low) / chroma
+                            g = (g - low) / chroma
+                            b = (b - low) / chroma
+                        }
                     }
                     // A spatial exposure ceiling is independent of source count:
                     // a new key cannot globally divide the already travelling front.
-                    val alpha = if (samGlare) 0.96f * w / (0.30f + w) * candidate
+                    val alpha = if (samGlare) samExposure!![index] * candidate
                         else 0.88f * w / (0.55f + w) * candidate
                     pixels[index] = ((alpha * 255f).toInt() shl 24) or
                         ((r * 255f).toInt().coerceIn(0, 255) shl 16) or
@@ -1086,8 +1093,12 @@ internal class PressEffect(
             // opaque black keycaps reveal its connected network in the gaps.
             node.halfWidth = min(ripple.flashWidth / 2f, pitch / 2f) + travel
             node.halfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.76f
-            node.coreHalfWidth = min(ripple.flashWidth / 2f, pitch / 2f) + travel * 0.63f
-            node.coreHalfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.65f
+            // Fast broad reach belongs to the dim shoulder. The much smaller
+            // bright core remains attached to this particular touch location.
+            node.coreHalfWidth = min(ripple.flashWidth / 2f, pitch / 2f) +
+                pitch * 1.7f * reach * ripple.size * progress
+            node.coreHalfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) +
+                pitch * 1.65f * reach * ripple.size * progress
             node.candidateCoreHalfWidth = node.coreHalfWidth
             node.candidateCoreHalfHeight = node.coreHalfHeight
             node.corner = min(node.halfWidth, node.halfHeight)
@@ -1112,6 +1123,7 @@ internal class PressEffect(
             java.util.Arrays.fill(oldGreen, 0f)
             java.util.Arrays.fill(oldBlue, 0f)
             java.util.Arrays.fill(oldWeight, 0f)
+            oldSamExposure?.let { java.util.Arrays.fill(it, 0f) }
             var any = false
             for (i in 0 until end) {
                 val ripple = ripples[i]
@@ -1120,7 +1132,7 @@ internal class PressEffect(
                 prepareNode(scratch, ripple, alpha)
                 accumulate(scratch, FIELD_OLD_WIDTH, FIELD_OLD_HEIGHT,
                     logicalWidth.toFloat() / FIELD_OLD_WIDTH, bounds.height() / FIELD_OLD_HEIGHT,
-                    oldRed, oldGreen, oldBlue, oldWeight)
+                    oldRed, oldGreen, oldBlue, oldWeight, oldSamExposure)
                 any = true
             }
             if (!any) return false
@@ -1138,6 +1150,7 @@ internal class PressEffect(
                 red[index] = bilinear(oldRed, a, b, c, d, fx, fy)
                 green[index] = bilinear(oldGreen, a, b, c, d, fx, fy)
                 blue[index] = bilinear(oldBlue, a, b, c, d, fx, fy)
+                if (samGlare) samExposure!![index] = bilinear(oldSamExposure!!, a, b, c, d, fx, fy)
             }
             return true
         }
@@ -1149,7 +1162,8 @@ internal class PressEffect(
         }
 
         private fun accumulate(node: FieldNode, gridWidth: Int, gridHeight: Int, cellWidth: Float, cellHeight: Float,
-            rBuffer: FloatArray, gBuffer: FloatArray, bBuffer: FloatArray, wBuffer: FloatArray) {
+            rBuffer: FloatArray, gBuffer: FloatArray, bBuffer: FloatArray, wBuffer: FloatArray,
+            exposureBuffer: FloatArray?) {
             val fluidMarginX = node.halfWidth * 0.18f * node.fluidMix
             val fluidMarginY = node.halfHeight * 0.18f * node.fluidMix
             val inverseHalfWidth = if (node.fluidMix > 0f) 1f / node.halfWidth else 0f
@@ -1260,20 +1274,31 @@ internal class PressEffect(
                 val feather = node.feather * (1f - 0.45f * fluidBlend)
                 val coverage = 1f - smoothstep(-feather * 0.20f, feather, distance)
                 if (coverage <= 0f) continue
+                val index = y * gridWidth + x
                 val w = if (samGlare) {
-                    // A single press has a visibly stronger centre, not a flat
-                    // full-panel backlight. Repeated presses can still join into
-                    // the broad glare without shrinking its final footprint.
                     val horizontal = (node.dx[x] - node.rowBend[y]) / node.coreHalfWidth
                     val vertical = (node.dy[y] - node.columnBend[x]) / node.coreHalfHeight
-                    node.weight * coverage / (1f + 2.4f * (horizontal * horizontal + vertical * vertical))
+                    val coreRadius = horizontal * horizontal + vertical * vertical
+                    val coreDenominator = 1f + coreRadius
+                    val core = 0.72f / (coreDenominator * coreDenominator)
+                    val outerX = (node.dx[x] - node.rowBend[y]) / node.halfWidth
+                    val outerY = (node.dy[y] - node.columnBend[x]) / node.halfHeight
+                    val shoulder = 0.10f / (1f + 2f * (outerX * outerX + outerY * outerY))
+                    val exposure = (node.weight / 1.35f) * coverage * (core + shoulder - core * shoulder)
+                    // The strongest local source determines exposure; another
+                    // distant shoulder cannot lift the whole scene to its peak.
+                    // max is continuous as sources expand and fade, so their
+                    // boundaries join without a new-wave reset or a hard ring.
+                    exposureBuffer!![index] = max(exposureBuffer[index], exposure)
+                    // Prefer the actual local colour pool over the numerous
+                    // faint far tails. Old sources retain their own colours.
+                    exposure * exposure
                 } else if (fluidBlend > 0f) node.weight * coverage * fluidDensity
                     else if (node.candidateMix[y] > 0f) {
                         val compact = node.columnDensity[x] * node.rowDensity[y]
                         val bridge = node.candidateColumnDensity[x] * node.candidateRowDensity[y]
                         node.weight * coverage * (compact + (bridge - compact) * node.candidateMix[y])
                     } else node.weight * coverage * node.columnDensity[x] * node.rowDensity[y]
-                val index = y * gridWidth + x
                 wBuffer[index] += w
                 rBuffer[index] += w * node.red
                 gBuffer[index] += w * node.green

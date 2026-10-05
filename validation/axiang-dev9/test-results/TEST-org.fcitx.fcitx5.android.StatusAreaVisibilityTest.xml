@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.StatusAreaVisibilityTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-05T04:23:28.617Z" hostname="1860ba65b9a5" time="0.001">
+  <properties/>
+  <testcase name="quickToolsHideRimeMaintenanceAndDecorativeOptionsWithoutDamagingSchemaActions" classname="org.fcitx.fcitx5.android.StatusAreaVisibilityTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

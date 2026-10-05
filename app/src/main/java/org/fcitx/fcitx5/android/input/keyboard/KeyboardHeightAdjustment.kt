@@ -30,7 +30,7 @@ internal class KeyboardHeightAdjustment(
     private var changed = false
 
     fun preview(requestedHeightPx: Int): Int {
-        val ratio = if (portrait && textLayout && !showNumberRow) 0.8f else 1f
+        val ratio = KeyboardSizePolicy.heightRatio(portrait, showNumberRow)
         percent = (requestedHeightPx * 100f / (baseHeightPx.coerceAtLeast(1) * ratio))
             .roundToInt().coerceIn(minimumPercent, maximumPercent)
         changed = true

@@ -1,0 +1,56 @@
+{
+  "source_commit": "ea30e4c9023f980f5f1598fb3fbc121223564717",
+  "renderer": "Actual Android TextKeyboard and PressEffect, Robolectric NATIVE",
+  "user_media_included": false,
+  "physical_device_capture": false,
+  "files": [
+    {
+      "source": "dev7-sam/idle.png",
+      "file": "sam-idle.png",
+      "bytes": 25022,
+      "sha256": "9ac4f2281b2abf64d393ae8f17aa6a29d994a7557d3dfb9f24305e9e9d5c587a"
+    },
+    {
+      "source": "dev7-sam/tap-150ms.png",
+      "file": "sam-tap-150ms.png",
+      "bytes": 42791,
+      "sha256": "330089c7840ca9e7590944f3a1d9031aa5427c60b6531301ff88c8df082ac6f3"
+    },
+    {
+      "source": "dev7-sam/separated-both-regions-300ms.png",
+      "file": "sam-separated-colours-300ms.png",
+      "bytes": 40313,
+      "sha256": "70ce95906b096662ebd5845c874b1aecdfe098a727643c9fd0078a2de79ebf01"
+    },
+    {
+      "source": "dev7-sam/burst/frame-025.png",
+      "file": "sam-burst-025.png",
+      "bytes": 52276,
+      "sha256": "654be2b6e63389971046e066197386fb1508e2660e0b88d10e303d4aa4cbf7bd"
+    },
+    {
+      "source": "dev7-sam/burst/frame-050.png",
+      "file": "sam-burst-050.png",
+      "bytes": 57264,
+      "sha256": "fc90887fa62a282a1903fe53f71f12f168ffb70fee59ae7253c8d8e060c5caca"
+    },
+    {
+      "source": "dev7-sam/burst/metrics.csv",
+      "file": "sam-burst-metrics.csv",
+      "bytes": 5320,
+      "sha256": "d0d82a7dd36adf87cf89de1d8628ffcaea168f5b3570d6a11bd2988ebf557fc5"
+    },
+    {
+      "source": "dev7-sam/burst/provenance.txt",
+      "file": "sam-burst-provenance.txt",
+      "bytes": 604,
+      "sha256": "32326dc9936ae76904d98175a336f1f97c9ba0a4316d7759ed221d77e6145d53"
+    },
+    {
+      "source": "dev7-sam/separated-colours.csv",
+      "file": "sam-separated-colours.csv",
+      "bytes": 135,
+      "sha256": "bb1de734c5651a3016e00b310c937567dd261b21877fae1c965032cfdaf4874f"
+    }
+  ]
+}

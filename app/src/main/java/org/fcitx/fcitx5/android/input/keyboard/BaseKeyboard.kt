@@ -155,10 +155,13 @@ abstract class BaseKeyboard(
 
     protected open val slideSelectionEnabled = false
     private val popupSelectionKeys = hashSetOf<Int>()
-    private fun canSlideSelect(key: KeyView): Boolean {
+    protected open fun canSlideSelect(key: KeyView): Boolean {
         val text = (key.def as? KeyDef.Appearance.Text)?.displayText ?: return false
         return text.length == 1 && (text[0] in 'a'..'z' || text[0] in 'A'..'Z' || text[0] in '0'..'9')
     }
+
+    private fun canRetargetPendingTap(key: KeyView): Boolean =
+        canSlideSelect(key) && !key.hasConsumedTouchAction && key.id !in popupSelectionKeys
 
     private val hapticOnRepeat by prefs.keyboard.hapticOnRepeat
 
@@ -534,8 +537,8 @@ abstract class BaseKeyboard(
     private fun releaseTouch(event: MotionEvent, index: Int, target: TouchTarget) {
         // A small lift-off drift must not discard a letter. If Android batches away
         // the last MOVE, resolve a deliberate slide from the final UP coordinates.
-        if (slideSelectionEnabled && canSlideSelect(target.view) &&
-            target.view.id !in popupSelectionKeys && !withinSlideTolerance(event, index, target)) {
+        if (slideSelectionEnabled && canRetargetPendingTap(target.view) &&
+            !withinSlideTolerance(event, index, target)) {
             val next = findTouchTarget(event, index)
             if (next != null && canSlideSelect(next.view)) {
                 switchSlideTarget(event, index, target, next)
@@ -714,8 +717,7 @@ abstract class BaseKeyboard(
                     for (i in 0 until event.pointerCount) {
                         val pid = event.getPointerId(i)
                         val target = touchTargets[pid] ?: continue
-                        if (slideSelectionEnabled && canSlideSelect(target.view) &&
-                            target.view.id !in popupSelectionKeys) {
+                        if (slideSelectionEnabled && canRetargetPendingTap(target.view)) {
                             val next = findTouchTarget(event, i)
                             // Do not send a tiny excursion to the child: its gesture
                             // detector would permanently mark this tap as cancelled.

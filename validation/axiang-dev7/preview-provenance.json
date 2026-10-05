@@ -1,0 +1,17 @@
+{
+  "source_commit": "ea30e4c9023f980f5f1598fb3fbc121223564717",
+  "native_frame_count": 127,
+  "fps": 60,
+  "padding_frames": 48,
+  "duration": 2.9166666666666665,
+  "source": "actual Android TextKeyboard and PressEffect, Robolectric NATIVE",
+  "physical_device_capture": false,
+  "interpolation": false,
+  "outputs": [
+    {
+      "filename": "axiang-dev7-sam-preview.mp4",
+      "bytes": 123505,
+      "sha256": "44d4a1683b3888c7e79364924d7d242926de4723aa16bd511472e90acf5001a1"
+    }
+  ]
+}

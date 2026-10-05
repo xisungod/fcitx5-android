@@ -22,10 +22,14 @@ object KeyboardSizePolicy {
         return (referencePercent * PORTRAIT_DEFAULT_HEIGHT_SCALE).roundToInt().coerceIn(10, 90)
     }
 
-    /** The toolbar lives outside this height, and number/symbol pages keep the normal page height. */
-    fun heightForLayout(baseHeightPixels: Int, portrait: Boolean, textLayout: Boolean, showNumberRow: Boolean): Int =
-        if (portrait && textLayout && !showNumberRow) (baseHeightPixels * 4f / PORTRAIT_REFERENCE_ROWS).roundToInt()
-        else baseHeightPixels
+    /** Every page shares the alphabet keyboard's height; switching to 123 cannot enlarge the IME. */
+    fun heightForLayout(baseHeightPixels: Int, portrait: Boolean,
+        @Suppress("UNUSED_PARAMETER") textLayout: Boolean, showNumberRow: Boolean): Int =
+        (baseHeightPixels * heightRatio(portrait, showNumberRow)).roundToInt()
+
+    /** Also used when converting a height drag back into the saved global percentage. */
+    internal fun heightRatio(portrait: Boolean, showNumberRow: Boolean): Float =
+        if (portrait && !showNumberRow) 4f / PORTRAIT_REFERENCE_ROWS else 1f
 
     /** A saved side margin can exceed the available width after rotation or on a smaller phone. */
     fun sidePaddingForWidth(requestedPixels: Int, widthPixels: Int, density: Float): Int {

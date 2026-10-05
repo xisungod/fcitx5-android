@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.EnterLongPressGestureTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:48:49.630Z" hostname="1860ba65b9a5" time="2.254">
+  <properties/>
+  <testcase name="longPressCommitsOneLiteralNewlineAndConsumesTheRelease" classname="org.fcitx.fcitx5.android.EnterLongPressGestureTest" time="0.423"/>
+  <testcase name="twoFingersHoldingReturnNeverSendOnEitherReleaseOrder" classname="org.fcitx.fcitx5.android.EnterLongPressGestureTest" time="0.339"/>
+  <testcase name="secondFingerAfterNewlineCannotRearmTheHoldOrSendAndANewTapStillWorks" classname="org.fcitx.fcitx5.android.EnterLongPressGestureTest" time="0.372"/>
+  <testcase name="shortTapKeepsTheOriginalReturnActionForReturnAndSendIcons" classname="org.fcitx.fcitx5.android.EnterLongPressGestureTest" time="0.305"/>
+  <testcase name="leavingTheKeyBeforeActivationCancelsTheHoldAndTheNextTapWorks" classname="org.fcitx.fcitx5.android.EnterLongPressGestureTest" time="0.286"/>
+  <testcase name="cancelBeforeOrAfterActivationLeavesTheNextReturnTapFresh" classname="org.fcitx.fcitx5.android.EnterLongPressGestureTest" time="0.268"/>
+  <testcase name="sustainedHoldNeverRepeatsAndASeparateHoldCanInsertTheNextNewline" classname="org.fcitx.fcitx5.android.EnterLongPressGestureTest" time="0.25"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

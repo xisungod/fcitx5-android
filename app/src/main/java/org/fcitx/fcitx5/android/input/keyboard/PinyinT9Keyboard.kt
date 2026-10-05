@@ -19,6 +19,15 @@ import splitties.views.imageResource
 /** Numeric pinyin codes go to Rime's T9 schema; the keypad never commits its letter groups. */
 @SuppressLint("ViewConstructor")
 class PinyinT9Keyboard(context: Context, theme: Theme) : BaseKeyboard(context, theme, Layout) {
+    override val slideSelectionEnabled = true
+
+    override fun canSlideSelect(key: KeyView): Boolean {
+        // Only the nine primary cells participate. Labels are letter groups,
+        // not individual letters; punctuation and control keys keep their gestures.
+        val tag = key.tag as? String ?: return false
+        return tag.length == 8 && tag.startsWith("t9-key-") && tag.last() in '1'..'9'
+    }
+
     companion object {
         const val Name = "PinyinT9"
         const val Text26Route = "Text26"

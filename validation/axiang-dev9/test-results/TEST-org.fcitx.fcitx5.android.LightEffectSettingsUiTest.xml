@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-05T04:22:55.941Z" hostname="1860ba65b9a5" time="4.822">
+  <properties/>
+  <testcase name="lightSettingsExposeTheKeyboardSizeAndFeedbackShortcut" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.331"/>
+  <testcase name="shapeSelectorPersistsIndependentlyOfTheUsersColorMode" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.219"/>
+  <testcase name="toolsMenuOpensKeyboardSettingsAndBackDiscardsWhileDoneApplies" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="1.102"/>
+  <testcase name="openingRandomModeDisplaysItsActualLegacyPaletteWithoutChangingPreferences" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.514"/>
+  <testcase name="numberRowSwitchChangesTheRealKeyboardAndItsTouchGeometry" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.337"/>
+  <testcase name="nativeFragmentOpensWithoutStartingTheInputEngine" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.197"/>
+  <testcase name="customPaletteEditsAddsAndRemovesRealStoredColoursUpToEight" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.753"/>
+  <testcase name="quickerDefaultIgnitionIsAdjustableWithoutOverwritingASavedTiming" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.254"/>
+  <testcase name="singleColourCanBeAnyRgbValueAndInvalidHexCannotSave" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.351"/>
+  <testcase name="openingThePageKeepsExistingTimingsAndSliderReleasePersistsTheChosenDuration" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.138"/>
+  <testcase name="renderTheActualSettingsScreenAndNativeColourEditor" classname="org.fcitx.fcitx5.android.LightEffectSettingsUiTest" time="0.618"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

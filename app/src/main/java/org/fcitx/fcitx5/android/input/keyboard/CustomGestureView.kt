@@ -83,6 +83,11 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx) {
     private var swipeTotalY = 0
     private var gestureConsumed = false
 
+    /** A parent may retarget a pending tap, but must not start another tap after
+     * this contact has already performed a long press, repeat or consumed swipe. */
+    internal val hasConsumedTouchAction: Boolean
+        get() = longPressTriggered || repeatStarted || swipeRepeatTriggered || gestureConsumed
+
     var doubleTapEnabled = false
     private var lastClickTime = 0L
     private var maybeDoubleTap = false

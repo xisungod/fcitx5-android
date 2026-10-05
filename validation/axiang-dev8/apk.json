@@ -1,0 +1,16 @@
+{
+  "version_name": "1.1-dev.8",
+  "version_code": 825,
+  "application_id": "org.fcitx.fcitx5.android.axiang.dev.motion4",
+  "source_commit": "ba8a9560861ea485bda68997140d43532ba8a8cf",
+  "apk_filename": "axiang-input-1.1-dev.8-arm64.apk",
+  "bytes": 263313388,
+  "sha256": "b1b8b22f4224e51b9afb405a6e4a52d717818c9c5d6028641090f1be4dd673c0",
+  "signing_certificate_sha256": "3a2d4a1e44aa177cc8f2c15968bc633a10f227b6e998308607acace46e4eb12d",
+  "abi": "arm64-v8a",
+  "tests": 311,
+  "classes": 52,
+  "test_failures": 0,
+  "offline_package_verifier_passed": true,
+  "install_mode": "same application ID and signing certificate as dev.7; in-place update preserves data"
+}

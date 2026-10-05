@@ -84,16 +84,17 @@ class KeyPressDepthTest {
     }
 
     @Test
-    fun theFirstFrameCompressesAndEvenZeroDurationTouchesReboundOnceWithoutAColourGap() {
-        for (upTime in longArrayOf(0L, 10L, 20L, 40L)) {
+    fun pressStartsContinuouslyAndEvenZeroDurationTouchesReboundOnceWithoutAColourGap() {
+        for (upTime in longArrayOf(0L, 10L, 16L, 20L, 30L, 40L, 50L, 80L)) {
             var now = 0L
             val released = KeyPressDepth { now }
             val held = KeyPressDepth { now }
             released.pressed()
             held.pressed()
-            assertEquals("DOWN must visibly compress in the first frame", 0.96f, released.currentScale(), 0.000001f)
-            assertEquals(-0.5f, released.currentLift(), 0f)
-            assertEquals(1f, released.currentFaceOpacity(), 0f)
+            assertEquals("DOWN starts geometry continuously at rest", 1f, released.currentScale(), 0f)
+            assertEquals(0f, released.currentLift(), 0f)
+            assertEquals(0f, released.currentVelocity(), 0f)
+            assertEquals("Colour still responds immediately, even before the first motion frame", 1f, released.currentFaceOpacity(), 0f)
             now = upTime
             val position = released.currentLift()
             val velocity = released.currentVelocity()
@@ -133,7 +134,7 @@ class KeyPressDepthTest {
                 }
                 priorPosition = lift
             }
-            assertTrue("Even ${upTime}ms touches must produce a visible positive rebound", peak in 0.89f..0.99f)
+            assertTrue("Even ${upTime}ms touches must produce a visible positive rebound", peak in 0.84f..0.99f)
             assertTrue("The peak must be perceptible, without delaying input", peakTime in 180..230)
             assertTrue(KeyPressDepth.scaleDelta(peak) in 0.028f..0.031f)
             assertEquals(1f, released.currentScale(), 0f)
@@ -146,13 +147,31 @@ class KeyPressDepthTest {
     }
 
     @Test
+    fun firstDisplayFramesShowProgressiveCompressionInsteadOfAnInitialSizeStep() {
+        var now = 0L
+        val depth = KeyPressDepth { now }
+        depth.pressed()
+        assertEquals(1f, depth.currentScale(), 0f)
+        var previous = 1f
+        for ((time, compression) in listOf(16L to 0.005f..0.010f, 33L to 0.020f..0.026f,
+            50L to 0.035f..0.041f, 80L to 0.055f..0.062f, 180L to 0.075f..0.080f)) {
+            now = time
+            val scale = depth.currentScale()
+            assertTrue("The actual ${time}ms frame has a visible but progressive press", 1f - scale in compression)
+            assertTrue(scale < previous)
+            assertEquals(1f, depth.currentFaceOpacity(), 0f)
+            previous = scale
+        }
+    }
+
+    @Test
     fun repressPreservesPositionAndVelocityAcrossTheRisePeakAndLanding() {
         for (repressAfter in longArrayOf(60L, 80L, 100L, 200L, 350L)) {
             var now = 0L
             val motion = KeyPressDepth { now }
             val control = KeyPressDepth { now }
             listOf(motion, control).forEach { it.pressed() }
-            now = 200
+            now = 300
             assertEquals(-1f, motion.currentLift(), 0f)
             assertFalse("A held key stops scheduling after reaching compression", motion.isTransitioning())
             listOf(motion, control).forEach { it.released() }
@@ -169,7 +188,7 @@ class KeyPressDepthTest {
             now += 19
             assertEquals("Duplicate DOWN cannot restart the moving spring", control.currentLift(), motion.currentLift(), 0f)
             assertEquals(control.currentVelocity(), motion.currentVelocity(), 0f)
-            now += 250
+            now += 400
             assertEquals(-1f, motion.currentLift(), 0f)
             assertEquals(0.92f, motion.currentScale(), 0.000001f)
             assertFalse(motion.isTransitioning())
@@ -187,6 +206,7 @@ class KeyPressDepthTest {
         var now = 0L
         val depth = KeyPressDepth { now }
         depth.pressed()
+        now = 50
         depth.released()
         while (depth.currentLift() < 0f) now++
         val crossing = depth.currentLift()
@@ -194,7 +214,7 @@ class KeyPressDepthTest {
         assertTrue(crossing in 0f..0.02f)
         assertTrue(velocity > 0f)
         depth.pressed()
-        assertEquals("A crossing key must not receive the resting-key compression seed", crossing, depth.currentLift(), 0f)
+        assertEquals("A crossing key must retain its exact position on retouch", crossing, depth.currentLift(), 0f)
         assertEquals(velocity, depth.currentVelocity(), 0f)
         assertEquals(1f, depth.currentFaceOpacity(), 0f)
         now += 1
@@ -206,21 +226,21 @@ class KeyPressDepthTest {
         var now = 0L
         val depth = KeyPressDepth { now }
         depth.pressed()
-        now = 200
+        now = 300
         assertEquals(-1f, depth.currentLift(), 0f)
         assertEquals(0.92f, depth.currentScale(), 0.000001f)
         depth.released()
-        now = 300
+        now = 400
         assertTrue("After 100ms the cap has crossed upward through rest", depth.currentLift() in 0.39f..0.46f)
         assertEquals(1f, depth.currentFaceOpacity(), 0f)
-        now = 400
+        now = 500
         assertTrue("At 200ms the single rebound is near its positive peak", depth.currentLift() in 0.94f..0.99f)
         assertTrue(depth.currentFaceOpacity() > 0.99f)
-        now = 700
+        now = 800
         assertTrue("A visible cap still connects consecutive input after 500ms", depth.currentFaceOpacity() > 0.4f)
         var previous = depth.currentLift()
         for (elapsed in 501L..1100L) {
-            now = 200 + elapsed
+            now = 300 + elapsed
             val lift = depth.currentLift()
             assertTrue("The landing never restarts an oscillation", lift <= previous)
             assertTrue(lift >= 0f)
@@ -703,7 +723,7 @@ class KeyPressDepthTest {
             key.draw(beforeCanvas)
             saveDepthFrame(before, "before")
             h.event(MotionEvent.ACTION_DOWN, 7 to "A")
-            h.advance(200)
+            h.advance(300)
             val pressed = Bitmap.createBitmap(key.width, key.height, Bitmap.Config.ARGB_8888)
             val pressedCanvas = GlyphRecordingCanvas(pressed, "A").apply { drawColor(Color.BLACK) }
             key.draw(pressedCanvas)
@@ -798,7 +818,7 @@ class KeyPressDepthTest {
                         cap[0] >= 0f && cap[1] >= 0f && cap[2] <= width && cap[3] <= height)
                 }
                 h.event(MotionEvent.ACTION_DOWN, 7 to "A")
-                h.advance(220)
+                h.advance(300)
                 h.render(key).recycle()
                 val pressedScale = scale
                 assertEquals(1f - settings.pressAmplitude / 100f, pressedScale, 0.00001f)
@@ -817,7 +837,7 @@ class KeyPressDepthTest {
     }
 
     @Test
-    fun realZeroAndShortTouchesCommitImmediatelyAndStillShowCompressionThenRebound() {
+    fun realZeroAndShortTouchesCommitImmediatelyAndStartContinuousMotionThenRebound() {
         val h = Harness(lights = true)
         try {
             val key = h.key("A")
@@ -825,19 +845,22 @@ class KeyPressDepthTest {
             val anchor = Rect(key.bounds)
             for ((index, duration) in longArrayOf(0L, 10L, 20L, 40L).withIndex()) {
                 h.event(MotionEvent.ACTION_DOWN, 7 to "A")
-                assertEquals(0.96f, h.depth(key).currentScale(), 0.000001f)
+                assertEquals("The real DOWN cannot jump the key geometry", 1f, h.depth(key).currentScale(), 0f)
                 h.advance(duration)
                 val compressed = h.depth(key).currentLift()
                 h.event(MotionEvent.ACTION_UP, 7 to "A")
                 assertEquals("Text never waits for the visual rebound", List(index + 1) { "a" }, h.typed)
                 assertEquals(compressed, h.depth(key).currentLift(), 0f)
-                h.advance(200)
+                // A zero-duration contact has no downward momentum, so its
+                // upper peak arrives slightly earlier than ordinary short taps.
+                val reboundSample = if (duration == 0L) 190L else 200L
+                h.advance(reboundSample)
                 val image = Bitmap.createBitmap(key.width, key.height, Bitmap.Config.ARGB_8888)
                 val canvas = GlyphRecordingCanvas(image, "A")
                 key.draw(canvas)
                 assertTrue("A ${duration}ms real touch must visibly rebound", canvas.glyphScaleX in 1.028f..1.031f)
                 assertTrue(canvas.glyphDraws > 0)
-                saveDepthFrame(image, "short-$duration-released-200ms")
+                saveDepthFrame(image, "short-$duration-released-${reboundSample}ms")
                 image.recycle()
                 assertFixedGeometry(h, key, outer, anchor)
                 h.advance(1100)
@@ -927,15 +950,18 @@ class KeyPressDepthTest {
                         glyphY.getValue(next), h.typed.joinToString("")).joinToString(","))
                     if (time == 0) {
                         assertTrue("The first real DOWN frame is a full red block", leftRed > 0.8f)
-                        assertTrue("The actual first glyph frame is already compressed downward", glyphY.getValue(left) > baselineGlyph.getValue(left) + 0.2f)
+                        assertEquals("The actual first glyph frame starts without a size or position jump",
+                            baselineGlyph.getValue(left), glyphY.getValue(left), 0.000001f)
                         assertTrue(h.typed.isEmpty())
                     }
+                    if (time == 25) assertTrue("The next displayed glyph frame visibly follows the progressive press",
+                        glyphY.getValue(left) > baselineGlyph.getValue(left) + 0.05f)
                     if (time == 100 || time == 200) {
                         assertTrue("L must retain a red full face across A, despite saved ${savedRetreat}ms fading", leftRed > 0.7f)
                         assertTrue("A has its own independent coloured face", nextRed > 0.7f)
                         if (time == 100) {
                             assertTrue("L is recovering from compression while A first compresses", h.depth(left).currentLift() < 0f)
-                            assertTrue(h.depth(next).currentLift() < 0f)
+                            assertEquals("A starts at rest while its new colour supplies immediate feedback", 0f, h.depth(next).currentLift(), 0f)
                         } else {
                             assertTrue("L has risen above rest while A follows independently", h.depth(left).currentLift() > 0f)
                             assertTrue("L glyph shares the actual upward rebound", glyphY.getValue(left) < baselineGlyph.getValue(left) - 0.3f)
@@ -956,7 +982,7 @@ class KeyPressDepthTest {
                         val y = (stripIndex / 2) * 484f
                         stripCanvas.drawBitmap(image, x, y + 34f, null)
                         stripCanvas.drawText("${time}ms  " + when (time) {
-                            0 -> "L DOWN: immediate red compression"
+                            0 -> "L DOWN: immediate red, continuous motion start"
                             100 -> "A DOWN: L starts rebounding"
                             200 -> "L rebounds above rest; A follows"
                             300 -> "L retouched; A keeps rebounding"
@@ -1004,7 +1030,7 @@ class KeyPressDepthTest {
                 7 to "A", 23 to "A")
             h.event(MotionEvent.ACTION_POINTER_UP,
                 7 to "A", 23 to "A")
-            h.advance(180)
+            h.advance(220)
             assertEquals("The remaining finger must keep a shared key compressed", 0.92f, h.depth(key).currentScale(), 0.00001f)
             h.event(MotionEvent.ACTION_UP, 23 to "A")
             h.advance(1100)
@@ -1028,7 +1054,7 @@ class KeyPressDepthTest {
             val baseline = h.render(h.keyboard)
             h.event(MotionEvent.ACTION_DOWN, 7 to "L")
             h.advance(80)
-            assertTrue(h.depth(key).currentLift() < -0.8f)
+            assertTrue(h.depth(key).currentLift() < -0.7f)
             assertTrue(h.keyboard.isAttachedToWindow)
             h.keyboard.visibility = View.INVISIBLE
             assertTrue("This exercises hidden-without-detach, not teardown", h.keyboard.isAttachedToWindow)
@@ -1041,7 +1067,7 @@ class KeyPressDepthTest {
             assertTrue("Showing the cached keyboard must restore the actual dark resting pixels", baseline.sameAs(h.render(h.keyboard)))
             h.event(MotionEvent.ACTION_DOWN, 7 to "L")
             h.advance(80)
-            assertTrue("A fresh touch compresses again after hidden pointers are discarded", h.depth(key).currentLift() < -0.8f)
+            assertTrue("A fresh touch compresses again after hidden pointers are discarded", h.depth(key).currentLift() < -0.7f)
             h.keyboard.dispatchWindowVisibilityChanged(View.INVISIBLE)
             assertEquals("The window-level hide also cancels motion immediately", 0f, h.depth(key).currentLift(), 0f)
             assertFalse(h.depth(key).isTransitioning())

@@ -46,6 +46,20 @@ class KeyboardHeightAdjustmentTest {
         assertEquals(648, reopened.heightPx)
     }
 
+    @Test fun adjustingHeightFromTheNumericPageReopensAtTheSameHeightOnLetters() {
+        val pref = preference().apply { setValue(30) }
+        val numeric = KeyboardHeightAdjustment(pref, 2400, true, false, false, 300, 1800)
+        assertEquals("123 must begin at the four-row alphabet height", 576, numeric.heightPx)
+        assertEquals(768, numeric.preview(768))
+        assertEquals("Preview cannot write the global height", 30, pref.getValue())
+        numeric.save()
+        assertEquals("The shared 0.8 height factor must also be used when saving", 40, pref.getValue())
+        val letters = KeyboardHeightAdjustment(pref, 2400, true, true, false, 300, 1800)
+        assertEquals(numeric.heightPx, letters.heightPx)
+        assertEquals("Repeated page changes cannot compound the height", 768,
+            KeyboardHeightAdjustment(pref, 2400, true, false, false, 300, 1800).heightPx)
+    }
+
     @Test fun resetIsADraftAndCancelKeepsTheOriginalHeight() {
         val pref = preference().apply { setValue(45) }
         val draft = KeyboardHeightAdjustment(pref, 1000, true, true, true, 160, 800)

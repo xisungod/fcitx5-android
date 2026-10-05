@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyboardHeightEditorTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-05T04:22:42.759Z" hostname="1860ba65b9a5" time="0.171">
+  <properties/>
+  <testcase name="hideAndShowDiscardTheOldPointerAndTheNextDragUsesTheNewHeight" classname="org.fcitx.fcitx5.android.KeyboardHeightEditorTest" time="0.051"/>
+  <testcase name="accessibilityAdjustsByEightDpAndRespectsBothHeightLimits" classname="org.fcitx.fcitx5.android.KeyboardHeightEditorTest" time="0.029"/>
+  <testcase name="backdropConsumesTouchesWithoutEditingAndEachToolbarButtonCallsOnlyItsOwnAction" classname="org.fcitx.fcitx5.android.KeyboardHeightEditorTest" time="0.02"/>
+  <testcase name="dragClampsBothLimitsAndCancelRestoresTheHeightAtThisDragStart" classname="org.fcitx.fcitx5.android.KeyboardHeightEditorTest" time="0.023"/>
+  <testcase name="dragKeepsItsOriginalScreenBaselineWhenPreviewMovesTheEditorAndUpKeepsItOpen" classname="org.fcitx.fcitx5.android.KeyboardHeightEditorTest" time="0.024"/>
+  <testcase name="secondaryFingerCannotClickTheToolbarOrTakeOverAfterThePrimaryFingerLeaves" classname="org.fcitx.fcitx5.android.KeyboardHeightEditorTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="org.fcitx.fcitx5.android.KeyLegendInkTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-05T03:48:55.069Z" hostname="1860ba65b9a5" time="0.044">
+  <properties/>
+  <testcase name="plainLightGlyphHasNoDarkContourOnAColouredKeyFace" classname="org.fcitx.fcitx5.android.KeyLegendInkTest" time="0.038"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

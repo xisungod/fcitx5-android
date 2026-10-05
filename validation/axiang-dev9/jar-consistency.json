@@ -1,0 +1,27 @@
+{
+  "KeyboardQuickSettingsUi.class": {
+    "compile_sha256": "4a1f4c368f67e8f9552a5eda61ed0ae5c1c1cb62e67605074252f4b4e94b3cbd",
+    "runtime_sha256": "4a1f4c368f67e8f9552a5eda61ed0ae5c1c1cb62e67605074252f4b4e94b3cbd",
+    "match": true
+  },
+  "BaseKeyboard.class": {
+    "compile_sha256": "35817b96d3676f867c48f25e261f7a1f0ed80b6657eb383c26be30c514c89738",
+    "runtime_sha256": "35817b96d3676f867c48f25e261f7a1f0ed80b6657eb383c26be30c514c89738",
+    "match": true
+  },
+  "CustomGestureView.class": {
+    "compile_sha256": "f7953ac7800f474186a6ab5694a946c1be11b45c1bb899b11f452edd373f3e5f",
+    "runtime_sha256": "f7953ac7800f474186a6ab5694a946c1be11b45c1bb899b11f452edd373f3e5f",
+    "match": true
+  },
+  "NumberKeyboard.class": {
+    "compile_sha256": "c4774cf4ffacf3b0907e7b054c8239896cfedc4418d6cf360f75907a0dc2becc",
+    "runtime_sha256": "c4774cf4ffacf3b0907e7b054c8239896cfedc4418d6cf360f75907a0dc2becc",
+    "match": true
+  },
+  "PinyinT9Keyboard.class": {
+    "compile_sha256": "431265cfd2d26a5eddd5dd6507bcf172456a1e22d67b9dea212eacf3065c0063",
+    "runtime_sha256": "431265cfd2d26a5eddd5dd6507bcf172456a1e22d67b9dea212eacf3065c0063",
+    "match": true
+  }
+}

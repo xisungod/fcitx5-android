@@ -1,0 +1,18 @@
+{
+  "source_commit": "cc34351599b265a0e4a45bf61d194b0aa4e9366f",
+  "producer": "NineKeySlideGestureTest; actual Android keyboard rendering with Robolectric NATIVE",
+  "physical_device_capture": false,
+  "user_media_included": false,
+  "files": [
+    {
+      "source": "app/build/outputs/effect-checks/nine-key-slide-number.png",
+      "file": "nine-key-slide-number.png",
+      "sha256": "efb08d9fc3621570eee534ba7c37e72f805f5a901e4c35337643493ca9db0a57"
+    },
+    {
+      "source": "app/build/outputs/effect-checks/nine-key-slide-t9.png",
+      "file": "nine-key-slide-t9.png",
+      "sha256": "ee165e33b151c23e0cab1271e4df6f8c74cb001cdec5e8aeba48e3d5a2f731af"
+    }
+  ]
+}
