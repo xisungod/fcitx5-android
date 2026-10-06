@@ -1,0 +1,59 @@
+{
+  "format": "axiang-touch3-exact-delivery-identity-v1",
+  "repository": "xisungod/fcitx5-android",
+  "source_commit": "dc04e721035b8f1cab7469a3476c32064cbc2d5e",
+  "apk_name": "AXiang-1.2-touch.3-arm64.apk",
+  "apk_bytes": 268597703,
+  "apk_sha256": "ca16dddd6aa25cbb36ad455d001fa8309ea6efbb7ef6c342df569aba8228577a",
+  "signer_sha256": "ffede124b18d54af5d4cfa9f3a32504fa2ccc898563bc4816bacbe3e46ec0494",
+  "package": "org.fcitx.fcitx5.android.axiang.touch2",
+  "version_name": "1.2-touch.3",
+  "version_code": 3,
+  "unit_tests": 589,
+  "baseline_apk_sha256": "a9118a03cbcbda659744bee4f433c1862c76ed950f5ca0b0efc3a0cd25080cbd",
+  "release_id": 405090208,
+  "release_tag": "axiang-touch-1.2-touch.3",
+  "contains_signing_key_or_user_logs": false,
+  "public_files": {
+    "AXiang-1.2-touch.3-arm64.apk": {
+      "bytes": 268597703,
+      "sha256": "ca16dddd6aa25cbb36ad455d001fa8309ea6efbb7ef6c342df569aba8228577a"
+    },
+    "GUIDE.zh-CN.md": {
+      "bytes": 7078,
+      "sha256": "40948c28d9d2539aed31b206bad12ea39267880016c03707e1410a932409370a"
+    },
+    "SHA256SUMS.txt": {
+      "bytes": 804,
+      "sha256": "fb068f6f732c6abb8f2afc72e8038c053214f8e65fad4d8b9b58da425b5095aa"
+    },
+    "build-verification.json": {
+      "bytes": 1992,
+      "sha256": "c26600c09422c117ba75d6b8c8e98500c26ddebd6c11659e4bb4441d157d3cc0"
+    },
+    "full-junit-reports.zip": {
+      "bytes": 61083,
+      "sha256": "aeabcb30a4af10dc8faa17b84664c70e85d13fd001077fdbbe27d14a6d581927"
+    },
+    "prebuilt-manifest.json": {
+      "bytes": 68806,
+      "sha256": "cfc62a524ab5df15e700d47d8c613804ce01095f88a57b47736b4e5208f39122"
+    },
+    "source-patch-manifest.json": {
+      "bytes": 6817,
+      "sha256": "2bd7ad33c70c5c52a635aea16e96099ab9defe57fe640be08a45049f94072135"
+    },
+    "source-snapshot.json": {
+      "bytes": 490,
+      "sha256": "f41b34d8d07fa282aeeccddad87bd815f01777a46d027c071958fd77b835cd2e"
+    },
+    "typing-test-source.patch": {
+      "bytes": 191974,
+      "sha256": "358760af3dffcfc8880039e9c28066a342333a7f2a7cb719c6e335937262e325"
+    },
+    "unit-test-summary.json": {
+      "bytes": 17833,
+      "sha256": "43c9cf7a9ee10979483a23b805760dd93eb077d3c03297426f30a21d7d28b2a5"
+    }
+  }
+}
