@@ -1,0 +1,69 @@
+name: Recover verified AXiang touch test download
+on:
+  push:
+    branches: ["delivery/axiang-touch-1"]
+    paths: [".github/workflows/touch-upload-retry.yml"]
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 69fd9374a25ec9d04526770eda444e75a10b9774
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: 37403039504
+          name: axiang-touch-1-37403039504
+          path: ${{ runner.temp }}/verified-touch
+      - name: Verify the already tested package and source identity
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,zipfile
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'verified-touch'
+          manifests=list(root.rglob('build-verification.json'))
+          assert len(manifests)==1
+          folder=manifests[0].parent
+          verification=json.loads(manifests[0].read_text())
+          assert verification['compiled_source_commit']=='69fd9374a25ec9d04526770eda444e75a10b9774'
+          assert str(verification['github_run_id'])=='37403039504'
+          assert verification['unit_tests']==451 and verification['python_tests']==49
+          assert verification['unit_test_failures']==verification['unit_test_errors']==verification['unit_test_skipped']==0
+          assert verification['signature_verified'] and verification['zip_alignment_verified']
+          assert verification['package']=='org.fcitx.fcitx5.android.axiang.touch'
+          assert verification['version_name']=='1.2-touch.1'
+          def digest(p):
+              with p.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+          for line in (folder/'SHA256SUMS.txt').read_text().splitlines():
+              checksum,name=line.split('  ',1)
+              assert Path(name).name==name and digest(folder/name)==checksum,name
+          apk=folder/'AXiang-1.2-touch.1-arm64.apk'
+          assert digest(apk)==verification['apk_sha256']
+          prepared=json.loads((folder/'prebuilt-manifest.json').read_text())
+          expected={f['path']:f for f in prepared['files']+prepared['added_files']}
+          with zipfile.ZipFile(apk) as archive:
+              actual={n for n in archive.namelist() if n.startswith(('assets/','lib/')) and not n.endswith('/')}
+              assert actual==set(expected)
+              for name,record in expected.items():
+                  data=archive.read(name)
+                  assert len(data)==record['bytes'] and hashlib.sha256(data).hexdigest()==record['sha256'],name
+          with open(os.environ['GITHUB_ENV'],'a') as env:env.write('VERIFIED_TOUCH_DIR='+str(folder)+'\n')
+          print('Verified original CI source, 451 JVM tests, 49 Python tests, APK and all packaged data')
+          PY
+      - name: Upload the verified package to its existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/xisungod/fcitx5-android/releases/404232921 > "$RUNNER_TEMP/release.json"
+          python3 - "$RUNNER_TEMP/release.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1]))
+          assert (r['id'],r['tag_name'],r['target_commitish'],r['draft'])==(404232921,'axiang-touch-1.2-touch.1','69fd9374a25ec9d04526770eda444e75a10b9774',True)
+          PY
+          gh release upload axiang-touch-1.2-touch.1 "$VERIFIED_TOUCH_DIR"/* --repo xisungod/fcitx5-android --clobber
