@@ -19,9 +19,9 @@ jobs:
       BUILD_ABI: arm64-v8a
       BUILD_VERSION_CODE: "1"
       BUILD_VERSION_NAME: "1.2-touch.1"
-      BUILD_COMMIT_HASH: "58360a5f1bac4b4b416367a9d518337b9f19407e"
+      BUILD_COMMIT_HASH: "69fd9374a25ec9d04526770eda444e75a10b9774"
       XUANCAI_APP_SUFFIX: .axiang.touch
-      SOURCE_COMMIT: "58360a5f1bac4b4b416367a9d518337b9f19407e"
+      SOURCE_COMMIT: "69fd9374a25ec9d04526770eda444e75a10b9774"
       SOURCE_BASE: "2a038c9bb5360d6760666c3df564cab4c66d1564"
       RELEASE_TAG: axiang-touch-1.2-touch.1
       RELEASE_ID: "404232921"
@@ -29,7 +29,7 @@ jobs:
       - name: Check out the fixed and previously tested touch source
         uses: actions/checkout@v7
         with:
-          ref: "58360a5f1bac4b4b416367a9d518337b9f19407e"
+          ref: "69fd9374a25ec9d04526770eda444e75a10b9774"
           fetch-depth: 0
           persist-credentials: false
 
