@@ -1,0 +1,253 @@
+name: AXiang touch test download preparation
+
+on:
+  push:
+    branches: ["delivery/axiang-touch-1"]
+
+concurrency:
+  group: axiang-touch-download-1
+  cancel-in-progress: false
+
+jobs:
+  touch:
+    if: github.repository == 'xisungod/fcitx5-android' && github.ref == 'refs/heads/delivery/axiang-touch-1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "1"
+      BUILD_VERSION_NAME: "1.2-touch.1"
+      BUILD_COMMIT_HASH: "58360a5f1bac4b4b416367a9d518337b9f19407e"
+      XUANCAI_APP_SUFFIX: .axiang.touch
+      SOURCE_COMMIT: "58360a5f1bac4b4b416367a9d518337b9f19407e"
+      SOURCE_BASE: "2a038c9bb5360d6760666c3df564cab4c66d1564"
+      RELEASE_TAG: axiang-touch-1.2-touch.1
+      RELEASE_ID: "404232921"
+    steps:
+      - name: Check out the fixed and previously tested touch source
+        uses: actions/checkout@v7
+        with:
+          ref: "58360a5f1bac4b4b416367a9d518337b9f19407e"
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm the compiled source identity
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+
+      - name: Prepare Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Prepare Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install the pinned SDK tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Prepare Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Verify and extract pinned stable 1.2 native libraries and speech compile JAR
+        run: |
+          python3 scripts/prepare-axiang-diagnostic-delivery.py prepare \
+            --work "$RUNNER_TEMP/axiang-touch-baseline"
+
+      - name: Prepare the single public next-letter table overlay
+        run: |
+          python3 scripts/prepare-axiang-touch-delivery.py prepare \
+            --work "$RUNNER_TEMP/axiang-touch-build" \
+            --source-apk "$RUNNER_TEMP/axiang-touch-baseline/downloads/axiang-input-1.2-arm64.apk"
+          cat > "$RUNNER_TEMP/axiang-touch-build/test-memory.init.gradle" <<'GRADLE'
+          gradle.beforeProject { project ->
+              project.tasks.withType(Test).configureEach { maxHeapSize = '2g' }
+          }
+          GRADLE
+
+      - name: Compile touch test and run the complete 451-test JVM suite
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 \
+            -I "$RUNNER_TEMP/axiang-touch-build/touch.init.gradle" \
+            -I "$RUNNER_TEMP/axiang-touch-build/test-memory.init.gradle" \
+            :app:assembleDebug :app:testDebugUnitTest \
+            -x :app:generateDataDescriptor \
+            -x :app:installFcitxComponent \
+            -x :app:deleteFcitxComponentExcludeFiles \
+            2>&1 | tee "$RUNNER_TEMP/axiang-touch-build/build.log"
+
+      - name: Run all 49 public Python regression tests without user logs
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          import os
+          from pathlib import Path
+          import sys
+          import unittest
+
+          root = Path.cwd()
+          sys.path.insert(0, str(root / "scripts/touch-diagnostics"))
+          paths = [
+              "scripts/touch-diagnostics/test_run.py",
+              "scripts/touch-diagnostics/test_candidate_replay.py",
+              "scripts/test-build-pinyin-touch-language.py",
+          ]
+          suite = unittest.TestSuite()
+          for index, name in enumerate(paths):
+              spec = importlib.util.spec_from_file_location(f"axiang_public_test_{index}", root / name)
+              module = importlib.util.module_from_spec(spec)
+              sys.modules[spec.name] = module
+              spec.loader.exec_module(module)
+              suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(module))
+          if suite.countTestCases() != 49:
+              raise SystemExit("Expected exactly 49 public Python tests")
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          summary = {
+              "diagnostic_cli_tests": 44,
+              "public_probability_generator_tests": 5,
+              "tests": result.testsRun,
+              "failures": len(result.failures),
+              "errors": len(result.errors),
+              "skipped": len(result.skipped),
+              "user_logs_used": False,
+          }
+          destination = Path(os.environ["RUNNER_TEMP"]) / "axiang-touch-build/python-test-summary.json"
+          destination.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+          if not result.wasSuccessful() or result.skipped:
+              raise SystemExit("Python regression suite did not completely pass")
+          PY
+
+      - name: Verify the actual APK, stable data, added table, signature and 451 passing tests
+        run: |
+          python3 scripts/prepare-axiang-touch-delivery.py verify \
+            --work "$RUNNER_TEMP/axiang-touch-build" \
+            --output "$RUNNER_TEMP/axiang-touch-delivery" \
+            --expected-tests 451
+
+      - name: Package public source, guide and actual CI verification metadata
+        env:
+          WORKFLOW_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+          import subprocess
+          import zipfile
+
+          output = Path(os.environ["RUNNER_TEMP"]) / "axiang-touch-delivery"
+          work = Path(os.environ["RUNNER_TEMP"]) / "axiang-touch-build"
+          source = os.environ["SOURCE_COMMIT"]
+          base = os.environ["SOURCE_BASE"]
+          public_paths = [
+              "app/src/main/java", "app/src/main/res", "app/src/main/assets/typing",
+              "app/src/test/java", "scripts/touch-diagnostics", "docs/axiang",
+              "scripts/build-pinyin-touch-language.py", "scripts/test-build-pinyin-touch-language.py",
+              "scripts/prepare-axiang-diagnostic-delivery.py", "scripts/prepare-axiang-touch-delivery.py",
+          ]
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", "-z", base, source, "--", *public_paths])
+          members = [name.decode("utf-8") for name in changed.split(b"\0") if name]
+          if not members or any(Path(name).suffix in {".jsonl", ".apk", ".so", ".jar", ".pyc"} or
+                                "__pycache__" in Path(name).parts for name in members):
+              raise SystemExit("Refusing source patch with private logs or generated binaries")
+          patch = subprocess.check_output(
+              ["git", "diff", "--binary", "--full-index", base, source, "--", *public_paths])
+          (output / "pinyin-touch-source.patch").write_bytes(patch)
+          patch_metadata = {
+              "base_commit": base, "source_commit": source,
+              "patch": "pinyin-touch-source.patch", "bytes": len(patch),
+              "sha256": hashlib.sha256(patch).hexdigest(), "files": members,
+              "private_logs_prebuilts_and_generated_binaries_included": False,
+          }
+          (output / "source-patch-manifest.json").write_text(
+              json.dumps(patch_metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          snapshot = {
+              "branch": "delivery/axiang-touch-1", "commit": source,
+              "tree": subprocess.check_output(["git", "rev-parse", source + "^{tree}"], text=True).strip(),
+              "compiled_source_is_fixed_commit": True,
+              "workflow_commit": os.environ["WORKFLOW_COMMIT"],
+              "url": "https://github.com/xisungod/fcitx5-android/tree/" + source,
+              "private_logs_included": False,
+          }
+          (output / "source-snapshot.json").write_text(
+              json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
+          shutil.copyfile("docs/axiang/pinyin-touch-test.md", output / "使用说明.md")
+          shutil.copyfile(work / "python-test-summary.json", output / "python-test-summary.json")
+          reports = sorted(Path("app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          with zipfile.ZipFile(output / "full-junit-reports.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+              for path in reports:
+                  archive.write(path, path.name)
+          verification_path = output / "build-verification.json"
+          verification = json.loads(verification_path.read_text(encoding="utf-8"))
+          if verification["source_checkout_head"] != source or verification["unit_tests"] != 451:
+              raise SystemExit("Actual build source or test count differs from the fixed delivery")
+          verification.update({
+              "compiled_source_commit": source,
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "workflow_commit": os.environ["WORKFLOW_COMMIT"],
+              "signing_note": "Actual GitHub Actions debug certificate verified from this APK; may differ from local test builds and stable AXiang.",
+              "release_kind": "opt_in_touch_test_prerelease_draft",
+              "publication_performed": False,
+              "python_tests": 49,
+          })
+          verification_path.write_text(json.dumps(verification, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          def digest(path):
+              with path.open("rb") as stream:
+                  return hashlib.file_digest(stream, "sha256").hexdigest()
+          checksum_members = sorted(path for path in output.iterdir() if path.is_file() and path.name != "SHA256SUMS.txt")
+          (output / "SHA256SUMS.txt").write_text(
+              "".join(f"{digest(path)}  {path.name}\n" for path in checksum_members), encoding="utf-8")
+          PY
+
+      - name: Upload only to the existing touch test draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+            > "$RUNNER_TEMP/axiang-touch-build/release-before-upload.json"
+          python3 - "$RUNNER_TEMP/axiang-touch-build/release-before-upload.json" <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          release = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          expected = (int(os.environ["RELEASE_ID"]), os.environ["RELEASE_TAG"], os.environ["SOURCE_COMMIT"], True)
+          actual = (release.get("id"), release.get("tag_name"), release.get("target_commitish"), release.get("draft"))
+          if actual != expected:
+              raise SystemExit("Refusing upload: expected the existing draft with the fixed source commit and touch test tag")
+          PY
+          gh release upload "$RELEASE_TAG" \
+            "$RUNNER_TEMP/axiang-touch-delivery/AXiang-1.2-touch.1-arm64.apk" \
+            "$RUNNER_TEMP/axiang-touch-delivery/SHA256SUMS.txt" \
+            "$RUNNER_TEMP/axiang-touch-delivery/build-verification.json" \
+            "$RUNNER_TEMP/axiang-touch-delivery/unit-test-summary.json" \
+            "$RUNNER_TEMP/axiang-touch-delivery/prebuilt-manifest.json" \
+            "$RUNNER_TEMP/axiang-touch-delivery/model-provenance.json" \
+            "$RUNNER_TEMP/axiang-touch-delivery/python-test-summary.json" \
+            "$RUNNER_TEMP/axiang-touch-delivery/full-junit-reports.zip" \
+            "$RUNNER_TEMP/axiang-touch-delivery/pinyin-touch-source.patch" \
+            "$RUNNER_TEMP/axiang-touch-delivery/source-patch-manifest.json" \
+            "$RUNNER_TEMP/axiang-touch-delivery/source-snapshot.json" \
+            "$RUNNER_TEMP/axiang-touch-delivery/使用说明.md" \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Preserve actual verification results, build log and package backup
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-touch-1-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/axiang-touch-delivery/
+            ${{ runner.temp }}/axiang-touch-build/build.log
+            ${{ runner.temp }}/axiang-touch-build/python-test-summary.json
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
