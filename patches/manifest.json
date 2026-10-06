@@ -1,60 +1,55 @@
 {
   "format": 1,
-  "source_commit": "27954a72469787a26341c5a82ea60fb77b97842d",
+  "source_commit": "touchtest-1.2-ab",
   "base_commit": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
-  "patch_bytes": 2112423,
-  "patch_sha256": "c4c2245832b39d3b9e392c942efa4ba8286324fe2e1191629a6a8bd2cec075ab",
-  "gzip_sha256": "0c98974a7c99e21938b01095ec3c8a4aa8688f50ef93d9202cb51dcffc1712de",
+  "patch_bytes": 2100263,
+  "patch_sha256": "ac6be8503089cc1ddbca01188634e294e244979eeb82a19c6f27220cc60a5c89",
+  "gzip_sha256": "490541ccc0e6acab043d24617a9d8520505f2ab01ac7cad2426fac2e941211fa",
   "parts": [
     {
       "file": "axiang.patch.gz.part01",
       "bytes": 65536,
-      "sha256": "35a8a44b9747d504e5f30ceef1e2294a9ea3740e732d4a81491ea2ba0f856fad"
+      "sha256": "d24c2ad040e4a54acca23914f143866812b760c5e3ae47c7da60bdc94c5755c7"
     },
     {
       "file": "axiang.patch.gz.part02",
       "bytes": 65536,
-      "sha256": "a9af5571da03b15989ca8b9438b8b9e97c52f5bfcfea8b70fb1fc77746559162"
+      "sha256": "fae78452b34c475b6e746f878b7bd50426ab465eb9b09ca06e1e8868c9dd15c3"
     },
     {
       "file": "axiang.patch.gz.part03",
       "bytes": 65536,
-      "sha256": "85696e320f70798ccc72c50345a93040fd5da85d88e1e937eb9c324d16cabc73"
+      "sha256": "dd23cd309625974e44aa267a68dcb71edac6efe1f5d83dba10fdaf2e2771a0de"
     },
     {
       "file": "axiang.patch.gz.part04",
       "bytes": 65536,
-      "sha256": "2b2cc197dea4b8ef06c00219937c4c6cac409f065ec68da43438985213f26169"
+      "sha256": "b119e51c8e988d409a66dfa147dec710170714e5b9b3f9a159598279558ae5c8"
     },
     {
       "file": "axiang.patch.gz.part05",
       "bytes": 65536,
-      "sha256": "67f60cdd31a137aea887cf89f4957492f053363485d7b708cd96c4c7fc18a209"
+      "sha256": "5a887987d1e82963b99f35e55846bbf33d2754b4527ad7b2f2913bb381cf24b9"
     },
     {
       "file": "axiang.patch.gz.part06",
       "bytes": 65536,
-      "sha256": "9625e40d011b4e94e7d8facb924fd20edf6d6c74374191228513fc67c767867f"
+      "sha256": "db10eda6ac221a046f42d5a07cf5415abd385c7a3f6f818359e48fc6fbf414b7"
     },
     {
       "file": "axiang.patch.gz.part07",
       "bytes": 65536,
-      "sha256": "ef25bc45544c6b8df332f093373f43fcf3b4ac640a1e6b120d823c2b0ef72e50"
+      "sha256": "d731196e259778248c2fcf82f73e80e9324354c7ee70ba77d15139a88e8b92d2"
     },
     {
       "file": "axiang.patch.gz.part08",
       "bytes": 65536,
-      "sha256": "f150e62d38dbc72ebd40c902cd567bc2969091aa1768d96914240c87ac1b5426"
+      "sha256": "809373fe27dac53df368735d920c9933a8ffcb3a5387e20ef047acd29665367e"
     },
     {
       "file": "axiang.patch.gz.part09",
-      "bytes": 65536,
-      "sha256": "4e2efdcfb18e5044df28565bf5db459e4e0377defe5958eb82371547284fbbe7"
-    },
-    {
-      "file": "axiang.patch.gz.part10",
-      "bytes": 8565,
-      "sha256": "599dba6a78f34e2251094cf313c382307239f8812d15b785d4c48099d9649a45"
+      "bytes": 64542,
+      "sha256": "a670d3f0b2a4f123536068557a06b350dcdb3006e36aa35149cd4afe3bae9a30"
     }
   ]
 }

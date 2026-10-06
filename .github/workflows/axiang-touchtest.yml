@@ -1,0 +1,144 @@
+name: 阿翔 1.2 触摸测试版构建
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["test/axiang-1.2-touchtest"]
+    paths: ["patches/**", ".github/workflows/axiang-touchtest.yml", "AXIANG-TOUCHTEST.md"]
+
+concurrency:
+  group: axiang-touchtest-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "1201"
+      BUILD_VERSION_NAME: "1.2-touchtest.${{ github.run_number }}"
+      BUILD_COMMIT_HASH: ${{ github.sha }}
+      XUANCAI_APP_SUFFIX: .axiang.touchtest
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: 切到已验证版本并应用补丁
+        run: |
+          cp AXIANG-TOUCHTEST.md /tmp/AXIANG-NEXT.md
+          cp -r patches /tmp/axiang-dev-patches
+          cp -r scripts /tmp/axiang-dev-scripts
+          python3 /tmp/axiang-dev-scripts/assemble-axiang-patch.py --parts /tmp/axiang-dev-patches --output /tmp/xuancai.patch
+          git -c advice.detachedHead=false checkout e6199a2801b0c76e1baeff7a48f6b18e910e9dd7
+          git submodule update --init --recursive
+          git apply --whitespace=nowarn /tmp/xuancai.patch
+      - name: 准备完整雾凇与固定语法模型
+        run: python3 /tmp/axiang-dev-scripts/prepare-xuancai-rime.py
+      - name: 准备固定版本的本地听写运行库与中文模型
+        run: python3 /tmp/axiang-dev-scripts/prepare-axiang-asr.py
+      - name: 验证本地语音模型与自动标点的真实推理
+        run: |
+          python3 -m venv "$RUNNER_TEMP/axiang-asr-check"
+          "$RUNNER_TEMP/axiang-asr-check/bin/pip" install sherpa-onnx==1.13.8 numpy
+          "$RUNNER_TEMP/axiang-asr-check/bin/python" /tmp/axiang-dev-scripts/check-axiang-asr.py --output "$RUNNER_TEMP/axiang-asr-checks.json"
+      - name: 准备 Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: 准备 Android SDK
+        uses: android-actions/setup-android@v4
+      - name: 安装 CMake 与 Rime 验证依赖
+        run: |
+          sdkmanager --install "cmake;3.31.6"
+          sudo apt-get update -qq
+          sudo apt-get install -y extra-cmake-modules gettext cmake ninja-build pkg-config libboost-regex-dev libyaml-cpp-dev libmarisa-dev libopencc-dev libleveldb-dev liblua5.4-dev libgoogle-glog-dev python3-yaml
+      - name: 准备 Gradle
+        uses: gradle/actions/setup-gradle@v6
+      - name: 预编译内置词典并验证真实 Rime 候选
+        run: python3 /tmp/axiang-dev-scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/xuancai-rime-host"
+      - name: 编译主程序并运行界面测试
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest 2>&1 | tee /tmp/app-build.log
+      - name: 报告编译与测试错误
+        if: failure()
+        run: |
+          # Kotlin compiler errors -> annotations (readable through the API)
+          grep -E '^e: ' /tmp/app-build.log | head -20 | while IFS= read -r line; do
+            echo "::error title=kotlin::${line:0:900}"
+          done
+          # failed unit tests -> annotations with the assertion message
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          n = 0
+          for f in glob.glob('app/build/test-results/**/*.xml', recursive=True):
+              for case in ET.parse(f).getroot().iter('testcase'):
+                  for bad in list(case.findall('failure')) + list(case.findall('error')):
+                      msg = (bad.get('message') or bad.text or '').replace('\n', ' ')[:700]
+                      print(f"::error title=test::{case.get('classname')}.{case.get('name')}: {msg}")
+                      n += 1
+          print('failed tests:', n)
+          PY
+          grep -E 'FAILURE|What went wrong' -A4 /tmp/app-build.log | head -30 | while IFS= read -r line; do
+            echo "::warning title=gradle::${line:0:500}"
+          done
+      - name: 优先保留界面确认图
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-dev-ui-checks
+          path: |
+            app/build/outputs/effect-checks/
+            app/build/outputs/icon-checks/
+            app/build/outputs/ripple-shape-checks/
+            app/build/outputs/press-depth-checks/
+            app/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+      - name: 保留候选验证、绘制图与测试报告
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-dev-checks
+          path: |
+            app/build/outputs/effect-checks/
+            app/build/outputs/icon-checks/
+            app/build/outputs/ripple-shape-checks/
+            app/build/outputs/press-depth-checks/
+            app/build/test-results/testDebugUnitTest/
+            ${{ runner.temp }}/xuancai-rime-host/checks/
+            ${{ runner.temp }}/axiang-asr-checks.json
+          if-no-files-found: ignore
+      - name: 整理并校验内置 Rime 的单一安装包
+        run: |
+          mkdir -p /tmp/axiang-dev
+          cp app/build/outputs/apk/debug/*.apk /tmp/axiang-dev/axiang-dev-input-arm64.apk
+          cp /tmp/AXIANG-NEXT.md /tmp/axiang-dev/README.md
+          SDK_TOOLS="$ANDROID_HOME/build-tools/36.1.0"
+          "$SDK_TOOLS/apksigner" verify --verbose /tmp/axiang-dev/axiang-dev-input-arm64.apk
+          "$SDK_TOOLS/aapt" dump badging /tmp/axiang-dev/axiang-dev-input-arm64.apk > /tmp/app-badging.txt
+          sed -n '1,6p' /tmp/app-badging.txt
+          python3 /tmp/axiang-dev-scripts/verify-xuancai-rime-package.py /tmp/axiang-dev/axiang-dev-input-arm64.apk --bundled-rime --offline-dictation --aapt "$SDK_TOOLS/aapt" --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE"
+          cd /tmp/axiang-dev
+          sha256sum *.apk > SHA256SUMS.txt
+      - name: 保存测试包
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-touchtest-${{ github.run_id }}-arm64
+          path: /tmp/axiang-dev/*
+          retention-days: 14
+      - name: 发布测试预发布版（手机可直接下载）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd /tmp/axiang-dev
+          mv axiang-dev-input-arm64.apk axiang-1.2-touchtest-arm64.apk
+          sha256sum *.apk > SHA256SUMS.txt
+          TAG="axiang-1.2-touchtest.${{ github.run_number }}"
+          gh release create "$TAG" axiang-1.2-touchtest-arm64.apk SHA256SUMS.txt \
+            --repo "${{ github.repository }}" --target "${{ github.sha }}" --prerelease \
+            --title "阿翔 1.2 触摸测试版 ${{ github.run_number }}" --notes-file /tmp/AXIANG-NEXT.md
