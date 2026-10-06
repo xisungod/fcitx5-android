@@ -1,10 +1,10 @@
 {
   "format": 1,
-  "source_commit": "touchtest-1.2-ab-2",
+  "source_commit": "touchtest-1.2-ab-3",
   "base_commit": "e6199a2801b0c76e1baeff7a48f6b18e910e9dd7",
-  "patch_bytes": 2100918,
-  "patch_sha256": "11921f103d32bd6430543975328de08679e8d0b6df66bba671129d59b0b3e617",
-  "gzip_sha256": "25ad3b99137d17038ee1b6c30df6323324b7c897a945183ae233c800819241aa",
+  "patch_bytes": 2101152,
+  "patch_sha256": "a5cd247e797bfd48ce5f5579e1b55156fd500fabdc22ea9bb02038af781a6bcd",
+  "gzip_sha256": "9e617c091e6076786592b44b0a91462606040cf0622cf141d8fbac2a561f8444",
   "parts": [
     {
       "file": "axiang.patch.gz.part01",
@@ -48,8 +48,8 @@
     },
     {
       "file": "axiang.patch.gz.part09",
-      "bytes": 64723,
-      "sha256": "c105d95ea237ed366259edbfdab3e9484905f771396ceb3a63f927affd143bcb"
+      "bytes": 64752,
+      "sha256": "dbeb5825363b95fd7d9ed13e6e9c73f7d2430a4a8c064e86767da4c42d1c2bbd"
     }
   ]
 }
