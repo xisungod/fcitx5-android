@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Stable, app-private editor allowlist for the explicit typing test session. -->
+    <item name="typing_test_input" type="id" />
+</resources>

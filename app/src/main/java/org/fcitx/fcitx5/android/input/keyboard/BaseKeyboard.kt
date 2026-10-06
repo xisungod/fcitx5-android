@@ -29,6 +29,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticPolicy
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestSession
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -94,6 +95,10 @@ abstract class BaseKeyboard(
     }
     private fun downOrderEditorInfo(): EditorInfo? =
         downOrderEditorInfoProvider?.invoke() ?: editorService?.currentInputEditorInfo
+
+    /** The test editor alone may retain evidence when both correction experiments are off. */
+    protected fun typingTestEditorEligible(): Boolean =
+        TypingTestSession.isEligibleEditor(downOrderEditorInfo())
 
     /** Memory-only observation for canonical MotionEvent replay tests. */
     internal var touchDiagnosticObserver: ((JSONObject) -> Unit)?
@@ -527,7 +532,7 @@ abstract class BaseKeyboard(
         TouchContact(target, event.getX(index), event.getY(index), event.eventTime,
             maxOf(slideTouchSlop * 1.5f, minOf(target.hitRect.width(), target.hitRect.height()) * 0.45f),
             tapCells = if (this is TextKeyboard && (prefs.keyboard.pinyinTouchCorrection.getValue() ||
-                prefs.keyboard.pinyinTouchAlternatives.getValue()))
+                prefs.keyboard.pinyinTouchAlternatives.getValue() || typingTestEditorEligible()))
                 alphabetCells() else emptyList(),
             downSequence = touchDownSequence++,
             downOrderState = if (downOrderForGesture && isDownOrderLetter(target.view))

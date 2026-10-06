@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.ui.main.DeveloperFragment
 import org.fcitx.fcitx5.android.ui.main.LicensesFragment
 import org.fcitx.fcitx5.android.ui.main.MainFragment
 import org.fcitx.fcitx5.android.ui.main.PluginFragment
+import org.fcitx.fcitx5.android.ui.main.TypingTestFragment
 import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonConfigFragment
 import org.fcitx.fcitx5.android.ui.main.settings.addon.AddonListFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.AdvancedSettingsFragment
@@ -82,6 +83,9 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object Typing : SettingsRoute()
+
+    @Serializable
+    data object TypingTest : SettingsRoute()
 
     @Serializable
     data object EngineTools : SettingsRoute()
@@ -233,6 +237,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<TypingSettingsFragment, Typing> {
                 label = ctx.getString(R.string.ax_settings_typing)
+            }
+            fragment<TypingTestFragment, TypingTest> {
+                label = ctx.getString(R.string.typing_test_title)
             }
             fragment<EngineToolsFragment, EngineTools> {
                 label = ctx.getString(R.string.ax_settings_tools)

@@ -431,6 +431,8 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         @JvmStatic
         fun handleFcitxEvent(type: Int, params: Array<Any>) {
             val event = FcitxEvent.create(type, params)
+            if (event is FcitxEvent.CommitStringEvent)
+                org.fcitx.fcitx5.android.data.typingtest.TypingTestSession.prepareNativeCommit(event)
             Timber.d("Handling $event")
             fcitxEventHandlers.forEach { it.invoke(event) }
             eventFlow_.tryEmit(event)

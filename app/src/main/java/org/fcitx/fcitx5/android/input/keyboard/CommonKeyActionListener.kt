@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.annotation.Keep
 import androidx.lifecycle.lifecycleScope
 import android.view.inputmethod.EditorInfo
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,6 +26,8 @@ import org.fcitx.fcitx5.android.core.FcitxEvent.InputPanelEvent
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticPolicy
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticStore
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestKeyTicket
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestSession
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
@@ -421,9 +424,67 @@ class CommonKeyActionListener :
         }
     }
 
+    /** Capture only the explicitly active test field; ordinary input keeps its existing path. */
+    private suspend fun FcitxAPI.withTypingTestKey(
+        ticket: TypingTestKeyTicket?, editor: EditorInfo?,
+        block: suspend FcitxAPI.() -> Unit
+    ) {
+        if (ticket == null || !TypingTestSession.isEligibleEditor(editor)) {
+            block()
+            return
+        }
+        withInputTransaction {
+            TypingTestSession.startKey(ticket)
+            block()
+            // Read-only measurement work comes after this timestamp, and is reported separately.
+            val finishedAtNanos = System.nanoTime()
+            if (!TypingTestSession.isEligibleEditor(editor)) return@withInputTransaction
+            val schemaSupported = RimeActions.isPinyinSchema(inputMethodEntryCached, false)
+            val snapshotStarted = System.nanoTime()
+            val raw = if (schemaSupported) currentPinyinSpelling()?.takeIf { it.isNotEmpty() } else null
+            val candidates = if (raw != null) try {
+                getCandidates(0, 3).map { it.text }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // An optional measurement must never turn a successful key into an input failure.
+                TypingTestSession.markUnsupported(editor, "candidate_snapshot_failed")
+                null
+            } else null
+            TypingTestSession.finishKey(ticket, finishedAtNanos, raw, candidates,
+                schemaSupported, System.nanoTime() - snapshotStarted)
+        }
+    }
+
     val listener by lazy {
         KeyActionListener { action, source ->
             val editor = service.currentInputEditorInfo
+            val typingTestTicket = when (action) {
+                is FcitxKeyAction -> {
+                    val letter = action.act.singleOrNull()?.takeIf { it in 'a'..'z' }
+                    TypingTestSession.beginKey(editor, letter, action.pinyinTapEvidence,
+                        supported = source == KeyActionListener.Source.Keyboard &&
+                            letter != null && action.states == KeyStates.Virtual,
+                        orientation = context.resources.configuration.orientation)
+                }
+                is SymAction -> if (action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace ||
+                        action.sym.sym == FcitxKeyMapping.FcitxKey_space ||
+                        action.sym.sym == FcitxKeyMapping.FcitxKey_Return) {
+                    TypingTestSession.beginKey(editor, null, null,
+                        backspace = action.sym.sym == FcitxKeyMapping.FcitxKey_BackSpace,
+                        supported = source == KeyActionListener.Source.Keyboard &&
+                            action.states == KeyStates.Virtual,
+                        orientation = context.resources.configuration.orientation)
+                } else {
+                    TypingTestSession.markUnsupported(editor, "non_typing_key")
+                    null
+                }
+                is SelectTouchCandidateAction -> null
+                else -> {
+                    TypingTestSession.markUnsupported(editor, "non_typing_action")
+                    null
+                }
+            }
             val epoch = editorEpoch
             val feedbackAction = action is RestorePinyinTapAction || action is ConfirmPinyinTapAction
             val sequence = if (feedbackAction) -1L else pinyinTapRuntime.nextAction()
@@ -441,7 +502,9 @@ class CommonKeyActionListener :
             if (touchFeaturesEnabled()) pinyinTouchModels.preload(service.lifecycleScope)
             when (action) {
                 is FcitxKeyAction -> service.postFcitxJob {
-                    sendPinyinTap(action, source, editor, epoch, sequence, touchSequence)
+                    withTypingTestKey(typingTestTicket, editor) {
+                        sendPinyinTap(action, source, editor, epoch, sequence, touchSequence)
+                    }
                 }
                 is SelectTouchCandidateAction -> service.postFcitxJob {
                     selectTouchCandidate(action.token, editor, epoch)
@@ -453,9 +516,11 @@ class CommonKeyActionListener :
                     resolvePinyinFeedback(action.token, false, editor, epoch)
                 }
                 is SymAction -> service.postFcitxJob {
-                    if (trackedBackspace && kbdPrefs.pinyinTouchAlternatives.getValue())
-                        sendTouchBackspace(action, editor, epoch, touchSequence)
-                    else sendKey(action.sym, action.states)
+                    withTypingTestKey(typingTestTicket, editor) {
+                        if (trackedBackspace && kbdPrefs.pinyinTouchAlternatives.getValue())
+                            sendTouchBackspace(action, editor, epoch, touchSequence)
+                        else sendKey(action.sym, action.states)
+                    }
                 }
                 is CommitAction -> service.postFcitxJob {
                     commitAndReset()

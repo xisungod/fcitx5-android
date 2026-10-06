@@ -62,6 +62,7 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticStore
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestSession
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
@@ -111,6 +112,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val touchDiagnostics by lazy { TouchDiagnosticStore.get(this) }
     private fun revokeTouchDiagnosticEditor() {
         touchDiagnostics.updateEditor(null)
+        TypingTestSession.revokeEditor()
     }
 
     private var offlineDictationEditorGeneration = 0L
@@ -360,6 +362,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
+                TypingTestSession.observeCommit(currentInputEditorInfo, event)
                 if (offlineDictationSession != null) finishOfflineDictation()
                 commitText(event.data.text, event.data.cursor)
             }
@@ -381,6 +384,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         }
                     }
                 } else {
+                    TypingTestSession.markUnsupported(currentInputEditorInfo, "physical_forward_key")
                     // KeyEvent from physical keyboard (or input method engine forwardKey)
                     // use cached event if available
                     cachedKeyEvents.remove(it.timestamp)?.let { keyEvent ->
@@ -764,6 +768,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onEvaluateFullscreenMode() = false
 
     private fun forwardKeyEvent(event: KeyEvent): Boolean {
+        TypingTestSession.markUnsupported(currentInputEditorInfo, "physical_keyboard")
         // reason to use a self increment index rather than timestamp:
         // KeyUp and KeyDown events actually can happen on the same time
         val timestamp = cachedKeyEventIndex++
@@ -873,6 +878,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
         touchDiagnostics.updateEditor(attribute)
+        TypingTestSession.attachEditor(attribute)
         finishOfflineDictation()
         inputView?.cancelPendingEngineSwitch()
         inputView?.finishTransientEditors()
@@ -909,6 +915,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         touchDiagnostics.updateEditor(info)
+        TypingTestSession.attachEditor(info)
         Timber.d("onStartInputView: restarting=$restarting")
         postFcitxJob {
             focus(true)

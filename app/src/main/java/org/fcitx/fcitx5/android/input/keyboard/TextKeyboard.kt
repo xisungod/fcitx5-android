@@ -186,7 +186,8 @@ class TextKeyboard(
                             transformed = action.copy(act = lower,
                                 pinyinTapEvidence = if (chineseMode && !englishMode &&
                                     (AppPrefs.getInstance().keyboard.pinyinTouchCorrection.getValue() ||
-                                        AppPrefs.getInstance().keyboard.pinyinTouchAlternatives.getValue()) &&
+                                        AppPrefs.getInstance().keyboard.pinyinTouchAlternatives.getValue() ||
+                                        typingTestEditorEligible()) &&
                                     currentPinyinTapEvidence?.tap?.original == lower.singleOrNull())
                                     currentPinyinTapEvidence else null)
                         }
