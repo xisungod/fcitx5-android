@@ -42,7 +42,7 @@ class LabeledCandidateItemUi(
                     append(" ")
                 }
                 color(altFg) {
-                    append(candidate.comment)
+                    append(candidate.displayComment)
                 }
             }
         }

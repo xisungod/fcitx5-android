@@ -56,7 +56,7 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
                     append(" ")
                 }
                 color(altFg) {
-                    append(candidate.comment)
+                    append(candidate.displayComment)
                 }
             }
         }

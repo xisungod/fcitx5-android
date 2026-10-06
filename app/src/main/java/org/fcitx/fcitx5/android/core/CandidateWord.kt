@@ -11,6 +11,12 @@ data class CandidateWord @JvmOverloads constructor(
     val comment: String,
     val spaceBetweenComment: Boolean = true
 ) {
+    val displayComment: String
+        get() = when (comment) {
+            "纠错", "糾錯" -> "*"
+            else -> comment
+        }
+
     fun textWithComment(): String {
         return buildString {
             append(text)
@@ -18,7 +24,7 @@ data class CandidateWord @JvmOverloads constructor(
                 if (spaceBetweenComment) {
                     append(" ")
                 }
-                append(comment)
+                append(displayComment)
             }
         }
     }
