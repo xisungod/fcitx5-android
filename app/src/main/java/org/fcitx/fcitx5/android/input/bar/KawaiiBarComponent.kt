@@ -62,6 +62,8 @@ import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
@@ -110,6 +112,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
 
     private var clipboardTimeoutJob: Job? = null
+    private var pinyinFeedbackJob: Job? = null
     private var keyboardLayoutPopup: PopupMenu? = null
 
     private var isClipboardFresh: Boolean = false
@@ -491,6 +494,27 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onScopeSetupFinished(scope: DynamicScope) {
+        fun collectPinyinFeedback() {
+            pinyinFeedbackJob?.cancel()
+            pinyinFeedbackJob = service.lifecycleScope.launch {
+                commonKeyActionListener.pinyinTapFeedback.collect { feedback ->
+                    candidateUi.setPinyinFeedback(feedback,
+                        restore = { token -> commonKeyActionListener.listener.onKeyAction(
+                            KeyAction.RestorePinyinTapAction(token), KeyActionListener.Source.Keyboard) },
+                        confirm = { token -> commonKeyActionListener.listener.onKeyAction(
+                            KeyAction.ConfirmPinyinTapAction(token), KeyActionListener.Source.Keyboard) })
+                }
+            }
+        }
+        view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) { collectPinyinFeedback() }
+            override fun onViewDetachedFromWindow(v: View) {
+                pinyinFeedbackJob?.cancel()
+                pinyinFeedbackJob = null
+                commonKeyActionListener.clearPinyinTapFeedback()
+            }
+        })
+        if (view.isAttachedToWindow) collectPinyinFeedback()
         ClipboardManager.lastEntry?.let {
             val now = System.currentTimeMillis()
             val clipboardTimeout = clipboardItemTimeout.getValue() * 1000L

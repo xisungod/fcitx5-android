@@ -79,6 +79,9 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun save() = withFcitxContext { saveFcitxState() }
     override suspend fun reloadConfig() = withFcitxContext { reloadFcitxConfig() }
 
+    override suspend fun <T> withInputTransaction(block: suspend FcitxAPI.() -> T): T =
+        withFcitxContext { block(this@Fcitx) }
+
     override suspend fun sendKey(
         key: String,
         states: UInt,

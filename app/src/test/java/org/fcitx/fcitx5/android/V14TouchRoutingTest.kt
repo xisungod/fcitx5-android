@@ -89,6 +89,7 @@ class V14TouchRoutingTest {
             setting(p.pressKeyHoldTime, 120)
             setting(p.pressKeyRetreatTime, 300)
             setting(AppPrefs.getInstance().advanced.disableAnimation, false)
+            setting(AppPrefs.getInstance().keyboard.pinyinTouchCorrection, false)
             activity.setTheme(R.style.Theme_InputViewTheme)
             keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
             activity.setContentView(keyboard)

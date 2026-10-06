@@ -194,6 +194,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        commonKeyActionListener.clearPinyinTapFeedback()
         cancelPendingEngineSwitch()
         currentInputType = info.inputType
         latestIme = fcitx.runImmediately { inputMethodEntryCached }
@@ -355,6 +356,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onDetached() {
+        commonKeyActionListener.clearPinyinTapFeedback()
         cancelPendingEngineSwitch()
         inputView.onKeyboardLayoutChanged(false)
         currentKeyboard?.let {

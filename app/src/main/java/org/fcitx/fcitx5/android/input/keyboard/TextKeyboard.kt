@@ -12,6 +12,7 @@ import androidx.annotation.Keep
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.allViews
 import androidx.core.view.updateLayoutParams
+import org.json.JSONObject
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyState
@@ -138,6 +139,12 @@ class TextKeyboard(
     private var englishMode = false
     private var chineseMode = false
 
+    override fun diagnosticState(): JSONObject = JSONObject()
+        .put("caps_state", capsState.name)
+        .put("english_mode", englishMode)
+        .put("chinese_mode", chineseMode)
+        .put("punctuation_mapping", JSONObject(punctuationMapping))
+
     private fun transformAlphabet(c: String): String {
         return when (capsState) {
             CapsState.None -> c.lowercase()
@@ -171,7 +178,12 @@ class TextKeyboard(
                         transformed = KeyAction.CommitAction(sentenceMark)
                     } else if (action.act.length == 1 && action.act[0].isLetter()) when (capsState) {
                         CapsState.None -> {
-                            transformed = action.copy(act = action.act.lowercase())
+                            val lower = action.act.lowercase()
+                            transformed = action.copy(act = lower,
+                                pinyinTapEvidence = if (chineseMode && !englishMode &&
+                                    AppPrefs.getInstance().keyboard.pinyinTouchCorrection.getValue() &&
+                                    currentPinyinTapEvidence?.tap?.original == lower.singleOrNull())
+                                    currentPinyinTapEvidence else null)
                         }
                         CapsState.Once -> {
                             transformed = action.copy(

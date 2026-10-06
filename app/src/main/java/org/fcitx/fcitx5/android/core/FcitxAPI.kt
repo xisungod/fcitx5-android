@@ -44,6 +44,13 @@ interface FcitxAPI {
 
     suspend fun reloadConfig()
 
+    /**
+     * Run input-state checks and consecutive native operations on the input queue.
+     * The block must not switch dispatchers or suspend for external work: doing
+     * so would allow another queued input operation between its native calls.
+     */
+    suspend fun <T> withInputTransaction(block: suspend FcitxAPI.() -> T): T = block()
+
     suspend fun sendKey(key: String, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)
 
     suspend fun sendKey(c: Char, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)

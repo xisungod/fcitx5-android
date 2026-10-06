@@ -65,7 +65,10 @@ class TapAccuracyTest {
 
     private data class Finger(val id: Int, val x: Float, val y: Float)
 
-    private class Harness(widthDp: Int = 360, overrides: String = "", numberRow: Boolean = false) : AutoCloseable {
+    private class Harness(
+        widthDp: Int = 360, overrides: String = "", numberRow: Boolean = false,
+        boundarySettling: Boolean = false, pinyinCorrection: Boolean = false
+    ) : AutoCloseable {
         private val restore = mutableListOf<() -> Unit>()
         private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         private val activity = controller.get()
@@ -74,6 +77,7 @@ class TapAccuracyTest {
         private val expectedHeight = ((if (numberRow) 320 else 260) * density).roundToInt()
         val keyboard: TextKeyboard
         val typed = mutableListOf<String>()
+        val actions = mutableListOf<KeyAction.FcitxKeyAction>()
         val popups = mutableListOf<PopupAction>()
         private var downTime = 0L
 
@@ -87,6 +91,8 @@ class TapAccuracyTest {
             setting(AppPrefs.getInstance().keyboard.popupOnKeyPress, false)
             setting(AppPrefs.getInstance().keyboard.expandKeypressArea, true)
             setting(AppPrefs.getInstance().keyboard.longPressDelay, 300)
+            setting(AppPrefs.getInstance().keyboard.touchBoundarySettling, boundarySettling)
+            setting(AppPrefs.getInstance().keyboard.pinyinTouchCorrection, pinyinCorrection)
             activity.setTheme(R.style.Theme_InputViewTheme)
             keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
             // The activity may relayout on any looper tick. Keep the actual
@@ -100,7 +106,7 @@ class TapAccuracyTest {
                 View.MeasureSpec.makeMeasureSpec(expectedHeight, View.MeasureSpec.EXACTLY))
             keyboard.layout(0, 0, expectedWidth, expectedHeight)
             keyboard.keyActionListener = KeyActionListener { action, _ ->
-                if (action is KeyAction.FcitxKeyAction) typed += action.act
+                if (action is KeyAction.FcitxKeyAction) { typed += action.act; actions += action }
             }
             keyboard.popupActionListener = PopupActionListener { popups += it }
         }
@@ -310,9 +316,28 @@ class TapAccuracyTest {
         }
     }
 
-    @Test fun aStableSettlingMovementRecoversEveryLowConfidenceNeighbourBoundary() {
+    @Test fun rapidBoundaryDriftKeepsEveryNeighbourIdentityEvenWhenSlowAdjustmentIsEnabled() {
         for (width in listOf(320, 360, 480)) {
-            Harness(width, if (width == 360) customWidths else "").use { h ->
+            Harness(width, if (width == 360) customWidths else "", boundarySettling = true).use { h ->
+                for (pair in neighbours(h)) {
+                    h.typed.clear()
+                    val drift = pair.point(6f * h.density)
+                    h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+                    h.event(MotionEvent.ACTION_MOVE, drift)
+                    h.waitFor(48)
+                    h.event(MotionEvent.ACTION_MOVE, drift)
+                    assertTrue("Rapid drift must leave the original $pair pressed", h.key(pair.from).isPressed)
+                    h.event(MotionEvent.ACTION_UP, drift)
+                    assertEquals("A sustained but rapid boundary excursion must preserve $pair at width=$width",
+                        listOf(pair.from.lowercase()), h.typed)
+                }
+            }
+        }
+    }
+
+    @Test fun aDeliberateSlowHoldCanRecoverEveryLowConfidenceNeighbourBoundaryWhenEnabled() {
+        for (width in listOf(320, 360, 480)) {
+            Harness(width, if (width == 360) customWidths else "", boundarySettling = true).use { h ->
                 for (pair in neighbours(h)) {
                     val target = h.bounds(pair.to)
                     // An overlap may be only a sliver after custom resizing. Such a
@@ -326,11 +351,12 @@ class TapAccuracyTest {
                     h.typed.clear()
                     h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
                     assertTrue("The uncertain initial contact must actually land on ${pair.from}", h.key(pair.from).isPressed)
+                    h.waitFor(192)
                     h.event(MotionEvent.ACTION_MOVE, interior)
                     h.waitFor(48)
                     h.event(MotionEvent.ACTION_MOVE, interior)
                     h.event(MotionEvent.ACTION_UP, interior)
-                    assertEquals("A stable interior landing must repair the uncertain first contact $pair at width=$width",
+                    assertEquals("An enabled slow hold and stable landing may adjust $pair at width=$width",
                         listOf(pair.to.lowercase()), h.typed)
                 }
             }
@@ -338,15 +364,46 @@ class TapAccuracyTest {
     }
 
     @Test fun aBoundaryRecoveryDoesNotEnableFreeSlideSelection() {
-        Harness().use { h ->
+        Harness(boundarySettling = true).use { h ->
             val pair = neighbours(h).first { it.from == "F" && it.to == "G" }
             val settled = pair.point(8f * h.density)
             h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+            h.waitFor(192)
             h.event(MotionEvent.ACTION_MOVE, settled)
             h.waitFor(48)
             h.event(MotionEvent.ACTION_MOVE, settled)
             h.event(MotionEvent.ACTION_UP, h.center("H"))
             assertEquals("UP drift after a corrected landing must keep that corrected key", listOf("g"), h.typed)
+        }
+    }
+
+    @Test fun samplesBeforeTheSlowHoldThresholdCannotCountTowardAdjustmentDwell() {
+        for (batched in listOf(false, true)) Harness(boundarySettling = true).use { h ->
+            val pair = neighbours(h).first { it.from == "F" && it.to == "G" }
+            val interior = pair.point(8f * h.density)
+            h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+            h.waitFor(152)
+            if (batched) {
+                h.moveWithHistory(0L to interior, 32L to interior, 40L to interior)
+            } else {
+                h.event(MotionEvent.ACTION_MOVE, interior)
+                h.waitFor(24)
+                h.event(MotionEvent.ACTION_MOVE, interior)
+                h.event(MotionEvent.ACTION_MOVE, interior)
+            }
+            h.event(MotionEvent.ACTION_UP, interior)
+            assertEquals("Only the sample at 200ms is eligible; early drift is not slow-adjustment evidence, batched=$batched",
+                listOf("f"), h.typed)
+        }
+    }
+
+    @Test fun aSlowUpWithoutMoveEvidenceStillCannotRetargetTheDownKey() {
+        Harness(boundarySettling = true).use { h ->
+            val pair = neighbours(h).first { it.from == "F" && it.to == "G" }
+            h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+            h.waitFor(224)
+            h.event(MotionEvent.ACTION_UP, pair.point(8f * h.density))
+            assertEquals("Elapsed hold time alone must never make UP start boundary adjustment", listOf("f"), h.typed)
         }
     }
 
@@ -407,20 +464,21 @@ class TapAccuracyTest {
     }
 
     @Test fun aHistoricalBoundaryRecoverySurvivesTheWindowAndFinalLiftDrift() {
-        for (batched in listOf(false, true)) for (liftOn in listOf("G", "H")) Harness().use { h ->
+        for (batched in listOf(false, true)) for (liftOn in listOf("G", "H")) Harness(boundarySettling = true).use { h ->
             val pair = neighbours(h).first { it.from == "F" && it.to == "G" }
             val settled = pair.point(8f * h.density)
             h.event(MotionEvent.ACTION_DOWN, pair.point(-h.density))
+            h.waitFor(192)
             if (batched) {
-                h.moveWithHistory(0L to settled, 48L to settled, 160L to settled)
+                h.moveWithHistory(0L to settled, 48L to settled, 88L to settled)
             } else {
                 h.event(MotionEvent.ACTION_MOVE, settled)
                 h.waitFor(40)
                 h.event(MotionEvent.ACTION_MOVE, settled)
-                h.waitFor(104)
+                h.waitFor(32)
                 h.event(MotionEvent.ACTION_MOVE, settled)
             }
-            assertTrue("The landing was confirmed before the 140ms window closed, batched=$batched", h.key("G").isPressed)
+            assertTrue("The slow landing was confirmed before the 280ms window closed, batched=$batched", h.key("G").isPressed)
             h.event(MotionEvent.ACTION_UP, h.center(liftOn))
             assertEquals("A confirmed correction must neither expire nor become a slide, batched=$batched, UP=$liftOn",
                 listOf("g"), h.typed)
@@ -538,6 +596,57 @@ class TapAccuracyTest {
             assertTrue(h.typed.isEmpty())
             h.tap("N")
             assertEquals(listOf("n"), h.typed)
+        }
+    }
+
+    @Test fun pinyinEvidenceKeepsEachThumbsOriginalDownCoordinatesDespiteReverseReleaseAndDrift() {
+        Harness(pinyinCorrection = true).use { h ->
+            ReflectionHelpers.setField(h.keyboard, "chineseMode", true)
+            val first = h.center("N", 3)
+            val second = h.center("I", 9)
+            h.event(MotionEvent.ACTION_DOWN, first)
+            h.event(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), first, second)
+            val drift = h.center("B", 3)
+            h.event(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), drift, second)
+            h.event(MotionEvent.ACTION_UP, drift)
+            assertEquals(listOf("i", "n"), h.typed)
+            val i = h.actions[0].pinyinTapEvidence!!
+            val n = h.actions[1].pinyinTapEvidence!!
+            assertEquals(9, i.pointerId)
+            assertEquals(3, n.pointerId)
+            assertEquals(second.x, i.tap.downX, 0f)
+            assertEquals(second.y, i.tap.downY, 0f)
+            assertEquals(first.x, n.tap.downX, 0f)
+            assertEquals(first.y, n.tap.downY, 0f)
+            assertEquals('i', i.tap.original)
+            assertEquals('n', n.tap.original)
+            assertEquals(26, n.cells.size)
+        }
+    }
+
+    @Test fun explicitSlideAndEnglishCapsAndDisabledCorrectionDoNotSupplyPinyinEvidence() {
+        Harness(pinyinCorrection = true).use { h ->
+            ReflectionHelpers.setField(h.keyboard, "chineseMode", true)
+            h.event(MotionEvent.ACTION_DOWN, h.center("G"))
+            h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+            h.waitFor(64)
+            h.event(MotionEvent.ACTION_MOVE, h.center("H"))
+            h.event(MotionEvent.ACTION_UP, h.center("H"))
+            assertEquals(listOf("h"), h.typed)
+            assertNull(h.actions.last().pinyinTapEvidence)
+            ReflectionHelpers.setField(h.keyboard, "englishMode", true)
+            h.tap("N")
+            assertNull(h.actions.last().pinyinTapEvidence)
+            ReflectionHelpers.setField(h.keyboard, "englishMode", false)
+            ReflectionHelpers.setField(h.keyboard, "capsState", TextKeyboard.CapsState.Lock)
+            h.tap("N")
+            assertEquals("N", h.actions.last().act)
+            assertNull(h.actions.last().pinyinTapEvidence)
+        }
+        Harness(pinyinCorrection = false).use { h ->
+            ReflectionHelpers.setField(h.keyboard, "chineseMode", true)
+            h.tap("N")
+            assertNull(h.actions.last().pinyinTapEvidence)
         }
     }
 }

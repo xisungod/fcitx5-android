@@ -8,13 +8,15 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapEvidence
 
 sealed class KeyAction {
 
     data class FcitxKeyAction(
         val act: String,
         val code: Int = ScancodeMapping.charToScancode(act[0]),
-        val states: KeyStates = KeyStates.Virtual
+        val states: KeyStates = KeyStates.Virtual,
+        val pinyinTapEvidence: PinyinTapEvidence? = null
     ) : KeyAction()
 
     data class SymAction(val sym: KeySym, val states: KeyStates = KeyStates.Virtual) : KeyAction()
@@ -40,4 +42,8 @@ sealed class KeyAction {
     data class PickerSwitchAction(val key: PickerWindow.Key? = null) : KeyAction()
 
     data object SpaceLongPressAction : KeyAction()
+
+    /** Explicit choices about the most recent, still-composing corrected tap. */
+    data class RestorePinyinTapAction(val token: Long) : KeyAction()
+    data class ConfirmPinyinTapAction(val token: Long) : KeyAction()
 }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pinyin_touch_correction_section">Pinyin input correction</string>
+    <string name="pinyin_touch_correction">Pinyin touch correction · experimental</string>
+    <string name="pinyin_touch_correction_summary">Uses touch position and pinyin probabilities only near key boundaries. Clear center taps keep their original key. Your input is not uploaded.</string>
+    <string name="pinyin_touch_personalization">Learn typing habits · experimental</string>
+    <string name="pinyin_touch_personalization_summary">Learns touch offsets locally only from keys you explicitly confirm or restore. Password fields are excluded.</string>
+    <string name="pinyin_touch_profile_clear">Clear typing habit data</string>
+    <string name="pinyin_touch_profile_clear_done">Typing habit data cleared</string>
+    <string name="pinyin_touch_restore_letter">Restore %1$s</string>
+    <string name="pinyin_touch_confirm_letter">Confirm %1$s</string>
+    <string name="pinyin_touch_restore_letter_description">Restore original letter %1$s</string>
+    <string name="pinyin_touch_confirm_letter_description">Confirm intended letter %1$s</string>
+</resources>

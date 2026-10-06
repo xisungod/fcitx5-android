@@ -1,0 +1,22 @@
+// JVM replay uses production keyboard classes and Android resources, without JNI.
+gradle.beforeProject { p ->
+    ['com.android.application', 'com.android.library'].each { androidPlugin ->
+        p.plugins.withId(androidPlugin) {
+            p.extensions.getByName('androidComponents').finalizeDsl { dsl ->
+                dsl.externalNativeBuild.cmake.path = null
+                dsl.buildFeatures.prefab = false
+                if (androidPlugin == 'com.android.library') dsl.buildFeatures.prefabPublishing = false
+            }
+        }
+    }
+    p.tasks.withType(Test).configureEach {
+        ['AXIANG_TOUCH_REPLAY_INPUT', 'AXIANG_TOUCH_REPLAY_OUTPUT',
+         'AXIANG_TOUCH_REPLAY_SYNTHETIC'].each { key ->
+            def value = System.getenv(key)
+            if (value != null) environment(key, value)
+        }
+        // Input traces are external to Gradle's normal source inputs.
+        if (System.getenv('AXIANG_TOUCH_REPLAY_INPUT') != null ||
+            System.getenv('AXIANG_TOUCH_REPLAY_SYNTHETIC') != null) outputs.upToDateWhen { false }
+    }
+}

@@ -17,6 +17,10 @@ internal object KeyboardPreferenceSections {
 
     const val APPLY_TYPING_KEY = "axiang_apply_typing"
     const val DICTIONARY_IMPORT_KEY = "rime_personal_dictionary_import"
+    const val TOUCH_DIAGNOSTIC_STATUS_KEY = "touch_diagnostic_status"
+    const val TOUCH_DIAGNOSTIC_EXPORT_KEY = "touch_diagnostic_export"
+    const val TOUCH_DIAGNOSTIC_CLEAR_KEY = "touch_diagnostic_clear"
+    const val PINYIN_TOUCH_PROFILE_CLEAR_KEY = "pinyin_touch_profile_clear"
 
     private data class Section(
         val page: Page,
@@ -41,6 +45,9 @@ internal object KeyboardPreferenceSections {
                 listOf(soundOnKeyPress.key, soundOnKeyPressVolume.key)),
             Section(Page.Feedback, "keyboard_haptic_details", R.string.axiang_keyboard_haptic_details,
                 listOf(buttonPressVibrationMilliseconds.key, buttonPressVibrationAmplitude.key)),
+            Section(Page.Typing, "typing_touch_correction", R.string.pinyin_touch_correction_section,
+                listOf(pinyinTouchCorrection.key, pinyinTouchPersonalization.key,
+                    PINYIN_TOUCH_PROFILE_CLEAR_KEY)),
             Section(Page.Typing, "typing_fuzzy", R.string.axiang_typing_fuzzy,
                 listOf(rimeFuzzyNl.key, rimeFuzzyZh.key, rimeFuzzyAng.key, APPLY_TYPING_KEY)),
             Section(Page.Typing, "typing_dictionary", R.string.axiang_typing_dictionary,
@@ -49,7 +56,11 @@ internal object KeyboardPreferenceSections {
                 listOf(horizontalCandidateStyle.key, expandedCandidateStyle.key,
                     expandedCandidateGridSpanCount.key)),
             Section(Page.Typing, "typing_behavior", R.string.axiang_typing_behavior,
-                listOf(inlineSuggestions.key, focusChangeResetKeyboard.key))
+                listOf(inlineSuggestions.key, focusChangeResetKeyboard.key)),
+            Section(Page.Typing, "typing_touch_diagnostics", R.string.touch_diagnostic_section,
+                listOf(touchBoundarySettling.key, touchDiagnosticLogging.key,
+                    TOUCH_DIAGNOSTIC_STATUS_KEY, TOUCH_DIAGNOSTIC_EXPORT_KEY,
+                    TOUCH_DIAGNOSTIC_CLEAR_KEY))
         )
     }
 

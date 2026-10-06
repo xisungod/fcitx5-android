@@ -66,6 +66,17 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val rimeFuzzyNl = switch(R.string.rime_fuzzy_nl, "rime_fuzzy_nl", false)
         val rimeFuzzyZh = switch(R.string.rime_fuzzy_zh, "rime_fuzzy_zh", false)
         val rimeFuzzyAng = switch(R.string.rime_fuzzy_ang, "rime_fuzzy_ang", false)
+        val pinyinTouchCorrection = switch(
+            R.string.pinyin_touch_correction, "pinyin_touch_correction", false,
+            R.string.pinyin_touch_correction_summary)
+        val pinyinTouchPersonalization = switch(
+            R.string.pinyin_touch_personalization, "pinyin_touch_personalization", false,
+            R.string.pinyin_touch_personalization_summary)
+        // Optional long-hold boundary adjustment never retargets a quick tap.
+        val touchBoundarySettling = switch(
+            R.string.touch_boundary_settling, "touch_boundary_settling", false)
+        val touchDiagnosticLogging = switch(
+            R.string.touch_diagnostic_logging, "touch_diagnostic_logging", false)
         val hapticOnKeyPress =
             enumList(
                 R.string.button_haptic_feedback,

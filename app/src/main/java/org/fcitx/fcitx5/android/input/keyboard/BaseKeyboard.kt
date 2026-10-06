@@ -17,6 +17,8 @@ import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.updateLayoutParams
+import org.json.JSONArray
+import org.json.JSONObject
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
@@ -33,6 +35,9 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListener
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
+import org.fcitx.fcitx5.android.input.keyboard.typing.KeyCell
+import org.fcitx.fcitx5.android.input.keyboard.typing.TapEvidence
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapEvidence
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
@@ -68,6 +73,18 @@ abstract class BaseKeyboard(
     internal fun drawPressExtension(canvas: Canvas) { pressEffectLayer?.drawExtension(canvas) }
 
     private val prefs = AppPrefs.getInstance()
+    private val touchTrace = TouchTraceRecorder(context)
+    private var boundarySettlingForGesture = true
+
+    /** Memory-only observation for canonical MotionEvent replay tests. */
+    internal var touchDiagnosticObserver: ((JSONObject) -> Unit)?
+        get() = touchTrace.observer
+        set(value) { touchTrace.discard(); touchTrace.observer = value }
+
+    protected open fun diagnosticState(): JSONObject = JSONObject()
+    /** Original per-pointer DOWN evidence, available only during ordinary UP dispatch. */
+    protected var currentPinyinTapEvidence: PinyinTapEvidence? = null
+        private set
     private val keyMotion = ThemeManager.prefs.keyMotionEffect.getValue()
     private val floatingKeys = android.util.SparseArray<KeyView>()
     private var motionLifecycleReady = false
@@ -475,7 +492,8 @@ abstract class BaseKeyboard(
         val slideThreshold: Float,
         var sliding: Boolean = false,
         var settled: Boolean = false,
-        val retargetGuard: TapRetargetGuard = TapRetargetGuard()
+        val retargetGuard: TapRetargetGuard = TapRetargetGuard(),
+        val tapCells: List<KeyCell> = emptyList()
     )
 
     /** Each pointer keeps its own original touch and deliberate-slide state. */
@@ -484,7 +502,20 @@ abstract class BaseKeyboard(
 
     private fun beginTouch(event: MotionEvent, index: Int, target: TouchTarget): TouchContact =
         TouchContact(target, event.getX(index), event.getY(index), event.eventTime,
-            maxOf(slideTouchSlop * 1.5f, minOf(target.hitRect.width(), target.hitRect.height()) * 0.45f))
+            maxOf(slideTouchSlop * 1.5f, minOf(target.hitRect.width(), target.hitRect.height()) * 0.45f),
+            tapCells = if (this is TextKeyboard && prefs.keyboard.pinyinTouchCorrection.getValue())
+                alphabetCells() else emptyList())
+
+    private fun alphabetCells(): List<KeyCell> = keyRows.flatMap { row ->
+        if (row.visibility != View.VISIBLE) emptyList() else row.children.filterIsInstance<KeyView>()
+            .filter { it.visibility == View.VISIBLE }.mapNotNull { key ->
+                val text = (key.def as? KeyDef.Appearance.Text)?.displayText?.lowercase()
+                text?.singleOrNull()?.takeIf { it in 'a'..'z' }?.let { letter ->
+                    KeyCell(letter, (key.left + row.left).toFloat(), (key.top + row.top).toFloat(),
+                        (key.right + row.left).toFloat(), (key.bottom + row.top).toFloat())
+                }
+            }.toList()
+    }
 
     private fun releaseAllTouchTargets() {
         touchTargets.forEach {
@@ -531,8 +562,23 @@ abstract class BaseKeyboard(
             event.metaState, event.xPrecision, event.yPrecision,
             event.deviceId, event.edgeFlags
         )
-        target.view.dispatchTouchEvent(e)
-        e.recycle()
+        val previousEvidence = currentPinyinTapEvidence
+        val contact = touchTargets[event.getPointerId(pointerIndex)]
+        val rawLetter = (target.view.def as? KeyDef.Appearance.Text)?.displayText?.lowercase()?.singleOrNull()
+        currentPinyinTapEvidence = if (action == MotionEvent.ACTION_UP && contact != null &&
+            !contact.sliding && !contact.settled && contact.tapCells.isNotEmpty() &&
+            rawLetter != null && rawLetter in 'a'..'z') {
+            PinyinTapEvidence(TapEvidence(rawLetter, contact.downX, contact.downY,
+                resources.displayMetrics.density), contact.tapCells,
+                diagnosticTraceId = touchTrace.currentTraceId,
+                diagnosticToken = touchTrace.currentRecordingToken,
+                pointerId = event.getPointerId(pointerIndex), downTime = contact.downAt)
+        } else null
+        try {
+            touchTrace.dispatch(event.getPointerId(pointerIndex), target.view.id) {
+                target.view.dispatchTouchEvent(e)
+            }
+        } finally { currentPinyinTapEvidence = previousEvidence; e.recycle() }
     }
 
     private val effectKeyBounds = Rect()
@@ -564,7 +610,11 @@ abstract class BaseKeyboard(
     private fun maySettleBoundaryTap(
         x: Float, y: Float, sampleTime: Long, contact: TouchContact, next: TouchTarget
     ): Boolean {
-        if (contact.settled || sampleTime - contact.downAt !in 0L..TapRetargetGuard.SETTLE_WINDOW_MS) return false
+        // The experiment changes only automatic boundary settling. Intentional
+        // slide selection and the original MOVE/UP sampling remain unchanged.
+        if (!boundarySettlingForGesture) return false
+        if (contact.settled || sampleTime - contact.downAt !in
+            TapRetargetGuard.SETTLE_MIN_HOLD_MS..TapRetargetGuard.SETTLE_WINDOW_MS) return false
         val original = contact.target.hitRect
         val edgeBand = minOf(dp(6f).toFloat(), minOf(original.width(), original.height()) * 0.20f)
         // The original contact must be close to this neighbour, not merely close
@@ -582,7 +632,7 @@ abstract class BaseKeyboard(
         // so hidden intermediate samples cannot produce extra feedback.
         val selection = TouchContact(contact.target, contact.downX, contact.downY,
             contact.downAt, contact.slideThreshold, contact.sliding, contact.settled,
-            contact.retargetGuard)
+            contact.retargetGuard, contact.tapCells)
         var handover: TouchSample? = null
         var pendingHoldCancelled = false
 
@@ -600,6 +650,8 @@ abstract class BaseKeyboard(
                 val decision = if (selection.sliding) TapRetargetGuard.Decision.Slide
                     else selection.retargetGuard.observe(next.view.id, time, maySettle, maySlide)
                 if (decision != TapRetargetGuard.Decision.Keep) {
+                    touchTrace.decision(time, event.getPointerId(index), target.view.id, next.view.id,
+                        decision == TapRetargetGuard.Decision.Slide)
                     selection.target = next
                     selection.sliding = decision == TapRetargetGuard.Decision.Slide
                     if (decision == TapRetargetGuard.Decision.Settle) selection.settled = true
@@ -624,7 +676,7 @@ abstract class BaseKeyboard(
             // Use the point that actually selected the final key. A later,
             // unconfirmed excursion may already be over another neighbour.
             switchSlideTarget(event, index, contact, selection.target, selection.sliding,
-                sample = sample, resetRetargetGuard = false)
+                sample = sample, resetRetargetGuard = false, recordDecision = false)
         }
         contact.sliding = selection.sliding
         contact.settled = selection.settled
@@ -636,9 +688,12 @@ abstract class BaseKeyboard(
         event: MotionEvent, index: Int, contact: TouchContact, next: TouchTarget,
         deliberateSlide: Boolean = true,
         sample: TouchSample? = null,
-        resetRetargetGuard: Boolean = true
+        resetRetargetGuard: Boolean = true,
+        recordDecision: Boolean = true
     ) {
         val old = contact.target
+        if (recordDecision) touchTrace.decision(sample?.time ?: event.eventTime,
+            event.getPointerId(index), old.view.id, next.view.id, deliberateSlide)
         old.view.cancelGestures()
         onPopupAction(PopupAction.DismissAction(old.view.id))
         contact.target = next
@@ -662,8 +717,11 @@ abstract class BaseKeyboard(
             } else {
                 target.view.cancelGestures()
                 onPopupAction(PopupAction.DismissAction(target.view.id))
+                touchTrace.released(event.getPointerId(index), target.view.id, cancelled = true)
+                return
             }
         } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, target)
+        touchTrace.released(event.getPointerId(index), contact.target.view.id)
     }
 
     private val motionViews = android.util.SparseArray<View>()
@@ -769,7 +827,52 @@ abstract class BaseKeyboard(
         }
     }
 
+    private fun diagnosticLayout(): JSONObject {
+        val keys = JSONArray()
+        for (row in keyRows) if (row.visibility == View.VISIBLE) {
+            for (key in row.children.filterIsInstance<KeyView>()) if (key.visibility == View.VISIBLE) {
+                keys.put(JSONObject().put("index", keys.length()).put("id", key.id)
+                    .put("label", (key.def as? KeyDef.Appearance.Text)?.displayText
+                        ?: key.def.javaClass.simpleName)
+                    .put("rect", JSONArray().put(key.left + row.left).put(key.top + row.top)
+                        .put(key.right + row.left).put(key.bottom + row.top)))
+            }
+        }
+        val keyboardPrefs = prefs.keyboard
+        val settings = JSONObject()
+            .put("number_row", this is TextKeyboard && keyRows.size == TextKeyboard.Layout.size + 1)
+            .put("portrait_number_row", ThemeManager.prefs.portraitNumberRow.getValue())
+            .put("key_width_overrides", ThemeManager.prefs.keyWidthOverrides.getValue())
+            .put("expand_keypress_area", expandKeypressArea)
+            .put("long_press_delay", keyboardPrefs.longPressDelay.getValue())
+            .put("popup_on_key_press", popupOnKeyPress)
+            .put("space_swipe_move_cursor", spaceSwipeMoveCursor.getValue())
+            .put("space_long_press_behavior", spaceLongPressBehavior.getValue().name)
+            .put("swipe_symbol_direction", swipeSymbolDirection.name)
+            .put("vivo_keypress_workaround", vivoKeypressWorkaround)
+            .put("slide_selection_enabled", slideSelectionEnabled)
+            .put("guard_tap_retargeting", guardTapRetargeting)
+            .put("touch_slop_px", slideTouchSlop)
+            .put("settle_window_ms", TapRetargetGuard.SETTLE_WINDOW_MS)
+            .put("settle_min_hold_ms", TapRetargetGuard.SETTLE_MIN_HOLD_MS)
+            .put("settle_dwell_ms", TapRetargetGuard.SETTLE_DWELL_MS)
+            .put("slide_dwell_ms", TapRetargetGuard.SLIDE_DWELL_MS)
+            .put("retarget_min_samples", TapRetargetGuard.MIN_SAMPLES)
+            .put("keep_letters_uppercase", keyboardPrefs.keepLettersUppercase.getValue())
+            .put("show_lang_switch_key", keyboardPrefs.showLangSwitchKey.getValue())
+            .put("pinyin_touch_correction", keyboardPrefs.pinyinTouchCorrection.getValue())
+        return JSONObject().put("name", javaClass.simpleName.removeSuffix("Keyboard"))
+            .put("width", width).put("height", height).put("density", resources.displayMetrics.density)
+            .put("orientation", resources.configuration.orientation).put("keys", keys)
+            .put("settings", settings).put("state", diagnosticState())
+    }
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN)
+            boundarySettlingForGesture = prefs.keyboard.touchBoundarySettling.getValue()
+        touchTrace.beforeEvent(ev, boundarySettlingForGesture, ::diagnosticLayout) { x, y ->
+            findTouchTarget(x, y)?.view?.id
+        }
         if (pressEffectLayer != null || keyMotion != ThemePrefs.KeyMotionEffect.Off) {
             val action = ev.actionMasked
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
@@ -789,6 +892,7 @@ abstract class BaseKeyboard(
             pressEffectLayer?.onRelease(pointerId)
             motionReleasePointer(pointerId)
         }
+        touchTrace.afterEvent(ev)
         return handled
     }
 
@@ -883,6 +987,9 @@ abstract class BaseKeyboard(
                     return true
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    touchTargets.forEach { (pid, contact) ->
+                        touchTrace.released(pid, contact.target.view.id, cancelled = true)
+                    }
                     releaseAllTouchTargets()
                     return true
                 }
@@ -896,6 +1003,7 @@ abstract class BaseKeyboard(
         action: KeyAction,
         source: KeyActionListener.Source = KeyActionListener.Source.Keyboard
     ) {
+        touchTrace.action(action, source)
         keyActionListener?.onKeyAction(action, source)
     }
 
@@ -932,6 +1040,7 @@ abstract class BaseKeyboard(
     }
 
     override fun onDetachedFromWindow() {
+        touchTrace.discard()
         pressEffectLayer?.setActive(false)
         if (keyMotion == ThemePrefs.KeyMotionEffect.Press) {
             // Reattaching the same keyboard must not retain an old held pointer.
@@ -945,6 +1054,7 @@ abstract class BaseKeyboard(
         super.onWindowVisibilityChanged(visibility)
         pressEffectLayer?.syncVisibility()
         resetHiddenFloat(visibility != View.VISIBLE)
+        if (visibility != View.VISIBLE) touchTrace.discard()
     }
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
@@ -957,6 +1067,7 @@ abstract class BaseKeyboard(
         super.onVisibilityAggregated(isVisible)
         pressEffectLayer?.syncVisibility()
         resetHiddenFloat(!isVisible)
+        if (!isVisible) touchTrace.discard()
     }
 
     /** IME windows can hide without detaching their cached keyboard views. */

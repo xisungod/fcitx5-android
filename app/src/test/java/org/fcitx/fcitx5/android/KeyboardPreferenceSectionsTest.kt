@@ -5,8 +5,10 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Looper
+import android.os.UserManager
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -34,6 +36,9 @@ import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.TwinSeekBarPreference
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardPreferenceSections
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.TypingSettingsFragment
+import org.fcitx.fcitx5.android.input.keyboard.typing.KeyCell
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchProfileStore
+import org.fcitx.fcitx5.android.input.keyboard.typing.TapEvidence
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -57,6 +62,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 @LooperMode(LooperMode.Mode.PAUSED)
 class KeyboardPreferenceSectionsTest {
     private var previousApplication: Any? = null
+    private var previousPrefs: Any? = null
+    private lateinit var stored: SharedPreferences
 
     @Before fun prepare() {
         val application = RuntimeEnvironment.getApplication()
@@ -68,12 +75,25 @@ class KeyboardPreferenceSectionsTest {
             previousApplication = get(null)
             set(null, app)
         }
-        val stored = PreferenceManager.getDefaultSharedPreferences(application)
+        AppPrefs::class.java.getDeclaredField("instance").apply {
+            isAccessible = true
+            previousPrefs = get(null)
+            set(null, null)
+        }
+        stored = PreferenceManager.getDefaultSharedPreferences(application)
         stored.edit().clear().commit()
         AppPrefs.init(stored)
     }
 
     @After fun restoreApplication() {
+        val listener = AppPrefs::class.java.getDeclaredField("onSharedPreferenceChangeListener")
+            .apply { isAccessible = true }.get(AppPrefs.getInstance())
+            as SharedPreferences.OnSharedPreferenceChangeListener
+        stored.unregisterOnSharedPreferenceChangeListener(listener)
+        AppPrefs::class.java.getDeclaredField("instance").apply {
+            isAccessible = true
+            set(null, previousPrefs)
+        }
         FcitxApplication::class.java.getDeclaredField("instance").apply {
             isAccessible = true
             set(null, previousApplication)
@@ -281,6 +301,54 @@ class KeyboardPreferenceSectionsTest {
             awaitUi("The visible Apply row must reach the engine deploy action") { engine.deployments.size == 1 }
             assertEquals(listOf(71), engine.deployments.toList())
             assertEquals(RimeFuzzyConfig.render(true, false, true), directory.resolve("xuancai_mobile.yaml").readText())
+        }
+    }
+
+    @Test fun pinyinTouchCorrectionIsOptInAndItsVisibleSwitchDoesNotEnableDiagnosticsOrDeployRime() {
+        withTypingFragment { _, fragment, engine, _ ->
+            val prefs = AppPrefs.getInstance().keyboard
+            assertFalse(prefs.pinyinTouchCorrection.getValue())
+            val correction = fragment.findPreference<Preference>(prefs.pinyinTouchCorrection.key)!!
+            assertSame("The visible switch and runtime setting must share their backing store",
+                prefs.pinyinTouchCorrection.sharedPreferences, correction.sharedPreferences)
+            assertEquals("typing_touch_correction", correction.parent!!.key)
+            assertEquals(fragment.getString(R.string.pinyin_touch_correction_summary), correction.summary)
+            correction.performClick()
+            assertTrue("The visible switch must persist the opt-in", prefs.pinyinTouchCorrection.getValue())
+            assertFalse("Correction must not start collecting diagnostic logs", prefs.touchDiagnosticLogging.getValue())
+            assertFalse("Correction must not enable long-hold boundary adjustment", prefs.touchBoundarySettling.getValue())
+            assertFalse("Learning must remain a separate opt-in", prefs.pinyinTouchPersonalization.getValue())
+            val learning = fragment.findPreference<Preference>(prefs.pinyinTouchPersonalization.key)!!
+            assertEquals("typing_touch_correction", learning.parent!!.key)
+            learning.performClick()
+            assertTrue(prefs.pinyinTouchPersonalization.getValue())
+            assertEquals("typing_touch_correction", fragment.findPreference<Preference>(
+                KeyboardPreferenceSections.PINYIN_TOUCH_PROFILE_CLEAR_KEY)!!.parent!!.key)
+            assertTrue("Touch correction must not trigger a Rime rebuild", engine.deployments.isEmpty())
+            correction.performClick()
+            assertFalse(prefs.pinyinTouchCorrection.getValue())
+            learning.performClick()
+            assertFalse(prefs.pinyinTouchPersonalization.getValue())
+        }
+    }
+
+    @Test fun clickingTypingHabitResetClearsTheActualLocalProfileWithoutChangingSettings() {
+        withTypingFragment { activity, fragment, engine, _ ->
+            shadowOf(activity.application.getSystemService(UserManager::class.java)).setUserUnlocked(true)
+            PinyinTouchProfileStore.clear(activity)
+            val store = PinyinTouchProfileStore(activity)
+            val cells = listOf(KeyCell('n', 0f, 0f, 100f, 100f))
+            repeat(8) { assertTrue(store.observe(cells, TapEvidence('n', 60f, 55f, 1f), 'n')) }
+            assertEquals(8, store.confirmedSampleCount(cells, 1f, 'n'))
+            fragment.findPreference<Preference>(KeyboardPreferenceSections.PINYIN_TOUCH_PROFILE_CLEAR_KEY)!!
+                .performClick()
+            awaitUi("The visible reset must clear the local profile") {
+                store.confirmedSampleCount(cells, 1f, 'n') == 0
+            }
+            assertTrue(store.offsets(cells, 1f).isEmpty())
+            assertFalse(AppPrefs.getInstance().keyboard.pinyinTouchCorrection.getValue())
+            assertFalse(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.getValue())
+            assertTrue(engine.deployments.isEmpty())
         }
     }
 

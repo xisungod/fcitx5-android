@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pinyin_touch_correction_section">拼音输入纠错</string>
+    <string name="pinyin_touch_correction">拼音触点纠错（实验）</string>
+    <string name="pinyin_touch_correction_summary">只在拼音键位交界处结合落点和拼音概率判断，明确键心保持原键；不上传输入。</string>
+    <string name="pinyin_touch_personalization">按键习惯学习（实验）</string>
+    <string name="pinyin_touch_personalization_summary">仅依据你明确确认或还原的按键，在本机学习落点偏移；密码框不参与。</string>
+    <string name="pinyin_touch_profile_clear">清除按键习惯数据</string>
+    <string name="pinyin_touch_profile_clear_done">按键习惯数据已清除</string>
+    <string name="pinyin_touch_restore_letter">还原 %1$s</string>
+    <string name="pinyin_touch_confirm_letter">确认 %1$s</string>
+    <string name="pinyin_touch_restore_letter_description">将本次纠正还原为字母 %1$s</string>
+    <string name="pinyin_touch_confirm_letter_description">确认本次想输入的字母为 %1$s</string>
+</resources>

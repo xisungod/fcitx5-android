@@ -57,7 +57,10 @@ internal class TapRetargetGuard {
     companion object {
         const val SETTLE_DWELL_MS = 32L
         const val SLIDE_DWELL_MS = 48L
-        const val SETTLE_WINDOW_MS = 140L
+        // Optional boundary adjustment is reserved for a deliberate hold. Fast
+        // taps keep their DOWN identity; explicit slides keep their own dwell.
+        const val SETTLE_MIN_HOLD_MS = 200L
+        const val SETTLE_WINDOW_MS = 280L
         const val MIN_SAMPLES = 2
     }
 }
