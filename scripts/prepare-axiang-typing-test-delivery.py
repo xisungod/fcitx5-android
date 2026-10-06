@@ -292,7 +292,8 @@ def source_patch(root, commit):
         require(b"\0" not in blob, f"Binary data in a public source path: {name}")
         records.append({"path": name, "bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest()})
     patch = git(root, "diff", "--full-index", BASE_COMMIT, commit, "--", *paths)
-    require(b"GIT binary patch" not in patch, "Public source patch contains binary payloads")
+    require(not re.search(rb"(?m)^GIT binary patch$", patch),
+            "Public source patch contains binary payloads")
     return patch, {"base_commit": BASE_COMMIT, "source_commit": commit,
                    "patch": "typing-test-source.patch", "bytes": len(patch),
                    "sha256": hashlib.sha256(patch).hexdigest(), "files": paths, "source_files": records,
