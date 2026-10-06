@@ -26,6 +26,7 @@ import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.inputView
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import timber.log.Timber
@@ -38,6 +39,7 @@ class HorizontalCandidateComponent :
     private val inputView by manager.inputView()
     private val service by manager.inputMethodService()
     private val bar: KawaiiBarComponent by manager.must()
+    private val commonKeyActionListener: CommonKeyActionListener by manager.must()
     private val buffer = CandidatePageBuffer()
     private var pageJob: Job? = null
     private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
@@ -65,12 +67,14 @@ class HorizontalCandidateComponent :
                     else maxOf(context.dp(40), view.width / slots)
                 val generation = buffer.generation
                 holder.itemView.setOnClickListener {
+                    commonKeyActionListener.invalidateTouchCandidates()
                     if (generation == buffer.generation && holder.bindingAdapterPosition != RecyclerView.NO_POSITION) {
                         val index = holder.idx
                         fcitx.launchOnReady { it.select(index) }
                     }
                 }
                 holder.itemView.setOnLongClickListener {
+                    commonKeyActionListener.invalidateTouchCandidates()
                     if (generation == buffer.generation && holder.bindingAdapterPosition != RecyclerView.NO_POSITION)
                         inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)
                     true

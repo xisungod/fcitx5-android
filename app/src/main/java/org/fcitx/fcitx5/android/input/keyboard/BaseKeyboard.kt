@@ -6,12 +6,15 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Canvas
 import android.graphics.Rect
+import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.inputmethod.EditorInfo
 import androidx.annotation.CallSuper
 import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -25,6 +28,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.InputFeedbacks
+import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticPolicy
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -75,6 +79,21 @@ abstract class BaseKeyboard(
     private val prefs = AppPrefs.getInstance()
     private val touchTrace = TouchTraceRecorder(context)
     private var boundarySettlingForGesture = true
+    private var downOrderForGesture = false
+    private var downOrderEditorForGesture: EditorInfo? = null
+    private var downOrderGestureCancelled = false
+    private var touchDownSequence = 0L
+    private var touchGestureGeneration = 0L
+
+    /** Memory-only editor source for canonical keyboard tests without an IME service. */
+    internal var downOrderEditorInfoProvider: (() -> EditorInfo?)? = null
+    private val editorService: InputMethodService? by lazy {
+        generateSequence(context) { current ->
+            (current as? ContextWrapper)?.baseContext?.takeIf { it !== current }
+        }.filterIsInstance<InputMethodService>().firstOrNull()
+    }
+    private fun downOrderEditorInfo(): EditorInfo? =
+        downOrderEditorInfoProvider?.invoke() ?: editorService?.currentInputEditorInfo
 
     /** Memory-only observation for canonical MotionEvent replay tests. */
     internal var touchDiagnosticObserver: ((JSONObject) -> Unit)?
@@ -151,6 +170,7 @@ abstract class BaseKeyboard(
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceLongPressBehavior = prefs.keyboard.spaceKeyLongPressBehavior
     private val spaceKeys = mutableListOf<KeyView>()
+    private val alphabetKeyIds = hashSetOf<Int>()
     private val surfaceKeys = mutableListOf<KeyView>()
     private val depthKeys = mutableListOf<KeyView>()
     private fun updateSpaceGestures() {
@@ -270,6 +290,7 @@ abstract class BaseKeyboard(
             is KeyDef.Appearance.Image -> ImageKeyView(context, theme, def.appearance)
         }.apply {
             if (id == View.NO_ID) id = View.generateViewId()
+            if (def is AlphabetKey) alphabetKeyIds.add(id)
             if (keyMotion == ThemePrefs.KeyMotionEffect.Press) {
                 depthKeys.add(this)
                 floatingKeys.put(id, this)
@@ -493,7 +514,9 @@ abstract class BaseKeyboard(
         var sliding: Boolean = false,
         var settled: Boolean = false,
         val retargetGuard: TapRetargetGuard = TapRetargetGuard(),
-        val tapCells: List<KeyCell> = emptyList()
+        val tapCells: List<KeyCell> = emptyList(),
+        val downSequence: Long = 0L,
+        val downOrderState: Long? = null
     )
 
     /** Each pointer keeps its own original touch and deliberate-slide state. */
@@ -503,8 +526,78 @@ abstract class BaseKeyboard(
     private fun beginTouch(event: MotionEvent, index: Int, target: TouchTarget): TouchContact =
         TouchContact(target, event.getX(index), event.getY(index), event.eventTime,
             maxOf(slideTouchSlop * 1.5f, minOf(target.hitRect.width(), target.hitRect.height()) * 0.45f),
-            tapCells = if (this is TextKeyboard && prefs.keyboard.pinyinTouchCorrection.getValue())
-                alphabetCells() else emptyList())
+            tapCells = if (this is TextKeyboard && (prefs.keyboard.pinyinTouchCorrection.getValue() ||
+                prefs.keyboard.pinyinTouchAlternatives.getValue()))
+                alphabetCells() else emptyList(),
+            downSequence = touchDownSequence++,
+            downOrderState = if (downOrderForGesture && isDownOrderLetter(target.view))
+                (this as TextKeyboard).downOrderStateGeneration else null)
+
+    private fun isDownOrderLetter(key: KeyView): Boolean {
+        if ((this as? TextKeyboard)?.acceptsDownOrderedLetterTaps != true) return false
+        return key.id in alphabetKeyIds
+    }
+
+    private fun isOrdinaryDownOrderTap(contact: TouchContact): Boolean {
+        val key = contact.target.view
+        if (contact.downOrderState == null ||
+            contact.downOrderState != (this as? TextKeyboard)?.downOrderStateGeneration ||
+            contact.sliding || contact.settled || !canRetargetPendingTap(key) ||
+            !key.isEnabled || !isDownOrderLetter(key)) return false
+        // Gesture state belongs to the KeyView. Keep simultaneous contacts on
+        // that same key on their existing path rather than ending another hold.
+        return touchTargets.values.count { it.target.view === key } == 1
+    }
+
+    private fun downOrderGeometryUnchanged(contact: TouchContact): Boolean {
+        val key = contact.target.view
+        val row = key.parent as? View ?: return false
+        val bounds = contact.target.hitRect
+        return row.parent === this && row.visibility == View.VISIBLE && key.visibility == View.VISIBLE &&
+            bounds.left == key.left + row.left && bounds.top == key.top + row.top &&
+            bounds.right == key.right + row.left && bounds.bottom == key.bottom + row.top
+    }
+
+    private fun releaseOlderOrdinaryTaps(event: MotionEvent, releasingIndex: Int) {
+        if (!downOrderForGesture || downOrderGestureCancelled) return
+        val gestureGeneration = touchGestureGeneration
+        val pointerIds = TapDownOrder.olderPointersToRelease(event.getPointerId(releasingIndex),
+            touchTargets.map { (pid, contact) ->
+                val index = event.findPointerIndex(pid)
+                TapDownOrder.Contact(pid, contact.downSequence,
+                    index >= 0 && isOrdinaryDownOrderTap(contact) &&
+                        withinSlideTolerance(event, index, contact.target))
+            })
+        for (pid in pointerIds) {
+            if (gestureGeneration != touchGestureGeneration) return
+            if (!ensureDownOrderContext()) return
+            val contact = touchTargets[pid] ?: continue
+            val index = event.findPointerIndex(pid)
+            if (index < 0 || !isOrdinaryDownOrderTap(contact)) continue
+            // Finalize before callbacks: a layout/editor change or its later
+            // physical UP must never dispatch this contact a second time.
+            touchTargets.remove(pid)
+            pressEffectLayer?.onRelease(pid)
+            motionReleasePointer(pid)
+            releaseTouch(event, index, contact, phantom = true)
+            // The child's UP clears timers before its click callback. Never
+            // cancel that view afterwards: the callback may start a fresh DOWN.
+            if (gestureGeneration != touchGestureGeneration) return
+            if (!ensureDownOrderContext()) return
+        }
+    }
+
+    private fun ensureDownOrderContext(): Boolean {
+        if (!downOrderForGesture) return true
+        if (downOrderGestureCancelled) return false
+        if (downOrderEditorForGesture !== downOrderEditorInfo() ||
+            !TouchDiagnosticPolicy.allows(downOrderEditorForGesture) ||
+            touchTargets.values.any { !downOrderGeometryUnchanged(it) }) {
+            cancelDownOrderGesture()
+            return false
+        }
+        return true
+    }
 
     private fun alphabetCells(): List<KeyCell> = keyRows.flatMap { row ->
         if (row.visibility != View.VISIBLE) emptyList() else row.children.filterIsInstance<KeyView>()
@@ -552,7 +645,8 @@ abstract class BaseKeyboard(
         action: Int,
         pointerIndex: Int,
         target: TouchTarget,
-        sample: TouchSample? = null
+        sample: TouchSample? = null,
+        contact: TouchContact? = touchTargets[event.getPointerId(pointerIndex)]
     ) {
         val childX = (sample?.x ?: event.getX(pointerIndex)) - target.hitRect.left
         val childY = (sample?.y ?: event.getY(pointerIndex)) - target.hitRect.top
@@ -563,7 +657,6 @@ abstract class BaseKeyboard(
             event.deviceId, event.edgeFlags
         )
         val previousEvidence = currentPinyinTapEvidence
-        val contact = touchTargets[event.getPointerId(pointerIndex)]
         val rawLetter = (target.view.def as? KeyDef.Appearance.Text)?.displayText?.lowercase()?.singleOrNull()
         currentPinyinTapEvidence = if (action == MotionEvent.ACTION_UP && contact != null &&
             !contact.sliding && !contact.settled && contact.tapCells.isNotEmpty() &&
@@ -704,8 +797,10 @@ abstract class BaseKeyboard(
         dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, index, next, sample)
     }
 
-    private fun releaseTouch(event: MotionEvent, index: Int, contact: TouchContact) {
+    private fun releaseTouch(event: MotionEvent, index: Int, contact: TouchContact, phantom: Boolean = false) {
         val target = contact.target
+        if (phantom) touchTrace.released(event.getPointerId(index), target.view.id,
+            reason = "down_order", time = event.eventTime)
         // UP never starts a slide: lift-off drift cannot replace a fast tap with
         // its neighbour. Only an established MOVE gesture follows a final UP.
         if (slideSelectionEnabled && canRetargetPendingTap(target.view) &&
@@ -713,15 +808,15 @@ abstract class BaseKeyboard(
             val next = findTouchTarget(event, index)
             if (next != null && canSlideSelect(next.view)) {
                 if (contact.sliding && next.view !== target.view) switchSlideTarget(event, index, contact, next)
-                dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, contact.target)
+                dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, contact.target, contact = contact)
             } else {
                 target.view.cancelGestures()
                 onPopupAction(PopupAction.DismissAction(target.view.id))
                 touchTrace.released(event.getPointerId(index), target.view.id, cancelled = true)
                 return
             }
-        } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, target)
-        touchTrace.released(event.getPointerId(index), contact.target.view.id)
+        } else dispatchMotionEventToTarget(event, MotionEvent.ACTION_UP, index, target, contact = contact)
+        if (!phantom) touchTrace.released(event.getPointerId(index), contact.target.view.id)
     }
 
     private val motionViews = android.util.SparseArray<View>()
@@ -861,6 +956,8 @@ abstract class BaseKeyboard(
             .put("keep_letters_uppercase", keyboardPrefs.keepLettersUppercase.getValue())
             .put("show_lang_switch_key", keyboardPrefs.showLangSwitchKey.getValue())
             .put("pinyin_touch_correction", keyboardPrefs.pinyinTouchCorrection.getValue())
+            .put("pinyin_touch_alternatives", keyboardPrefs.pinyinTouchAlternatives.getValue())
+            .put("pinyin_down_order", keyboardPrefs.pinyinDownOrder.getValue())
         return JSONObject().put("name", javaClass.simpleName.removeSuffix("Keyboard"))
             .put("width", width).put("height", height).put("density", resources.displayMetrics.density)
             .put("orientation", resources.configuration.orientation).put("keys", keys)
@@ -868,12 +965,19 @@ abstract class BaseKeyboard(
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.actionMasked == MotionEvent.ACTION_DOWN)
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             boundarySettlingForGesture = prefs.keyboard.touchBoundarySettling.getValue()
+            downOrderEditorForGesture = if (prefs.keyboard.pinyinDownOrder.getValue()) downOrderEditorInfo() else null
+            downOrderForGesture = this is TextKeyboard && prefs.keyboard.pinyinDownOrder.getValue() &&
+                TouchDiagnosticPolicy.allows(downOrderEditorForGesture) && acceptsDownOrderedLetterTaps
+            downOrderGestureCancelled = false
+            touchDownSequence = 0L
+            touchGestureGeneration++
+        }
         touchTrace.beforeEvent(ev, boundarySettlingForGesture, ::diagnosticLayout) { x, y ->
             findTouchTarget(x, y)?.view?.id
         }
-        if (pressEffectLayer != null || keyMotion != ThemePrefs.KeyMotionEffect.Off) {
+        if (!downOrderGestureCancelled && (pressEffectLayer != null || keyMotion != ThemePrefs.KeyMotionEffect.Off)) {
             val action = ev.actionMasked
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
                 val i = ev.actionIndex
@@ -912,6 +1016,8 @@ abstract class BaseKeyboard(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (vivoKeypressWorkaround || slideSelectionEnabled) {
+            if (event.actionMasked != MotionEvent.ACTION_DOWN) ensureDownOrderContext()
+            if (downOrderGestureCancelled && event.actionMasked != MotionEvent.ACTION_DOWN) return true
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     releaseAllTouchTargets()
@@ -971,6 +1077,8 @@ abstract class BaseKeyboard(
                     val i = event.actionIndex
                     val pid = event.getPointerId(i)
                     val target = touchTargets[pid] ?: return true
+                    releaseOlderOrdinaryTaps(event, i)
+                    if (touchTargets[pid] !== target) return true
                     releaseTouch(event, i, target)
                     touchTargets.remove(pid)
                     return true
@@ -982,11 +1090,14 @@ abstract class BaseKeyboard(
                         releaseAllTouchTargets()
                         return true
                     }
+                    releaseOlderOrdinaryTaps(event, 0)
+                    if (touchTargets[pid] !== target) return true
                     releaseTouch(event, 0, target)
                     touchTargets.remove(pid)
                     return true
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    if (downOrderForGesture) downOrderGestureCancelled = true
                     touchTargets.forEach { (pid, contact) ->
                         touchTrace.released(pid, contact.target.view.id, cancelled = true)
                     }
@@ -1040,6 +1151,7 @@ abstract class BaseKeyboard(
     }
 
     override fun onDetachedFromWindow() {
+        if (downOrderForGesture) cancelDownOrderGesture()
         touchTrace.discard()
         pressEffectLayer?.setActive(false)
         if (keyMotion == ThemePrefs.KeyMotionEffect.Press) {
@@ -1074,14 +1186,17 @@ abstract class BaseKeyboard(
     private fun resetHiddenFloat(hidden: Boolean) {
         // Visibility callbacks may arrive during View construction, before the
         // keyboard's children and gesture storage have been initialised.
-        if (!motionLifecycleReady || keyMotion != ThemePrefs.KeyMotionEffect.Press) return
+        if (!motionLifecycleReady) return
         if (!hidden && isShown && windowVisibility == View.VISIBLE) return
+        if (downOrderForGesture) cancelDownOrderGesture()
+        if (keyMotion != ThemePrefs.KeyMotionEffect.Press) return
         releaseAllTouchTargets() // Cancel; hiding must never commit a pending letter.
         motionViews.clear()
         for (i in depthKeys.indices) depthKeys[i].resetPressDepth()
     }
 
     open fun onAttach() {
+        if (downOrderForGesture) cancelDownOrderGesture()
         pressEffectLayer?.setActive(true)
     }
 
@@ -1094,10 +1209,21 @@ abstract class BaseKeyboard(
     }
 
     open fun onInputMethodUpdate(ime: InputMethodEntry) {
-        // do nothing by default
+        if (downOrderForGesture) cancelDownOrderGesture()
+    }
+
+    private fun cancelDownOrderGesture() {
+        downOrderGestureCancelled = true
+        touchTargets.forEach { (pid, contact) ->
+            touchTrace.released(pid, contact.target.view.id, cancelled = true)
+        }
+        releaseAllTouchTargets()
+        pressEffectLayer?.onRelease()
+        motionReleaseAll()
     }
 
     open fun onDetach() {
+        if (downOrderForGesture) cancelDownOrderGesture()
         releaseAllTouchTargets()
         pressEffectLayer?.setActive(false)
         motionReleaseAll()

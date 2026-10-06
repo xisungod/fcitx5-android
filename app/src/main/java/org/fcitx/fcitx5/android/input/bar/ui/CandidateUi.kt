@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.bar.ui
 
 import android.content.Context
+import android.text.TextUtils
 import android.view.View
 import android.view.Gravity
 import android.widget.LinearLayout
@@ -12,6 +13,7 @@ import android.widget.TextView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapFeedback
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateOffer
 import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.before
@@ -40,6 +42,7 @@ class CandidateUi(override val ctx: Context, private val theme: Theme, private v
 
     private val restoreButton = feedbackButton()
     private val confirmButton = feedbackButton()
+    private var touchCandidateButton: TextView? = null
     private val feedbackUi = LinearLayout(ctx).apply {
         id = View.generateViewId()
         orientation = LinearLayout.HORIZONTAL
@@ -51,10 +54,11 @@ class CandidateUi(override val ctx: Context, private val theme: Theme, private v
     fun setPinyinFeedback(
         feedback: PinyinTapFeedback?, restore: (Long) -> Unit, confirm: (Long) -> Unit
     ) {
-        feedbackUi.visibility = if (feedback == null) View.GONE else View.VISIBLE
-        restoreButton.setOnClickListener(null)
-        confirmButton.setOnClickListener(null)
+        clearFeedback()
         if (feedback == null) return
+        feedbackUi.visibility = View.VISIBLE
+        restoreButton.visibility = View.VISIBLE
+        confirmButton.visibility = View.VISIBLE
         restoreButton.text = ctx.getString(R.string.pinyin_touch_restore_letter, feedback.original.toString())
         restoreButton.contentDescription = ctx.getString(
             R.string.pinyin_touch_restore_letter_description, feedback.original.toString())
@@ -63,6 +67,48 @@ class CandidateUi(override val ctx: Context, private val theme: Theme, private v
             R.string.pinyin_touch_confirm_letter_description, feedback.selected.toString())
         restoreButton.setOnClickListener { restore(feedback.token) }
         confirmButton.setOnClickListener { confirm(feedback.token) }
+    }
+
+    fun setTouchCandidate(offer: PinyinTouchCandidateOffer?, select: (Long) -> Unit) {
+        clearFeedback()
+        if (offer == null) return
+        val button = touchCandidateButton ?: feedbackButton().apply {
+            textSize = 18f
+            setTextColor(theme.candidateTextColor)
+            setSingleLine()
+            ellipsize = TextUtils.TruncateAt.END
+            maxWidth = dp(144)
+            feedbackUi.addView(this, LinearLayout.LayoutParams(wrapContent, matchParent))
+            touchCandidateButton = this
+        }
+        updateTouchCandidateWidth(root.width)
+        button.text = "${offer.text}*"
+        button.contentDescription = ctx.getString(
+            R.string.pinyin_touch_alternative_description, offer.text)
+        button.setOnClickListener { select(offer.token) }
+        button.visibility = View.VISIBLE
+        feedbackUi.visibility = View.VISIBLE
+    }
+
+    private fun clearFeedback() {
+        feedbackUi.visibility = View.GONE
+        restoreButton.visibility = View.GONE
+        confirmButton.visibility = View.GONE
+        restoreButton.setOnClickListener(null)
+        confirmButton.setOnClickListener(null)
+        touchCandidateButton?.apply {
+            visibility = View.GONE
+            setOnClickListener(null)
+            text = ""
+            contentDescription = null
+        }
+    }
+
+    private fun updateTouchCandidateWidth(barWidth: Int) {
+        if (barWidth <= 0) return
+        // Leave the expand control and a scrollable portion of the literal candidates visible.
+        touchCandidateButton?.maxWidth = (barWidth - ctx.dp(48 + 96))
+            .coerceIn(ctx.dp(48), ctx.dp(144))
     }
 
     val expandButton = ToolButton(ctx, R.drawable.ic_baseline_expand_more_24, theme).apply {
@@ -84,5 +130,9 @@ class CandidateUi(override val ctx: Context, private val theme: Theme, private v
             startOfParent()
             before(feedbackUi)
         })
+    }.apply {
+        addOnLayoutChangeListener { _, left, _, right, _, _, _, _, _ ->
+            updateTouchCandidateWidth(right - left)
+        }
     }
 }

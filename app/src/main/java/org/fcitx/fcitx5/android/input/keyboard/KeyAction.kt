@@ -46,4 +46,7 @@ sealed class KeyAction {
     /** Explicit choices about the most recent, still-composing corrected tap. */
     data class RestorePinyinTapAction(val token: Long) : KeyAction()
     data class ConfirmPinyinTapAction(val token: Long) : KeyAction()
+
+    /** Select a still-current touch alternative without replacing the original candidate list. */
+    data class SelectTouchCandidateAction(val token: Long) : KeyAction()
 }

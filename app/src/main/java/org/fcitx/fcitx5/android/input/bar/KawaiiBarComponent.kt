@@ -25,6 +25,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.fcitx.fcitx5.android.R
@@ -497,12 +498,22 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         fun collectPinyinFeedback() {
             pinyinFeedbackJob?.cancel()
             pinyinFeedbackJob = service.lifecycleScope.launch {
-                commonKeyActionListener.pinyinTapFeedback.collect { feedback ->
-                    candidateUi.setPinyinFeedback(feedback,
-                        restore = { token -> commonKeyActionListener.listener.onKeyAction(
-                            KeyAction.RestorePinyinTapAction(token), KeyActionListener.Source.Keyboard) },
-                        confirm = { token -> commonKeyActionListener.listener.onKeyAction(
-                            KeyAction.ConfirmPinyinTapAction(token), KeyActionListener.Source.Keyboard) })
+                combine(commonKeyActionListener.pinyinTapFeedback,
+                    commonKeyActionListener.touchCandidateOffer) { feedback, offer ->
+                    feedback to offer
+                }.collect { (feedback, offer) ->
+                    if (offer != null) {
+                        candidateUi.setTouchCandidate(offer) { token ->
+                            commonKeyActionListener.listener.onKeyAction(
+                                KeyAction.SelectTouchCandidateAction(token), KeyActionListener.Source.Keyboard)
+                        }
+                    } else {
+                        candidateUi.setPinyinFeedback(feedback,
+                            restore = { token -> commonKeyActionListener.listener.onKeyAction(
+                                KeyAction.RestorePinyinTapAction(token), KeyActionListener.Source.Keyboard) },
+                            confirm = { token -> commonKeyActionListener.listener.onKeyAction(
+                                KeyAction.ConfirmPinyinTapAction(token), KeyActionListener.Source.Keyboard) })
+                    }
                 }
             }
         }
@@ -512,6 +523,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 pinyinFeedbackJob?.cancel()
                 pinyinFeedbackJob = null
                 commonKeyActionListener.clearPinyinTapFeedback()
+                commonKeyActionListener.invalidateTouchCandidates()
             }
         })
         if (view.isAttachedToWindow) collectPinyinFeedback()

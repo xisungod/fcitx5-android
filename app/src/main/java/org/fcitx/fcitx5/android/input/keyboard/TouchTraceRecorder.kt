@@ -99,11 +99,12 @@ internal class TouchTraceRecorder(context: Context) {
                         put("up_t", event.eventTime - current.downAt)
                         put("up", JSONArray().put(event.getX(i)).put(event.getY(i)))
                         put("up_hit_key", hitKey(event.getX(i), event.getY(i)) ?: JSONObject.NULL)
-                        put("up_key", JSONObject.NULL)
+                        if (!has("release_reason")) put("up_key", JSONObject.NULL)
                     }
                 }
                 MotionEvent.ACTION_CANCEL -> current.activeContacts.values.forEach {
-                    it.put("cancelled", true).put("cancel_t", event.eventTime - current.downAt)
+                    if (!it.has("release_reason"))
+                        it.put("cancelled", true).put("cancel_t", event.eventTime - current.downAt)
                 }
             }
         }.onFailure { discard() }
@@ -121,11 +122,15 @@ internal class TouchTraceRecorder(context: Context) {
             .put("touch_minor", historicalIndex?.let { event.getHistoricalTouchMinor(i, it) } ?: event.getTouchMinor(i)))
     }
 
-    fun released(pointerId: Int, keyId: Int, cancelled: Boolean = false) {
+    fun released(pointerId: Int, keyId: Int, cancelled: Boolean = false,
+                 reason: String? = null, time: Long? = null) {
         runCatching {
-            trace?.takeIf(::valid)?.activeContacts?.get(pointerId)?.apply {
+            val current = trace?.takeIf(::valid) ?: return
+            current.activeContacts[pointerId]?.apply {
                 put("up_key", keyId)
                 if (cancelled) put("cancelled", true)
+                reason?.let { put("release_reason", it) }
+                time?.let { put("release_t", it - current.downAt) }
             }
         }.onFailure { discard() }
     }

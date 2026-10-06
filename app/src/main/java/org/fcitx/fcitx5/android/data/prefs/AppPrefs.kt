@@ -69,6 +69,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val pinyinTouchCorrection = switch(
             R.string.pinyin_touch_correction, "pinyin_touch_correction", false,
             R.string.pinyin_touch_correction_summary)
+        val pinyinDownOrder = switch(
+            R.string.pinyin_down_order, "pinyin_down_order", true,
+            R.string.pinyin_down_order_summary)
+        val pinyinTouchAlternatives = switch(
+            R.string.pinyin_touch_alternatives, "pinyin_touch_alternatives", true,
+            R.string.pinyin_touch_alternatives_summary)
         val pinyinTouchPersonalization = switch(
             R.string.pinyin_touch_personalization, "pinyin_touch_personalization", false,
             R.string.pinyin_touch_personalization_summary)

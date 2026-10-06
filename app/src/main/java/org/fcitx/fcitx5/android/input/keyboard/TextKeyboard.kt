@@ -138,6 +138,10 @@ class TextKeyboard(
     private var capsState: CapsState = CapsState.None
     private var englishMode = false
     private var chineseMode = false
+    internal var downOrderStateGeneration = 0L
+        private set
+    internal val acceptsDownOrderedLetterTaps: Boolean
+        get() = chineseMode && !englishMode && capsState == CapsState.None
 
     override fun diagnosticState(): JSONObject = JSONObject()
         .put("caps_state", capsState.name)
@@ -181,7 +185,8 @@ class TextKeyboard(
                             val lower = action.act.lowercase()
                             transformed = action.copy(act = lower,
                                 pinyinTapEvidence = if (chineseMode && !englishMode &&
-                                    AppPrefs.getInstance().keyboard.pinyinTouchCorrection.getValue() &&
+                                    (AppPrefs.getInstance().keyboard.pinyinTouchCorrection.getValue() ||
+                                        AppPrefs.getInstance().keyboard.pinyinTouchAlternatives.getValue()) &&
                                     currentPinyinTapEvidence?.tap?.original == lower.singleOrNull())
                                     currentPinyinTapEvidence else null)
                         }
@@ -214,6 +219,7 @@ class TextKeyboard(
 
     override fun onAttach() {
         super.onAttach()
+        downOrderStateGeneration++
         capsState = CapsState.None
         updateCapsButtonIcon()
         updateAlphabetKeys()
@@ -229,6 +235,8 @@ class TextKeyboard(
     }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
+        super.onInputMethodUpdate(ime)
+        downOrderStateGeneration++
         englishMode = isEnglish(ime)
         chineseMode = !englishMode && (ime.uniqueName == "rime" || ime.languageCode.startsWith("zh"))
         lang.contentDescription = if (englishMode) "English" else "中文"
@@ -272,6 +280,7 @@ class TextKeyboard(
     }
 
     private fun switchCapsState(lock: Boolean = false) {
+        downOrderStateGeneration++
         capsState =
             if (lock) {
                 when (capsState) {

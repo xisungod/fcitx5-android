@@ -77,7 +77,10 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override fun translate(str: String, domain: String) = getFcitxTranslation(domain, str)
 
     override suspend fun save() = withFcitxContext { saveFcitxState() }
-    override suspend fun reloadConfig() = withFcitxContext { reloadFcitxConfig() }
+    override suspend fun reloadConfig() = withFcitxContext {
+        RimeTouchProbe.close()
+        reloadFcitxConfig()
+    }
 
     override suspend fun <T> withInputTransaction(block: suspend FcitxAPI.() -> T): T =
         withFcitxContext { block(this@Fcitx) }
@@ -89,13 +92,23 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         up: Boolean,
         timestamp: Int
     ) =
-        withFcitxContext { sendKeyToFcitxString(key, states.toInt(), code, up, timestamp) }
+        withFcitxContext {
+            if (!RimeTouchProbePolicy.ordinaryKey(key.singleOrNull(), states)) RimeTouchProbe.close()
+            sendKeyToFcitxString(key, states.toInt(), code, up, timestamp)
+        }
 
     override suspend fun sendKey(c: Char, states: UInt, code: Int, up: Boolean, timestamp: Int) =
-        withFcitxContext { sendKeyToFcitxChar(c, states.toInt(), code, up, timestamp) }
+        withFcitxContext {
+            if (!RimeTouchProbePolicy.ordinaryKey(c, states)) RimeTouchProbe.close()
+            sendKeyToFcitxChar(c, states.toInt(), code, up, timestamp)
+        }
 
     override suspend fun sendKey(sym: Int, states: UInt, code: Int, up: Boolean, timestamp: Int) =
-        withFcitxContext { sendKeySymToFcitx(sym, states.toInt(), code, up, timestamp) }
+        withFcitxContext {
+            val letter = sym.takeIf { it in 'a'.code..'z'.code }?.toChar()
+            if (!RimeTouchProbePolicy.ordinaryKey(letter, states)) RimeTouchProbe.close()
+            sendKeySymToFcitx(sym, states.toInt(), code, up, timestamp)
+        }
 
     override suspend fun sendKey(
         sym: KeySym,
@@ -104,7 +117,11 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         up: Boolean,
         timestamp: Int
     ) =
-        withFcitxContext { sendKeySymToFcitx(sym.sym, states.toInt(), code, up, timestamp) }
+        withFcitxContext {
+            val letter = sym.sym.takeIf { it in 'a'.code..'z'.code }?.toChar()
+            if (!RimeTouchProbePolicy.ordinaryKey(letter, states.states)) RimeTouchProbe.close()
+            sendKeySymToFcitx(sym.sym, states.toInt(), code, up, timestamp)
+        }
 
     override suspend fun select(idx: Int): Boolean = withFcitxContext { selectCandidate(idx) }
     override suspend fun isEmpty(): Boolean = withFcitxContext { isInputPanelEmpty() }
@@ -132,6 +149,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     }
 
     override suspend fun setGlobalConfig(config: RawConfig) = withFcitxContext {
+        RimeTouchProbe.close()
         setFcitxGlobalConfig(config)
     }
 
@@ -140,6 +158,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     }
 
     override suspend fun setAddonConfig(addon: String, config: RawConfig) = withFcitxContext {
+        RimeTouchProbe.close()
         setFcitxAddonConfig(addon, config)
     }
 
@@ -148,19 +167,26 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     }
 
     override suspend fun setAddonSubConfig(addon: String, path: String, config: RawConfig) =
-        withFcitxContext { setFcitxAddonSubConfig(addon, path, config) }
+        withFcitxContext {
+            RimeTouchProbe.close()
+            setFcitxAddonSubConfig(addon, path, config)
+        }
 
     override suspend fun getImConfig(key: String) = withFcitxContext {
         getFcitxInputMethodConfig(key) ?: RawConfig()
     }
 
     override suspend fun setImConfig(key: String, config: RawConfig) = withFcitxContext {
+        RimeTouchProbe.close()
         setFcitxInputMethodConfig(key, config)
     }
 
     override suspend fun addons() = withFcitxContext { getFcitxAddons() ?: emptyArray() }
     override suspend fun setAddonState(name: Array<String>, state: BooleanArray) =
-        withFcitxContext { setFcitxAddonState(name, state) }
+        withFcitxContext {
+            RimeTouchProbe.close()
+            setFcitxAddonState(name, state)
+        }
 
     override suspend fun triggerQuickPhrase() = withFcitxContext { triggerQuickPhraseInput() }
     override suspend fun triggerUnicode() = withFcitxContext { triggerUnicodeInput() }
@@ -180,7 +206,12 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         withFcitxContext { getFcitxStatusAreaActions() ?: emptyArray() }
 
     override suspend fun activateAction(id: Int) =
-        withFcitxContext { activateUserInterfaceAction(id) }
+        withFcitxContext {
+            // Includes schema switches and deployment actions that may replace
+            // the Rime component registry used by the cached read-only probe.
+            RimeTouchProbe.close()
+            activateUserInterfaceAction(id)
+        }
 
     override suspend fun getCandidates(offset: Int, limit: Int): Array<CandidateWord> =
         withFcitxContext { getFcitxCandidates(offset, limit) ?: emptyArray() }
@@ -477,6 +508,7 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         }
 
         override fun nativeExit() {
+            RimeTouchProbe.close()
             exitFcitx()
         }
 

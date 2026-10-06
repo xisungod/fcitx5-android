@@ -93,6 +93,9 @@ class TapAccuracyTest {
             setting(AppPrefs.getInstance().keyboard.longPressDelay, 300)
             setting(AppPrefs.getInstance().keyboard.touchBoundarySettling, boundarySettling)
             setting(AppPrefs.getInstance().keyboard.pinyinTouchCorrection, pinyinCorrection)
+            // This suite isolates the original touch/inline-correction mode.
+            setting(AppPrefs.getInstance().keyboard.pinyinTouchAlternatives, false)
+            setting(AppPrefs.getInstance().keyboard.pinyinDownOrder, false)
             activity.setTheme(R.style.Theme_InputViewTheme)
             keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
             // The activity may relayout on any looper tick. Keep the actual

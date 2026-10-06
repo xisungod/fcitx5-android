@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="pinyin_down_order">双指快打顺序（实验）</string>
+    <string name="pinyin_down_order_summary">两指重叠时，普通中文字母按按下先后提交；滑选和长按分别处理。</string>
+    <string name="pinyin_touch_alternatives">触点候选纠错（实验）</string>
+    <string name="pinyin_touch_alternatives_summary">保留原始拼音，用一条触点备选补充词语候选；点击带 * 的候选使用。开启后优先使用此模式，不自动改字母。</string>
+    <string name="pinyin_touch_alternative_description">纠错候选 %1$s，原始拼音已保留</string>
     <string name="pinyin_touch_correction_section">拼音输入纠错</string>
     <string name="pinyin_touch_correction">拼音触点纠错（实验）</string>
     <string name="pinyin_touch_correction_summary">只在拼音键位交界处结合落点和拼音概率判断，明确键心保持原键；不上传输入。</string>

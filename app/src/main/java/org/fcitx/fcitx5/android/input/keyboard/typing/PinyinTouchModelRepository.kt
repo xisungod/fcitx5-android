@@ -13,6 +13,10 @@ internal class PinyinTouchModelRepository(private val context: Context) {
         private set
 
     @Volatile
+    var languageModel: PinyinTouchLanguageModel? = null
+        private set
+
+    @Volatile
     var profileStore: PinyinTouchProfileStore? = null
         private set
 
@@ -34,7 +38,8 @@ internal class PinyinTouchModelRepository(private val context: Context) {
             profileStore = runCatching { PinyinTouchProfileStore(context) }.getOrNull()
             decider = runCatching {
                 context.assets.open("typing/pinyin_touch_model.tsv").bufferedReader().use {
-                    PinyinSpatialKeyDecider(PinyinTouchLanguageModel.parse(it))
+                    PinyinTouchLanguageModel.parse(it).also { model -> languageModel = model }
+                        .let(::PinyinSpatialKeyDecider)
                 }
             }.getOrNull()
         }

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="pinyin_down_order">Two-finger typing order · experimental</string>
+    <string name="pinyin_down_order_summary">Keeps ordinary Chinese letter taps in touch-down order when fingers overlap. Slide and long-press actions keep their own handling.</string>
+    <string name="pinyin_touch_alternatives">Touch-based candidate correction · experimental</string>
+    <string name="pinyin_touch_alternatives_summary">Keeps the original pinyin and offers a word candidate from one touch-based alternative. Tap the candidate marked * to use it. Overrides inline touch correction while enabled.</string>
+    <string name="pinyin_touch_alternative_description">Correction candidate %1$s; original pinyin is preserved</string>
     <string name="pinyin_touch_correction_section">Pinyin input correction</string>
     <string name="pinyin_touch_correction">Pinyin touch correction · experimental</string>
     <string name="pinyin_touch_correction_summary">Uses touch position and pinyin probabilities only near key boundaries. Clear center taps keep their original key. Your input is not uploaded.</string>
