@@ -4,11 +4,13 @@
 #include <stdio.h>
 #include <string.h>
 
+static RimeApi *api;
+
 static void expect_candidate(RimeSessionId session, const char *keys, const char *expected) {
-    RimeClearComposition(session);
-    assert(RimeSimulateKeySequence(session, keys));
+    api->clear_composition(session);
+    assert(api->simulate_key_sequence(session, keys));
     RIME_STRUCT(RimeContext, ctx);
-    assert(RimeGetContext(session, &ctx));
+    assert(api->get_context(session, &ctx));
     int found = 0;
     printf("%s:", keys);
     for (int i = 0; i < ctx.menu.num_candidates; ++i) {
@@ -16,12 +18,13 @@ static void expect_candidate(RimeSessionId session, const char *keys, const char
         if (strcmp(ctx.menu.candidates[i].text, expected) == 0) found = 1;
     }
     puts("");
-    RimeFreeContext(&ctx);
+    api->free_context(&ctx);
     assert(found);
 }
 
 int main(int argc, char **argv) {
     assert(argc == 4);
+    api = rime_get_api();
     RIME_STRUCT(RimeTraits, traits);
     traits.shared_data_dir = argv[1];
     traits.user_data_dir = argv[2];
@@ -29,19 +32,20 @@ int main(int argc, char **argv) {
     traits.staging_dir = argv[3];
     traits.app_name = "rime.xuancai_verify";
     traits.min_log_level = 2;
-    RimeSetup(&traits);
-    RimeInitialize(&traits);
-    RimeSessionId session = RimeCreateSession();
+    api->setup(&traits);
+    api->initialize(&traits);
+    RimeSessionId session = api->create_session();
     assert(session);
-    assert(RimeSelectSchema(session, "rime_ice"));
-    RimeSetOption(session, "ascii_mode", False);
-    RimeSetOption(session, "traditionalization", False);
+    assert(api->select_schema(session, "rime_ice"));
+    api->set_option(session, "ascii_mode", False);
+    api->set_option(session, "traditionalization", False);
     expect_candidate(session, "nihao", "你好");
     expect_candidate(session, "zhongguo", "中国");
     expect_candidate(session, "jisuanji", "计算机");
     expect_candidate(session, "hello", "hello");
-    RimeDestroySession(session);
-    RimeFinalize();
+    api->destroy_session(session);
+    api->finalize();
     puts("Rime Ice Chinese and English candidate checks passed.");
+    puts("{\"suite\":\"rime_smoke\",\"cases\":4,\"failures\":0}");
     return 0;
 }

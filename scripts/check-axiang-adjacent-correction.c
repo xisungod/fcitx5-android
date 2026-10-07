@@ -11,6 +11,7 @@
 #include <time.h>
 
 static RimeApi *api;
+static int test_cases;
 
 static void type_input(RimeSessionId session, const char *input) {
     api->clear_composition(session);
@@ -53,6 +54,7 @@ static void expect(RimeSessionId session, const char *input,
         exit(1);
     }
     assert(strcmp(api->get_input(session), input) == 0);
+    ++test_cases;
 }
 
 static void expect_command_without_correction(RimeSessionId session, const char *input) {
@@ -74,6 +76,7 @@ static void expect_command_without_correction(RimeSessionId session, const char 
     assert(count > 0);
     assert(strcmp(api->get_input(session), input) == 0);
     printf("Command %s keeps its candidates without typo suggestions.\n", input);
+    ++test_cases;
 }
 
 int main(int argc, char **argv) {
@@ -102,13 +105,20 @@ int main(int argc, char **argv) {
      * require the target near the top without hardcoding it above another word. */
     expect(session, "juhaoa", "你好啊", 3);
     expect(session, "xiaoguniabg", "小姑娘", 1);
-    expect(session, "xiaogujiang", "小姑娘", 1);
+    /* xiao gu jiang is also exact full spelling. Keep its literal sentence
+     * first; its possible neighboring-key intention remains a suggestion. */
+    expect(session, "xiaogujiang", "小姑将", 1);
+    expect(session, "xiaogujiang", "小姑娘", 5);
     expect(session, "xiaogunuabg", "小姑娘", 1);
 
     /* Independent words and key pairs: Y/H, G/T, F/G and Q/W. */
     expect(session, "pinhin", "拼音", 1);
-    expect(session, "xiaotuniang", "小姑娘", 1);
-    expect(session, "shuruga", "输入法", 1);
+    /* These also have exact full syllables. Protect their literal sentence,
+     * while keeping the originally intended adjacent correction accessible. */
+    expect(session, "xiaotuniang", "小图娘", 1);
+    expect(session, "xiaotuniang", "小姑娘", 5);
+    expect(session, "shuruga", "输入嘎", 1);
+    expect(session, "shuruga", "输入法", 5);
     expect(session, "wingchu", "清楚", 1);
 
     /* Touching corners of staggered neighboring rows count as adjacent too:
@@ -164,9 +174,11 @@ int main(int argc, char **argv) {
     assert(strcmp(commit.text, "小姑娘") == 0);
     api->free_commit(&commit);
     assert(!api->get_input(session) || !*api->get_input(session));
+    ++test_cases;
 
     api->destroy_session(session);
     api->finalize();
     puts("Adjacent-key candidate, exact-spelling, abbreviation and command acceptance checks passed.");
+    printf("{\"suite\":\"adjacent_correction\",\"cases\":%d,\"failures\":0}\n", test_cases);
     return 0;
 }

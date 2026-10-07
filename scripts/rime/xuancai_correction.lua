@@ -3,6 +3,44 @@ local M = {}
 local typo_index = require('axiang_typo_index')
 local neighbors = require('axiang_qwerty_neighbors')
 
+-- A complete literal sentence is as intentional as a dictionary phrase. Its
+-- canonical spelling must match the input: a sentence assembled from initials,
+-- spelling aliases or completion is not evidence that the raw spelling is exact.
+-- Reuse the first value snapshot for the existing repair guards; no candidate
+-- object or user-data result is retained between invocations.
+local function exact_evidence(input, seg, env)
+  local head, priority
+  local translation = env.exact:query(input, seg)
+  if translation then
+    local count = 0
+    for candidate in translation:iter() do
+      count = count + 1
+      if not head then
+        head = {type = candidate.type, _end = candidate._end, comment = candidate.comment}
+      end
+      local spelling = candidate.comment:gsub("[%s']", '')
+      local quality = candidate.quality
+      if candidate._end == seg._end and spelling == input
+          and quality > -math.huge and quality < math.huge then
+        priority = quality
+        break
+      end
+      if count >= 8 then break end
+    end
+  end
+  return head, priority
+end
+
+local function below_literal(candidate, priority)
+  if not priority or candidate.quality <= priority - 0.01 then return candidate end
+  -- This candidate belongs to the separate, read-only supplement query (or was
+  -- just constructed by a repair). The main translator's candidate is untouched.
+  -- Avoid another ShadowCandidate layer: downstream script/emoji conversion may
+  -- wrap the phrase itself, and native learning must still find its genuine item.
+  candidate.quality = priority - 0.01
+  return candidate
+end
+
 -- Bounded weighted edit distance: adjacent keys cost 1, omissions/transpositions
 -- cost 2, unrelated substitutions cost 4. Never rewrite the composing input.
 local function distance(a, b, limit)
@@ -51,17 +89,11 @@ local function phrase_heads(input, seg, env)
   return heads
 end
 
-local function phrase_repair(input, seg, env)
+local function phrase_repair(input, seg, env, head, priority)
   if #input < 16 or #input > 64 then return end
   -- A complete dictionary phrase wins. The normal translator's learned phrases
   -- also have higher quality than this fallback; this probe never learns twice.
-  local exact = env.exact:query(input, seg)
-  if exact then
-    for candidate in exact:iter() do
-      if candidate._end == seg._end and candidate.type ~= 'sentence' then return end
-      break
-    end
-  end
+  if head and head._end == seg._end and head.type ~= 'sentence' then return end
   local matches, blocked = {}, {}
   -- Rime may keep a long phrase only up to the initial of its final syllable,
   -- then append unrelated words for the remainder. Probe at most four suffix
@@ -108,7 +140,7 @@ local function phrase_repair(input, seg, env)
     local candidate = Candidate('xuancai_phrase_repair', seg.start, seg._end, best.text, '纠错')
     candidate.preedit = input
     candidate.quality = 1.3
-    yield(candidate)
+    yield(below_literal(candidate, priority))
   end
 end
 
@@ -116,19 +148,15 @@ end
 -- native corrector only knows horizontal neighbors. Search a public-vocabulary
 -- index with the same two-dimensional graph for every letter, then ask Rime for
 -- real exact dictionary candidates. Never substitute text in the raw input.
-local function short_repair(input, seg, env)
+local function short_repair(input, seg, env, head, priority)
   if #input < 4 or #input > 24 then return end
   local has_exact_word = false
-  local exact = env.exact:query(input, seg)
-  if exact then
-    for candidate in exact:iter() do
-      if candidate._end == seg._end and candidate.type ~= 'sentence' then
-        -- Do not hijack abbreviations, spelling-algebra aliases or completion.
-        -- Exact words keep priority but can have additional typo alternatives.
-        if candidate.comment:gsub('[^a-z]', '') ~= input then return end
-        has_exact_word = true
-      end
-      break
+  if head then
+    if head._end == seg._end and head.type ~= 'sentence' then
+      -- Do not hijack abbreviations, spelling-algebra aliases or completion.
+      -- Exact words keep priority but can have additional typo alternatives.
+      if head.comment:gsub('[^a-z]', '') ~= input then return end
+      has_exact_word = true
     end
   end
   local matches = typo_index.search(env.typo_index, input, neighbors)
@@ -163,7 +191,7 @@ local function short_repair(input, seg, env)
           group[round], '纠错')
         corrected.preedit = input
         corrected.quality = (has_exact_word and 1.19 or 1.25) - emitted * 0.01
-        yield(corrected)
+        yield(below_literal(corrected, priority))
         emitted = emitted + 1
         if emitted >= 5 then return end
       end
@@ -188,10 +216,13 @@ function M.init(env)
 end
 function M.func(input, seg, env)
   if #input < 3 or not input:match('^[a-z]+$') or env.commands[input] then return end
-  short_repair(input, seg, env)
-  phrase_repair(input, seg, env)
+  local head, priority = exact_evidence(input, seg, env)
+  short_repair(input, seg, env, head, priority)
+  phrase_repair(input, seg, env, head, priority)
   local translation = env.translator:query(input, seg)
-  if translation then for candidate in translation:iter() do yield(candidate) end end
+  if translation then for candidate in translation:iter() do
+    yield(below_literal(candidate, priority))
+  end end
 end
 function M.fini(env)
   env.translator = nil

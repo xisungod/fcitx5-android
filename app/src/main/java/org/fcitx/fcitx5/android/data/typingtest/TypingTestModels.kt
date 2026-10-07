@@ -17,7 +17,7 @@ object TypingTestPrompts {
         TypingTestPrompt(7, "请帮我看一下", "qingbangwokanyixia"),
         TypingTestPrompt(8, "这个问题怎么解决", "zhegewentizenmejiejue"),
         TypingTestPrompt(9, "晚上早点休息", "wanshangzaodianxiuxi"),
-        TypingTestPrompt(10, "你现在在哪里", "nixianzainali"),
+        TypingTestPrompt(10, "你现在在哪里", "nixianzaizainali"),
         TypingTestPrompt(11, "我们一起回家", "womenyiqihuijia"),
         TypingTestPrompt(12, "手机键盘很好用", "shoujijianpanhenhaoyong"),
         TypingTestPrompt(13, "输入速度越来越快", "shurusuduyuelaiyuekuai"),
