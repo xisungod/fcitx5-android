@@ -1,0 +1,102 @@
+{
+  "format": "axiang-touch8-2-exact-delivery-identity-v1",
+  "repository": "xisungod/fcitx5-android",
+  "source_commit": "aa9232725bccd2072340068f7cfd2df1b41dc3ac",
+  "apk_name": "AXiang-1.2-touch.8.2-arm64.apk",
+  "apk_bytes": 272198575,
+  "apk_sha256": "4690edd288ce06e8bcf9f829dced1cb1b5e449c92afcb2c86fe74c2e26705cbe",
+  "signer_sha256": "ffede124b18d54af5d4cfa9f3a32504fa2ccc898563bc4816bacbe3e46ec0494",
+  "package": "org.fcitx.fcitx5.android.axiang.touch2",
+  "version_name": "1.2-touch.8.2",
+  "version_code": 11,
+  "unit_tests": 829,
+  "unit_test_scope": "full_application_suite",
+  "baseline_apk_sha256": "3f64045efa7b2e58d57b927ad22353ea07f4c80a20dec725cc807facd3c0e2b8",
+  "completion_resource_sha256": "e763c788f480dbc6934453c9c255173e2173ed9ca69d1cbeea405ddc3f7c4e88",
+  "completion_resource_bytes": 7702187,
+  "release_id": 405794285,
+  "release_tag": "axiang-touch-1.2-touch.8.2",
+  "contains_signing_key_or_user_logs": false,
+  "public_files": {
+    "AXiang-1.2-touch.8.2-arm64.apk": {
+      "bytes": 272198575,
+      "sha256": "4690edd288ce06e8bcf9f829dced1cb1b5e449c92afcb2c86fe74c2e26705cbe"
+    },
+    "GUIDE.zh-CN.md": {
+      "bytes": 3359,
+      "sha256": "fddad2c38ee09858868733b81be28cbc35e1c21f028a4371959cf53e89bf2ddf"
+    },
+    "SHA256SUMS.txt": {
+      "bytes": 1834,
+      "sha256": "0a1cbd25b7f824f5adf24a5768fa10d0685a2fe9bd7ac42b9c1a1f28b843a377"
+    },
+    "build-verification.json": {
+      "bytes": 4409,
+      "sha256": "65ff8f1a418c07551a896b6d0094efe364d8cde7dc228c72fda32b2ac3fbc538"
+    },
+    "completion-resource-test-summary.json": {
+      "bytes": 631,
+      "sha256": "324724d8269a378fd50b7356555f14df1441801bdeb7672f4acc08d254454208"
+    },
+    "full-junit-reports.zip": {
+      "bytes": 79478,
+      "sha256": "58340a57d0e2e2f9f0ea2e476bbbda834c550ed33eb18ab7e2e779008f65dcc5"
+    },
+    "inherited-native-prediction-evidence.json": {
+      "bytes": 1547,
+      "sha256": "d6d6b333eaccb3722830eff319d8a273a192f36f77ddd3a70e537cf794a1f78a"
+    },
+    "inherited-rime-evidence.json": {
+      "bytes": 1369,
+      "sha256": "3e2d32a3e9c2db38347ec10b74c4d20874d4b51b383f38c650c1ce06c40266fe"
+    },
+    "native-prediction-provenance.json": {
+      "bytes": 40652,
+      "sha256": "e5c209ae1bac8f8a3f110e86631050ee6f38a60058a756a2776e620db99a2437"
+    },
+    "native-prediction-test-summary.json": {
+      "bytes": 6834,
+      "sha256": "cc9c900f1507971019e5348da058dd192755729fba64003c08230c7bf86d1bf6"
+    },
+    "packaged-rime-version.json": {
+      "bytes": 1245,
+      "sha256": "3b34810d8ac14b9b9a9af7f682d99bb5155805b1b3224dce5842fe4451f66753"
+    },
+    "prebuilt-manifest.json": {
+      "bytes": 137788,
+      "sha256": "a31a5c808a6c8cb78ad506f798c99ece5e295832eb2949cfc4dbc7f07c9bb645"
+    },
+    "prediction-benchmark-baseline-candidates.json": {
+      "bytes": 35377,
+      "sha256": "1d7c50581014784126b8d4cc07a026b536f0a2f0b5611eb1ce01530378e64b7e"
+    },
+    "prediction-benchmark-current-candidates.json": {
+      "bytes": 36952,
+      "sha256": "d23a00391a040ebfbfa97e514fc93febc0b42bd633b72eac328532c3d2ad8592"
+    },
+    "prediction-benchmark-evaluation.json": {
+      "bytes": 195759,
+      "sha256": "eb426a68a5f5e6266298d8e1fa9627b9414982c7c6a9b3310507217176430099"
+    },
+    "prediction-benchmark-summary.json": {
+      "bytes": 6265,
+      "sha256": "716d8a3d33486f4539de7e412ef7676f2332c9dbfcf926263094c86dc6959d2b"
+    },
+    "source-patch-manifest.json": {
+      "bytes": 7974,
+      "sha256": "b1cb35b18f18f6618dca498e286a692b480fd405f02fd4726a357f59115b075d"
+    },
+    "source-snapshot.json": {
+      "bytes": 488,
+      "sha256": "1dba616a12e61cb992dd629e4a28d513c896ffdc5835b69164f18ac61947a838"
+    },
+    "typing-test-source.patch": {
+      "bytes": 8981672,
+      "sha256": "2afa6abb3c14534671c93bae5d1cba7438d6183a8fe0eef84d1a4dbddbaa98cf"
+    },
+    "unit-test-summary.json": {
+      "bytes": 30532,
+      "sha256": "13081f08ba19f74846daf69c1fc79c1197d53ea6bde88fb3edb0636e7043561c"
+    }
+  }
+}
