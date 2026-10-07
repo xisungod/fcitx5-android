@@ -11,6 +11,11 @@ class NextWordCompletionIndexTest {
             "# source: public synthetic parser fixture\n" + rows.joinToString("\n", postfix = "\n"))
             .toByteArray(Charsets.UTF_8)
 
+    private fun fixtureV2(vararg rows: String): ByteArray =
+        ("# AXiang next-word completions v2\n# entries: ${rows.size}\n" +
+            "# source: public synthetic parser fixture; lexical specificity is not probability\n" +
+            rows.joinToString("\n", postfix = "\n")).toByteArray(Charsets.UTF_8)
+
     private fun invalid(bytes: ByteArray) {
         try {
             NextWordCompletionIndex.parse(bytes)
@@ -26,6 +31,7 @@ class NextWordCompletionIndexTest {
         assertNull(index.lookup("未知"))
         assertNull(index.lookup(""))
         assertNull(index.lookup("abc"))
+        assertFalse(index.lookup("做")!!.specificContinuation)
     }
 
     @Test fun longestMatchingContextWinsAndPunctuationEndsTheEarlierPrefix() {
@@ -108,6 +114,35 @@ class NextWordCompletionIndexTest {
         invalid(bytes.replace("a".repeat(1800), "a".repeat(9000)).toByteArray())
     }
 
+    @Test fun versionTwoRetainsSixCharacterPrefixesAndSuffixesAndItsLexicalFlag() {
+        val index = NextWordCompletionIndex.parse(fixtureV2("古诗词的前缀\t字\t接着写下半句,下一句\t1", "通用前缀\t字\t继续\t0"))
+        val specific = index.lookup("古诗词的前缀")!!
+        assertTrue(specific.specificContinuation)
+        assertEquals(listOf("接着写下半句", "下一句"), specific.multis)
+        assertFalse(index.lookup("通用前缀")!!.specificContinuation)
+        assertEquals("古诗词的前缀", index.trailingMatches("这是古诗词的前缀").first().prefix)
+    }
+
+    @Test fun versionTwoAcceptsTheBoundedThreeSourcePoolsWithoutExpandingARuntimeDictionary() {
+        val singles = (0 until 34).map { (0x4e00 + it).toChar().toString() }
+        val multis = (0 until 74).map { "天${(0x4e00 + it).toChar()}地人日月" }
+        val row = "前缀\t${singles.joinToString(",")}\t${multis.joinToString(",")}\t0"
+        val index = NextWordCompletionIndex.parse(fixtureV2(row))
+        assertEquals(34, index.lookup("前缀")!!.singles.size)
+        assertEquals(74, index.lookup("前缀")!!.multis.size)
+        assertTrue(row.toByteArray().size > 1024)
+    }
+
+    @Test fun versionTwoRejectsInvalidFlagShapeAndExceedingCorpusBudgets() {
+        for (row in listOf("前缀\t字\t继续\t2", "前缀\t字\t继续\ttrue", "字\t好\t继续\t1",
+            "前缀\t字\t\t1", "前缀\t字\t继续", "前缀\t字\t继续\t0\textra",
+            "超过六个字前缀\t字\t继续\t0", "前缀\t字\t超过六个字词尾\t0")) invalid(fixtureV2(row))
+        val singles = (0 until 35).joinToString(",") { (0x4e00 + it).toChar().toString() }
+        val multis = (0 until 75).joinToString(",") { "天${(0x4e00 + it).toChar()}" }
+        invalid(fixtureV2("前缀\t$singles\t继续\t0"))
+        invalid(fixtureV2("前缀\t字\t$multis\t0"))
+    }
+
     @Test fun actualShippedReadOnlyAssetFitsTheSameStrictParserAndRetainsUsefulSourceWords() {
         val relative = "src/main/assets/typing/next_word_completions.tsv"
         val file = File(relative).takeIf(File::isFile) ?: File("app/$relative")
@@ -119,5 +154,12 @@ class NextWordCompletionIndexTest {
         assertTrue(continuation.multis.contains("准备"))
         assertTrue(index.lookup("谢谢")!!.singles.contains("你"))
         assertTrue(index.lookup("今天")!!.multis.contains("晚上"))
+        val lyric = index.lookup("天青色")!!
+        assertTrue(lyric.multis.contains("等烟雨"))
+        assertTrue(lyric.specificContinuation)
+        val idiom = index.lookup("一帆")!!
+        assertTrue(idiom.multis.contains("风顺"))
+        assertTrue(idiom.specificContinuation)
+        for (prefix in listOf("我", "你", "在")) assertFalse(index.lookup(prefix)!!.specificContinuation)
     }
 }

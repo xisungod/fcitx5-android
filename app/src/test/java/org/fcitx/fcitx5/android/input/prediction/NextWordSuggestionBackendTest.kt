@@ -13,6 +13,11 @@ class NextWordSuggestionBackendTest {
             "# source: public synthetic backend fixture\n" + rows.joinToString("\n", postfix = "\n"))
             .toByteArray()
 
+    private fun fixtureV2(vararg rows: String): ByteArray =
+        ("# AXiang next-word completions v2\n# entries: ${rows.size}\n" +
+            "# source: public synthetic backend fixture; flag is lexical specificity, not probability\n" +
+            rows.joinToString("\n", postfix = "\n")).toByteArray()
+
     private fun result(pool: List<String>) = LibimeNextWordPredictor.Result(
         pool.filter(NextWordPredictionRuntime::isHanText).take(5), 100L,
         queryNanos = 80L, suggestionPool = pool)
@@ -178,6 +183,60 @@ class NextWordSuggestionBackendTest {
         assertFalse(output.contains("做什么"))
     }
 
+    @Test fun aSpecificLexicalRouteMayPrecedeGenericParticlesWhileTwoNativeOptionsSurvive() {
+        val native = listOf("的", "了", "茶", "咖啡", "一")
+        val backend = NextWordSuggestionBackend({ _, _ -> result(native) },
+            { fixtureV2("字典前缀\t字\t可信续写,另一续写\t1") })
+        val values = backend.query("字典前缀").candidates
+        assertEquals(listOf("可信续写", "的", "了"), values.take(3))
+        assertTrue(values.contains("茶"))
+        assertEquals(5, values.size)
+        assertFalse(values.contains("字典前缀可信续写"))
+    }
+
+    @Test fun ordinaryBroadRoutesAndOlderAssetsCannotClaimSpecificityByTheirLength() {
+        for (bytes in listOf(fixtureV2("字典前缀\t字\t普通续写,另一续写\t0"), fixture("前缀\t字\t普通续写,另一续写"))) {
+            val backend = NextWordSuggestionBackend({ _, _ -> result(listOf("的", "了", "咖啡")) }, { bytes })
+            assertEquals("的", backend.query("字典前缀").candidates.first())
+        }
+    }
+
+    @Test fun aSpecificRouteCannotReplaceExistingContentQuestionsOrPronouns() {
+        for (first in listOf("吗", "你", "茶", "咖啡", "去", "不")) {
+            val backend = NextWordSuggestionBackend({ _, _ -> result(listOf(first, "的", "了")) },
+                { fixtureV2("字典前缀\t字\t可信续写,另一续写\t1") })
+            assertEquals(first, backend.query("字典前缀").candidates.first())
+        }
+    }
+
+    @Test fun aTinyDisplayCannotPromoteAtTheCostOfBothNativeFallbacks() {
+        val backend = NextWordSuggestionBackend({ _, _ -> result(listOf("的", "了")) },
+            { fixtureV2("字典前缀\t字\t可信续写\t1") })
+        assertEquals("的", backend.query("字典前缀", 1).candidates.first())
+        assertEquals("的", backend.query("字典前缀", 2).candidates.first())
+        assertEquals(listOf("可信续写", "的", "了"), backend.query("字典前缀", 3).candidates)
+    }
+
+    @Test fun aGenericPhraseCannotUseSpecificityToConsumeTheInformativePromotionSlot() {
+        val backend = NextWordSuggestionBackend({ _, _ -> result(listOf("的", "了")) },
+            { fixtureV2("字典前缀\t字\t一个,一些,可信续写\t1") })
+        assertEquals("可信续写", backend.query("字典前缀").candidates.first())
+    }
+
+    @Test fun realThreeSourceLexicalEvidenceCanGuideGenericModelFixturesWithoutWordSpecificCode() {
+        val relative = "src/main/assets/typing/next_word_completions.tsv"
+        val asset = File(relative).takeIf(File::isFile) ?: File("app/$relative")
+        val backend = NextWordSuggestionBackend({ _, _ -> result(listOf("的", "了", "在")) }, { asset.readBytes() })
+        for ((prefix, suffix) in listOf("天青色" to "等烟雨", "一帆" to "风顺")) {
+            val values = backend.query(prefix).candidates
+            assertEquals(suffix, values.first())
+            assertEquals(listOf("的", "了"), values.drop(1).take(2))
+            assertFalse(values.contains(prefix + suffix))
+        }
+        val protected = NextWordSuggestionBackend({ _, _ -> result(listOf("咖啡", "的", "了")) }, { asset.readBytes() })
+        assertEquals("咖啡", protected.query("天青色").candidates.first())
+    }
+
     @Test fun actualArmPoolsAndActualAssetKeepContentAcrossDifferentContexts() {
         // Public synthetic queries against the actual new ARM64/bionic JNI bridge. These are
         // bounded native model pools, not measured user intentions or phone/UI accuracy.
@@ -200,9 +259,10 @@ class NextWordSuggestionBackendTest {
         val relative = "src/main/assets/typing/next_word_completions.tsv"
         val asset = File(relative).takeIf(File::isFile) ?: File("app/$relative")
         val backend = NextWordSuggestionBackend({ context, _ -> result(pools.getValue(context)) }, { asset.readBytes() })
+        val actualIndex = NextWordCompletionIndex.parse(asset.readBytes())
         val outputs = pools.mapValues { (context, _) -> backend.query(context).candidates }
         for ((context, values) in outputs) {
-            assertEquals("Model first survives for $context", pools.getValue(context).first(), values.first())
+            assertTrue("Original model fallback survives for $context", values.contains(pools.getValue(context).first()))
             assertEquals(values.distinct(), values)
             assertTrue(values.size <= 5)
             println("PUBLIC_PREDICTION_MATRIX " + context + "\t" + pools.getValue(context).joinToString(",") + "\t" + values.joinToString(","))
@@ -217,11 +277,18 @@ class NextWordSuggestionBackendTest {
         assertTrue(outputs.getValue("今天").contains("下午"))
         assertTrue(outputs.getValue("谢谢").contains("您"))
         assertTrue(outputs.getValue("你好").contains("吗"))
-        assertEquals(listOf("吗", "的", "不", "了", "呢"), outputs.getValue("你好"))
+        for (context in listOf("你好", "谢谢", "你在做", "今天要", "联系")) {
+            assertEquals("Specificity cannot override existing content for $context",
+                pools.getValue(context).first(), outputs.getValue(context).first())
+        }
         assertTrue(outputs.getValue("今天要").contains("去"))
         assertTrue(outputs.getValue("做").indexOf("什么") in 0..2)
         for (context in listOf("我想喝", "去", "学习", "今天要", "今天", "谢谢", "你好", "联系", "怎么", "想")) {
-            assertFalse("An example word must not become a global override for $context", outputs.getValue(context).contains("什么"))
+            if (outputs.getValue(context).contains("什么")) {
+                val literal = actualIndex.trailingMatches(context).firstOrNull()!!
+                assertTrue("A continuation must have actual literal evidence rather than a global override for $context",
+                    literal.multis.contains("什么"))
+            }
         }
         assertNotEquals(outputs.getValue("做"), outputs.getValue("我想喝"))
         assertNotEquals(outputs.getValue("去"), outputs.getValue("学习"))

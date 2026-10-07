@@ -79,10 +79,21 @@ internal class NextWordSuggestionBackend(
         }
         val result = LinkedHashSet<String>()
         fun add(value: String?) { if (value != null && result.size < limit) result.add(value) }
-        // The model's strongest prediction survives even when it is a natural single character.
-        add(model.firstOrNull())
-        // Keep a strong existing phrase pair together instead of replacing it with asset frequency.
-        if (model.firstOrNull()?.let(::isMulti) == true) add(model.getOrNull(1))
+        // The resource flag describes a narrow, evidenced dictionary continuation. It is not
+        // a calibrated probability and cannot override an existing model content prediction.
+        val specific = matches.firstOrNull()?.takeIf { it.specificContinuation }
+            ?.multis?.firstOrNull(::isInformativeMulti)
+        val promote = limit >= 3 && specific != null && model.firstOrNull() in GENERIC_PROMOTION_FIRSTS
+        if (promote) {
+            add(specific)
+            // Keep at least the model's first two predictions when capacity permits.
+            add(model.firstOrNull())
+            add(model.getOrNull(1))
+        } else {
+            // Strong content, natural questions and pronouns retain their existing first place.
+            add(model.firstOrNull())
+            if (model.firstOrNull()?.let(::isMulti) == true) add(model.getOrNull(1))
+        }
         // Character length is not information: retain the strongest existing single-character
         // content alternative (for example tea after a drink) before reserving phrase positions.
         // This small display heuristic never rejects a word or changes language-model scores.
@@ -113,5 +124,9 @@ internal class NextWordSuggestionBackend(
         private val LOW_INFORMATION_PHRASES = setOf("一个", "一些", "一点", "一种", "这个", "那个", "这种", "那种")
         private val LOW_INFORMATION_SINGLES = setOf("的", "了", "一", "个", "得", "过", "着", "和", "与", "不",
             "在", "是", "也", "又", "就", "把", "比", "之", "其", "于", "及", "而", "或", "所", "等")
+        // Deliberately narrower than the display-diversity list. These remain selectable;
+        // only a trusted multi-character lexical route may appear before one of them.
+        private val GENERIC_PROMOTION_FIRSTS = setOf("的", "了", "一", "个", "得", "着", "过", "和", "与",
+            "在", "是", "也", "就", "又", "而", "于", "其", "之", "所", "及", "或")
     }
 }

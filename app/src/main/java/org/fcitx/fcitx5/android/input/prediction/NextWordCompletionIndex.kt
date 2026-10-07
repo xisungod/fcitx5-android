@@ -9,7 +9,8 @@ internal class NextWordCompletionIndex private constructor(
     private val bytes: ByteArray,
     private val rowOffsets: IntArray
 ) {
-    data class Match(val prefix: String, val singles: List<String>, val multis: List<String>)
+    data class Match(val prefix: String, val singles: List<String>, val multis: List<String>,
+                     val specificContinuation: Boolean = false)
 
     fun lookup(prefix: String): Match? {
         if (!isHan(prefix, 1, MAX_PREFIX_CODE_POINTS)) return null
@@ -28,7 +29,7 @@ internal class NextWordCompletionIndex private constructor(
                     val end = fieldEnd(bytes, prefixEnd + 1, NEWLINE)
                     val line = String(bytes, start, end - start, Charsets.UTF_8)
                     val fields = line.split('\t')
-                    return Match(fields[0], values(fields[1]), values(fields[2]))
+                    return Match(fields[0], values(fields[1]), values(fields[2]), fields.getOrNull(3) == "1")
                 }
             }
         }
@@ -52,17 +53,18 @@ internal class NextWordCompletionIndex private constructor(
     }
 
     companion object {
-        const val MAX_BYTES = 1024 * 1024
-        private const val MAX_ROWS = 65_536
-        private const val MAX_LINE_BYTES = 1024
+        const val MAX_BYTES = 16 * 1024 * 1024
+        private const val MAX_ROWS = 524_288
+        private const val MAX_LINE_BYTES = 2048
         private const val MAX_HEADER_LINE_BYTES = 8192
-        private const val MAX_PREFIX_CODE_POINTS = 4
-        private const val MAX_SUFFIX_CODE_POINTS = 4
-        private const val MAX_SINGLE_ITEMS = 24
-        private const val MAX_MULTI_ITEMS = 64
+        private const val MAX_PREFIX_CODE_POINTS = 6
+        private const val MAX_SUFFIX_CODE_POINTS = 6
+        private const val MAX_SINGLE_ITEMS = 34
+        private const val MAX_MULTI_ITEMS = 74
         private const val TAB = 9
         private const val NEWLINE = 10
-        private const val MAGIC = "# AXiang next-word completions v1"
+        private const val MAGIC_V1 = "# AXiang next-word completions v1"
+        private const val MAGIC_V2 = "# AXiang next-word completions v2"
 
         fun parse(source: ByteArray): NextWordCompletionIndex {
             require(source.isNotEmpty() && source.size <= MAX_BYTES) { "InvalidCompletionIndexSize" }
@@ -74,6 +76,7 @@ internal class NextWordCompletionIndex private constructor(
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
             val rows = ArrayList<Int>()
             var lineNumber = 0
+            var version = 0
             var start = 0
             var expectedRows: Int? = null
             var previousPrefixStart = -1
@@ -82,29 +85,44 @@ internal class NextWordCompletionIndex private constructor(
             while (start < bytes.size) {
                 val end = fieldEnd(bytes, start, NEWLINE)
                 require(end - start <= if (bytes[start].toInt() == '#'.code && !dataStarted)
-                    MAX_HEADER_LINE_BYTES else MAX_LINE_BYTES) { "CompletionIndexLineTooLong" }
+                    MAX_HEADER_LINE_BYTES else if (version == 1) 1024 else MAX_LINE_BYTES) { "CompletionIndexLineTooLong" }
                 val line = decoder.reset().decode(ByteBuffer.wrap(bytes, start, end - start)).toString()
                 when {
-                    lineNumber == 0 -> require(line == MAGIC) { "InvalidCompletionIndexVersion" }
+                    lineNumber == 0 -> {
+                        version = when (line) {
+                            MAGIC_V1 -> 1
+                            MAGIC_V2 -> 2
+                            else -> throw IllegalArgumentException("InvalidCompletionIndexVersion")
+                        }
+                        require(version != 1 || bytes.size <= 1024 * 1024) { "InvalidCompletionIndexSize" }
+                    }
                     lineNumber == 1 -> {
                         require(line.startsWith("# entries: ")) { "MissingCompletionIndexCount" }
                         expectedRows = line.substringAfter("# entries: ").toIntOrNull()
-                        require(expectedRows != null && expectedRows in 1..MAX_ROWS) { "InvalidCompletionIndexCount" }
+                        require(expectedRows != null && expectedRows in 1..(if (version == 1) 65_536 else MAX_ROWS)) {
+                            "InvalidCompletionIndexCount"
+                        }
                     }
                     line.startsWith("#") -> require(!dataStarted) { "UnexpectedCompletionIndexHeader" }
                     else -> {
                         dataStarted = true
                         val fields = line.split('\t')
-                        require(fields.size == 3 && isHan(fields[0], 1, MAX_PREFIX_CODE_POINTS)) {
+                        require(fields.size == (if (version == 1) 3 else 4) &&
+                            isHan(fields[0], 1, if (version == 1) 4 else MAX_PREFIX_CODE_POINTS)) {
                             "InvalidCompletionIndexRow"
                         }
                         val singles = values(fields[1])
                         val multis = values(fields[2])
-                        require(singles.size <= MAX_SINGLE_ITEMS && multis.size <= MAX_MULTI_ITEMS &&
+                        require(singles.size <= (if (version == 1) 24 else MAX_SINGLE_ITEMS) &&
+                            multis.size <= (if (version == 1) 64 else MAX_MULTI_ITEMS) &&
                             singles.size + multis.size > 0 && singles.all { isHan(it, 1, 1) } &&
-                            multis.all { isHan(it, 2, MAX_SUFFIX_CODE_POINTS) } &&
+                            multis.all { isHan(it, 2, if (version == 1) 4 else MAX_SUFFIX_CODE_POINTS) } &&
                             singles.distinct().size == singles.size && multis.distinct().size == multis.size) {
                             "InvalidCompletionIndexCandidates"
+                        }
+                        if (version == 2) require((fields[3] == "0" || fields[3] == "1") &&
+                            (fields[3] != "1" || (fields[0].codePointCount(0, fields[0].length) >= 2 && multis.isNotEmpty()))) {
+                            "InvalidCompletionIndexSpecificity"
                         }
                         val prefixEnd = fieldEnd(bytes, start, TAB)
                         require(previousPrefixStart < 0 || compareBytes(bytes,
