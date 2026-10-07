@@ -69,7 +69,50 @@ object TypingTestMetrics {
         return TypingTestTrialResult(input.prompt.id, input.inputKind, completed,
             first?.take(TypingTestAligner.MAX_LENGTH), final?.take(TypingTestAligner.MAX_LENGTH),
             rawEdits, neighbourEdits, top1, top3, backspaceRate, backspaces, letters, alignment,
-            reasons.toList(), calibration, latency(input.processingNanos))
+            reasons.toList(), calibration, latency(input.processingNanos),
+            stageLatencies(input.stageTimings), alternativeMetrics(input, validTarget && fullPinyin))
+    }
+
+    private fun alternativeMetrics(
+        input: TypingTestTrialInput,
+        knownTarget: Boolean
+    ): TypingTestAlternativeMetrics {
+        // Lifecycle callbacks can repeat. Count each offer/kind once, never turn replayed callbacks
+        // into additional trials. Conflicting duplicate evidence is observable but is not truth.
+        val groups = input.alternativeEvents.groupBy { it.offerToken to it.kind }
+        fun groupsOf(kind: TypingTestAlternativeEventKind) = groups.filterKeys { it.second == kind }.values
+        fun coherent(kind: TypingTestAlternativeEventKind) = groupsOf(kind).mapNotNull {
+            // Explanatory rank/path counters cannot create or remove a correctness observation.
+            it.map { event -> event.copy(originalRank = null, searchPathCount = null) }
+                .distinct().singleOrNull()
+        }
+        fun targetEligible(event: TypingTestAlternativeEvent) = knownTarget &&
+            event.fullPromptComposition && event.originalPinyin?.let {
+                it.length == input.prompt.pinyin.length && it.all { letter -> letter in 'a'..'z' }
+            } == true && !event.candidateText.isNullOrEmpty()
+        fun targetRate(kind: TypingTestAlternativeEventKind): TypingTestFraction {
+            val events = coherent(kind).filter(::targetEligible)
+            return TypingTestFraction(events.count { it.candidateText == input.prompt.text }, events.size)
+        }
+        val resolved = coherent(TypingTestAlternativeEventKind.Resolved).filter { it.success != null }
+        val successful = resolved.count { it.success == true }
+        val reasons = groupsOf(TypingTestAlternativeEventKind.Rejected).map { group ->
+            val distinct = group.map { it.reason?.takeIf(String::isNotEmpty) ?: "unspecified" }.distinct()
+            distinct.singleOrNull() ?: "conflicting_event"
+        }.groupingBy { it }.eachCount()
+        return TypingTestAlternativeMetrics(
+            generatedCount = groupsOf(TypingTestAlternativeEventKind.Generated).size,
+            rejectedCount = groupsOf(TypingTestAlternativeEventKind.Rejected).size,
+            publishedCount = groupsOf(TypingTestAlternativeEventKind.Published).size,
+            displayedCount = groupsOf(TypingTestAlternativeEventKind.Displayed).size,
+            selectedCount = groupsOf(TypingTestAlternativeEventKind.Selected).size,
+            resolvedCount = groupsOf(TypingTestAlternativeEventKind.Resolved).size,
+            resolvedSuccessCount = successful,
+            rejectionReasons = reasons,
+            publishedHitRate = targetRate(TypingTestAlternativeEventKind.Published),
+            selectionSuccessRate = TypingTestFraction(successful, resolved.size),
+            targetSelectionRate = targetRate(TypingTestAlternativeEventKind.Selected)
+        )
     }
 
     private fun calibrationSamples(
@@ -113,8 +156,21 @@ object TypingTestMetrics {
             retained.size - valid.size, (samples.size - limit).coerceAtLeast(0))
     }
 
-    fun summarize(trials: List<TypingTestTrialResult>, processingNanos: List<Long> = emptyList()) =
-        summarizeTypingTest(trials, processingNanos)
+    fun stageLatencies(
+        timings: TypingTestStageTimings,
+        maximumSamples: Int = MAX_TIMING_SAMPLES
+    ) = TypingTestStageLatencies(
+        latency(timings.sendKeyNanos, maximumSamples).copy(measurement = "send_key_ns"),
+        latency(timings.touchSearchNanos, maximumSamples).copy(measurement = "touch_search_ns"),
+        latency(timings.alternativeQueryNanos, maximumSamples).copy(measurement = "alternative_query_ns"),
+        latency(timings.offerReadyNanos, maximumSamples).copy(measurement = "enqueue_to_offer_publish_ns")
+    )
+
+    fun summarize(
+        trials: List<TypingTestTrialResult>,
+        processingNanos: List<Long> = emptyList(),
+        stageTimings: TypingTestStageTimings = TypingTestStageTimings()
+    ) = summarizeTypingTest(trials, processingNanos, stageTimings)
 }
 
 /** Aggregate numerators/denominators, never average per-trial percentages or percentile values. */
@@ -126,18 +182,44 @@ data class TypingTestSummary(
     val top1HitRate: TypingTestFraction,
     val top3HitRate: TypingTestFraction,
     val backspaceRate: TypingTestFraction,
-    val latency: TypingTestLatency
+    val latency: TypingTestLatency,
+    val stageLatencies: TypingTestStageLatencies = TypingTestStageLatencies(),
+    val alternativeMetrics: TypingTestAlternativeMetrics = TypingTestAlternativeMetrics()
 )
 
 fun summarizeTypingTest(
     trials: List<TypingTestTrialResult>,
     /** Actual per-key samples, not already-aggregated per-trial p95 values. */
-    processingNanos: List<Long> = emptyList()
+    processingNanos: List<Long> = emptyList(),
+    stageTimings: TypingTestStageTimings = TypingTestStageTimings()
 ): TypingTestSummary {
     fun sum(selector: (TypingTestTrialResult) -> TypingTestFraction) = TypingTestFraction(
         trials.sumOf { selector(it).numerator }, trials.sumOf { selector(it).denominator })
+    val alternatives = trials.map { it.alternativeMetrics }
+    fun sumAlternatives(selector: (TypingTestAlternativeMetrics) -> TypingTestFraction) =
+        TypingTestFraction(alternatives.sumOf { selector(it).numerator },
+            alternatives.sumOf { selector(it).denominator })
+    val rejectionReasons = linkedMapOf<String, Int>()
+    alternatives.forEach { metrics -> metrics.rejectionReasons.forEach { (reason, count) ->
+        rejectionReasons[reason] = (rejectionReasons[reason] ?: 0) + count
+    } }
+    val alternativeMetrics = TypingTestAlternativeMetrics(
+        generatedCount = alternatives.sumOf { it.generatedCount },
+        rejectedCount = alternatives.sumOf { it.rejectedCount },
+        publishedCount = alternatives.sumOf { it.publishedCount },
+        displayedCount = alternatives.sumOf { it.displayedCount },
+        selectedCount = alternatives.sumOf { it.selectedCount },
+        resolvedCount = alternatives.sumOf { it.resolvedCount },
+        resolvedSuccessCount = alternatives.sumOf { it.resolvedSuccessCount },
+        rejectionReasons = rejectionReasons,
+        publishedHitRate = sumAlternatives { it.publishedHitRate },
+        selectionSuccessRate = sumAlternatives { it.selectionSuccessRate },
+        targetSelectionRate = sumAlternatives { it.targetSelectionRate }
+    )
     return TypingTestSummary(trials.size, trials.count { it.targetCompleted }, sum { it.rawEditRate },
         sum { it.adjacentSubstitutionRate }, sum { it.top1HitRate }, sum { it.top3HitRate },
         sum { it.backspaceRate }, TypingTestMetrics.latency(processingNanos,
-            TypingTestMetrics.MAX_SESSION_TIMING_SAMPLES))
+            TypingTestMetrics.MAX_SESSION_TIMING_SAMPLES),
+        TypingTestMetrics.stageLatencies(stageTimings, TypingTestMetrics.MAX_SESSION_TIMING_SAMPLES),
+        alternativeMetrics)
 }

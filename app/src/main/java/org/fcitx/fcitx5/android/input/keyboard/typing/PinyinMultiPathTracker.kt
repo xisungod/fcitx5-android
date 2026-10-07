@@ -37,32 +37,30 @@ class PinyinMultiPathTracker(
     private val languageModel: NextLetterProbabilityModel,
     syllables: Set<String>
 ) {
-    private data class Choice(val letter: Char, val logSpatialProbability: Double)
-    private data class Contact(val original: Char, val choices: List<Choice>)
-    private data class PathScore(val spelling: String, val logScore: Double, val changes: List<Int>)
-
-    private val syllables = syllables.filter { it.isNotEmpty() && it.all { c -> c in 'a'..'z' } }.toSet()
-    private val syllablePrefixes = this.syllables.flatMap { word ->
-        (1 until word.length).map { word.take(it) }
-    }.toSet()
-    private val maximumSyllableLength = this.syllables.maxOfOrNull { it.length } ?: 0
-    private val contacts = ArrayList<Contact>()
+    private val inventory = PinyinSyllableInventory(syllables)
+    private val contacts = ArrayList<PinyinPathContact>()
+    private var literalSpelling = ""
     private var editorIdentity: Any? = null
     private var sequence = 0L
     private var lastProcessedSequence = 0L
     private var offered: PinyinMultiPathProposal? = null
+    private var evaluated: PinyinMultiPathEvaluation? = null
 
     val rawSpelling: String
-        @Synchronized get() = contacts.joinToString("") { it.original.toString() }
+        @Synchronized get() = literalSpelling
     val contactCount: Int
         @Synchronized get() = contacts.size
     val currentProposal: PinyinMultiPathProposal?
         @Synchronized get() = offered
 
+    val evaluationStats: PinyinMultiPathEvaluation?
+        @Synchronized get() = evaluated
+
     /** Invalidates the visible offer without discarding earlier queued letters. */
     @Synchronized
     fun nextAction(): Long {
         offered = null
+        evaluated = null
         return ++sequence
     }
 
@@ -72,6 +70,7 @@ class PinyinMultiPathTracker(
         if (actionSequence > sequence) {
             sequence = actionSequence
             offered = null
+            evaluated = null
         }
     }
 
@@ -97,7 +96,8 @@ class PinyinMultiPathTracker(
         afterText: String?,
         afterCursor: Int,
         evidence: PinyinTapEvidence,
-        offsets: Map<Char, CenterOffset> = emptyMap()
+        offsets: Map<Char, CenterOffset> = emptyMap(),
+        searchImmediately: Boolean = true
     ): PinyinMultiPathProposal? {
         if (!acceptSequence(actionSequence)) return null
         val before = spellingAtEnd(beforeText, beforeCursor)
@@ -115,8 +115,9 @@ class PinyinMultiPathTracker(
             resetComposition()
             return null
         }
-        contacts += Contact(letter, spatialChoices(evidence, offsets))
-        return offerIfLatest(actionSequence)
+        contacts += PinyinPathContact(letter, spatialChoices(evidence, offsets))
+        literalSpelling = after
+        return if (searchImmediately) offerIfLatest(actionSequence) else null
     }
 
     /** Only an exact one-letter deletion at the composition end retains history. */
@@ -127,7 +128,8 @@ class PinyinMultiPathTracker(
         beforeText: String,
         beforeCursor: Int,
         afterText: String?,
-        afterCursor: Int
+        afterCursor: Int,
+        searchImmediately: Boolean = true
     ): PinyinMultiPathProposal? {
         if (!acceptSequence(actionSequence)) return null
         val before = spellingAtEnd(beforeText, beforeCursor)
@@ -138,8 +140,9 @@ class PinyinMultiPathTracker(
             return null
         }
         contacts.removeAt(contacts.lastIndex)
+        literalSpelling = after
         if (contacts.isEmpty()) resetComposition()
-        return offerIfLatest(actionSequence)
+        return if (searchImmediately) offerIfLatest(actionSequence) else null
     }
 
     /** Guard again inside the native selection transaction, immediately before use. */
@@ -160,113 +163,47 @@ class PinyinMultiPathTracker(
         if (actionSequence <= lastProcessedSequence || actionSequence > sequence) return false
         lastProcessedSequence = actionSequence
         offered = null
+        evaluated = null
         return true
     }
 
     private fun resetComposition() {
         contacts.clear()
+        literalSpelling = ""
         editorIdentity = null
         offered = null
+        evaluated = null
+    }
+
+    /** Captures immutable evidence only; worker evaluation never holds this lock. */
+    @Synchronized
+    fun captureSearch(actionSequence: Long): PinyinMultiPathSearch? {
+        if (actionSequence != sequence || actionSequence != lastProcessedSequence || contacts.isEmpty()) return null
+        val identity = editorIdentity ?: return null
+        return PinyinMultiPathSearch(literalSpelling, actionSequence, identity, contacts.toList(),
+            languageModel, inventory)
+    }
+
+    /** A result is usable only for its exact snapshot and the still-current composition. */
+    @Synchronized
+    fun acceptSearch(search: PinyinMultiPathSearch, result: PinyinMultiPathSearchResult): Boolean {
+        if (result.search !== search || search.editorSequence != sequence ||
+            search.editorSequence != lastProcessedSequence || editorIdentity !== search.editorIdentity ||
+            literalSpelling != search.originalSpelling) return false
+        offered = result.proposal
+        evaluated = result.evaluation
+        return true
     }
 
     private fun offerIfLatest(actionSequence: Long): PinyinMultiPathProposal? {
-        if (actionSequence != sequence) return null
-        offered = propose(actionSequence)
-        return offered
+        val search = captureSearch(actionSequence) ?: return null
+        val result = search.evaluate()
+        return if (acceptSearch(search, result)) result.proposal else null
     }
 
-    private fun propose(actionSequence: Long): PinyinMultiPathProposal? {
-        val raw = rawSpelling
-        if (raw.isEmpty() || syllables.isEmpty()) return null
-        val boundaries = fullSyllableBoundaries(raw)
-        // ji+b is a legitimate unfinished next syllable. Likewise ni+jch and
-        // initials-only input must not acquire a full-spelling backup by expansion.
-        if (!boundaries[raw.length] && (0 until raw.length).any { start ->
-                boundaries[start] && (raw.substring(start) in syllablePrefixes ||
-                    raw.substring(start).all { it !in VOWELS })
-            }) return null
-
-        val ambiguous = contacts.indices.filter { contacts[it].choices.size > 1 }
-        if (ambiguous.isEmpty() || ambiguous.size > MAX_AMBIGUOUS_CONTACTS) return null
-        val distributions = HashMap<String, DoubleArray?>()
-        fun probabilities(prefix: String): DoubleArray? = distributions.getOrPut(prefix) {
-            languageModel.nextLetterProbabilities(prefix)?.takeIf { row ->
-                row.size == 26 && row.all { it.isFinite() && it >= 0f } &&
-                    row.sum().isFinite() && row.sum() > 0f
-            }?.let { row ->
-                val total = row.sum().toDouble()
-                DoubleArray(26) { row[it] / total }
-            }
-        }
-        fun score(spelling: String, changes: List<Int>): PathScore? {
-            if (changes.isNotEmpty() && !fullSyllableBoundaries(spelling)[spelling.length]) return null
-            var spatial = 0.0
-            var language = 0.0
-            for (i in spelling.indices) {
-                val letter = spelling[i]
-                spatial += contacts[i].choices.first { it.letter == letter }.logSpatialProbability
-                val distribution = probabilities(spelling.substring(0, i))
-                // An invalid raw prefix remains finite and represented. Missing
-                // evidence contributes a uniform prior, never a skipped position.
-                val probability = distribution?.get(letter - 'a') ?: 1.0 / 26.0
-                if (i in changes && (distribution == null || probability < MIN_CHANGED_LANGUAGE_PROBABILITY))
-                    return null
-                language += ln(max(PROBABILITY_FLOOR, probability))
-            }
-            return PathScore(spelling, spatial + LANGUAGE_WEIGHT * language -
-                changes.size * EDIT_LOG_PENALTY, changes)
-        }
-
-        val original = score(raw, emptyList())!!
-        val paths = ArrayList<PathScore>()
-        paths += original
-        var enumerated = 1
-        val letters = raw.toCharArray()
-        for ((position, first) in ambiguous.withIndex()) {
-            for (firstChoice in contacts[first].choices.drop(1)) {
-                letters[first] = firstChoice.letter
-                enumerated++
-                score(String(letters), listOf(first))?.let(paths::add)
-                for (second in ambiguous.drop(position + 1)) {
-                    for (secondChoice in contacts[second].choices.drop(1)) {
-                        letters[second] = secondChoice.letter
-                        enumerated++
-                        score(String(letters), listOf(first, second))?.let(paths::add)
-                    }
-                    letters[second] = raw[second]
-                }
-            }
-            letters[first] = raw[first]
-        }
-        check(enumerated <= MAX_ENUMERATED_PATHS)
-        val best = paths.drop(1).minWithOrNull(compareByDescending<PathScore> { it.logScore }
-            .thenBy { it.changes.size }.thenBy { it.spelling }) ?: return null
-        if (best.logScore - original.logScore < MIN_LOG_ADVANTAGE) return null
-        val greatest = paths.maxOf { it.logScore }
-        val confidence = (exp(best.logScore - greatest) /
-            paths.sumOf { exp(it.logScore - greatest) }).toFloat()
-        if (confidence < MIN_MODEL_CONFIDENCE) return null
-        val normalization = raw.length * (1.0 + LANGUAGE_WEIGHT)
-        return PinyinMultiPathProposal(raw, best.spelling, -original.logScore / normalization,
-            -best.logScore / normalization, confidence, best.changes, actionSequence, enumerated)
-    }
-
-    /** Inventory membership only; this DP neither generates nor ranks paths. */
-    private fun fullSyllableBoundaries(spelling: String): BooleanArray {
-        val boundaries = BooleanArray(spelling.length + 1)
-        boundaries[0] = true
-        for (start in spelling.indices) {
-            if (!boundaries[start]) continue
-            for (end in start + 1..minOf(spelling.length, start + maximumSyllableLength)) {
-                if (spelling.substring(start, end) in syllables) boundaries[end] = true
-            }
-        }
-        return boundaries
-    }
-
-    private fun spatialChoices(evidence: PinyinTapEvidence, offsets: Map<Char, CenterOffset>): List<Choice> {
+    private fun spatialChoices(evidence: PinyinTapEvidence, offsets: Map<Char, CenterOffset>): List<PinyinPathChoice> {
         val tap = evidence.tap
-        fun originalOnly() = listOf(Choice(tap.original, 0.0))
+        fun originalOnly() = listOf(PinyinPathChoice(tap.original, 0.0))
         if (!tap.downX.isFinite() || !tap.downY.isFinite() || !tap.density.isFinite() || tap.density <= 0f)
             return originalOnly()
         if (evidence.cells.any { !it.isValid() } ||
@@ -291,7 +228,7 @@ class PinyinMultiPathTracker(
         }
         val greatest = scores.maxOrNull()!!
         val logTotal = greatest + ln(scores.sumOf { exp(it - greatest) })
-        val choices = cells.mapIndexed { index, cell -> Choice(cell.letter, scores[index] - logTotal) }
+        val choices = cells.mapIndexed { index, cell -> PinyinPathChoice(cell.letter, scores[index] - logTotal) }
         return if (exp(choices[0].logSpatialProbability) >= MIN_UNAMBIGUOUS_SPATIAL_PROBABILITY)
             originalOnly() else choices
     }
@@ -348,13 +285,6 @@ class PinyinMultiPathTracker(
         private const val MAX_CENTER_OFFSET = 0.12f
         private const val ORIGINAL_LOG_BONUS = 0.26236426446749106
         private const val MIN_UNAMBIGUOUS_SPATIAL_PROBABILITY = 0.90
-        private const val PROBABILITY_FLOOR = 0.002
-        private const val LANGUAGE_WEIGHT = 0.72
-        private const val EDIT_LOG_PENALTY = 1.5
-        private const val MIN_CHANGED_LANGUAGE_PROBABILITY = 0.06
-        private const val MIN_LOG_ADVANTAGE = 2.0
-        private const val MIN_MODEL_CONFIDENCE = 0.82f
-        private const val VOWELS = "aeiouv"
 
         /** Rime may insert spaces/apostrophes; neither changes the typed letters. */
         fun spellingAtEnd(text: String, cursor: Int): String? {

@@ -6,14 +6,18 @@
 package org.fcitx.fcitx5.android.input.candidates.horizontal
 
 import android.annotation.SuppressLint
+import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.CallSuper
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.LayoutParams
 import org.fcitx.fcitx5.android.core.CandidateWord
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateOffer
+import java.util.WeakHashMap
 import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.wrapContent
@@ -29,20 +33,54 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
     var total = -1
         private set
 
+    private var touchOffer: PinyinTouchCandidateOffer? = null
+    internal var entries: List<HorizontalCandidateEntry> = emptyList()
+        private set
+    internal var renderGeneration = 0L
+        private set
+    internal var onRawSelect: (Int) -> Unit = {}
+    internal var onRawLongClick: (Int, CandidateWord, View) -> Unit = { _, _, _ -> }
+    internal var onTouchSelect: (Long) -> Unit = {}
+    internal var onTouchLayoutRequested: () -> Unit = {}
+    private val holderBindings = WeakHashMap<CandidateViewHolder, Binding>()
+
+    internal data class Binding(val generation: Long, val entry: HorizontalCandidateEntry)
+    internal fun binding(position: Int) = Binding(renderGeneration, entries[position])
+    internal fun isCurrent(binding: Binding, position: Int): Boolean =
+        binding.generation == renderGeneration && position >= 0 && entries.getOrNull(position) == binding.entry
+    internal fun currentBinding(holder: RecyclerView.ViewHolder): Binding? {
+        val candidate = holder as? CandidateViewHolder ?: return null
+        return holderBindings[candidate]?.takeIf { isCurrent(it, candidate.bindingAdapterPosition) }
+    }
+
     @SuppressLint("NotifyDataSetChanged")
-    fun updateCandidates(data: Array<CandidateWord>, total: Int) {
-        this.candidates = data
-        this.total = total
+    private fun render() {
+        renderGeneration++
+        entries = horizontalCandidateEntries(candidates, touchOffer)
         notifyDataSetChanged()
     }
 
-    override fun getItemCount() = candidates.size
+    fun setTouchCandidate(offer: PinyinTouchCandidateOffer?) {
+        if (offer == touchOffer) return
+        touchOffer = offer
+        render()
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun updateCandidates(data: Array<CandidateWord>, total: Int,
+                         offer: PinyinTouchCandidateOffer? = touchOffer) {
+        this.candidates = data
+        this.total = total
+        this.touchOffer = offer
+        render()
+    }
+
+    override fun getItemCount() = entries.size
 
     fun appendCandidates(data: Array<CandidateWord>, total: Int) {
-        val start = candidates.size
         candidates += data
         this.total = total
-        notifyItemRangeInserted(start, data.size)
+        render()
     }
 
     @CallSuper
@@ -58,11 +96,50 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
 
     @CallSuper
     override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
-        holder.update(position, candidates[position])
+        val binding = binding(position)
+        holderBindings[holder] = binding
+        val entry = binding.entry
+        when (entry) {
+            is HorizontalCandidateEntry.Raw -> {
+                holder.update(entry.nativeIndex, entry.word)
+                holder.itemView.contentDescription = null
+                holder.itemView.setOnLongClickListener {
+                    if (isCurrent(binding, holder.bindingAdapterPosition))
+                        onRawLongClick(entry.nativeIndex, entry.word, holder.ui.root)
+                    true
+                }
+            }
+            is HorizontalCandidateEntry.Touch -> {
+                holder.update(-1, CandidateWord("", entry.offer.text, "*", false))
+                holder.itemView.contentDescription = holder.itemView.context.getString(
+                    R.string.pinyin_touch_alternative_description, entry.offer.text)
+                holder.itemView.setOnLongClickListener(null)
+                holder.itemView.isLongClickable = false
+                onTouchLayoutRequested()
+            }
+        }
+        holder.itemView.setOnClickListener {
+            if (isCurrent(binding, holder.bindingAdapterPosition)) when (entry) {
+                is HorizontalCandidateEntry.Raw -> onRawSelect(entry.nativeIndex)
+                is HorizontalCandidateEntry.Touch -> onTouchSelect(entry.offer.token)
+            }
+        }
+    }
+
+    override fun onViewAttachedToWindow(holder: CandidateViewHolder) {
+        super.onViewAttachedToWindow(holder)
+        val position = holder.bindingAdapterPosition
+        if (position >= 0 && entries.getOrNull(position) is HorizontalCandidateEntry.Touch)
+            onTouchLayoutRequested()
     }
 
     @CallSuper
     override fun onViewRecycled(holder: CandidateViewHolder) {
+        holderBindings.remove(holder)
+        holder.itemView.setOnClickListener(null)
+        holder.itemView.setOnLongClickListener(null)
+        holder.itemView.isLongClickable = false
+        holder.itemView.contentDescription = null
         holder.clear()
     }
 

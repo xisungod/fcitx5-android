@@ -4,6 +4,9 @@ package org.fcitx.fcitx5.android.input.keyboard.typing
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class PinyinMultiPathTrackerTest {
     private val editor = Any()
@@ -272,5 +275,148 @@ class PinyinMultiPathTrackerTest {
         for (text in listOf("经常hui", "nü", "ABC", "abc\n", "abc1", "abc@", "' "))
             assertNull(text, PinyinMultiPathTracker.spellingAtEnd(text, text.length))
         assertNull(PinyinMultiPathTracker.spellingAtEnd("jing' chang hui", 4))
+    }
+
+    @Test fun `rare changed initial remains eligible when whole spelling strongly supports it`() {
+        // Public full-spelling example. q is uncommon in the global start row;
+        // an absolute per-letter 6 percent cutoff used to reject this whole path.
+        val spelling = "wibggeiwofagexiaoxi"
+        val tracker = tracker()
+        var proposal: PinyinMultiPathProposal? = null
+        for (index in spelling.indices) {
+            val cell = cells.first { it.letter == spelling[index] }
+            val x = when (index) {
+                0 -> cell.left + .25f // w/q boundary
+                2 -> cell.right - .25f // b/n boundary
+                else -> cell.centerX
+            }
+            val contact = PinyinTapEvidence(TapEvidence(cell.letter, x, cell.centerY, 1f), cells)
+            proposal = tracker.recordTap(tracker.nextAction(), editor, spelling.take(index), index,
+                spelling.take(index + 1), index + 1, contact)
+        }
+        assertEquals("qinggeiwofagexiaoxi", proposal!!.alternativeSpelling)
+        assertEquals(listOf(0, 2), proposal.changedIndices)
+        assertTrue(model.nextLetterProbabilities("")!!['q' - 'a'] < .06f)
+        assertEquals(spelling, tracker.rawSpelling)
+    }
+
+    @Test fun `deferred search cannot publish after composition advances or is cleared`() {
+        val tracker = tracker()
+        for (i in raw.indices) {
+            tracker.recordTap(tracker.nextAction(), editor, raw.take(i), i, raw.take(i + 1), i + 1,
+                evidence(raw[i], true), searchImmediately = false)
+            assertNull(tracker.currentProposal)
+        }
+        val search = tracker.captureSearch(tracker.nextAction() - 1)
+        assertNull(search) // enqueuing another action invalidates the old history snapshot
+        val freshTracker = tracker()
+        var lastSequence = 0L
+        for (i in raw.indices) {
+            lastSequence = freshTracker.nextAction()
+            freshTracker.recordTap(lastSequence, editor, raw.take(i), i, raw.take(i + 1), i + 1,
+                evidence(raw[i], true), searchImmediately = false)
+        }
+        val valid = freshTracker.captureSearch(lastSequence)!!
+        val result = valid.evaluate()
+        assertEquals(corrected, result.proposal!!.alternativeSpelling)
+        assertTrue(freshTracker.acceptSearch(valid, result))
+        assertEquals(corrected, freshTracker.currentProposal!!.alternativeSpelling)
+        freshTracker.clear()
+        assertFalse(freshTracker.acceptSearch(valid, result))
+        assertNull(freshTracker.currentProposal)
+        assertNull(freshTracker.evaluationStats)
+    }
+
+    @Test fun `search result ownership uses identity even for equal composition snapshots`() {
+        val tracker = tracker()
+        type(tracker)
+        val sequence = tracker.currentProposal!!.editorSequence
+        val first = tracker.captureSearch(sequence)!!
+        val second = tracker.captureSearch(sequence)!!
+        val result = first.evaluate()
+        assertFalse(tracker.acceptSearch(second, result))
+        assertTrue(tracker.acceptSearch(first, result))
+    }
+
+    @Test fun `worker search never holds tracker lock while waiting for language evidence`() {
+        val enteredModel = CountDownLatch(1)
+        val releaseModel = CountDownLatch(1)
+        val blockingModel = NextLetterProbabilityModel { prefix ->
+            enteredModel.countDown()
+            check(releaseModel.await(5, TimeUnit.SECONDS))
+            model.nextLetterProbabilities(prefix)
+        }
+        val tracker = PinyinMultiPathTracker(blockingModel, model.syllables)
+        var sequence = 0L
+        for (i in raw.indices) {
+            sequence = tracker.nextAction()
+            tracker.recordTap(sequence, editor, raw.take(i), i, raw.take(i + 1), i + 1,
+                evidence(raw[i], true), searchImmediately = false)
+        }
+        val search = tracker.captureSearch(sequence)!!
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val evaluation = pool.submit<PinyinMultiPathSearchResult> { search.evaluate() }
+            assertTrue(enteredModel.await(2, TimeUnit.SECONDS))
+            pool.submit { tracker.clear() }.get(1, TimeUnit.SECONDS)
+            releaseModel.countDown()
+            assertFalse(tracker.acceptSearch(search, evaluation.get(5, TimeUnit.SECONDS)))
+        } finally {
+            releaseModel.countDown()
+            pool.shutdownNow()
+        }
+    }
+
+    @Test fun `worker cancellation exits without publishing or changing literal spelling`() {
+        val tracker = tracker()
+        type(tracker)
+        val search = tracker.captureSearch(tracker.currentProposal!!.editorSequence)!!
+        var checks = 0
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            search.evaluate {
+                if (++checks == 3) throw java.util.concurrent.CancellationException()
+            }
+        }
+        assertEquals(raw, tracker.rawSpelling)
+        assertEquals(corrected, tracker.currentProposal!!.alternativeSpelling)
+    }
+
+    @Test fun `absent model evidence is cached within bounded evaluation`() {
+        var calls = 0
+        val tracker = PinyinMultiPathTracker(NextLetterProbabilityModel {
+            calls++
+            null
+        }, model.syllables)
+        type(tracker)
+        val stats = tracker.evaluationStats!!
+        assertEquals(PinyinMultiPathEvaluation.Reason.NoValidAlternative, stats.reason)
+        assertTrue(stats.cacheHits > 0)
+        assertTrue(stats.modelQueries < stats.modelQueries + stats.cacheHits)
+        assertNull(tracker.currentProposal)
+    }
+
+    @Test fun `two alternatives at every allowed contact stay within exhaustive path cap`() {
+        // Synthetic equal-probability inventory exercises the largest search,
+        // including rare rows, without adding words to the production model.
+        val geometry = listOf(KeyCell('a', 0f, 0f, 100f, 100f),
+            KeyCell('s', 100f, 0f, 200f, 100f), KeyCell('z', 100f, 100f, 200f, 200f))
+        val tracker = PinyinMultiPathTracker(NextLetterProbabilityModel { FloatArray(26) { 1f / 26f } },
+            setOf("a", "s", "z"))
+        val spelling = "s".repeat(PinyinMultiPathTracker.MAX_AMBIGUOUS_CONTACTS)
+        val tap = PinyinTapEvidence(TapEvidence('s', 100.25f, 99.75f, 1f), geometry)
+        for (i in spelling.indices) {
+            tracker.recordTap(tracker.nextAction(), editor, spelling.take(i), i,
+                spelling.take(i + 1), i + 1, tap, searchImmediately = false)
+        }
+        val search = tracker.captureSearch(spelling.length.toLong())!!
+        val result = search.evaluate()
+        assertEquals(PinyinMultiPathTracker.MAX_ENUMERATED_PATHS, result.evaluation.attemptedPaths)
+        assertEquals(result.evaluation.attemptedPaths, result.evaluation.validPaths)
+        assertEquals(15, result.evaluation.ambiguousContactCount)
+        assertTrue(result.evaluation.cacheHits > 0)
+        assertTrue(result.evaluation.modelQueries < result.evaluation.attemptedPaths * spelling.length)
+        assertEquals(PinyinMultiPathEvaluation.Reason.InsufficientAdvantage, result.evaluation.reason)
+        assertNull(result.proposal)
+        assertEquals(spelling, tracker.rawSpelling)
     }
 }

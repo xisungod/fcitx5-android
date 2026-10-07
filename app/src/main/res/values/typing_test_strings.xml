@@ -33,6 +33,7 @@
     <string name="typing_test_result_limitation">A known target helps evaluate a phrase, but does not prove the intention behind every touch. Ambiguous, edited or incomplete samples are excluded from reliable key alignment.</string>
     <string name="typing_test_unavailable">--</string>
     <string name="typing_test_unavailable_help">-- means this run did not provide enough reliable evidence.</string>
+    <string name="typing_test_alternative_help">Suggestions marked * are measured separately from original candidates. A successful selection means the selection completed; target accuracy is checked against this phrase.</string>
     <string name="typing_test_export">Export local report</string>
     <string name="typing_test_clear">Clear local reports</string>
     <string name="typing_test_clear_title">Clear typing test reports?</string>

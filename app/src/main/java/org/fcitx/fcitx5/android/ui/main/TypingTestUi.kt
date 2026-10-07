@@ -274,6 +274,7 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
             setTextIsSelectable(true)
         }.also { addText(it) }
         addText(note(R.string.typing_test_unavailable_help), 14)
+        addText(note(R.string.typing_test_alternative_help), 10)
         addText(note(R.string.typing_test_result_limitation), 10, 8)
         addReportActions(state.reportAvailable)
         addButton(R.string.typing_test_try_again, "typing-test-retry", true, actions.retry)

@@ -640,5 +640,204 @@ class TypingTestSessionTest {
         assertTrue(TypingTestSession.isEligibleEditor(info))
     }
 
+    @Test fun optionalStageAndOfferObservationRequiresOwnForegroundEditor() {
+        val info = editor()
+        assertNull(TypingTestSession.beginObservation(info))
+        start(info)
+        assertNotNull(TypingTestSession.beginObservation(info))
+        assertNull(TypingTestSession.beginObservation(editor()))
+        TypingTestSession.setActive(false)
+        assertNull(TypingTestSession.beginObservation(info))
+        start(info.apply { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD })
+        assertNull(TypingTestSession.beginObservation(info))
+    }
+
+    @Test fun delayedStageAndOfferResultsCannotEnterReactivatedOrReplacementEditor() {
+        val info = start()
+        val stale = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.setActive(false)
+        TypingTestSession.setActive(true)
+        TypingTestSession.recordStage(stale, TypingTestStage.TouchSearch, 1_000L)
+        TypingTestSession.recordAlternative(stale, 1L, TypingTestAlternativeEventKind.Generated)
+        val replaced = TypingTestSession.beginObservation(info)!!
+        val next = editor()
+        TypingTestSession.attachEditor(next)
+        TypingTestSession.recordStage(replaced, TypingTestStage.SendKey, 2_000L)
+        TypingTestSession.recordAlternative(replaced, 2L, TypingTestAlternativeEventKind.Published,
+            originalPinyin = prompt.pinyin, candidateText = prompt.text)
+        type(next)
+        val result = commitAndComplete(next)
+        assertEquals(0, result.stageLatencies.touchSearch.sampleCount)
+        assertEquals(0, result.stageLatencies.sendKey.sampleCount)
+        assertEquals(0, result.alternativeMetrics.generatedCount)
+        assertEquals(0, result.alternativeMetrics.publishedCount)
+    }
+
+    @Test fun stageDurationsRemainSeparateFromOriginalKeyAndSnapshotSamples() {
+        val info = start()
+        val observation = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordStage(observation, TypingTestStage.SendKey, 8_000_000L)
+        TypingTestSession.recordStage(observation, TypingTestStage.TouchSearch, 2_000_000L)
+        TypingTestSession.recordStage(observation, TypingTestStage.AlternativeQuery, 3_000_000L)
+        TypingTestSession.recordStage(observation, TypingTestStage.AlternativeQuery, -1L)
+        type(info)
+        val result = commitAndComplete(info)
+        assertEquals(8_000_000L, result.stageLatencies.sendKey.p95Nanos)
+        assertEquals(2_000_000L, result.stageLatencies.touchSearch.p95Nanos)
+        assertEquals(3_000_000L, result.stageLatencies.alternativeQuery.p95Nanos)
+        assertEquals(1, result.stageLatencies.alternativeQuery.invalidSampleCount)
+        assertEquals(prompt.pinyin.length, result.latency.sampleCount)
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertEquals(1, row.getJSONArray("send_key_ns").length())
+        assertEquals(prompt.pinyin.length, row.getJSONArray("test_snapshot_ns").length())
+        assertEquals("send_key_ns", row.getJSONObject("stage_latencies")
+            .getJSONObject("send_key").getString("measurement"))
+    }
+
+    @Test fun fullPhraseStarOfferHasItsOwnTruthAndCannotInflateInitialRimeSnapshot() {
+        val info = start()
+        type(info, candidates = listOf("怒号啊", "你好呀"))
+        val observation = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordAlternative(observation, 9L, TypingTestAlternativeEventKind.Generated,
+            originalPinyin = prompt.pinyin, alternativePinyin = prompt.pinyin, searchPathCount = 3)
+        TypingTestSession.recordAlternative(observation, 9L, TypingTestAlternativeEventKind.Published,
+            candidateText = prompt.text, originalRank = 4)
+        // A repeated layout notification must not multiply display or hit denominators.
+        repeat(2) { TypingTestSession.recordAlternative(observation, 9L,
+            TypingTestAlternativeEventKind.Displayed) }
+        TypingTestSession.recordAlternative(observation, 9L, TypingTestAlternativeEventKind.Selected)
+        TypingTestSession.observeCommit(info, prompt.text)
+        TypingTestSession.recordAlternative(observation, 9L, TypingTestAlternativeEventKind.Resolved,
+            success = true)
+        TypingTestSession.completePhrase(prompt.text)
+        val result = TypingTestSession.state.value.results.last()
+        assertEquals(TypingTestFraction(0, 1), result.top1HitRate)
+        assertEquals(TypingTestFraction(0, 1), result.top3HitRate)
+        assertEquals(TypingTestFraction(1, 1), result.alternativeMetrics.publishedHitRate)
+        assertEquals(TypingTestFraction(1, 1), result.alternativeMetrics.targetSelectionRate)
+        assertEquals(TypingTestFraction(1, 1), result.alternativeMetrics.selectionSuccessRate)
+        assertEquals(1, result.alternativeMetrics.displayedCount)
+        val report = JSONObject(TypingTestSession.exportReport()!!)
+        assertEquals("axiang-typing-test-v2", report.getString("format"))
+        val events = report.getJSONArray("trials").getJSONObject(0).getJSONArray("alternative_events")
+        assertEquals(5, events.length())
+        assertEquals(4, events.getJSONObject(4).getInt("original_rank_zero_based"))
+        assertEquals(3, events.getJSONObject(4).getInt("search_path_count"))
+        assertFalse(report.getBoolean("automatic_touch_training"))
+    }
+
+    @Test fun partialOfferAndUnpublishedClicksDoNotAcquireFullPhraseTruth() {
+        val info = start()
+        val observation = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordAlternative(observation, 10L, TypingTestAlternativeEventKind.Published,
+            originalPinyin = "ni", candidateText = prompt.text)
+        TypingTestSession.recordAlternative(observation, 11L, TypingTestAlternativeEventKind.Displayed)
+        TypingTestSession.recordAlternative(observation, 11L, TypingTestAlternativeEventKind.Selected)
+        TypingTestSession.recordAlternative(observation, 11L, TypingTestAlternativeEventKind.Resolved,
+            success = true)
+        type(info)
+        val result = commitAndComplete(info)
+        assertEquals(1, result.alternativeMetrics.publishedCount)
+        assertEquals(TypingTestFraction(0, 0), result.alternativeMetrics.publishedHitRate)
+        assertEquals(0, result.alternativeMetrics.displayedCount)
+        assertEquals(0, result.alternativeMetrics.selectedCount)
+        assertEquals(0, result.alternativeMetrics.resolvedCount)
+    }
+
+    @Test fun fullPhraseStarOfferAfterEarlyRepairIsSeparateFromUnscoredFirstAttempt() {
+        val info = start()
+        type(info, "n")
+        val backspace = TypingTestSession.beginKey(info, null, null, backspace = true)!!
+        finish(backspace, "", emptyList())
+        type(info)
+        val observation = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordAlternative(observation, 12L, TypingTestAlternativeEventKind.Published,
+            originalPinyin = prompt.pinyin, candidateText = prompt.text)
+        val result = commitAndComplete(info)
+        assertEquals(TypingTestFraction(0, 0), result.top1HitRate)
+        assertEquals(TypingTestFraction(0, 0), result.top3HitRate)
+        assertEquals(TypingTestFraction(1, 1), result.alternativeMetrics.publishedHitRate)
+    }
+
+    @Test fun boundedStageAndEventStorageExportsExplicitOmissionCounts() {
+        val info = start()
+        val observation = TypingTestSession.beginObservation(info)!!
+        repeat(300) { index ->
+            TypingTestSession.recordStage(observation, TypingTestStage.SendKey, index.toLong())
+            TypingTestSession.recordAlternative(observation, index.toLong(),
+                TypingTestAlternativeEventKind.Generated)
+        }
+        type(info)
+        val result = commitAndComplete(info)
+        assertEquals(256, result.stageLatencies.sendKey.sampleCount)
+        assertEquals(256, result.alternativeMetrics.generatedCount)
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertEquals(44, row.getJSONObject("stage_omitted_counts").getInt("SendKey"))
+        assertEquals(44, row.getInt("alternative_event_omitted_count"))
+    }
+
+    @Test fun completedTrialRejectsLateProbeEvenWithSameEditorObject() {
+        val info = start()
+        type(info)
+        val stale = TypingTestSession.beginObservation(info)!!
+        commitAndComplete(info)
+        TypingTestSession.nextPhrase()
+        TypingTestSession.setActive(true)
+        TypingTestSession.recordStage(stale, TypingTestStage.AlternativeQuery, 11L)
+        TypingTestSession.recordAlternative(stale, 15L, TypingTestAlternativeEventKind.Published,
+            originalPinyin = prompt.pinyin, candidateText = prompt.text)
+        val second = TypingTestPrompts.all[1]
+        type(info, second.pinyin, listOf(second.text))
+        val result = commitAndComplete(info, second.text)
+        assertEquals(0, result.stageLatencies.alternativeQuery.sampleCount)
+        assertEquals(0, result.alternativeMetrics.publishedCount)
+    }
+
+    @Test fun offerReadyMeasuresOriginalEnqueueToObservedPublicationAcrossCallbacksOnce() {
+        val info = start()
+        val enqueued = TypingTestSession.beginObservation(info)!!
+        type(info)
+        val beforePublish = System.nanoTime()
+        TypingTestSession.recordAlternative(enqueued, 16L, TypingTestAlternativeEventKind.Published,
+            originalPinyin = prompt.pinyin, candidateText = prompt.text)
+        val afterPublish = System.nanoTime()
+        val later = TypingTestSession.beginObservation(info)!!
+        // A current receipt from a different callback cannot change this offer's start time.
+        TypingTestSession.recordOfferReady(later, 16L)
+        repeat(2) { TypingTestSession.recordOfferReady(enqueued, 16L) }
+        val result = commitAndComplete(info)
+        val ready = result.stageLatencies.offerReady
+        assertEquals(1, ready.sampleCount)
+        val observed = ready.p95Nanos!!
+        assertTrue(observed >= beforePublish - enqueued.enqueueNanos)
+        assertTrue(observed <= afterPublish - enqueued.enqueueNanos)
+        assertEquals("enqueue_to_offer_publish_ns", ready.measurement)
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertEquals(1, row.getJSONArray("enqueue_to_offer_publish_ns").length())
+        assertEquals(observed, row.getJSONObject("stage_latencies")
+            .getJSONObject("offer_ready").getLong("p95_ns"))
+    }
+
+    @Test fun unpublishedOrOldGenerationOfferCannotFabricateReadyDuration() {
+        val info = start()
+        val old = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordOfferReady(old, 17L)
+        TypingTestSession.recordStage(old, TypingTestStage.OfferReady, 12L)
+        TypingTestSession.recordAlternative(old, 17L, TypingTestAlternativeEventKind.Generated,
+            originalPinyin = prompt.pinyin)
+        TypingTestSession.recordOfferReady(old, 17L)
+        TypingTestSession.recordAlternative(old, 18L, TypingTestAlternativeEventKind.Published,
+            originalPinyin = prompt.pinyin, candidateText = prompt.text)
+        TypingTestSession.setActive(false)
+        TypingTestSession.setActive(true)
+        TypingTestSession.recordOfferReady(old, 18L)
+        val fresh = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordOfferReady(fresh, 18L)
+        type(info)
+        val result = commitAndComplete(info)
+        assertEquals(0, result.stageLatencies.offerReady.sampleCount)
+        assertNull(result.stageLatencies.offerReady.p95Nanos)
+    }
+
     companion object { private val FIELD_ID = R.id.typing_test_input }
 }

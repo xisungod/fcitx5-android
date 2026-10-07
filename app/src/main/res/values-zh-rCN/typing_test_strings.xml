@@ -33,6 +33,7 @@
     <string name="typing_test_result_limitation">目标文字有助于评测整句，但不能证明每次触摸的本意。有歧义、回改或未完成的样本，不纳入可靠按键对齐。</string>
     <string name="typing_test_unavailable">--</string>
     <string name="typing_test_unavailable_help">-- 表示本轮没有足够可靠的证据，暂时无法统计。</string>
+    <string name="typing_test_alternative_help">带 * 的建议单独统计，不计入原候选命中率。执行成功表示选择流程完成；是否打对，仍与本句目标文字核对。</string>
     <string name="typing_test_export">导出本机报告</string>
     <string name="typing_test_clear">清除本机报告</string>
     <string name="typing_test_clear_title">清除打字测试报告？</string>

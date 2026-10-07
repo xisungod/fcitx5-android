@@ -502,18 +502,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     commonKeyActionListener.touchCandidateOffer) { feedback, offer ->
                     feedback to offer
                 }.collect { (feedback, offer) ->
-                    if (offer != null) {
-                        candidateUi.setTouchCandidate(offer) { token ->
-                            commonKeyActionListener.listener.onKeyAction(
-                                KeyAction.SelectTouchCandidateAction(token), KeyActionListener.Source.Keyboard)
-                        }
-                    } else {
-                        candidateUi.setPinyinFeedback(feedback,
+                    horizontalCandidate.setTouchCandidate(offer)
+                    // Existing top-three words may move second; novel suggestions follow the top three.
+                    candidateUi.setPinyinFeedback(if (offer == null) feedback else null,
                             restore = { token -> commonKeyActionListener.listener.onKeyAction(
                                 KeyAction.RestorePinyinTapAction(token), KeyActionListener.Source.Keyboard) },
                             confirm = { token -> commonKeyActionListener.listener.onKeyAction(
                                 KeyAction.ConfirmPinyinTapAction(token), KeyActionListener.Source.Keyboard) })
-                    }
                 }
             }
         }
@@ -522,6 +517,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             override fun onViewDetachedFromWindow(v: View) {
                 pinyinFeedbackJob?.cancel()
                 pinyinFeedbackJob = null
+                horizontalCandidate.setTouchCandidate(null)
                 commonKeyActionListener.clearPinyinTapFeedback()
                 commonKeyActionListener.invalidateTouchCandidates()
             }

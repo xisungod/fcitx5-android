@@ -35,6 +35,35 @@ object TypingTestPrompts {
 
 enum class TypingTestInputKind { FULL_PINYIN, SHORTHAND_OR_MIXED, EXTERNAL, UNKNOWN }
 
+/** Actual observed durations. OfferReady overlaps processing blocks; samples are not additive. */
+enum class TypingTestStage { SendKey, TouchSearch, AlternativeQuery, OfferReady }
+
+data class TypingTestStageTimings(
+    val sendKeyNanos: List<Long> = emptyList(),
+    val touchSearchNanos: List<Long> = emptyList(),
+    val alternativeQueryNanos: List<Long> = emptyList(),
+    /** Original triggering action enqueue -> published offer, including debounce/queues. */
+    val offerReadyNanos: List<Long> = emptyList()
+)
+
+enum class TypingTestAlternativeEventKind { Generated, Rejected, Published, Displayed, Selected, Resolved }
+
+/** Frozen evidence for one offer. A later commit must not retroactively change its eligibility. */
+data class TypingTestAlternativeEvent(
+    val offerToken: Long,
+    val kind: TypingTestAlternativeEventKind,
+    val originalPinyin: String? = null,
+    val alternativePinyin: String? = null,
+    val candidateText: String? = null,
+    val reason: String? = null,
+    val success: Boolean? = null,
+    val fullPromptComposition: Boolean = false,
+    /** Native Rime order, zero-based; null if unavailable. Never a calibrated confidence. */
+    val originalRank: Int? = null,
+    /** Number of bounded spelling paths examined; explanatory evidence, not a model score. */
+    val searchPathCount: Int? = null
+)
+
 /** Freeze at the FIRST complete full-pinyin attempt, before any correction/commit. */
 data class TypingTestCandidateSnapshot(
     val rawPinyin: String,
@@ -68,11 +97,13 @@ data class TypingTestTrialInput(
     val committedText: String = "",
     val backspaceCount: Int = 0,
     val letterKeyCount: Int = 0,
-    /** Enqueued letter action -> complete action callback, including queue wait and touch scoring. */
+    /** Enqueued letter action -> complete callback; detached search/probes are separate samples. */
     val processingNanos: List<Long> = emptyList(),
     val priorCommitCount: Int = 0,
     /** First complete candidate spelling; finalInputPinyin can differ after the user repairs it. */
-    val candidateInputPinyin: String? = finalInputPinyin
+    val candidateInputPinyin: String? = finalInputPinyin,
+    val stageTimings: TypingTestStageTimings = TypingTestStageTimings(),
+    val alternativeEvents: List<TypingTestAlternativeEvent> = emptyList()
 )
 
 data class TypingTestFraction(val numerator: Int, val denominator: Int) {
@@ -87,6 +118,30 @@ data class TypingTestLatency(
     val invalidSampleCount: Int,
     val omittedSampleCount: Int,
     val measurement: String = "enqueue_to_key_action_completion_ns"
+)
+
+data class TypingTestStageLatencies(
+    val sendKey: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0, "send_key_ns"),
+    val touchSearch: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0, "touch_search_ns"),
+    val alternativeQuery: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0,
+        "alternative_query_ns"),
+    val offerReady: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0,
+        "enqueue_to_offer_publish_ns")
+)
+
+/** Event counts describe the pipeline; target hit rates only describe eligible prescribed phrases. */
+data class TypingTestAlternativeMetrics(
+    val generatedCount: Int = 0,
+    val rejectedCount: Int = 0,
+    val publishedCount: Int = 0,
+    val displayedCount: Int = 0,
+    val selectedCount: Int = 0,
+    val resolvedCount: Int = 0,
+    val resolvedSuccessCount: Int = 0,
+    val rejectionReasons: Map<String, Int> = emptyMap(),
+    val publishedHitRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val selectionSuccessRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val targetSelectionRate: TypingTestFraction = TypingTestFraction(0, 0)
 )
 
 /** Proposed labels for a prescribed, successfully completed trial; not automatic training. */
@@ -117,5 +172,7 @@ data class TypingTestTrialResult(
     val alignment: TypingTestAlignment?,
     val unscoredReasons: List<String>,
     val calibrationSamples: List<TypingTestCalibrationSample>,
-    val latency: TypingTestLatency
+    val latency: TypingTestLatency,
+    val stageLatencies: TypingTestStageLatencies = TypingTestStageLatencies(),
+    val alternativeMetrics: TypingTestAlternativeMetrics = TypingTestAlternativeMetrics()
 )

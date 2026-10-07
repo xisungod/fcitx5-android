@@ -12,7 +12,9 @@ import android.view.inputmethod.EditorInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxAPI
@@ -27,6 +29,9 @@ import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticPolicy
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticStore
 import org.fcitx.fcitx5.android.data.typingtest.TypingTestKeyTicket
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestObservationTicket
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestAlternativeEventKind
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestStage
 import org.fcitx.fcitx5.android.data.typingtest.TypingTestSession
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -62,7 +67,8 @@ import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapRuntime
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapEvidence
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinSpatialKeyDecider
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchModelRepository
-import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinMultiPathProposal
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinMultiPathSearch
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinMultiPathTracker
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateRuntime
 import org.fcitx.fcitx5.android.input.keyboard.typing.resolvePinyinTouchCandidate
 import org.fcitx.fcitx5.android.input.keyboard.typing.resolvePinyinTapFeedback
@@ -104,6 +110,8 @@ class CommonKeyActionListener :
     private val touchCandidateRuntime = PinyinTouchCandidateRuntime()
     val touchCandidateOffer get() = touchCandidateRuntime.offer
     @Volatile private var touchQueryJob: Job? = null
+    private data class TouchOfferObservation(val token: Long, val ticket: TypingTestObservationTicket?)
+    @Volatile private var touchOfferObservation: TouchOfferObservation? = null
     @Volatile private var probeOverBudget = false
     @Volatile
     private var editorEpoch = 0L
@@ -117,6 +125,7 @@ class CommonKeyActionListener :
     fun invalidateTouchCandidates() {
         touchQueryJob?.cancel()
         touchQueryJob = null
+        touchOfferObservation = null
         touchCandidateRuntime.clear()
         probeOverBudget = false
     }
@@ -124,7 +133,21 @@ class CommonKeyActionListener :
     private fun nextTouchAction(): Long {
         touchQueryJob?.cancel()
         touchQueryJob = null
+        touchOfferObservation = null
         return touchCandidateRuntime.nextAction()
+    }
+
+    /** Called by the visible horizontal slot, never inferred from publication alone. */
+    fun onTouchCandidateDisplayed(token: Long) {
+        val observation = touchOfferObservation?.takeIf { it.token == token }?.ticket ?: return
+        if (!touchCandidateRuntime.isCurrent(token) || touchCandidateOffer.value?.token != token) return
+        // Publication is recorded inside the earlier native transaction. Enqueue
+        // this callback after it so a very fast UI collector cannot overtake it.
+        service.postFcitxJob {
+            if (touchCandidateRuntime.isCurrent(token) && touchCandidateOffer.value?.token == token)
+                TypingTestSession.recordAlternative(observation, token,
+                    TypingTestAlternativeEventKind.Displayed)
+        }
     }
 
     private fun touchFeaturesEnabled() = kbdPrefs.pinyinTouchCorrection.getValue() ||
@@ -240,24 +263,34 @@ class CommonKeyActionListener :
         editor: EditorInfo?,
         epoch: Long,
         sequence: Long,
-        touchSequence: Long
+        touchSequence: Long,
+        observation: TypingTestObservationTicket?
     ) {
         val evidence = action.pinyinTapEvidence
         if (kbdPrefs.pinyinTouchAlternatives.getValue()) {
-            withInputTransaction { sendTouchAlternativeTap(action, source, editor, epoch, touchSequence) }
+            withInputTransaction { sendTouchAlternativeTap(action, source, editor, epoch, touchSequence, observation) }
             return
         }
         if (evidence == null || !kbdPrefs.pinyinTouchCorrection.getValue()) {
-            sendKey(action.act, action.states.states, action.code)
+            sendMeasuredLetter(action.act, action.states.states, action.code, observation)
             recordPinyinDecision(evidence, action.act, bypass = "Disabled")
             return
         }
-        withInputTransaction { sendPinyinTapInTransaction(action, source, editor, epoch, sequence) }
+        withInputTransaction { sendPinyinTapInTransaction(action, source, editor, epoch, sequence, observation) }
+    }
+
+    private suspend fun FcitxAPI.sendMeasuredLetter(
+        letter: String, states: UInt, code: Int, observation: TypingTestObservationTicket?
+    ) {
+        val started = if (observation != null) System.nanoTime() else 0L
+        sendKey(letter, states, code)
+        if (observation != null) TypingTestSession.recordStage(observation,
+            TypingTestStage.SendKey, System.nanoTime() - started)
     }
 
     private suspend fun FcitxAPI.sendTouchAlternativeTap(
         action: FcitxKeyAction, source: KeyActionListener.Source, editor: EditorInfo?,
-        epoch: Long, sequence: Long
+        epoch: Long, sequence: Long, observation: TypingTestObservationTicket?
     ) {
         val evidence = action.pinyinTapEvidence
         val model = pinyinTouchModels.languageModel
@@ -268,54 +301,125 @@ class CommonKeyActionListener :
             action.act[0] == evidence.tap.original && action.states == KeyStates.Virtual &&
             allowsTouchAlternatives(editor, epoch) && model != null
         // The literal letter reaches live Rime even when the old inline mode is enabled.
-        sendKey(action.act, action.states.states, action.code)
+        sendMeasuredLetter(action.act, action.states.states, action.code, observation)
         recordPinyinDecision(evidence, action.act, bypass = "LiteralWithTouchAlternative")
-        if (!supported || !allowsTouchAlternatives(editor, epoch)) return
+        if (!supported || !allowsTouchAlternatives(editor, epoch)) {
+            TypingTestSession.recordAlternative(observation, sequence,
+                TypingTestAlternativeEventKind.Rejected,
+                reason = if (model == null) "ModelNotReady" else "UnsupportedTouchContext")
+            return
+        }
         val after = inputPanelCached.preedit
         val offsets = if (kbdPrefs.pinyinTouchPersonalization.getValue())
             pinyinTouchModels.profileStore?.offsets(evidence!!.cells, evidence.tap.density).orEmpty()
         else emptyMap()
-        val proposal = touchCandidateRuntime.tracker(model!!).recordTap(sequence, editor!!,
-            before.toString(), before.cursor, after.toString(), after.cursor, evidence!!, offsets)
-        if (proposal != null) scheduleTouchQuery(proposal, editor, epoch)
+        val tracker = touchCandidateRuntime.tracker(model!!)
+        tracker.recordTap(sequence, editor!!, before.toString(), before.cursor,
+            after.toString(), after.cursor, evidence!!, offsets, searchImmediately = false)
+        tracker.captureSearch(sequence)?.let { scheduleTouchSearch(it, tracker, editor, epoch, observation) }
     }
 
-    private fun scheduleTouchQuery(proposal: PinyinMultiPathProposal, editor: EditorInfo, epoch: Long) {
-        if (probeOverBudget || !touchCandidateRuntime.isCurrent(proposal.editorSequence) ||
-            proposal.alternativeSpelling.length > 32) return
-        touchQueryJob = service.lifecycleScope.launch {
+    /** Only immutable Kotlin evidence is searched off-thread; native Rime stays on its owner queue. */
+    private fun scheduleTouchSearch(search: PinyinMultiPathSearch, tracker: PinyinMultiPathTracker,
+                                   editor: EditorInfo, epoch: Long,
+                                   observation: TypingTestObservationTicket?) {
+        if (!touchCandidateRuntime.isCurrent(search.editorSequence)) return
+        touchQueryJob = service.lifecycleScope.launch(Dispatchers.Default) {
+            // Coalesce fast input before searching an already obsolete prefix.
             delay(35)
-            if (!touchCandidateRuntime.isCurrent(proposal.editorSequence)) return@launch
+            if (!touchCandidateRuntime.isCurrent(search.editorSequence)) return@launch
+            val workerContext = currentCoroutineContext()
+            val started = if (observation != null) System.nanoTime() else 0L
+            val searchResult = try {
+                search.evaluate { workerContext.ensureActive() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Optional suggestions must never turn a successful literal key into a failure.
+                TypingTestSession.recordAlternative(observation, search.editorSequence,
+                    TypingTestAlternativeEventKind.Rejected, reason = "SearchFailed")
+                return@launch
+            } finally {
+                if (observation != null) TypingTestSession.recordStage(observation,
+                    TypingTestStage.TouchSearch, System.nanoTime() - started)
+            }
+            workerContext.ensureActive()
+            if (!touchCandidateRuntime.isCurrent(search.editorSequence)) return@launch
             service.postFcitxJob {
                 withInputTransaction {
                     val before = inputPanelCached.preedit
-                    if (probeOverBudget || !allowsTouchAlternatives(editor, epoch) ||
-                        !touchCandidateRuntime.matches(proposal, editor, before.toString(), before.cursor))
+                    if (!allowsTouchAlternatives(editor, epoch) ||
+                        !touchCandidateRuntime.isCurrent(search.editorSequence) ||
+                        PinyinMultiPathTracker.spellingAtEnd(before.toString(), before.cursor) != search.originalSpelling ||
+                        !tracker.acceptSearch(search, searchResult))
+                        return@withInputTransaction
+                    val proposal = searchResult.proposal
+                    if (proposal == null) {
+                        TypingTestSession.recordAlternative(observation, search.editorSequence,
+                            TypingTestAlternativeEventKind.Rejected, originalPinyin = search.originalSpelling,
+                            reason = searchResult.evaluation.reason.name,
+                            searchPathCount = searchResult.evaluation.attemptedPaths)
+                        return@withInputTransaction
+                    }
+                    TypingTestSession.recordAlternative(observation, proposal.editorSequence,
+                        TypingTestAlternativeEventKind.Generated, proposal.originalSpelling,
+                        proposal.alternativeSpelling, searchPathCount = proposal.enumeratedPathCount)
+                    fun reject(reason: String) = TypingTestSession.recordAlternative(observation,
+                        proposal.editorSequence, TypingTestAlternativeEventKind.Rejected,
+                        proposal.originalSpelling, proposal.alternativeSpelling, reason = reason,
+                        searchPathCount = proposal.enumeratedPathCount)
+                    if (probeOverBudget) { reject("ProbeDisabledAfterBudget"); return@withInputTransaction }
+                    if (proposal.alternativeSpelling.length > 32) {
+                        reject("ProbeLengthLimit"); return@withInputTransaction
+                    }
+                    if (!touchCandidateRuntime.matches(proposal, editor, before.toString(), before.cursor))
                         return@withInputTransaction
                     if (!RimeTouchProbePolicy.allowsQuery(getAddonConfig("rime"))) {
                         RimeTouchProbe.close()
+                        reject("ProbePolicy")
                         return@withInputTransaction
                     }
                     val result = RimeTouchProbe.query("rime_ice", proposal.alternativeSpelling)
+                    TypingTestSession.recordStage(observation, TypingTestStage.AlternativeQuery, result.elapsedNanos)
                     // Native queries cannot be preempted. A slow one yields no chip and
                     // disables further probes for this composition, never queued retries.
                     if (!result.withinBudget) {
                         if (touchCandidateRuntime.isCurrent(proposal.editorSequence)) probeOverBudget = true
+                        reject("ProbeOverBudget")
                         return@withInputTransaction
                     }
-                    if (!result.available || !allowsTouchAlternatives(editor, epoch)) return@withInputTransaction
-                    val existing = getCandidates(0, 24).map { it.text }.toSet()
-                    val candidate = result.candidates.firstOrNull { it.text !in existing } ?: return@withInputTransaction
+                    if (!result.available) { reject("ProbeUnavailable"); return@withInputTransaction }
+                    if (!allowsTouchAlternatives(editor, epoch)) return@withInputTransaction
+                    val existing = getCandidates(0, 24).map { it.text }
+                    // Agreement with the literal first word needs no extra suggestion.
+                    // A matching second/third word is still useful spatial evidence.
+                    val candidate = result.candidates.firstOrNull()
+                    if (candidate == null) { reject("NoFullSpanCandidate"); return@withInputTransaction }
+                    if (candidate.text == existing.firstOrNull()) {
+                        reject("AgreesWithOriginalFirst"); return@withInputTransaction
+                    }
                     val current = inputPanelCached.preedit
-                    touchCandidateRuntime.publish(proposal, editor, candidate.text,
-                        current.toString(), current.cursor)
+                    touchOfferObservation = TouchOfferObservation(proposal.editorSequence, observation)
+                    if (touchCandidateRuntime.publish(proposal, editor, candidate.text,
+                            current.toString(), current.cursor)) {
+                        TypingTestSession.recordAlternative(observation, proposal.editorSequence,
+                            TypingTestAlternativeEventKind.Published, proposal.originalSpelling,
+                            proposal.alternativeSpelling, candidate.text,
+                            originalRank = existing.indexOf(candidate.text).takeIf { it >= 0 },
+                            searchPathCount = proposal.enumeratedPathCount)
+                        TypingTestSession.recordOfferReady(observation, proposal.editorSequence)
+                    } else {
+                        if (touchOfferObservation?.token == proposal.editorSequence) touchOfferObservation = null
+                        reject("StaleBeforePublication")
+                    }
                 }
             }.join()
         }
     }
 
     private suspend fun FcitxAPI.sendTouchBackspace(
-        action: SymAction, editor: EditorInfo?, epoch: Long, sequence: Long
+        action: SymAction, editor: EditorInfo?, epoch: Long, sequence: Long,
+        observation: TypingTestObservationTicket?
     ) = withInputTransaction {
         val before = inputPanelCached.preedit
         sendKey(action.sym, action.states)
@@ -323,9 +427,10 @@ class CommonKeyActionListener :
         if (model == null || !allowsTouchAlternatives(editor, epoch)) return@withInputTransaction
         val after = inputPanelCached.preedit
         if (after.isEmpty()) { invalidateTouchCandidates(); return@withInputTransaction }
-        val proposal = touchCandidateRuntime.tracker(model).recordBackspace(sequence, editor!!,
-            before.toString(), before.cursor, after.toString(), after.cursor)
-        if (proposal != null) scheduleTouchQuery(proposal, editor, epoch)
+        val tracker = touchCandidateRuntime.tracker(model)
+        tracker.recordBackspace(sequence, editor!!, before.toString(), before.cursor,
+            after.toString(), after.cursor, searchImmediately = false)
+        tracker.captureSearch(sequence)?.let { scheduleTouchSearch(it, tracker, editor, epoch, observation) }
     }
 
     private suspend fun FcitxAPI.selectTouchCandidate(token: Long, editor: EditorInfo?, epoch: Long) =
@@ -334,9 +439,13 @@ class CommonKeyActionListener :
             if (!allowsTouchAlternatives(editor, epoch)) return@withInputTransaction
             val pending = touchCandidateRuntime.claim(token, editor, before.toString(), before.cursor)
                 ?: return@withInputTransaction
-            resolvePinyinTouchCandidate(pending.offer) {
+            val observation = touchOfferObservation?.takeIf { it.token == token }?.ticket
+            TypingTestSession.recordAlternative(observation, token, TypingTestAlternativeEventKind.Selected)
+            val resolved = resolvePinyinTouchCandidate(pending.offer) {
                 allowsTouchAlternatives(editor, epoch) && touchCandidateRuntime.isCurrent(token)
             }
+            TypingTestSession.recordAlternative(observation, token,
+                TypingTestAlternativeEventKind.Resolved, success = resolved)
             if (touchCandidateRuntime.isCurrent(token)) invalidateTouchCandidates()
         }
 
@@ -345,7 +454,8 @@ class CommonKeyActionListener :
         source: KeyActionListener.Source,
         editor: EditorInfo?,
         epoch: Long,
-        sequence: Long
+        sequence: Long,
+        observation: TypingTestObservationTicket?
     ) {
         val evidence = action.pinyinTapEvidence
         val prefix = currentPinyinSpelling()
@@ -355,7 +465,7 @@ class CommonKeyActionListener :
             action.act[0] == evidence.tap.original && action.states == KeyStates.Virtual &&
             allowsPinyinTap(editor, epoch) && prefix != null && model != null
         if (!supported) {
-            sendKey(action.act, action.states.states, action.code)
+            sendMeasuredLetter(action.act, action.states.states, action.code, observation)
             recordPinyinDecision(evidence, action.act, bypass = when {
                 !kbdPrefs.pinyinTouchCorrection.getValue() -> "Disabled"
                 !allowsPinyinTap(editor, epoch) -> "UnsupportedContext"
@@ -372,7 +482,7 @@ class CommonKeyActionListener :
         val decision = model!!.decide(evidence!!.tap, evidence.cells, prefix!!, offsets)
         val selected = if (decision.corrected) decision.selected.toString() else action.act
         val code = if (decision.corrected) ScancodeMapping.charToScancode(decision.selected) else action.code
-        sendKey(selected, action.states.states, code)
+        sendMeasuredLetter(selected, action.states.states, code, observation)
         recordPinyinDecision(evidence, selected, decision)
         if (decision.corrected && allowsPinyinTap(editor, epoch)) {
             pinyinTapRuntime.recordCorrection(sequence, editor!!, prefix,
@@ -459,6 +569,8 @@ class CommonKeyActionListener :
     val listener by lazy {
         KeyActionListener { action, source ->
             val editor = service.currentInputEditorInfo
+            // An old queued action must never attach to a later test.
+            val observation = TypingTestSession.beginObservation(editor)
             val typingTestTicket = when (action) {
                 is FcitxKeyAction -> {
                     val letter = action.act.singleOrNull()?.takeIf { it in 'a'..'z' }
@@ -503,7 +615,7 @@ class CommonKeyActionListener :
             when (action) {
                 is FcitxKeyAction -> service.postFcitxJob {
                     withTypingTestKey(typingTestTicket, editor) {
-                        sendPinyinTap(action, source, editor, epoch, sequence, touchSequence)
+                        sendPinyinTap(action, source, editor, epoch, sequence, touchSequence, observation)
                     }
                 }
                 is SelectTouchCandidateAction -> service.postFcitxJob {
@@ -518,7 +630,7 @@ class CommonKeyActionListener :
                 is SymAction -> service.postFcitxJob {
                     withTypingTestKey(typingTestTicket, editor) {
                         if (trackedBackspace && kbdPrefs.pinyinTouchAlternatives.getValue())
-                            sendTouchBackspace(action, editor, epoch, touchSequence)
+                            sendTouchBackspace(action, editor, epoch, touchSequence, observation)
                         else sendKey(action.sym, action.states)
                     }
                 }

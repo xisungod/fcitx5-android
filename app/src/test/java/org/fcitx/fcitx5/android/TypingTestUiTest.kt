@@ -138,7 +138,14 @@ class TypingTestUiTest {
         RuntimeEnvironment.setFontScale(1.4f)
         fixture { ui, _ ->
             listOf(TypingTestUi.State(TypingTestUi.Phase.Intro), typing,
-                typing.copy(phase = TypingTestUi.Phase.Completed, lastCommittedText = "你好啊")).forEach { state ->
+                typing.copy(phase = TypingTestUi.Phase.Completed, lastCommittedText = "你好啊"),
+                TypingTestUi.State(TypingTestUi.Phase.Report, completed = 5,
+                    reportSummary = "原 Rime 第一候选命中：80.0%（4/5）\n" +
+                        "* 全句建议命中：--（无可评分样本）\n" +
+                        "原引擎按键调用 P95：8.00 ms（32 次）\n" +
+                        "触点备选搜索 P95：2.00 ms（32 次）\n" +
+                        "只读备选查询 P95：--（无样本）",
+                    reportAvailable = true)).forEach { state ->
                 ui.render(state)
                 layout(ui.root)
                 descendants(ui.root).filterIsInstance<TextView>().forEach { view ->
