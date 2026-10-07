@@ -382,8 +382,11 @@
     <string name="press_key_retreat_time">Key colour · shrink and fade duration</string>
     <string name="verification_code_clipboard">Detect verification codes in copied text</string>
     <string name="verification_code_clipboard_summary">Copied messages show just the code in the toolbar; tap to paste it</string>
-    <string name="verification_code_sms">Read verification codes from SMS</string>
-    <string name="verification_code_sms_summary">Off by default. Needs SMS permission; codes are found on this device only and kept in memory for 5 minutes</string>
+    <string name="verification_code_sms">Detect codes in incoming SMS</string>
+    <string name="verification_code_sms_summary">On by default. Requests receive-SMS permission on first use; detects new incoming messages on this device only and keeps codes in memory for 5 minutes</string>
+    <string name="verification_code_sms_permission_denied_title">SMS permission not granted</string>
+    <string name="verification_code_sms_permission_denied_message">SMS code reading is off because SMS permission has not been granted. Open system settings to check AXiang\'s SMS permission.\n\nIf your system does not allow this permission, you can copy the message and tap the code suggestion on the keyboard.</string>
+    <string name="verification_code_sms_open_app_settings">View app permissions</string>
     <string name="verification_code_chip">Code %1$s</string>
     <string name="verification_code_sms_chip">SMS code %1$s</string>
     <string name="press_effect_palette_custom">Custom colours</string>

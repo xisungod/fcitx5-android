@@ -118,6 +118,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var nextWordPredictionVisible = false
     private var nativePreeditEmpty = true
     private var nativeCandidatesEmpty = true
+    private var suggestionListenersActive = false
 
     private var isClipboardFresh: Boolean = false
     private var isInlineSuggestionPresent: Boolean = false
@@ -134,6 +135,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.OnClipboardUpdateListener {
             if (!clipboardSuggestion.getValue()) return@OnClipboardUpdateListener
             service.lifecycleScope.launch {
+                if (!suggestionListenersActive) return@launch
+                if (isSmsCodeSuggestionActive()) return@launch
                 val token = ClipboardSuggestionDismissals.Token(
                     ClipboardSuggestionDismissals.Source.Clipboard, it.timestamp, it.id)
                 // Check inside the posted callback too: closing can precede a queued update.
@@ -171,7 +174,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var chipEntry: ClipboardEntry? = null
     private var chipToken: ClipboardSuggestionDismissals.Token? = null
 
+    private fun smsCodesAllowed(): Boolean = codeFromSms.getValue() &&
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.RECEIVE_SMS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /** A fresh SMS code takes precedence over idle next-word suggestions, never composing text. */
+    internal fun isSmsCodeSuggestionActive(): Boolean {
+        if (!chipFromSms || !isClipboardFresh || !smsCodesAllowed()) return false
+        val fresh = VerificationCodes.fresh() ?: return false
+        return fresh.source == VerificationCodes.Source.Sms && fresh.code == chipCode &&
+            fresh.timestamp == chipToken?.timestamp
+    }
+
     private fun clearClipboardSuggestion() {
+        val wasSms = chipFromSms
         chipCode = null
         chipFromSms = false
         chipEntry = null
@@ -179,6 +196,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         clipboardTimeoutJob?.cancel()
         clipboardTimeoutJob = null
         isClipboardFresh = false
+        if (wasSms) {
+            service.refreshNextWordPrediction()
+            setNextWordPredictionVisible(nextWordPredictionVisible)
+        }
     }
 
     private fun dismissClipboardSuggestion() {
@@ -188,7 +209,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private fun showSmsCode(code: VerificationCodes.Code) {
-        if (!codeFromSms.getValue() || code.source != VerificationCodes.Source.Sms) return
+        if (!smsCodesAllowed() || code.source != VerificationCodes.Source.Sms ||
+            VerificationCodes.fresh() != code) return
         val token = ClipboardSuggestionDismissals.Token(ClipboardSuggestionDismissals.Source.Sms, code.timestamp)
         if (ClipboardSuggestionDismissals.shared.isDismissed(token)) return
         chipToken = token
@@ -197,6 +219,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         chipFromSms = true
         idleUi.clipboardUi.text.text = context.getString(R.string.verification_code_sms_chip, code.code)
         isClipboardFresh = true
+        // Invalidate an already displayed offer as well as any query still running in the worker.
+        // Subsequent native idle events also see the blocked prediction surface in InputView.
+        service.refreshNextWordPrediction()
+        setNextWordPredictionVisible(nextWordPredictionVisible)
         // an SMS code stays offered for its whole validity window, independent of the clipboard timeout
         clipboardTimeoutJob?.cancel()
         val left = VerificationCodes.TTL_MS - (System.currentTimeMillis() - code.timestamp)
@@ -213,7 +239,27 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     @Keep
     private val onVerificationCodeListener = VerificationCodes.Listener { code ->
-        service.lifecycleScope.launch { showSmsCode(code) }
+        service.lifecycleScope.launch {
+            if (suggestionListenersActive) showSmsCode(code)
+        }
+    }
+
+    @Keep
+    private val onSmsCodePreferenceListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        service.lifecycleScope.launch {
+            if (suggestionListenersActive) reconcileSmsCodeSuggestion()
+        }
+    }
+
+    private fun reconcileSmsCodeSuggestion() {
+        if (!smsCodesAllowed()) {
+            if (chipFromSms) clearClipboardSuggestion()
+        } else {
+            val fresh = VerificationCodes.fresh()
+            if (fresh?.source == VerificationCodes.Source.Sms) showSmsCode(fresh)
+            else if (chipFromSms) clearClipboardSuggestion()
+        }
+        evalIdleUiState()
     }
 
     @Keep
@@ -385,7 +431,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 setOnClickListener {
                     val code = chipCode
                     if (code != null) {
-                        service.commitText(code)
+                        if (chipFromSms && !isSmsCodeSuggestionActive()) {
+                            clearClipboardSuggestion()
+                            evalIdleUiState()
+                            return@setOnClickListener
+                        }
+                        if (!service.commitText(code)) return@setOnClickListener
                         if (chipFromSms) VerificationCodes.consume()
                     } else chipEntry?.let {
                         service.commitText(it.text)
@@ -489,8 +540,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     /** Predictions use the idle row without pretending to be native expandable candidates. */
     fun setNextWordPredictionVisible(visible: Boolean) {
         nextWordPredictionVisible = visible
-        barStateMachine.push(PreeditUpdated, PreeditEmpty to (nativePreeditEmpty && !visible))
-        barStateMachine.push(CandidatesUpdated, CandidateEmpty to (nativeCandidatesEmpty && !visible))
+        val showPrediction = visible && !isSmsCodeSuggestionActive()
+        barStateMachine.push(PreeditUpdated, PreeditEmpty to (nativePreeditEmpty && !showPrediction))
+        barStateMachine.push(CandidatesUpdated, CandidateEmpty to (nativeCandidatesEmpty && !showPrediction))
     }
 
     override val view by lazy {
@@ -505,6 +557,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onScopeSetupFinished(scope: DynamicScope) {
+        suggestionListenersActive = true
         fun collectPinyinFeedback() {
             pinyinFeedbackJob?.cancel()
             pinyinFeedbackJob = service.lifecycleScope.launch {
@@ -543,8 +596,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         ClipboardManager.addOnUpdateListener(onClipboardUpdateListener)
         VerificationCodes.addListener(onVerificationCodeListener)
         VerificationCodes.fresh()?.let { showSmsCode(it) }
+        codeFromSms.registerOnChangeListener(onSmsCodePreferenceListener)
         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
         clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
+    }
+
+    /** InputView destroys its dependency scope after detaching; don't retain listeners or timers. */
+    internal fun dispose() {
+        suggestionListenersActive = false
+        codeFromSms.unregisterOnChangeListener(onSmsCodePreferenceListener)
+        VerificationCodes.removeListener(onVerificationCodeListener)
+        ClipboardManager.removeOnUpdateListener(onClipboardUpdateListener)
+        clipboardSuggestion.unregisterOnChangeListener(onClipboardSuggestionUpdateListener)
+        clipboardItemTimeout.unregisterOnChangeListener(onClipboardTimeoutUpdateListener)
+        clipboardTimeoutJob?.cancel()
+        clipboardTimeoutJob = null
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
@@ -561,12 +627,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             idleUi.inlineSuggestionsBar.clear()
         }
-        evalIdleUiState()
+        reconcileSmsCodeSuggestion()
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
         nativePreeditEmpty = empty
-        barStateMachine.push(PreeditUpdated, PreeditEmpty to (empty && !nextWordPredictionVisible))
+        barStateMachine.push(PreeditUpdated, PreeditEmpty to
+            (empty && !(nextWordPredictionVisible && !isSmsCodeSuggestionActive())))
     }
 
     override fun onCandidateUpdate(data: CandidateListEvent.Data) {

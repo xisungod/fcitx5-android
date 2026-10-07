@@ -54,6 +54,24 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FcitxAppTheme"
         tools:targetApi="33">
+        <!-- SMS_RECEIVED can arrive when the IME is not running. Opt-in and permission enable this
+             component; only the system telephony sender may deliver to it. -->
+        <receiver
+            android:name=".data.otp.SmsCodeReceiver"
+            android:enabled="false"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".data.otp.SmsCodePermissionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.DialogTheme" />
+
         <activity
             android:name=".input.voice.OfflineDictationPermissionActivity"
             android:exported="false"

@@ -445,32 +445,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         invalidateNextWordPrediction(clearContext = true)
     }
 
-    private var smsCodeReceiver: org.fcitx.fcitx5.android.data.otp.SmsCodeReceiver? = null
-
-    /** listen for SMS codes only while the user wants it and has granted RECEIVE_SMS */
-    private fun updateSmsCodeReceiver() {
-        val wanted = AppPrefs.getInstance().clipboard.verificationCodeFromSms.getValue() &&
-            androidx.core.content.ContextCompat.checkSelfPermission(
-                this, android.Manifest.permission.RECEIVE_SMS
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        val current = smsCodeReceiver
-        if (wanted && current == null) {
-            val receiver = org.fcitx.fcitx5.android.data.otp.SmsCodeReceiver()
-            runCatching {
-                androidx.core.content.ContextCompat.registerReceiver(
-                    this, receiver,
-                    android.content.IntentFilter(android.provider.Telephony.Sms.Intents.SMS_RECEIVED_ACTION),
-                    androidx.core.content.ContextCompat.RECEIVER_EXPORTED
-                )
-            }.onSuccess { smsCodeReceiver = receiver }
-        } else if (!wanted && current != null) {
-            runCatching { unregisterReceiver(current) }
-            smsCodeReceiver = null
-        }
-    }
-
     override fun onCreate() {
-        updateSmsCodeReceiver()
         fcitx = FcitxDaemon.connect(javaClass.name)
         lifecycleScope.launch {
             jobs.consumeEach { it.join() }
@@ -869,6 +844,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         highlightColor =
             styledColorOrDefault(android.R.attr.colorAccent, DefaultHighlightColor).alpha(0.4f)
         InputFeedbacks.syncSystemPrefs()
+        // A service start or a hidden input session must never launch a permission dialog.
+        if (::decorView.isInitialized) {
+            decorView.post {
+                org.fcitx.fcitx5.android.data.otp.SmsCodeAccess.requestAuthorizationForVisibleKeyboard(
+                    this, isInputViewShown && inputView?.isShown == true)
+            }
+        }
     }
 
     override fun onCreateInputView(): View? {
@@ -1051,7 +1033,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // right cursor position, try to workaround this would simply introduce more bugs.
         selection.resetTo(attribute.initialSelStart, attribute.initialSelEnd)
         resetComposingState()
-        updateSmsCodeReceiver()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
         nextWordController.attach(attribute, currentInputConnection)
@@ -1443,8 +1424,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         finishOfflineDictation()
         if (::decorView.isInitialized) decorView.removeCallbacks(applyPendingTheme)
         pendingTheme = null
-        smsCodeReceiver?.let { runCatching { unregisterReceiver(it) } }
-        smsCodeReceiver = null
         recreateInputViewPrefs.forEach {
             it.unregisterOnChangeListener(recreateInputViewListener)
         }

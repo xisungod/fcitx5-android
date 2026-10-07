@@ -7,8 +7,10 @@ package org.fcitx.fcitx5.android.ui.main
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +25,7 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.fragment.NavHostFragment
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.otp.SmsCodeAccess
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.databinding.ActivityMainBinding
@@ -35,22 +38,77 @@ import splitties.views.topPadding
 
 class MainActivity : AppCompatActivity() {
 
-    /** SMS verification codes are opt-in: ask for RECEIVE_SMS only when the user turns them on */
+    /** Default-on authorization is requested once at user entry; a manual ON can retry it. */
     private val smsPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) AppPrefs.getInstance().clipboard.verificationCodeFromSms.setValue(false)
+        onSmsPermissionResult(granted)
     }
 
+    private var smsPermissionRequestPending = false
+    private var smsSettingsEnablePending = false
+    private var smsPermissionDeniedDialog: AlertDialog? = null
+
     private val smsCodePrefListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
-        if (enabled) requestSmsPermissionIfNeeded()
+        if (enabled) requestSmsPermissionIfNeeded() else smsSettingsEnablePending = false
+        SmsCodeAccess.sync(this)
     }
 
     private fun requestSmsPermissionIfNeeded() {
-        if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+        if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED &&
+            !smsPermissionRequestPending) {
+            smsPermissionRequestPending = true
+            SmsCodeAccess.noteExplicitAuthorizationAttempt()
             smsPermission.launch(Manifest.permission.RECEIVE_SMS)
+        } else {
+            SmsCodeAccess.sync(this)
         }
     }
 
+    private fun onSmsPermissionResult(granted: Boolean) {
+        smsPermissionRequestPending = false
+        SmsCodeAccess.finishAuthorization(this, granted)
+        if (!granted) {
+            if (!isFinishing && !isDestroyed) {
+                smsPermissionDeniedDialog?.dismiss()
+                smsPermissionDeniedDialog = AlertDialog.Builder(this)
+                    .setTitle(R.string.verification_code_sms_permission_denied_title)
+                    .setMessage(R.string.verification_code_sms_permission_denied_message)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.verification_code_sms_open_app_settings) { _, _ ->
+                        // Continue this explicit enable attempt only on returning from settings.
+                        smsSettingsEnablePending = true
+                        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", packageName, null)))
+                    }
+                    .show()
+            }
+        }
+        SmsCodeAccess.sync(this)
+    }
+
+    private fun refreshSmsPermissionState() {
+        if (smsSettingsEnablePending) {
+            smsSettingsEnablePending = false
+            if (checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) {
+                SmsCodeAccess.completeSettingsEnable(this)
+            }
+        }
+        SmsCodeAccess.sync(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshSmsPermissionState()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(STATE_SMS_PERMISSION_REQUEST_PENDING, smsPermissionRequestPending)
+        outState.putBoolean(STATE_SMS_SETTINGS_ENABLE_PENDING, smsSettingsEnablePending)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onDestroy() {
+        smsPermissionDeniedDialog?.dismiss()
+        smsPermissionDeniedDialog = null
         AppPrefs.getInstance().clipboard.verificationCodeFromSms.unregisterOnChangeListener(smsCodePrefListener)
         super.onDestroy()
     }
@@ -61,9 +119,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        smsPermissionRequestPending = savedInstanceState?.getBoolean(STATE_SMS_PERMISSION_REQUEST_PENDING) ?: false
+        smsSettingsEnablePending = savedInstanceState?.getBoolean(STATE_SMS_SETTINGS_ENABLE_PENDING) ?: false
+        val requestAutomaticSmsPermission = !smsPermissionRequestPending &&
+            SmsCodeAccess.beginAutomaticAuthorization(this)
         AppPrefs.getInstance().clipboard.verificationCodeFromSms.let {
             it.registerOnChangeListener(smsCodePrefListener)
-            if (it.getValue()) requestSmsPermissionIfNeeded()
+            if (requestAutomaticSmsPermission) requestSmsPermissionIfNeeded()
         }
         enableEdgeToEdge()
         val binding = ActivityMainBinding.inflate(layoutInflater)
@@ -189,6 +251,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_SETTINGS_ROUTE = "${BuildConfig.APPLICATION_ID}.EXTRA_SETTINGS_ROUTE"
+        private const val STATE_SMS_PERMISSION_REQUEST_PENDING = "sms_permission_request_pending"
+        private const val STATE_SMS_SETTINGS_ENABLE_PENDING = "sms_settings_enable_pending"
     }
 
 }

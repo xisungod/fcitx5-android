@@ -128,7 +128,8 @@ class InputView(
     }
 
     internal fun nextWordPredictionSurfaceVisible(): Boolean =
-        visibility == View.VISIBLE && windowManager.currentWindow === keyboardWindow
+        visibility == View.VISIBLE && windowManager.currentWindow === keyboardWindow &&
+            !kawaiiBar.isSmsCodeSuggestionActive()
     private val keyboardWindow = KeyboardWindow()
     private val symbolPicker = symbolPicker()
     private val emojiPicker = emojiPicker()
@@ -530,6 +531,7 @@ class InputView(
         cancelKeyboardHeightEditor()
         advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
+        kawaiiBar.dispose()
         // clear DynamicScope, implies that InputView should not be attached again after detached.
         scope.clear()
         super.onDetachedFromWindow()

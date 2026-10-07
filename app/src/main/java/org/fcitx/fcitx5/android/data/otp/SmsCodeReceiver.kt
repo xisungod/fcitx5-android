@@ -9,10 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 
-/** Registered by the input method only while the user has enabled it and granted RECEIVE_SMS. */
+/** Protected manifest receiver, enabled only while SMS code reading and SMS permission allow it. */
 class SmsCodeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        if (!SmsCodeAccess.canReceive(context)) return
         val body = runCatching {
             Telephony.Sms.Intents.getMessagesFromIntent(intent)
                 ?.joinToString("") { it?.messageBody.orEmpty() }

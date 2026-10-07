@@ -377,8 +377,11 @@
     <string name="press_key_retreat_time">鍵面顏色 · 收縮淡出時間</string>
     <string name="verification_code_clipboard">辨識複製內容中的驗證碼</string>
     <string name="verification_code_clipboard_summary">複製整則簡訊後，工具列只顯示驗證碼，點一下即可貼上</string>
-    <string name="verification_code_sms">讀取簡訊驗證碼</string>
-    <string name="verification_code_sms_summary">預設關閉。需要簡訊權限；僅在本機辨識，驗證碼只在記憶體中保留 5 分鐘</string>
+    <string name="verification_code_sms">辨識新簡訊驗證碼</string>
+    <string name="verification_code_sms_summary">預設開啟，首次使用請求簡訊接收權限；只辨識新收到的簡訊，驗證碼僅在本機記憶體中保留 5 分鐘</string>
+    <string name="verification_code_sms_permission_denied_title">尚未取得簡訊權限</string>
+    <string name="verification_code_sms_permission_denied_message">簡訊權限未獲允許，讀取功能尚未開啟。請前往系統設定，查看 AXiang 的簡訊權限。\n\n若系統不允許授權，也可以複製簡訊，在鍵盤上點驗證碼提示。</string>
+    <string name="verification_code_sms_open_app_settings">查看應用程式權限</string>
     <string name="verification_code_chip">驗證碼 %1$s</string>
     <string name="verification_code_sms_chip">簡訊驗證碼 %1$s</string>
     <string name="press_effect_palette_custom">自選顏色</string>

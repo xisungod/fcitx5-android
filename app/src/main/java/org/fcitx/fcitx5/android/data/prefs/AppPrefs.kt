@@ -37,6 +37,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val pid = int("pid", 0)
         val editorInfoInspector = bool("editor_info_inspector", false)
         val needNotifications = bool("need_notifications", true)
+        val smsCodeOnboardingApplied = bool("sms_code_onboarding_applied", false)
+        val smsCodeAutomaticAuthorizationAttempted = bool("sms_code_auto_authorization_attempted", false)
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
@@ -387,7 +389,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             R.string.verification_code_clipboard_summary
         ) { clipboardListening.getValue() && clipboardSuggestion.getValue() }
         val verificationCodeFromSms = switch(
-            R.string.verification_code_sms, "verification_code_sms", false,
+            R.string.verification_code_sms, "verification_code_sms", true,
             R.string.verification_code_sms_summary
         )
     }
