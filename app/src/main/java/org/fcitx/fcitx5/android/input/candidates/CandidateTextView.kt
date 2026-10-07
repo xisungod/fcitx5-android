@@ -32,6 +32,17 @@ internal class CandidateTextView(context: Context) : TextView(context) {
     private var laidOutTypeface: android.graphics.Typeface? = null
     private var contentWidth = 0f
 
+    override fun setText(text: CharSequence?, type: BufferType) {
+        super.setText(text, type)
+        // TextView's setter requests layout only after its own mLayout exists.
+        // We measure with candidateLayout, so recycled holders need an explicit
+        // remeasure even when only the spans, rather than the plain text, change.
+        candidateLayout = null
+        laidOutText = null
+        requestLayout()
+        invalidate()
+    }
+
     private fun prepareLayout(): StaticLayout {
         candidateLayout?.let { layout ->
             if (laidOutText === text && laidOutSize == textSize &&

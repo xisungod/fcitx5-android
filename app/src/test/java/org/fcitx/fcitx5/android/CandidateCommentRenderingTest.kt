@@ -8,17 +8,24 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Looper
+import android.text.Spanned
+import android.text.TextPaint
+import android.text.style.RelativeSizeSpan
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.core.graphics.ColorUtils
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
+import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.candidates.candidateCommentForeground
 import org.fcitx.fcitx5.android.input.candidates.floating.LabeledCandidateItemUi
 import org.junit.Assert.*
@@ -90,6 +97,120 @@ class CandidateCommentRenderingTest {
         }
         assertTrue("No rendered pixels for ${Integer.toHexString(color)}", right >= left && bottom >= top)
         return Rect(left, top, right + 1, bottom + 1)
+    }
+
+    @Test fun horizontalHolderReuseFromShortSpellingsKeepsEveryHhhCandidateAtItsNormalBodySize() {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val adapter = HorizontalCandidateViewAdapter(theme)
+        val row = RecyclerView(controller.get()).apply {
+            layoutManager = LinearLayoutManager(context, RecyclerView.HORIZONTAL, false)
+            this.adapter = adapter
+            itemAnimator = null
+        }
+        controller.get().setContentView(row)
+        fun update(words: List<String>) {
+            adapter.updateCandidates(words.map { CandidateWord("", it, "") }.toTypedArray(), words.size)
+            repeat(2) { render(row, width = 600).recycle(); shadowOf(Looper.getMainLooper()).idle() }
+        }
+        try {
+            update(listOf("哈", "黑", "嘿", "会"))
+            val firstHolders = (0..3).map { row.findViewHolderForAdapterPosition(it) }
+            update(listOf("哈哈", "黑乎", "嘿嘿", "会很"))
+            val words = listOf("哈哈哈", "黑乎乎", "嘿嘿嘿", "会很好", "黄昏后")
+            update(words)
+            assertTrue("The regression must exercise existing holders rather than fresh views",
+                (0..3).any { row.findViewHolderForAdapterPosition(it) in firstHolders })
+            val image = render(row, width = 600)
+            try {
+                File("build/outputs/candidate-checks").apply { mkdirs() }
+                    .resolve("hhh-reused-horizontal.png").outputStream().use {
+                        image.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    }
+                words.forEachIndexed { index, word ->
+                    val holder = row.findViewHolderForAdapterPosition(index) as CandidateViewHolder
+                    val reference = CandidateItemUi(context, theme).apply {
+                        updateCandidate(CandidateWord("", word, ""))
+                    }
+                    val referenceImage = render(reference.root, width = 200)
+                    val slotImage = Bitmap.createBitmap(image, holder.itemView.left, 0,
+                        holder.itemView.width, image.height)
+                    try {
+                        val text = holder.ui.root.getChildAt(0) as TextView
+                        assertEquals("$word base SP", 24f, text.textSize, .01f)
+                        assertEquals("$word actual rendered body; itemWidth=${holder.itemView.width}, textWidth=${text.width}",
+                            bounds(referenceImage, theme.candidateTextColor).height(),
+                            bounds(slotImage, theme.candidateTextColor).height())
+                    } finally { referenceImage.recycle(); slotImage.recycle() }
+                }
+            } finally { image.recycle() }
+        } finally { controller.pause().stop().destroy() }
+    }
+
+    @Test fun reusedHorizontalHolderRemeasuresSpanOnlyChangesAndRestoresBodyAfterHintsAndEmptyInput() {
+        val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        // An unmistakably different hint hue keeps antialiased comment edges
+        // out of the primary-text pixel bounds, including the Chinese hints.
+        val isolatedTheme = theme.copy(candidateCommentColor = Color.YELLOW)
+        val adapter = HorizontalCandidateViewAdapter(isolatedTheme)
+        val row = RecyclerView(controller.get()).apply {
+            layoutManager = LinearLayoutManager(context, RecyclerView.HORIZONTAL, false)
+            this.adapter = adapter
+            itemAnimator = null
+        }
+        controller.get().setContentView(row)
+        val stages = listOf(
+            CandidateWord("", "你", "好啊", false),
+            CandidateWord("", "你好", "啊", false),
+            CandidateWord("", "你好啊", ""),
+            CandidateWord("", "你是啊", "ni shi a"),
+            CandidateWord("", "几号啊", "*", false),
+            CandidateWord("", "几", ""),
+            CandidateWord.Empty,
+            CandidateWord("", "哈哈哈", ""),
+            CandidateWord("", "你是啊", "ni shi a")
+        )
+        var reusedHolder: CandidateViewHolder? = null
+        try {
+            stages.forEachIndexed { index, word ->
+                val data = if (word == CandidateWord.Empty) emptyArray() else arrayOf(word)
+                adapter.updateCandidates(data, data.size)
+                repeat(2) { render(row, width = 480).recycle(); shadowOf(Looper.getMainLooper()).idle() }
+                if (data.isEmpty()) {
+                    assertEquals(0, row.childCount)
+                    return@forEachIndexed
+                }
+                val holder = row.findViewHolderForAdapterPosition(0) as CandidateViewHolder
+                if (index == 0) reusedHolder = holder
+                if (index in 1..2) {
+                    assertSame("Same plain text must still rebind the real holder's changed spans", reusedHolder, holder)
+                    assertEquals("你好啊", (holder.ui.root.getChildAt(0) as TextView).text.toString())
+                }
+                val text = holder.ui.root.getChildAt(0) as TextView
+                assertEquals(24f, text.textSize, .01f)
+                val reference = CandidateItemUi(context, isolatedTheme).apply {
+                    updateCandidate(CandidateWord("", word.text, ""))
+                }
+                val referenceImage = render(reference.root, width = 200)
+                val image = render(row, width = 480)
+                try {
+                    val expectedBody = bounds(referenceImage, theme.candidateTextColor)
+                    val actualBody = bounds(image, theme.candidateTextColor)
+                    assertEquals("Stage $index ${word.text} body width", expectedBody.width(), actualBody.width())
+                    assertEquals("Stage $index ${word.text} body height", expectedBody.height(), actualBody.height())
+                    if (word.comment.isNotBlank()) {
+                        val hint = bounds(image, isolatedTheme.candidateCommentColor)
+                        assertTrue("Stage $index keeps the annotation secondary", hint.height() < actualBody.height())
+                        val styled = text.text as Spanned
+                        val spans = styled.getSpans(word.text.length, styled.length, RelativeSizeSpan::class.java)
+                        val size = if (word.displayComment == "*") .55f else .625f
+                        val span = spans.single { kotlin.math.abs(it.sizeChange - size) < .001f }
+                        val hintPaint = TextPaint(text.paint)
+                        span.updateMeasureState(hintPaint)
+                        assertEquals(if (word.displayComment == "*") 13.2f else 15f, hintPaint.textSize, .01f)
+                    }
+                } finally { referenceImage.recycle(); image.recycle() }
+            }
+        } finally { controller.pause().stop().destroy() }
     }
 
     @Test fun commentsActuallyDrawSmallerAndInTheThemeCommentColorWithoutShrinkingChinese() {
