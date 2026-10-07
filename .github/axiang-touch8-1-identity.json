@@ -1,0 +1,80 @@
+{
+  "format": "axiang-touch8-1-exact-delivery-identity-v1",
+  "repository": "xisungod/fcitx5-android",
+  "source_commit": "d12bd16ece54b02c78aa28a92c2b161c51cc766b",
+  "apk_name": "AXiang-1.2-touch.8.1-arm64.apk",
+  "apk_bytes": 268992145,
+  "apk_sha256": "3f64045efa7b2e58d57b927ad22353ea07f4c80a20dec725cc807facd3c0e2b8",
+  "signer_sha256": "ffede124b18d54af5d4cfa9f3a32504fa2ccc898563bc4816bacbe3e46ec0494",
+  "package": "org.fcitx.fcitx5.android.axiang.touch2",
+  "version_name": "1.2-touch.8.1",
+  "version_code": 10,
+  "unit_tests": 820,
+  "unit_test_scope": "full_application_suite",
+  "baseline_apk_sha256": "5f04bd499df1552878cf353cad882bad709837d6f3ad257edcd34cb26e6eb441",
+  "release_id": 405726042,
+  "release_tag": "axiang-touch-1.2-touch.8.1",
+  "contains_signing_key_or_user_logs": false,
+  "public_files": {
+    "AXiang-1.2-touch.8.1-arm64.apk": {
+      "bytes": 268992145,
+      "sha256": "3f64045efa7b2e58d57b927ad22353ea07f4c80a20dec725cc807facd3c0e2b8"
+    },
+    "GUIDE.zh-CN.md": {
+      "bytes": 3761,
+      "sha256": "47c7d2b2c09057599c7c0cb1b53461ba91d2d0a87c9c0f2b451ee04ac4714ce4"
+    },
+    "SHA256SUMS.txt": {
+      "bytes": 1300,
+      "sha256": "79589792279797055623c5ac9787ae86017a0891c387c5d30cc45d2633a82c7f"
+    },
+    "build-verification.json": {
+      "bytes": 3074,
+      "sha256": "3eef8d409bae934fb702de9822a01edc5e21c87f6e14e9a4f21da3768a3ab589"
+    },
+    "completion-resource-test-summary.json": {
+      "bytes": 630,
+      "sha256": "fc00d93d92bd0c0182c326c6f5b6c9536f88bb1c57485ee8f5a109cf34f4af50"
+    },
+    "full-junit-reports.zip": {
+      "bytes": 79061,
+      "sha256": "2e485a4ba3736066472b37823d1485a4a080ae88a7b8793fa433d79a07e8ef03"
+    },
+    "inherited-rime-evidence.json": {
+      "bytes": 1369,
+      "sha256": "63de2e8c06471dcda07199ffaf16de9bb534f4347ca50c71e2a9654121cb1696"
+    },
+    "native-prediction-provenance.json": {
+      "bytes": 40652,
+      "sha256": "e5c209ae1bac8f8a3f110e86631050ee6f38a60058a756a2776e620db99a2437"
+    },
+    "native-prediction-test-summary.json": {
+      "bytes": 6834,
+      "sha256": "cc9c900f1507971019e5348da058dd192755729fba64003c08230c7bf86d1bf6"
+    },
+    "packaged-rime-version.json": {
+      "bytes": 1245,
+      "sha256": "e8b65389fef1e2baa2c5706c21405291ae712b47e3bdb3e8bf75fcdc25a13b08"
+    },
+    "prebuilt-manifest.json": {
+      "bytes": 137654,
+      "sha256": "9a9230dd85e18c186ce8a4409d2573c9d75cbdcf9aa51371701a2417833cba5d"
+    },
+    "source-patch-manifest.json": {
+      "bytes": 7786,
+      "sha256": "4d8f9c874a91b500f4ee2f768f59a67c169b5786a088f3f2badada87a10a00e3"
+    },
+    "source-snapshot.json": {
+      "bytes": 488,
+      "sha256": "d937cfbd7e41cd5a8a260b165cfd76abb34f98f6e56874f2b1747757f404dbbb"
+    },
+    "typing-test-source.patch": {
+      "bytes": 1081567,
+      "sha256": "28e734fb53fcbd6f6e9b739ae6d0957b70ba9f205a37f1169b16cbe6a2d48b49"
+    },
+    "unit-test-summary.json": {
+      "bytes": 24143,
+      "sha256": "5d0b8862c2e40b921c3a1a02d734a8ccd8e088541b77031e73cc3acd57abdb39"
+    }
+  }
+}
