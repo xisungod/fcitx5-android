@@ -86,6 +86,7 @@ import splitties.views.dsl.core.matchParent
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import org.fcitx.fcitx5.android.data.otp.VerificationCodes
+import org.fcitx.fcitx5.android.data.otp.SmsCodeStatus
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -235,6 +236,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             clipboardTimeoutJob = null
         }
         evalIdleUiState()
+        SmsCodeStatus.recordPrepared()
     }
 
     @Keep
@@ -298,6 +300,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private fun evalIdleUiState(fromUser: Boolean = false) {
         val newState = when {
+            // Temporarily cover a manually opened number row without forgetting the user's
+            // choice. Dismissal or expiry restores it; ordinary clipboard suggestions don't.
+            isSmsCodeSuggestionActive() -> IdleUi.State.Clipboard
             numberRowState == NumberRowState.ForceShow -> IdleUi.State.NumberRow
             isClipboardFresh -> IdleUi.State.Clipboard
             isInlineSuggestionPresent -> IdleUi.State.InlineSuggestion

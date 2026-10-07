@@ -144,6 +144,35 @@ class SmsCodeReceiverTest {
         assertEquals(VerificationCodes.Source.Sms, VerificationCodes.fresh()?.source)
     }
 
+    @Test fun deniedAuthorizationThenDirectSystemGrantCanReceiveANewCodeWithoutAnIme() {
+        assertTrue(SmsCodeAccess.beginAutomaticAuthorization(application))
+        SmsCodeAccess.finishAuthorization(application, false)
+        assertTrue(AppPrefs.getInstance().clipboard.verificationCodeFromSms.getValue())
+        assertFalse(receiverAvailable())
+        SmsCodeReceiver().onReceive(application, sms("验证码 482913"))
+        assertNull(VerificationCodes.fresh())
+
+        // Reproduce a grant in the phone's settings, with no app settings continuation flag.
+        grant()
+        SmsCodeAccess.prepareUserEntry(application)
+        assertTrue(receiverAvailable())
+        assertFalse(SmsCodeAccess.beginAutomaticAuthorization(application))
+        SmsCodeReceiver().onReceive(application, sms("验证码 8361"))
+        assertEquals("8361", VerificationCodes.fresh()?.code)
+    }
+
+    @Test fun manualOffAfterDenialStillRejectsNewSmsFollowingADirectSystemGrant() {
+        assertTrue(SmsCodeAccess.beginAutomaticAuthorization(application))
+        SmsCodeAccess.finishAuthorization(application, false)
+        AppPrefs.getInstance().clipboard.verificationCodeFromSms.setValue(false)
+        grant()
+        SmsCodeAccess.prepareUserEntry(application)
+        assertFalse(AppPrefs.getInstance().clipboard.verificationCodeFromSms.getValue())
+        assertFalse(receiverAvailable())
+        SmsCodeReceiver().onReceive(application, sms("验证码 482913"))
+        assertNull(VerificationCodes.fresh())
+    }
+
     @Test fun receiverUsesOnePublicationForOneValidSms() {
         optIn()
         grant()

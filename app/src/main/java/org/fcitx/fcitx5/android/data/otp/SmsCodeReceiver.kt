@@ -13,12 +13,23 @@ import android.provider.Telephony
 class SmsCodeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
-        if (!SmsCodeAccess.canReceive(context)) return
+        SmsCodeStatus.recordReceived()
+        if (!SmsCodeAccess.canReceive(context)) {
+            SmsCodeStatus.recordBlocked()
+            return
+        }
         val body = runCatching {
             Telephony.Sms.Intents.getMessagesFromIntent(intent)
+                ?.takeIf { messages -> messages.isNotEmpty() && messages.none { it == null } }
                 ?.joinToString("") { it?.messageBody.orEmpty() }
-        }.getOrNull() ?: return
-        val code = VerificationCodes.extract(body) ?: return
+        }.getOrNull()
+        if (body == null) {
+            SmsCodeStatus.recordMalformed()
+            return
+        }
+        val code = VerificationCodes.extract(body)
+        SmsCodeStatus.recordParseResult(code != null)
+        if (code == null) return
         VerificationCodes.publish(code, VerificationCodes.Source.Sms)
     }
 }

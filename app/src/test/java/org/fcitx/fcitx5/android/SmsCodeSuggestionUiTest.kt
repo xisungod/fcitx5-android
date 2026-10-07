@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Looper
 import android.text.Editable
+import android.text.InputType
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.view.ViewGroup
@@ -15,19 +16,37 @@ import android.view.inputmethod.EditorInfo
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.runBlocking
+import org.fcitx.fcitx5.android.core.Action
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.CapabilityFlags
+import org.fcitx.fcitx5.android.core.FcitxAPI
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.FormattedText
+import org.fcitx.fcitx5.android.core.InputMethodEntry
+import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.data.otp.VerificationCodes
+import org.fcitx.fcitx5.android.data.otp.SmsCodeStatus
+import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
+import org.fcitx.fcitx5.android.input.InputView
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ClipboardSuggestionDismissals
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
+import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
+import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOffer
 import org.junit.After
@@ -46,6 +65,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.util.ReflectionHelpers
 import java.time.Duration
+import java.lang.reflect.Proxy
 
 /** Exercises the real toolbar and actual editor acceptance without starting the native daemon. */
 @RunWith(RobolectricTestRunner::class)
@@ -75,11 +95,13 @@ class SmsCodeSuggestionUiTest {
         AppPrefs.getInstance().clipboard.verificationCodeFromSms.setValue(true)
         shadowOf(application).grantPermissions(Manifest.permission.RECEIVE_SMS)
         VerificationCodes.consume()
+        SmsCodeStatus.reset()
         clearSmsDismissal()
     }
 
     @After fun restore() {
         VerificationCodes.consume()
+        SmsCodeStatus.reset()
         clearSmsDismissal()
         shadowOf(application).denyPermissions(Manifest.permission.RECEIVE_SMS)
         val listener = AppPrefs::class.java.getDeclaredField("onSharedPreferenceChangeListener")
@@ -112,14 +134,37 @@ class SmsCodeSuggestionUiTest {
             acceptsCommit && super.commitText(text, newCursorPosition)
     }
 
-    private inner class Harness : AutoCloseable {
+    /** Substitute only the engine boundary; the complete InputView and broadcast pipeline run. */
+    private class IdleEngine : FcitxConnection {
+        val events = MutableSharedFlow<FcitxEvent<*>>(extraBufferCapacity = 16)
+        private val ime = InputMethodEntry("keyboard-us")
+        private val api = Proxy.newProxyInstance(FcitxAPI::class.java.classLoader,
+            arrayOf(FcitxAPI::class.java)) { _, method, _ ->
+            when (method.name) {
+                "getInputMethodEntryCached" -> ime
+                "getStatusAreaActionsCached" -> emptyArray<Action>()
+                "getClientPreeditCached" -> FormattedText.Empty
+                "getInputPanelCached" -> FcitxEvent.InputPanelEvent.Data()
+                "getEventFlow" -> events
+                else -> error("Unexpected native call in idle SMS UI test: ${method.name}")
+            }
+        } as FcitxAPI
+        override val lifecycleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        override fun <T> runImmediately(block: suspend FcitxAPI.() -> T): T = runBlocking { block(api) }
+        override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T = block(api)
+        override fun runIfReady(block: suspend FcitxAPI.() -> Unit) { runBlocking { block(api) } }
+    }
+
+    private inner class Harness(fullInputView: Boolean = false) : AutoCloseable {
         private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         private val activity = controller.get()
         private val scope = DynamicScope()
         val service = Robolectric.buildService(FcitxInputMethodService::class.java).get()
         val editor = Editor(application)
-        val bar = KawaiiBarComponent()
-        val candidates = HorizontalCandidateComponent()
+        val bar: KawaiiBarComponent
+        val candidates: HorizontalCandidateComponent
+        val inputView: InputView?
+        private val engine: IdleEngine?
         private val theme: Theme = ThemePreset.XuancaiBlackV09
         private val uiContext: ContextThemeWrapper = ContextThemeWrapper(activity, R.style.Theme_InputViewTheme)
 
@@ -128,36 +173,110 @@ class SmsCodeSuggestionUiTest {
             service.lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_START)
             ReflectionHelpers.setField(service, "mStartedInputConnection", editor)
             ReflectionHelpers.getField<CursorTracker>(service, "selection").resetTo(0)
-            scope += uiContext.wrapToUniqueComponent()
-            scope += theme.wrapToUniqueComponent()
-            scope += service.wrapToUniqueComponent()
-            scope += CommonKeyActionListener()
-            scope += PopupComponent()
-            scope += candidates
-            scope += bar
-            bar.onScopeSetupFinished(scope)
-            activity.setContentView(bar.view)
-            bar.onStartInput(EditorInfo(), CapabilityFlags(0uL))
+            if (fullInputView) {
+                // This test covers SMS UI, not the independently tested native touch probe.
+                AppPrefs.getInstance().keyboard.apply {
+                    pinyinTouchCorrection.setValue(false)
+                    pinyinTouchAlternatives.setValue(false)
+                    pinyinTouchPersonalization.setValue(false)
+                }
+                engine = IdleEngine()
+                ReflectionHelpers.setField(service, "fcitx", engine)
+                inputView = InputView(service, engine, theme)
+                ReflectionHelpers.setField(service, "inputView", inputView)
+                bar = ReflectionHelpers.getField(inputView, "kawaiiBar")
+                candidates = ReflectionHelpers.getField(inputView, "horizontalCandidate")
+                activity.setContentView(inputView)
+                inputView.startInput(EditorInfo(), CapabilityFlags(0uL))
+                inputView.handleEvents = true
+            } else {
+                inputView = null
+                engine = null
+                bar = KawaiiBarComponent()
+                candidates = HorizontalCandidateComponent()
+                scope += uiContext.wrapToUniqueComponent()
+                scope += theme.wrapToUniqueComponent()
+                scope += service.wrapToUniqueComponent()
+                scope += CommonKeyActionListener()
+                scope += PopupComponent()
+                scope += candidates
+                scope += bar
+                bar.onScopeSetupFinished(scope)
+                activity.setContentView(bar.view)
+                bar.onStartInput(EditorInfo(), CapabilityFlags(0uL))
+            }
             settle()
         }
 
         fun settle(milliseconds: Long = 16L) {
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(milliseconds))
             repeat(2) {
-                bar.view.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
-                    View.MeasureSpec.makeMeasureSpec(52, View.MeasureSpec.EXACTLY))
-                bar.view.layout(0, 0, 360, 52)
+                val root = inputView ?: bar.view
+                val height = if (inputView == null) 52 else 800
+                root.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                root.layout(0, 0, 360, height)
             }
         }
 
         fun predict(token: Long = 1L) {
-            candidates.setPredictionOffer(NextWordPredictionOffer(token, listOf("快乐", "朋友")))
-            bar.setNextWordPredictionVisible(true)
+            val offer = NextWordPredictionOffer(token, listOf("快乐", "朋友"))
+            if (inputView != null) inputView.showNextWordPrediction(offer)
+            else {
+                candidates.setPredictionOffer(offer)
+                bar.setNextWordPredictionVisible(true)
+            }
             settle()
         }
 
         fun sms(code: String = "482913", age: Long = 0L) {
             VerificationCodes.publish(code, VerificationCodes.Source.Sms, System.currentTimeMillis() - age)
+            settle()
+        }
+
+        fun startEditor(inputType: Int) {
+            val info = EditorInfo().apply { this.inputType = inputType }
+            if (inputView != null) inputView.startInput(info, CapabilityFlags.fromEditorInfo(info))
+            else {
+                bar.onStartInput(info, CapabilityFlags.fromEditorInfo(info))
+                bar.onKeyboardLayoutSwitched(inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_CLASS_NUMBER)
+            }
+            settle()
+        }
+
+        fun nativeIdleEvents() {
+            val flow = requireNotNull(engine).events
+            assertTrue(flow.subscriptionCount.value > 0)
+            assertTrue(flow.tryEmit(FcitxEvent.ClientPreeditEvent(FormattedText.Empty)))
+            assertTrue(flow.tryEmit(FcitxEvent.InputPanelEvent(FcitxEvent.InputPanelEvent.Data())))
+            assertTrue(flow.tryEmit(FcitxEvent.CandidateListEvent(FcitxEvent.CandidateListEvent.Data(total = 0))))
+            settle()
+        }
+
+        fun numberRow(): NumberRow = allViews(bar.view).filterIsInstance<NumberRow>().single()
+
+        /** Exercise the same installed gesture callback as a user expanding the password row. */
+        fun manuallyShowNumberRow() {
+            AppPrefs.getInstance().keyboard.toolbarNumRowOnPassword.setValue(true)
+            startEditor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+            assertTrue(numberRow().isShown)
+            numberRow().onCollapseListener!!.invoke()
+            settle()
+            assertFalse(numberRow().isShown)
+            val button = allViews(bar.view).filterIsInstance<ToolButton>().single {
+                it.contentDescription == activity.getString(R.string.hide_keyboard)
+            }
+            assertTrue(requireNotNull(button.onGestureListener).onGesture(button,
+                CustomGestureView.Event(CustomGestureView.GestureType.Up, false,
+                    -80f, 26f, -1, 0, -106, 0)))
+            settle()
+            assertTrue(numberRow().isShown)
+        }
+
+        fun clipboard(text: String) {
+            AppPrefs.getInstance().clipboard.clipboardSuggestion.setValue(true)
+            ReflectionHelpers.getField<ClipboardManager.OnClipboardUpdateListener>(bar,
+                "onClipboardUpdateListener").onUpdate(ClipboardEntry(id = 782, text = text))
             settle()
         }
 
@@ -190,6 +309,7 @@ class SmsCodeSuggestionUiTest {
             service.lifecycle.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
             controller.pause().stop().destroy()
             scope.clear()
+            engine?.lifecycleScope?.cancel()
         }
     }
 
@@ -201,6 +321,122 @@ class SmsCodeSuggestionUiTest {
             h.assertSmsShown()
             h.predict(2)
             h.assertSmsShown()
+        }
+    }
+
+    @Test fun incomingSmsCoversManualNumberRowAndDismissRestoresTheUsersChoice() {
+        Harness().use { h ->
+            h.manuallyShowNumberRow()
+            h.sms()
+            h.assertSmsShown()
+            assertFalse(h.numberRow().isShown)
+            h.dismiss()
+            assertFalse(h.chip().isShown)
+            assertTrue(h.numberRow().isShown)
+        }
+    }
+
+    @Test fun smsExpiryRestoresManualNumberRowWithoutAnotherInputEvent() {
+        Harness().use { h ->
+            h.manuallyShowNumberRow()
+            h.sms(age = VerificationCodes.TTL_MS - 1_000L)
+            h.assertSmsShown()
+            h.settle(1_100L)
+            assertFalse(h.chip().isShown)
+            assertTrue(h.numberRow().isShown)
+        }
+    }
+
+    @Test fun ordinaryClipboardDoesNotCoverAManuallyOpenedNumberRow() {
+        Harness().use { h ->
+            h.manuallyShowNumberRow()
+            h.clipboard("测试剪贴板内容")
+            assertTrue(h.numberRow().isShown)
+            assertFalse(allViews(h.bar.view).filterIsInstance<TextView>().single {
+                it.text.toString() == "测试剪贴板内容"
+            }.isShown)
+        }
+    }
+
+    @Test fun incomingSmsCanBeTappedIntoADigitsEditor() {
+        Harness().use { h ->
+            h.startEditor(InputType.TYPE_CLASS_NUMBER)
+            h.sms()
+            h.assertSmsShown()
+            h.tapCode()
+            assertEquals("482913", h.editor.buffer.toString())
+            assertNull(VerificationCodes.fresh())
+        }
+    }
+
+    @Test fun incomingSmsCanBeTappedIntoANumericPasswordEditor() {
+        Harness().use { h ->
+            h.startEditor(InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD)
+            h.sms()
+            h.assertSmsShown()
+            h.tapCode()
+            assertEquals("482913", h.editor.buffer.toString())
+            assertNull(VerificationCodes.fresh())
+        }
+    }
+
+    @Test fun incomingSmsCoversAutomaticPasswordNumberRowAndCanBeTappedIntoTheEditor() {
+        AppPrefs.getInstance().keyboard.toolbarNumRowOnPassword.setValue(true)
+        Harness().use { h ->
+            h.startEditor(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+            assertTrue(h.numberRow().isShown)
+            h.sms()
+            h.assertSmsShown()
+            assertFalse(h.numberRow().isShown)
+            h.tapCode()
+            assertEquals("482913", h.editor.buffer.toString())
+            assertNull(VerificationCodes.fresh())
+            assertTrue(h.numberRow().isShown)
+        }
+    }
+
+    @Test fun smsReceivedBeforeToolbarConstructionIsReplayedAfterStartAndNativeIdleEvents() {
+        VerificationCodes.publish("8361", VerificationCodes.Source.Sms)
+        Harness().use { h ->
+            h.assertSmsShown("8361")
+            h.bar.onPreeditEmptyStateUpdate(true)
+            h.bar.onCandidateUpdate(FcitxEvent.CandidateListEvent.Data(total = 0))
+            h.settle()
+            h.assertSmsShown("8361")
+        }
+    }
+
+    @Test fun fullInputViewReplaysANewCodeInTheNumericLayoutAcrossNativeIdleAndLatePrediction() {
+        VerificationCodes.publish("8361", VerificationCodes.Source.Sms)
+        Harness(fullInputView = true).use { h ->
+            h.startEditor(InputType.TYPE_CLASS_NUMBER)
+            h.assertSmsShown("8361")
+            assertFalse(requireNotNull(h.inputView).nextWordPredictionSurfaceVisible())
+            h.nativeIdleEvents()
+            h.assertSmsShown("8361")
+            h.predict(7)
+            h.assertSmsShown("8361")
+            h.tapCode()
+            assertEquals("8361", h.editor.buffer.toString())
+            assertNull(VerificationCodes.fresh())
+        }
+    }
+
+    @Test fun preparationStatusCountsOnlyFreshPermittedUndismissedSmsOffers() {
+        shadowOf(application).denyPermissions(Manifest.permission.RECEIVE_SMS)
+        Harness().use { h ->
+            h.sms()
+            assertEquals(0, SmsCodeStatus.snapshot().prepared)
+            shadowOf(application).grantPermissions(Manifest.permission.RECEIVE_SMS)
+            AppPrefs.getInstance().clipboard.verificationCodeFromSms.fireChange()
+            h.settle()
+            h.assertSmsShown()
+            assertEquals(1, SmsCodeStatus.snapshot().prepared)
+            h.dismiss()
+            h.startEditor(InputType.TYPE_CLASS_NUMBER)
+            assertEquals(1, SmsCodeStatus.snapshot().prepared)
+            h.sms("8361", age = VerificationCodes.TTL_MS + 1_000L)
+            assertEquals(1, SmsCodeStatus.snapshot().prepared)
         }
     }
 

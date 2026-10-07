@@ -383,9 +383,9 @@
     <string name="verification_code_clipboard">识别复制内容中的验证码</string>
     <string name="verification_code_clipboard_summary">复制整条短信后，工具栏只显示验证码，点一下即可粘贴</string>
     <string name="verification_code_sms">识别新短信验证码</string>
-    <string name="verification_code_sms_summary">默认开启，首次使用请求短信接收权限；只识别新收到的短信，验证码仅在本机内存中保留 5 分钟</string>
+    <string name="verification_code_sms_summary">默认开启，首次使用请求短信接收权限；只在本机识别新短信，验证码提示 5 分钟内有效</string>
     <string name="verification_code_sms_permission_denied_title">尚未取得短信权限</string>
-    <string name="verification_code_sms_permission_denied_message">短信权限未获允许，读取功能尚未开启。请前往系统设置，查看 AXiang 的短信权限。\n\n若系统不允许授权，也可以复制短信，在键盘上点验证码提示。</string>
+    <string name="verification_code_sms_permission_denied_message">尚未取得短信权限，暂时无法识别新短信。请前往系统设置，查看 AXiang 的短信权限。\n\n若系统不允许授权，也可以复制短信，在键盘上点验证码提示。</string>
     <string name="verification_code_sms_open_app_settings">查看应用权限</string>
     <string name="verification_code_chip">验证码 %1$s</string>
     <string name="verification_code_sms_chip">短信验证码 %1$s</string>
@@ -415,4 +415,20 @@
     <string name="key_exit_style">松手后的按键</string>
     <string name="key_exit_dim">原地渐暗（留下光迹）</string>
     <string name="key_exit_shrink">收成光点</string>
+    <string name="sms_code_status_title">短信验证码状态</string>
+    <string name="sms_code_status_summary">功能：%1$s · 权限：%2$s · 接收器：%3$s\n本次启动：收到 %4$d 条通知，识别 %5$d 次，准备 %6$d 次提示</string>
+    <string name="sms_code_status_details">AXiang %1$s\nAndroid %2$s（API %3$d，应用目标 API %4$d）\n功能：%5$s\n短信权限：%6$s\n接收器：%7$s\n系统接收检查：%8$s\n\n本次启动\n收到通知：%9$d\n匹配验证码：%10$d\n准备提示：%11$d\n被应用权限门控的通知：%12$d\n无法解析的通知：%13$d\n未匹配的通知：%14$d</string>
+    <string name="sms_code_status_explanation">这些计数只反映本次进程，不含短信正文、发送人或验证码，进程重启后会清零。收到 0 条通知不等于已证明系统拦截。准备提示不代表已在屏幕显示，正在组词时仍优先显示正常候选。</string>
+    <string name="sms_code_status_copy">复制状态</string>
+    <string name="sms_code_status_clear">清除计数</string>
+    <string name="sms_code_state_on">开启</string>
+    <string name="sms_code_state_off">关闭</string>
+    <string name="sms_code_state_allowed">已允许</string>
+    <string name="sms_code_state_not_allowed">未允许</string>
+    <string name="sms_code_state_enabled">已启用</string>
+    <string name="sms_code_state_disabled">未启用</string>
+    <string name="sms_code_state_unknown">未确认</string>
+    <string name="sms_code_state_system_default">系统默认（不代表已允许）</string>
+    <string name="sms_code_state_foreground">仅前台允许</string>
+    <string name="sms_code_state_errored">检查被拒绝</string>
 </resources>

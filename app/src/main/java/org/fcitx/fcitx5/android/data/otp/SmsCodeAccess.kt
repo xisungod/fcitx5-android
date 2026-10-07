@@ -74,8 +74,10 @@ object SmsCodeAccess {
 
     fun finishAuthorization(context: Context, granted: Boolean) {
         val pref = AppPrefs.getInstance().clipboard.verificationCodeFromSms
-        if (!granted) pref.setValue(false)
-        else if (pref.getValue()) pref.fireChange()
+        // A system denial changes availability, not the user's feature preference. Keeping
+        // that intent allows a later grant in system settings to take effect on foreground
+        // sync; explicit OFF still stays off and the automatic-attempt guard prevents loops.
+        if (granted && pref.getValue()) pref.fireChange()
         sync(context)
     }
 

@@ -383,9 +383,9 @@
     <string name="verification_code_clipboard">Detect verification codes in copied text</string>
     <string name="verification_code_clipboard_summary">Copied messages show just the code in the toolbar; tap to paste it</string>
     <string name="verification_code_sms">Detect codes in incoming SMS</string>
-    <string name="verification_code_sms_summary">On by default. Requests receive-SMS permission on first use; detects new incoming messages on this device only and keeps codes in memory for 5 minutes</string>
+    <string name="verification_code_sms_summary">On by default. Requests receive-SMS permission on first use; processes new messages on this device only and offers codes for 5 minutes</string>
     <string name="verification_code_sms_permission_denied_title">SMS permission not granted</string>
-    <string name="verification_code_sms_permission_denied_message">SMS code reading is off because SMS permission has not been granted. Open system settings to check AXiang\'s SMS permission.\n\nIf your system does not allow this permission, you can copy the message and tap the code suggestion on the keyboard.</string>
+    <string name="verification_code_sms_permission_denied_message">SMS permission has not been granted, so new SMS codes cannot be detected yet. Open system settings to check AXiang\'s SMS permission.\n\nIf your system does not allow this permission, you can copy the message and tap the code suggestion on the keyboard.</string>
     <string name="verification_code_sms_open_app_settings">View app permissions</string>
     <string name="verification_code_chip">Code %1$s</string>
     <string name="verification_code_sms_chip">SMS code %1$s</string>
@@ -415,4 +415,20 @@
     <string name="key_exit_style">Released key</string>
     <string name="key_exit_dim">Dims in place (trail)</string>
     <string name="key_exit_shrink">Shrinks to a spot</string>
+    <string name="sms_code_status_title">SMS verification status</string>
+    <string name="sms_code_status_summary">Feature: %1$s · Permission: %2$s · Receiver: %3$s\nThis process: %4$d notifications, %5$d matches, %6$d prepared suggestions</string>
+    <string name="sms_code_status_details">AXiang %1$s\nAndroid %2$s (API %3$d, app target API %4$d)\nFeature: %5$s\nSMS permission: %6$s\nReceiver: %7$s\nSystem reception check: %8$s\n\nThis process\nNotifications received: %9$d\nCodes matched: %10$d\nSuggestions prepared: %11$d\nNotifications blocked by app access: %12$d\nUnparseable notifications: %13$d\nNotifications without a match: %14$d</string>
+    <string name="sms_code_status_explanation">These counters cover only the current process and contain no message body, sender or code. Restarting the process clears them. Zero notifications does not prove a system block. A prepared suggestion does not mean it was visible; composing candidates still have priority.</string>
+    <string name="sms_code_status_copy">Copy status</string>
+    <string name="sms_code_status_clear">Clear counters</string>
+    <string name="sms_code_state_on">On</string>
+    <string name="sms_code_state_off">Off</string>
+    <string name="sms_code_state_allowed">Granted</string>
+    <string name="sms_code_state_not_allowed">Not granted</string>
+    <string name="sms_code_state_enabled">Enabled</string>
+    <string name="sms_code_state_disabled">Disabled</string>
+    <string name="sms_code_state_unknown">Unknown</string>
+    <string name="sms_code_state_system_default">System default (not proof of access)</string>
+    <string name="sms_code_state_foreground">Foreground only</string>
+    <string name="sms_code_state_errored">Check rejected</string>
 </resources>

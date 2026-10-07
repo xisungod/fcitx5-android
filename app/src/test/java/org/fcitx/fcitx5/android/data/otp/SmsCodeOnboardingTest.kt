@@ -104,8 +104,23 @@ class SmsCodeOnboardingTest {
         assertTrue(prefs().internal.smsCodeAutomaticAuthorizationAttempted.getValue())
         assertFalse(SmsCodeAccess.beginAutomaticAuthorization(application))
         SmsCodeAccess.finishAuthorization(application, false)
-        assertFalse(prefs().clipboard.verificationCodeFromSms.getValue())
+        assertTrue(prefs().clipboard.verificationCodeFromSms.getValue())
+        assertFalse(SmsCodeAccess.canReceive(application))
         assertFalse(SmsCodeAccess.beginAutomaticAuthorization(application))
+    }
+
+    @Test fun denialThenDirectSystemGrantEnablesReceptionOnVisibleEntryWithoutAnotherPrompt() {
+        assertTrue(SmsCodeAccess.beginAutomaticAuthorization(application))
+        SmsCodeAccess.finishAuthorization(application, false)
+        assertTrue(prefs().clipboard.verificationCodeFromSms.getValue())
+        assertFalse(SmsCodeAccess.canReceive(application))
+        grant()
+        assertFalse(SmsCodeAccess.requestAuthorizationForVisibleKeyboard(application, visible = true))
+        assertTrue(SmsCodeAccess.canReceive(application))
+        assertEquals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+            application.packageManager.getComponentEnabledSetting(
+                android.content.ComponentName(application, SmsCodeReceiver::class.java)))
+        assertNull(shadowOf(application).nextStartedActivity)
     }
 
     @Test fun hiddenKeyboardDoesNotMigrateOrLaunchAnything() {
@@ -139,6 +154,7 @@ class SmsCodeOnboardingTest {
     @Test fun explicitManualRetryDoesNotClearTheAutomaticPromptGuard() {
         SmsCodeAccess.beginAutomaticAuthorization(application)
         SmsCodeAccess.finishAuthorization(application, false)
+        prefs().clipboard.verificationCodeFromSms.setValue(false)
         prefs().clipboard.verificationCodeFromSms.setValue(true)
         SmsCodeAccess.noteExplicitAuthorizationAttempt()
         assertTrue(prefs().clipboard.verificationCodeFromSms.getValue())
@@ -181,7 +197,8 @@ class SmsCodeOnboardingTest {
         val activity = controller.get()
         activity.onRequestPermissionsResult(SmsCodePermissionActivity.REQUEST_SMS,
             arrayOf(Manifest.permission.RECEIVE_SMS), intArrayOf(PackageManager.PERMISSION_DENIED))
-        assertFalse(prefs().clipboard.verificationCodeFromSms.getValue())
+        assertTrue(prefs().clipboard.verificationCodeFromSms.getValue())
+        assertFalse(SmsCodeAccess.canReceive(application))
         assertTrue(ShadowDialog.getLatestDialog().isShowing)
         val saved = Bundle()
         controller.saveInstanceState(saved).pause().stop().destroy()
@@ -226,9 +243,10 @@ class SmsCodeOnboardingTest {
             (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             shadowOf(Looper.getMainLooper()).idle()
             controller.pause()
-            // Reproduce explicit OFF while this activity is behind system settings. The feature
-            // is already off after denial, so notify its actual preference listener explicitly.
-            prefs().clipboard.verificationCodeFromSms.fireChange()
+            // Reproduce explicit OFF while this activity is behind system settings. Denial
+            // retained the enabled intent, so only this user action cancels the continuation.
+            prefs().clipboard.verificationCodeFromSms.setValue(false)
+            shadowOf(Looper.getMainLooper()).idle()
             grant()
             controller.resume()
             assertTrue(activity.isFinishing)

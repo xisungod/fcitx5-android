@@ -90,17 +90,19 @@ class SmsCodePermissionFlowTest {
         android.content.ComponentName(application, SmsCodeReceiver::class.java)) ==
             android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
 
-    @Test fun denialExplainsWhyTheSwitchTurnedOffInsteadOfSilentlyFailing() {
+    @Test fun denialRetainsEnabledIntentAndDirectSystemGrantStartsReceptionOnResume() {
         pref().setValue(true)
         result(false)
-        assertFalse(pref().getValue())
+        assertTrue(pref().getValue())
         assertFalse(receiverEnabled())
         assertTrue(dialog()?.isShowing == true)
         assertNotNull(dialog()?.getButton(AlertDialog.BUTTON_POSITIVE))
         assertFalse(pending())
         grant()
         resumePermissionState()
-        assertFalse("A later grant alone must not turn the opted-out switch on", pref().getValue())
+        assertTrue(pref().getValue())
+        assertTrue(receiverEnabled())
+        assertFalse("Direct system authorization does not require our settings action", pending())
     }
 
     @Test fun explicitSettingsActionCompletesTheEnableAttemptOnGrant() {
@@ -125,12 +127,13 @@ class SmsCodePermissionFlowTest {
         dialog()!!.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         resumePermissionState()
-        assertFalse(pref().getValue())
+        assertTrue(pref().getValue())
+        assertFalse(receiverEnabled())
         assertFalse(pending())
         grant()
         resumePermissionState()
-        assertFalse(pref().getValue())
-        assertFalse(receiverEnabled())
+        assertTrue(pref().getValue())
+        assertTrue(receiverEnabled())
     }
 
     @Test fun permissionGrantReplaysTheEnabledPreferenceOnceWithoutStartingAnIme() {

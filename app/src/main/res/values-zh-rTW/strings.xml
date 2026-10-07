@@ -378,9 +378,9 @@
     <string name="verification_code_clipboard">辨識複製內容中的驗證碼</string>
     <string name="verification_code_clipboard_summary">複製整則簡訊後，工具列只顯示驗證碼，點一下即可貼上</string>
     <string name="verification_code_sms">辨識新簡訊驗證碼</string>
-    <string name="verification_code_sms_summary">預設開啟，首次使用請求簡訊接收權限；只辨識新收到的簡訊，驗證碼僅在本機記憶體中保留 5 分鐘</string>
+    <string name="verification_code_sms_summary">預設開啟，首次使用請求簡訊接收權限；只在本機辨識新簡訊，驗證碼提示 5 分鐘內有效</string>
     <string name="verification_code_sms_permission_denied_title">尚未取得簡訊權限</string>
-    <string name="verification_code_sms_permission_denied_message">簡訊權限未獲允許，讀取功能尚未開啟。請前往系統設定，查看 AXiang 的簡訊權限。\n\n若系統不允許授權，也可以複製簡訊，在鍵盤上點驗證碼提示。</string>
+    <string name="verification_code_sms_permission_denied_message">尚未取得簡訊權限，暫時無法辨識新簡訊。請前往系統設定，查看 AXiang 的簡訊權限。\n\n若系統不允許授權，也可以複製簡訊，在鍵盤上點驗證碼提示。</string>
     <string name="verification_code_sms_open_app_settings">查看應用程式權限</string>
     <string name="verification_code_chip">驗證碼 %1$s</string>
     <string name="verification_code_sms_chip">簡訊驗證碼 %1$s</string>
@@ -410,4 +410,20 @@
     <string name="key_exit_style">放開後的按鍵</string>
     <string name="key_exit_dim">原地漸暗（留下光跡）</string>
     <string name="key_exit_shrink">收成光點</string>
+    <string name="sms_code_status_title">簡訊驗證碼狀態</string>
+    <string name="sms_code_status_summary">功能：%1$s · 權限：%2$s · 接收器：%3$s\n本次啟動：收到 %4$d 則通知，辨識 %5$d 次，準備 %6$d 次提示</string>
+    <string name="sms_code_status_details">AXiang %1$s\nAndroid %2$s（API %3$d，應用程式目標 API %4$d）\n功能：%5$s\n簡訊權限：%6$s\n接收器：%7$s\n系統接收檢查：%8$s\n\n本次啟動\n收到通知：%9$d\n匹配驗證碼：%10$d\n準備提示：%11$d\n被應用程式權限阻擋的通知：%12$d\n無法解析的通知：%13$d\n未匹配的通知：%14$d</string>
+    <string name="sms_code_status_explanation">這些計數只反映本次程序，不含簡訊內容、寄件人或驗證碼，程序重新啟動後會歸零。收到 0 則通知不等於已證明系統攔截。準備提示不代表已在螢幕顯示，正在組詞時仍優先顯示正常候選。</string>
+    <string name="sms_code_status_copy">複製狀態</string>
+    <string name="sms_code_status_clear">清除計數</string>
+    <string name="sms_code_state_on">開啟</string>
+    <string name="sms_code_state_off">關閉</string>
+    <string name="sms_code_state_allowed">已允許</string>
+    <string name="sms_code_state_not_allowed">未允許</string>
+    <string name="sms_code_state_enabled">已啟用</string>
+    <string name="sms_code_state_disabled">未啟用</string>
+    <string name="sms_code_state_unknown">未確認</string>
+    <string name="sms_code_state_system_default">系統預設（不代表已允許）</string>
+    <string name="sms_code_state_foreground">僅前景允許</string>
+    <string name="sms_code_state_errored">檢查被拒絕</string>
 </resources>
