@@ -65,15 +65,22 @@ local function distance(a, b, limit)
   return previous[#b]
 end
 
-local function phrase_heads(input, seg, env)
+local function phrase_heads(input, seg, env, stream)
   local key = tostring(seg.start) .. ':' .. input
   if env.heads[key] then return env.heads[key] end
   local heads = {}
-  local translation = env.translator:query(input, seg)
-  if translation then
+  local translation = not stream and env.translator:query(input, seg)
+  if stream or translation then
+    local iterator, state
+    if stream then
+      iterator, state = stream.iterator, stream.state
+    else
+      iterator, state = translation:iter()
+    end
     local count = 0
-    for candidate in translation:iter() do
+    for candidate in iterator, state do
       count = count + 1
+      if stream then stream.prefix[#stream.prefix + 1] = candidate end
       if candidate.type == 'phrase' then
         heads[#heads + 1] = {text = candidate.text, comment = candidate.comment,
           preedit = candidate.preedit, _end = candidate._end, quality = candidate.quality}
@@ -89,7 +96,7 @@ local function phrase_heads(input, seg, env)
   return heads
 end
 
-local function phrase_repair(input, seg, env, head, priority)
+local function phrase_repair(input, seg, env, head, priority, stream)
   if #input < 16 or #input > 64 then return end
   -- A complete dictionary phrase wins. The normal translator's learned phrases
   -- also have higher quality than this fallback; this probe never learns twice.
@@ -100,7 +107,7 @@ local function phrase_repair(input, seg, env, head, priority)
   -- lengths and eight candidates each; no dictionary scan on the typing path.
   for trim = 0, 4 do
     local query = input:sub(1, #input - trim)
-      for _, candidate in ipairs(phrase_heads(query, seg, env)) do
+      for _, candidate in ipairs(phrase_heads(query, seg, env, trim == 0 and stream or nil)) do
         if (utf8.len(candidate.text) or 0) >= 6 then
           local spelling = candidate.comment
           local code = spelling:gsub(' ', '')
@@ -218,11 +225,25 @@ function M.func(input, seg, env)
   if #input < 3 or not input:match('^[a-z]+$') or env.commands[input] then return end
   local head, priority = exact_evidence(input, seg, env)
   short_repair(input, seg, env, head, priority)
-  phrase_repair(input, seg, env, head, priority)
   local translation = env.translator:query(input, seg)
-  if translation then for candidate in translation:iter() do
-    yield(below_literal(candidate, priority))
-  end end
+  local stream
+  if translation then
+    local iterator, state = translation:iter()
+    stream = {iterator = iterator, state = state, prefix = {}}
+  end
+  -- The long-phrase probe and final supplement both query this exact spelling.
+  -- Read its first eight native candidates once, then yield the same prefix and
+  -- continue the same iterator. Candidate references stay within this invocation;
+  -- only the existing dictionary value snapshots survive between keystrokes.
+  phrase_repair(input, seg, env, head, priority, stream)
+  if stream then
+    for _, candidate in ipairs(stream.prefix) do
+      yield(below_literal(candidate, priority))
+    end
+    for candidate in stream.iterator, stream.state do
+      yield(below_literal(candidate, priority))
+    end
+  end
 end
 function M.fini(env)
   env.translator = nil

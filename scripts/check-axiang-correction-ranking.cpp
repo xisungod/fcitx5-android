@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     api->initialize(&traits);
     const auto session = api->create_session();
     try {
-        Require(std::string(api->get_version()) == "1.12.0", "unexpected Rime version");
+        Require(std::string(api->get_version()) == "1.16.1", "unexpected Rime version");
         Require(session && api->select_schema(session, "rime_ice"), "missing pinned schema");
         api->set_option(session, "ascii_mode", False);
         api->set_option(session, "traditionalization", False);
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
             CheckTraditional(api, session, context);
             Require(context->options() == options && context->properties() == properties,
                     "conversion selection changed mode options or properties");
-            std::cout << "{\"schema\":1,\"engine_version\":\"1.12.0\","
+            std::cout << "{\"schema\":1,\"engine_version\":\"" << api->get_version() << "\","
                          "\"tests\":{\"cases\":1,\"failures\":0,\"errors\":0,\"skipped\":0},"
                          "\"traditional_native_phrase_preserved\":true,"
                          "\"full_selection_commits_once\":true}\n";
@@ -208,7 +208,8 @@ int main(int argc, char** argv) {
         notification.disconnect();
         Require(context->options() == options && context->properties() == properties,
                 "ranking changed mode options or properties");
-        std::cout << "{\"schema\":1,\"engine_version\":\"1.12.0\",\"tests\":{\"cases\":" << cases
+        std::cout << "{\"schema\":1,\"engine_version\":\"" << api->get_version()
+                  << "\",\"tests\":{\"cases\":" << cases
                   << ",\"failures\":0,\"errors\":0,\"skipped\":0},"
                      "\"literal_prefix_unchanged\":true,\"correction_recall_preserved\":true,"
                      "\"native_pagination_indices_unchanged\":true,\"full_selection_commits_once\":true,"

@@ -14,6 +14,7 @@ struct OwnedProbe {
 };
 std::unordered_map<int64_t, OwnedProbe> probes;
 int64_t next_handle = 1;
+thread_local std::string last_failure;
 
 bool FcitxThread(JNIEnv* env) {
     const auto thread_class = env->FindClass("java/lang/Thread");
@@ -61,18 +62,40 @@ jstring JavaString(JNIEnv* env, const std::string& value) {
 extern "C" JNIEXPORT jlong JNICALL
 Java_org_fcitx_fcitx5_android_core_RimeTouchProbe_nativeCreate(
     JNIEnv* env, jobject, jstring schema_id) {
-    if (!FcitxThread(env)) return 0;
+    last_failure.clear();
+    if (!FcitxThread(env)) { last_failure = "WrongThread"; return 0; }
     try {
         // At most one isolated translator exists. Never invoke setup, deploy,
         // initialize, finalize, cleanup-all, or create/alter a service session.
-        if (!probes.empty() || !RimeTouchProbe::RuntimeReady()) return 0;
+        if (!probes.empty()) { last_failure = "AlreadyCreated"; return 0; }
+        const auto status = RimeTouchProbe::RuntimeStatus();
+        if (status != "Ready") { last_failure = status; return 0; }
         auto probe = std::make_unique<RimeTouchProbe>(Utf8(env, schema_id));
-        if (env->ExceptionCheck()) return 0;
+        if (env->ExceptionCheck()) { last_failure = "JniFailure"; return 0; }
         const auto handle = next_handle++;
         probes.emplace(handle, OwnedProbe{pthread_self(), std::move(probe)});
         return handle;
-    } catch (...) {
+    } catch (const axiang::typing::ProbeUnavailable& error) {
+        last_failure = error.what();
         return 0;
+    } catch (...) {
+        last_failure = "CreateFailed";
+        return 0;
+    }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_org_fcitx_fcitx5_android_core_RimeTouchProbe_nativeRuntimeStatus(
+    JNIEnv* env, jobject) {
+    if (!FcitxThread(env)) return JavaString(env, "WrongThread");
+    try {
+        const auto runtime = RimeTouchProbe::RuntimeStatus();
+        // Maintenance/component readiness takes precedence over a remembered
+        // failure. Successful create/query clears that failure on this thread.
+        return JavaString(env, runtime != "Ready" ? runtime :
+            last_failure.empty() ? "Ready:1.16.1" : last_failure);
+    } catch (...) {
+        return JavaString(env, "RuntimeUnavailable");
     }
 }
 
@@ -86,17 +109,23 @@ Java_org_fcitx_fcitx5_android_core_RimeTouchProbe_nativeQuery(
         "(Ljava/lang/String;Ljava/lang/String;III)V");
     if (!constructor) return nullptr;
     std::vector<axiang::typing::ProbeCandidate> candidates;
+    last_failure.clear();
     if (FcitxThread(env)) {
         const auto found = probes.find(handle);
         if (found != probes.end() && pthread_equal(found->second.owner, pthread_self())) {
             try {
                 const auto keys = Utf8(env, input);
                 const auto preceding = Utf8(env, context);
-                if (!env->ExceptionCheck()) candidates = found->second.probe->Query(
+                const auto runtime = RimeTouchProbe::RuntimeStatus();
+                if (runtime != "Ready") last_failure = runtime;
+                else if (!env->ExceptionCheck()) candidates = found->second.probe->Query(
                     keys, preceding, std::chrono::nanoseconds(budget_nanos));
-            } catch (...) { candidates.clear(); }
+                else last_failure = "JniFailure";
+            } catch (...) { last_failure = "QueryFailed"; candidates.clear(); }
+        } else {
+            last_failure = "HandleUnavailable";
         }
-    }
+    } else last_failure = "WrongThread";
     if (env->ExceptionCheck()) return nullptr;
     const auto output = env->NewObjectArray(static_cast<jsize>(candidates.size()), candidate_class, nullptr);
     if (!output) return nullptr;

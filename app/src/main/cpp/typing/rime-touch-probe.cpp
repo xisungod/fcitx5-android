@@ -5,8 +5,17 @@
 #include <sstream>
 #include <stdexcept>
 #include <rime_api.h>
+#include <rime/component.h>
+namespace rime { class Config; class Translator; struct Ticket; }
+// Import the packaged runtime's registry-component RTTI instead of emitting
+// another weak copy in this RTLD_LOCAL JNI DSO. Android's libc++abi requires
+// one identity for dynamic_cast even when the type names match. Declare these
+// before config.h's derived components instantiate their base.
+extern template class rime::Class<rime::Config, const std::string&>::Component;
+extern template class rime::Class<rime::Translator, const rime::Ticket&>::Component;
 #include <rime/config.h>
 #include <rime/context.h>
+#include <rime/dict/dictionary.h>
 #include <rime/engine.h>
 #include <rime/ticket.h>
 #include <rime/gear/memory.h>
@@ -16,6 +25,12 @@
 #include <rime/translator.h>
 
 namespace axiang::typing {
+#ifdef __ANDROID__
+// Independently measured from constructors in the pinned shipped ARM64 ELF.
+// Catch missing Engine patch, old Context headers or incompatible Boost layout.
+static_assert(sizeof(rime::Engine) == 96, "Packaged Rime Engine ABI differs");
+static_assert(sizeof(rime::Context) == 352, "Packaged Rime Context ABI differs");
+#endif
 namespace {
 constexpr size_t kMaxInputBytes = 32;
 constexpr size_t kMaxContextBytes = 192;
@@ -29,14 +44,17 @@ class ReadOnlyEngine final : public rime::Engine {
 public:
     explicit ReadOnlyEngine(const std::string& schema_id) {
         rime::Schema source(schema_id);
-        if (!source.config()) throw std::runtime_error("schema unavailable");
+        if (!source.config()) throw ProbeUnavailable("SchemaUnavailable");
+        std::string loaded_schema;
+        if (!source.config()->GetString("schema/schema_id", &loaded_schema) ||
+            loaded_schema != schema_id) throw ProbeUnavailable("SchemaUnavailable");
         std::ostringstream yaml;
         if (!source.config()->SaveToStream(yaml))
-            throw std::runtime_error("schema clone failed");
+            throw ProbeUnavailable("SchemaCloneFailed");
         auto config = std::make_unique<rime::Config>();
         std::istringstream cloned(yaml.str());
         if (!config->LoadFromStream(cloned))
-            throw std::runtime_error("schema clone failed");
+            throw ProbeUnavailable("SchemaCloneFailed");
         // Config created without a component and loaded only from a stream
         // has no file path; none of these changes can be automatically saved.
         config->SetBool("translator/enable_user_dict", false);
@@ -74,13 +92,15 @@ class RimeTouchProbe::Impl {
 public:
     explicit Impl(const std::string& schema_id) : engine(schema_id) {
         auto* component = rime::Translator::Require("script_translator");
-        if (!component) throw std::runtime_error("translator unavailable");
+        if (!component) throw ProbeUnavailable("TranslatorUnavailable");
         translator.reset(component->Create(rime::Ticket(&engine, "translator")));
-        if (!translator) throw std::runtime_error("translator unavailable");
+        if (!translator) throw ProbeUnavailable("TranslatorUnavailable");
         // Verify the hard privacy setting at the actual instantiated object.
         auto* memory = dynamic_cast<rime::Memory*>(translator.get());
         if (!memory || memory->user_dict())
-            throw std::runtime_error("probe user dictionary must be disabled");
+            throw ProbeUnavailable("PrivacyGuardFailed");
+        if (!memory->dict() || !memory->dict()->loaded())
+            throw ProbeUnavailable("DictionaryUnavailable");
     }
 
     ReadOnlyEngine engine;
@@ -88,13 +108,33 @@ public:
 };
 
 bool RimeTouchProbe::RuntimeReady() {
+    return RuntimeStatus() == "Ready";
+}
+
+std::string RimeTouchProbe::RuntimeStatus() {
     const auto* api = rime_get_api();
-    return api && RIME_API_AVAILABLE(api, get_version) &&
-        std::string(api->get_version()) == "1.12.0" &&
-        RIME_API_AVAILABLE(api, is_maintenance_mode) &&
-        !api->is_maintenance_mode() &&
-        rime::Config::Require("config") && rime::Config::Require("schema") &&
-        rime::Translator::Require("script_translator");
+    if (!api || !RIME_API_AVAILABLE(api, get_version) || !api->get_version ||
+        !api->get_version()) return "RuntimeUnavailable";
+    // This internal C++ bridge is compiled against the exact Android 1.16.1
+    // revision, including prebuilder's Engine layout patch and Boost headers.
+    // The build script also locks the unchanged packaged library's SHA256.
+    // Other versions require a separately rebuilt and validated bridge.
+    const std::string version(api->get_version());
+    if (version != "1.16.1") {
+        const bool printable = version.size() <= 24 &&
+            std::all_of(version.begin(), version.end(), [](unsigned char c) {
+                return (c >= '0' && c <= '9') || c == '.' || c == '-' ||
+                    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            });
+        return "VersionMismatch:" + (printable ? version : "unknown");
+    }
+    if (!RIME_API_AVAILABLE(api, is_maintenance_mode) || !api->is_maintenance_mode)
+        return "RuntimeUnavailable";
+    if (api->is_maintenance_mode()) return "MaintenanceMode";
+    if (!rime::Config::Require("config")) return "ConfigUnavailable";
+    if (!rime::Config::Require("schema")) return "SchemaUnavailable";
+    if (!rime::Translator::Require("script_translator")) return "TranslatorUnavailable";
+    return "Ready";
 }
 
 bool RimeTouchProbe::ValidInput(const std::string& input) {
@@ -105,8 +145,9 @@ bool RimeTouchProbe::ValidInput(const std::string& input) {
 }
 
 RimeTouchProbe::RimeTouchProbe(const std::string& schema_id) {
-    if (schema_id != "rime_ice" || !RuntimeReady())
-        throw std::runtime_error("probe unavailable");
+    if (schema_id != "rime_ice") throw ProbeUnavailable("UnsupportedSchema");
+    const auto status = RuntimeStatus();
+    if (status != "Ready") throw ProbeUnavailable(status.c_str());
     impl_ = std::make_unique<Impl>(schema_id);
 }
 

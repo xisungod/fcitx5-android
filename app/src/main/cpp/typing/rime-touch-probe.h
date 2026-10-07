@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,13 @@ struct ProbeCandidate {
     int start;
     int end;
     int rank;
+};
+
+// Stable, non-text failure codes cross JNI; never export exception messages,
+// schema paths, user input or dictionary contents into diagnostics.
+class ProbeUnavailable final : public std::runtime_error {
+public:
+    explicit ProbeUnavailable(const char* status) : std::runtime_error(status) {}
 };
 
 // This object owns a bare Engine, Config and Context, never a Rime service
@@ -30,6 +38,7 @@ public:
                                      const std::string& preceding_text,
                                      std::chrono::nanoseconds budget);
     static bool RuntimeReady();
+    static std::string RuntimeStatus();
     static bool ValidInput(const std::string& input);
 
 private:

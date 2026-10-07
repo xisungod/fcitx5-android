@@ -83,5 +83,5 @@ int main(int argc, char** argv) {
     probe.reset();
     api->destroy_session(live);
     api->finalize();
-    return unchanged ? 0 : 4;
+    return unchanged && !first.empty() ? 0 : 4;
 }

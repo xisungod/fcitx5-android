@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
     traits.min_log_level = 2;
     api->setup(&traits);
     api->initialize(&traits);
+    assert(strcmp(api->get_version(), "1.16.1") == 0);
     RimeSessionId session = api->create_session();
     assert(session);
     assert(api->select_schema(session, "rime_ice"));

@@ -16,6 +16,8 @@ import kotlinx.coroutines.sync.withLock
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.RimeTouchProbe
+import org.fcitx.fcitx5.android.core.RimeTouchProbeStatus
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticPolicy
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapEvidence
@@ -572,6 +574,7 @@ object TypingTestSession {
 
     private fun saveReport(aborted: Boolean) {
         val app = context ?: return
+        val probe = RimeTouchProbe.diagnostics()
         val root = JSONObject().put("format", "axiang-typing-test-v2")
             .put("version", BuildConfig.VERSION_NAME).put("source_commit", BuildConfig.BUILD_GIT_HASH)
             .put("started_at", startedAt).put("finished_at", System.currentTimeMillis())
@@ -588,6 +591,13 @@ object TypingTestSession {
                 .put("TouchSearch", "touch_alternative_search_ns")
                 .put("AlternativeQuery", "native_read_only_rime_probe_ns"))
             .put("offer_ready_measurement", "enqueue_to_offer_publish_ns")
+            .put("touch_probe_runtime", JSONObject()
+                .put("measurement", "cached_bridge_status_at_report_save")
+                .put("expected_version", RimeTouchProbeStatus.EXPECTED_VERSION)
+                .put("library_available", probe.libraryAvailable ?: JSONObject.NULL)
+                .put("status", probe.runtimeStatus?.code ?: JSONObject.NULL)
+                .put("runtime_version", probe.runtimeStatus?.runtimeVersion ?: JSONObject.NULL)
+                .put("last_failure", probe.lastFailure ?: JSONObject.NULL))
             .put("summary", summary(mutableState.value.results))
         val layouts = linkedMapOf<String, JSONObject>()
         fun layoutOf(touch: TypingTestTouch): String {

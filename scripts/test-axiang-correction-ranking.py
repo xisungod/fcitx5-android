@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build/run public native ranking regressions without changing shared Rime data.
 
-Requires a previously built host librime 1.12.0 with its Lua plugin, source
+Requires a previously built host librime 1.16.1 with its Lua plugin, source
 headers and the pinned compiled AXiang data. No download or deployment occurs.
 The disposable user directory and overridden Lua live under --work. The output
 contains hashes and public-case counters, never private input reports or paths.
@@ -26,6 +26,8 @@ def main():
     parser.add_argument("--rime-source", type=Path, required=True)
     parser.add_argument("--rime-build", type=Path, required=True)
     parser.add_argument("--rime-data", type=Path, required=True)
+    parser.add_argument("--prebuilt-data", type=Path,
+                        help="Pinned-runtime deployed host fixture for an old APK prism")
     parser.add_argument("--include", type=Path, action="append", default=[])
     parser.add_argument("--cxx", default="g++")
     parser.add_argument("--cc", default="gcc")
@@ -39,6 +41,7 @@ def main():
     args = parser.parse_args()
     root, source, build, data = [p.resolve() for p in
                                (args.root, args.rime_source, args.rime_build, args.rime_data)]
+    prebuilt = (args.prebuilt_data or data / "build").resolve()
     lua = root / "scripts/rime/xuancai_correction.lua"
     test_sources = {
         "correction_ranking": root / "scripts/check-axiang-correction-ranking.cpp",
@@ -50,9 +53,10 @@ def main():
     source_hashes[str(driver.relative_to(root))] = digest(driver)
     lua_bytes = lua.read_bytes()
     lua_hash = hashlib.sha256(lua_bytes).hexdigest()
-    library = build / "lib/librime.so.1.12.0"
+    library = build / "lib/librime.so.1.16.1"
     required = [lua, *test_sources.values(), library, source / "src/rime_api.h",
-                data / "build/rime_ice.schema.yaml", data / "rime_ice.schema.yaml"]
+                data / "build/rime_ice.schema.yaml", data / "rime_ice.schema.yaml",
+                prebuilt / "rime_ice.schema.yaml", prebuilt / "rime_ice.prism.bin"]
     if not all(path.is_file() for path in required):
         parser.error("Pinned source, library, test and compiled schema inputs must exist")
     if args.output.exists():
@@ -81,13 +85,15 @@ def main():
             raise RuntimeError("Host test compilation failed; inspect --work/" + suite + ".compile.log")
         binaries[suite] = binary
     suites, checks = {}, {}
+    engine_version = None
     with tempfile.TemporaryDirectory(prefix="ranking-", dir=args.work) as temporary:
         temporary = Path(temporary)
         shared, user = temporary / "data", temporary / "user"
         shared.mkdir()
         for entry in data.iterdir():
             if entry.name != "lua":
-                (shared / entry.name).symlink_to(entry, target_is_directory=entry.is_dir())
+                target = prebuilt if entry.name == "build" else entry
+                (shared / entry.name).symlink_to(target, target_is_directory=target.is_dir())
         (shared / "lua").mkdir()
         for entry in (data / "lua").iterdir():
             if entry.name != "xuancai_correction.lua":
@@ -104,8 +110,9 @@ def main():
                 raise RuntimeError("Native regressions failed; inspect --work/" + suite + ".stderr")
             measured = json.loads(result.stdout.strip().splitlines()[-1])
             if suite == "correction_ranking":
-                if measured["engine_version"] != "1.12.0":
+                if measured["engine_version"] != "1.16.1":
                     raise RuntimeError("Unexpected native Rime version")
+                engine_version = measured["engine_version"]
                 counters = measured["tests"]
                 checks = {key: value for key, value in measured.items()
                           if key not in ("schema", "engine_version", "tests")}
@@ -115,7 +122,8 @@ def main():
                 raise RuntimeError("Native suite did not pass")
             suites[suite] = counters
         # Keep the ordinary ranking/old acceptance/paging/selection suites on
-        # actual APK data. Only this additional case receives a public host
+        # the same pinned-runtime deployed schema fixture and APK dictionaries.
+        # Only this additional case receives a public host
         # OpenCC fixture to exercise the downstream conversion/learning chain.
         if not (shared / "opencc").exists():
             (shared / "opencc").symlink_to(opencc, target_is_directory=True)
@@ -139,15 +147,21 @@ def main():
     tests = {key: sum(suite[key] for suite in suites.values())
              for key in ("cases", "failures", "errors", "skipped")}
     tests["suites"] = suites
-    output = {"schema": 1, "source_commit": commit, "source_working_tree_clean": clean,
+    output = {"schema": 2, "source_commit": commit, "source_working_tree_clean": clean,
               "lua_source": {"path": "scripts/rime/xuancai_correction.lua", "sha256": lua_hash},
               "schemas_sha256": {"assets/usr/share/rime-data/" + name: digest(data / name)
                                  for name in ("rime_ice.schema.yaml", "build/rime_ice.schema.yaml")},
-              "host_rime": {"engine_version": "1.12.0", "library_sha256": digest(library)},
+              "host_rime": {"engine_version": engine_version, "library_sha256": digest(library)},
+              "host_deployed_fixture": {
+                  "used": prebuilt != (data / "build").resolve(),
+                  "packaged_apk_changed": False,
+                  "scope": "Host uses the pinned runtime's deployed schema/prism; all public Lua A/B cases share that fixture",
+                  "compiled_schema_sha256": digest(prebuilt / "rime_ice.schema.yaml"),
+                  "prism_sha256": digest(prebuilt / "rime_ice.prism.bin")},
               "test_sources_sha256": source_hashes,
               "tests": tests, "checks": checks,
               "host_conversion_fixture": {"packaged_apk_changed": False,
-                                          "scope": "One separate host-only conversion case; other three suites use APK data without this fixture",
+                                          "scope": "One separate host-only OpenCC conversion case; the other three suites use the same host schema fixture without added OpenCC data",
                                           "public_opencc_inputs_sha256": opencc_inputs},
               "test_inputs": "public synthetic spellings; fresh disposable user directory",
               "device_verification": False, "phone_latency_verified": False}
@@ -155,7 +169,7 @@ def main():
         replay = json.loads(args.replay_summary.read_text())
         if replay.get("new_lua_sha256") != lua_hash:
             raise RuntimeError("Independent replay Lua differs from tested source")
-        if replay.get("compiled_schema_sha256") != digest(data / "build/rime_ice.schema.yaml"):
+        if replay.get("compiled_schema_sha256") != digest(prebuilt / "rime_ice.schema.yaml"):
             raise RuntimeError("Independent replay schema differs from tested data")
         if replay.get("passed") is not True:
             raise RuntimeError("Independent replay did not pass")

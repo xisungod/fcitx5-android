@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     traits.min_log_level = 2;
     api->setup(&traits);
     api->initialize(&traits);
-    assert(strcmp(api->get_version(), "1.12.0") == 0);
+    assert(strcmp(api->get_version(), "1.16.1") == 0);
     assert(api->find_module("lua"));
     assert(api->find_module("octagram"));
     RimeSessionId session = api->create_session();

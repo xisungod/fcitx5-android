@@ -381,6 +381,11 @@ class CommonKeyActionListener :
                     }
                     val result = RimeTouchProbe.query("rime_ice", proposal.alternativeSpelling)
                     TypingTestSession.recordStage(observation, TypingTestStage.AlternativeQuery, result.elapsedNanos)
+                    // A slow failure is still an unavailable interface, not a completed query.
+                    if (!result.available) {
+                        reject(result.failureReason ?: "ProbeUnavailable")
+                        return@withInputTransaction
+                    }
                     // Native queries cannot be preempted. A slow one yields no chip and
                     // disables further probes for this composition, never queued retries.
                     if (!result.withinBudget) {
@@ -388,7 +393,6 @@ class CommonKeyActionListener :
                         reject("ProbeOverBudget")
                         return@withInputTransaction
                     }
-                    if (!result.available) { reject("ProbeUnavailable"); return@withInputTransaction }
                     if (!allowsTouchAlternatives(editor, epoch)) return@withInputTransaction
                     val existing = getCandidates(0, 24).map { it.text }
                     // Agreement with the literal first word needs no extra suggestion.

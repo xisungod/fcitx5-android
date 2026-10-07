@@ -45,6 +45,7 @@ int main(int argc, char** argv) {
     traits.min_log_level = 2;
     api->setup(&traits);
     api->initialize(&traits);
+    Require(std::string(api->get_version()) == "1.16.1", "runtime version mismatch");
     const auto session = api->create_session();
     Require(session && api->select_schema(session, "rime_ice"), "missing schema");
     api->set_option(session, "ascii_mode", False);
@@ -102,7 +103,7 @@ int main(int argc, char** argv) {
     char schema[64] = {};
     Require(api->get_current_schema(session, schema, sizeof(schema)) &&
             std::string(schema) == "rime_ice", "reset changed schema");
-    std::cout << "{\"engine\":\"1.12.0\",\"pinned_auto_commit\":true,"
+    std::cout << "{\"engine\":\"" << api->get_version() << "\",\"pinned_auto_commit\":true,"
                  "\"partial_select_commits\":0,\"reset_replay_commits\":0,"
                  "\"partial_restored_raw\":true,\"explicit_full_select_commits\":1,"
                  "\"commit_notifications\":1,\"mode_options_properties_schema_unchanged\":true}\n";
