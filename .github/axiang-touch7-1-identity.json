@@ -1,0 +1,68 @@
+{
+  "format": "axiang-touch7-1-exact-delivery-identity-v1",
+  "repository": "xisungod/fcitx5-android",
+  "source_commit": "a4dfe903826916c5388d08e3e8e7a73bb00775a2",
+  "apk_name": "AXiang-1.2-touch.7.1-arm64.apk",
+  "apk_bytes": 268353151,
+  "apk_sha256": "4aff6ece07e080e90a3d3376171b69f7d315d93a17ad0fd9484c91f1a4d2ddf1",
+  "signer_sha256": "ffede124b18d54af5d4cfa9f3a32504fa2ccc898563bc4816bacbe3e46ec0494",
+  "package": "org.fcitx.fcitx5.android.axiang.touch2",
+  "version_name": "1.2-touch.7.1",
+  "version_code": 8,
+  "unit_tests": 45,
+  "unit_test_scope": "candidate_ui_targeted_not_full_suite",
+  "baseline_apk_sha256": "86750f603bffca07d6b19cab5feb7be66e2f377f2c691744cf5023484493132d",
+  "release_id": 405637326,
+  "release_tag": "axiang-touch-1.2-touch.7.1",
+  "contains_signing_key_or_user_logs": false,
+  "public_files": {
+    "AXiang-1.2-touch.7.1-arm64.apk": {
+      "bytes": 268353151,
+      "sha256": "4aff6ece07e080e90a3d3376171b69f7d315d93a17ad0fd9484c91f1a4d2ddf1"
+    },
+    "GUIDE.zh-CN.md": {
+      "bytes": 1198,
+      "sha256": "775aae6df5ec3c8d953cd158a07863000c4cebed2bc68b130c9aaf6fe7e4df80"
+    },
+    "SHA256SUMS.txt": {
+      "bytes": 993,
+      "sha256": "991301975529607ea6b5db05a1f3dd93e3b49af29e6121a79eb7172f780b00f7"
+    },
+    "build-verification.json": {
+      "bytes": 2139,
+      "sha256": "71f1ba75fef79cbfa1a9d003331cd118d816ecc1f9739e00a53fd5fcd7b93e6f"
+    },
+    "candidate-ui-source.patch": {
+      "bytes": 11701,
+      "sha256": "cd473841fd23a1da188cbfec83ddc3d9f1c402256180ba0a5d9fb59dc55e9946"
+    },
+    "inherited-native-evidence.json": {
+      "bytes": 1334,
+      "sha256": "3a97fafe165bb7800b4a634ea4985d1d7261edfdc22e1fd76b094a5169c8112a"
+    },
+    "packaged-rime-version.json": {
+      "bytes": 1245,
+      "sha256": "4922a2f6382c3ea3ae684612acf4553379a26b5b7890499c3981a1e9b1b425b5"
+    },
+    "prebuilt-manifest.json": {
+      "bytes": 137029,
+      "sha256": "f5811818fa89f1fc17594d45774e1510d19f1fa17174742d8988e1e4a4388d3d"
+    },
+    "source-patch-manifest.json": {
+      "bytes": 1159,
+      "sha256": "dabc2cdde83b9f41c218f09706ad711a703777793397af632f43163140653de6"
+    },
+    "source-snapshot.json": {
+      "bytes": 488,
+      "sha256": "a69352a29ba4ea821d817fb095e71706bffd9175276c33f3215b5b7be589378b"
+    },
+    "ui-junit-reports.zip": {
+      "bytes": 4313,
+      "sha256": "97ba925a86280b13c52c035dd305d23d6eb3a400601c6e8e31a2ff3589638ae6"
+    },
+    "ui-test-summary.json": {
+      "bytes": 1529,
+      "sha256": "74057f1bc3be85f4a8490932dfd3b83f243f9e437af4b5a058b056ac6f3d0293"
+    }
+  }
+}
