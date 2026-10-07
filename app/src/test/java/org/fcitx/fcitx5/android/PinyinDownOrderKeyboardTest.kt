@@ -185,12 +185,12 @@ class PinyinDownOrderKeyboardTest {
             x = finger.x; y = finger.y; pressure = .65f; size = .3f; touchMajor = 14f; touchMinor = 8f
         }
 
-        fun event(action: Int, vararg fingers: Finger, advance: Long = 8) {
+        fun event(action: Int, vararg fingers: Finger, advance: Long = 8, reportedTime: Long? = null) {
             if ((action and MotionEvent.ACTION_MASK) == MotionEvent.ACTION_DOWN) downTime = SystemClock.uptimeMillis()
             val properties = fingers.map { MotionEvent.PointerProperties().apply {
                 id = it.id; toolType = MotionEvent.TOOL_TYPE_FINGER
             } }.toTypedArray()
-            val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, fingers.size,
+            val event = MotionEvent.obtain(downTime, reportedTime ?: SystemClock.uptimeMillis(), action, fingers.size,
                 properties, fingers.map(::coords).toTypedArray(), 0, 0, 1f, 1f, 0, 0,
                 InputDevice.SOURCE_TOUCHSCREEN, 0)
             try { assertTrue(keyboard.dispatchTouchEvent(event)) } finally { event.recycle() }
@@ -236,6 +236,22 @@ class PinyinDownOrderKeyboardTest {
         }
     }
 
+    @Test fun delayedUpDeliveryKeepsSampleTimeSeparateFromActualDispatchTime() {
+        Harness(ordered = false, correction = false, alternatives = true).use { h ->
+            val n = h.center("N", 2)
+            val start = SystemClock.uptimeMillis()
+            h.event(MotionEvent.ACTION_DOWN, n)
+            h.waitFor(64)
+            val dispatchAt = SystemClock.uptimeMillis()
+            h.event(MotionEvent.ACTION_UP, n, reportedTime = start + 8)
+            val evidence = h.actions.filterIsInstance<KeyAction.FcitxKeyAction>().single().pinyinTapEvidence!!
+            assertEquals(start, evidence.downTime)
+            assertEquals(start + 8, evidence.physicalUpTime)
+            assertEquals(dispatchAt, evidence.dispatchTime)
+            assertTrue(evidence.dispatchTime!! > evidence.physicalUpTime!!)
+        }
+    }
+
     @Test fun threeFingerInverseUpPreservesDownEvidenceAndIgnoresArrayAndIdOrder() {
         Harness(correction = true).use { h ->
             val q = h.center("Q", 13)
@@ -254,6 +270,14 @@ class PinyinDownOrderKeyboardTest {
             assertEquals(listOf(q.y, r.y, y.y), evidence.map { it.tap.downY })
             assertEquals(listOf(at, at, at), evidence.map { it.downTime })
             assertTrue(evidence.all { it.cells.isNotEmpty() })
+            assertEquals(listOf(0L, 1L, 2L), evidence.map { it.downSequence })
+            assertEquals(listOf(0L, 1L, 2L), evidence.map { it.dispatchSequence })
+            assertEquals(3, evidence.map { it.contactId }.toSet().size)
+            assertTrue(evidence.all { it.contactId > 0 })
+            // q/r were confirmed by the younger finger's UP, not physically released.
+            assertNull(evidence[0].physicalUpTime)
+            assertNull(evidence[1].physicalUpTime)
+            assertEquals(evidence[2].dispatchTime, evidence[2].physicalUpTime)
             h.event(MotionEvent.ACTION_MOVE, r, q)
             h.event(up(0), r, q)
             h.event(MotionEvent.ACTION_UP, q)
@@ -266,9 +290,20 @@ class PinyinDownOrderKeyboardTest {
             assertEquals("down_order", contacts.getJSONObject(0).getString("release_reason"))
             assertEquals("down_order", contacts.getJSONObject(1).getString("release_reason"))
             assertTrue(contacts.getJSONObject(0).getLong("release_t") < contacts.getJSONObject(0).getLong("up_t"))
+            assertEquals(contacts.getJSONObject(0).getLong("up_t"),
+                contacts.getJSONObject(0).getLong("physical_up_t"))
+            assertEquals(evidence[0].contactId, contacts.getJSONObject(0).getLong("contact_id"))
+            val actions = trace.getJSONArray("actions")
+            assertTrue(actions.getJSONObject(0).isNull("physical_up_t"))
+            assertEquals("down_order", actions.getJSONObject(0).getString("confirmation_kind"))
+            assertEquals("physical_up", actions.getJSONObject(2).getString("confirmation_kind"))
             h.event(MotionEvent.ACTION_DOWN, q)
             h.event(MotionEvent.ACTION_UP, q)
             assertEquals(listOf("q", "r", "y", "q"), h.typed)
+            val laterEvidence = h.actions.filterIsInstance<KeyAction.FcitxKeyAction>().last().pinyinTapEvidence!!
+            assertFalse(evidence.any { it.contactId == laterEvidence.contactId })
+            assertEquals(0L, laterEvidence.downSequence)
+            assertEquals(0L, laterEvidence.dispatchSequence)
         }
     }
 
@@ -288,6 +323,10 @@ class PinyinDownOrderKeyboardTest {
             assertEquals(initial.y, evidence.tap.downY, 0f)
             assertEquals(13, evidence.pointerId)
             assertEquals(downAt, evidence.downTime)
+            assertEquals(downAt + 8L, evidence.physicalUpTime)
+            assertEquals(evidence.physicalUpTime, evidence.dispatchTime)
+            assertEquals(lifted.x, evidence.physicalUpX!!, 0f)
+            assertEquals(lifted.y, evidence.physicalUpY!!, 0f)
             assertTrue(evidence.cells.any { it.letter == 'f' })
             assertTrue(evidence.cells.any { it.letter == 'g' })
             assertEquals(h.traces.single().getString("id"), evidence.diagnosticTraceId)
@@ -603,7 +642,9 @@ class PinyinDownOrderKeyboardTest {
             h.event(MotionEvent.ACTION_UP, q)
             assertEquals(listOf("q", "q"), h.typed)
             val contact = h.traces.single().getJSONArray("contacts").getJSONObject(0)
-            assertFalse(contact.has("release_reason"))
+            assertEquals("physical_up", contact.getString("release_reason"))
+            assertEquals(contact.getLong("up_t"), contact.getLong("release_t"))
+            assertEquals(0L, contact.getLong("down_sequence"))
         }
     }
 

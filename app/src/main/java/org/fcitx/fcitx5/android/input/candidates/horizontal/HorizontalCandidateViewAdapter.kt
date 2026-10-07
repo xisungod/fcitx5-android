@@ -41,7 +41,7 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
     internal var onRawSelect: (Int) -> Unit = {}
     internal var onRawLongClick: (Int, CandidateWord, View) -> Unit = { _, _, _ -> }
     internal var onTouchSelect: (Long) -> Unit = {}
-    internal var onTouchLayoutRequested: () -> Unit = {}
+    internal var onCandidatesLayoutRequested: () -> Unit = {}
     private val holderBindings = WeakHashMap<CandidateViewHolder, Binding>()
 
     internal data class Binding(val generation: Long, val entry: HorizontalCandidateEntry)
@@ -115,7 +115,6 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
                     R.string.pinyin_touch_alternative_description, entry.offer.text)
                 holder.itemView.setOnLongClickListener(null)
                 holder.itemView.isLongClickable = false
-                onTouchLayoutRequested()
             }
         }
         holder.itemView.setOnClickListener {
@@ -124,13 +123,12 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
                 is HorizontalCandidateEntry.Touch -> onTouchSelect(entry.offer.token)
             }
         }
+        onCandidatesLayoutRequested()
     }
 
     override fun onViewAttachedToWindow(holder: CandidateViewHolder) {
         super.onViewAttachedToWindow(holder)
-        val position = holder.bindingAdapterPosition
-        if (position >= 0 && entries.getOrNull(position) is HorizontalCandidateEntry.Touch)
-            onTouchLayoutRequested()
+        if (holder.bindingAdapterPosition >= 0) onCandidatesLayoutRequested()
     }
 
     @CallSuper

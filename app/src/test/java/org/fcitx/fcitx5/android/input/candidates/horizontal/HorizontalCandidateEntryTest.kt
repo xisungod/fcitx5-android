@@ -11,6 +11,26 @@ class HorizontalCandidateEntryTest {
     private fun offer(text: String = "经常会", token: Long = 1) =
         PinyinTouchCandidateOffer(token, text, "jibgchsnghui", "jingchanghui")
 
+    @Test fun `verified first offer retains literal first and unchanged native selection indices`() {
+        val words = arrayOf(word("军长会"), word("其他"), word("经常会"), word("第四"))
+        val promoted = offer().copy(promotedToFirst = true)
+        val rows = horizontalCandidateEntries(words, promoted)
+        assertEquals(promoted, (rows[0] as HorizontalCandidateEntry.Touch).offer)
+        assertEquals(listOf(0, 1, 3), rows.filterIsInstance<HorizontalCandidateEntry.Raw>().map { it.nativeIndex })
+        assertEquals("军长会", (rows[1] as HorizontalCandidateEntry.Raw).word.text)
+        assertEquals(listOf("军长会", "其他", "经常会", "第四"), words.map { it.text })
+        assertEquals(words.toList(), horizontalCandidateEntries(words, null)
+            .filterIsInstance<HorizontalCandidateEntry.Raw>().map { it.word })
+    }
+
+    @Test fun `stale first designation cannot promote novel or lower ranked word`() {
+        val words = arrayOf(word("原词"), word("其他"), word("第三"), word("经常会"))
+        for (text in listOf("经常会", "新词")) {
+            val rows = horizontalCandidateEntries(words, offer(text).copy(promotedToFirst = true))
+            assertEquals(words.take(3), rows.take(3).map { (it as HorizontalCandidateEntry.Raw).word })
+        }
+    }
+
     @Test fun `touch is second and all remaining words retain native indices`() {
         val words = arrayOf(word("基本"), word("经常会"), word("机场"), word("经常会"), word("检查"))
         val original = words.copyOf()

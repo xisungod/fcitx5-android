@@ -75,8 +75,11 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val pinyinTouchAlternatives = switch(
             R.string.pinyin_touch_alternatives, "pinyin_touch_alternatives", true,
             R.string.pinyin_touch_alternatives_summary)
+        val pinyinTouchPromotion = switch(
+            R.string.pinyin_touch_promotion, "pinyin_touch_promotion", true,
+            R.string.pinyin_touch_promotion_summary)
         val pinyinTouchPersonalization = switch(
-            R.string.pinyin_touch_personalization, "pinyin_touch_personalization", false,
+            R.string.pinyin_touch_personalization, "pinyin_touch_personalization", true,
             R.string.pinyin_touch_personalization_summary)
         // Optional long-hold boundary adjustment never retargets a quick tap.
         val touchBoundarySettling = switch(

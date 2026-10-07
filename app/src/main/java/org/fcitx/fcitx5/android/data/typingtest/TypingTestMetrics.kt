@@ -17,13 +17,20 @@ object TypingTestMetrics {
         val validTarget = target.isNotEmpty() && target.length <= TypingTestAligner.MAX_LENGTH &&
             target.all { it in 'a'..'z' }
         val fullPinyin = input.inputKind == TypingTestInputKind.FULL_PINYIN
+        val firstFullPinyin = (input.firstAttemptInputKind ?: input.inputKind) ==
+            TypingTestInputKind.FULL_PINYIN
+        val rawFullPinyin = (input.rawAttemptInputKind ?: input.firstAttemptInputKind ?: input.inputKind) ==
+            TypingTestInputKind.FULL_PINYIN
+        if (!rawFullPinyin) reasons += "unsupported_raw_attempt_window"
         if (!validTarget) reasons += "unsupported_target"
-        if (!fullPinyin) reasons += "unsupported_input_kind"
+        if (!fullPinyin) reasons += if (firstFullPinyin) "final_input_kind_changed_after_first_attempt" else "unsupported_input_kind"
         val first = input.firstAttemptPinyin
-        val firstEligible = validTarget && fullPinyin && input.firstAttemptComplete &&
-            first != null && first.length == target.length && first.all { it in 'a'..'z' }
+        val firstEligible = validTarget && rawFullPinyin && input.firstAttemptComplete &&
+            input.firstAttemptOmittedLetterCount == 0 &&
+            first != null && first.length >= target.length && first.length <= TypingTestAligner.MAX_LENGTH && first.all { it in 'a'..'z' }
+        if (input.firstAttemptOmittedLetterCount > 0) reasons += "first_attempt_capture_limit"
         if (!input.firstAttemptComplete) reasons += "incomplete_first_attempt"
-        else if (!firstEligible && fullPinyin && validTarget) reasons += "unsupported_first_attempt"
+        else if (!firstEligible && firstFullPinyin && validTarget) reasons += "unsupported_first_attempt"
         val alignment = if (firstEligible) TypingTestAligner.align(first, target) else null
         if (firstEligible && alignment == null) reasons += "first_attempt_exceeds_alignment_budget"
         val rawEdits = if (firstEligible) TypingTestAligner.distance(first, target)
@@ -35,22 +42,39 @@ object TypingTestMetrics {
                 TypingTestQwerty.areAdjacent(it.actual!!, it.expected!!) }, target.length)
         }
 
-        // Freeze the first complete attempt before edits/commit, not the final repaired spelling.
+        // Freeze the first target-length candidate observation, separately from the raw attempt window.
         // Prefixes/stale panels are excluded; later repairs cannot turn the initial miss into a hit.
         val snapshot = input.finalCandidateSnapshot
         val final = input.finalInputPinyin
         val candidateRaw = input.candidateInputPinyin
-        val candidateEligible = validTarget && fullPinyin && input.firstAttemptComplete &&
-            input.priorCommitCount == 0 &&
-            snapshot != null && snapshot.completePromptComposition && snapshot.coherent &&
-            candidateRaw != null && candidateRaw == input.observedAttemptPinyin &&
-            candidateRaw == snapshot.rawPinyin && candidateRaw.length == target.length &&
-            candidateRaw.all { it in 'a'..'z' }
-        if (!candidateEligible) reasons += "no_coherent_full_phrase_candidate_snapshot"
-        val top1 = if (candidateEligible) TypingTestFraction(
-            if (snapshot.candidates.firstOrNull() == input.prompt.text) 1 else 0, 1) else notScored
-        val top3 = if (candidateEligible) TypingTestFraction(
-            if (snapshot.candidates.take(3).any { it == input.prompt.text }) 1 else 0, 1) else notScored
+        fun candidateEligible(observed: TypingTestCandidateSnapshot?): Boolean =
+            validTarget && firstFullPinyin && input.firstAttemptComplete &&
+                observed != null && observed.completePromptComposition && observed.coherent &&
+                (observed.inputKindAtCapture ?: input.inputKind) == TypingTestInputKind.FULL_PINYIN &&
+                (observed.priorCommitCountAtCapture ?: input.priorCommitCount) == 0 &&
+                candidateRaw != null && candidateRaw == input.observedAttemptPinyin &&
+                candidateRaw == observed.rawPinyin && candidateRaw.length == target.length &&
+                candidateRaw.all { it in 'a'..'z' }
+        fun hit(observed: TypingTestCandidateSnapshot?, maximumRank: Int): TypingTestFraction =
+            if (candidateEligible(observed)) TypingTestFraction(
+                if (observed!!.candidates.take(maximumRank).any { it == input.prompt.text }) 1 else 0, 1)
+            else notScored
+        if (!candidateEligible(snapshot)) reasons += "no_coherent_full_phrase_candidate_snapshot"
+        val top1 = hit(snapshot, 1)
+        val top3 = hit(snapshot, 3)
+        val displayedTop1 = hit(input.displayedCandidateSnapshot, 1)
+        val displayedTop3 = hit(input.displayedCandidateSnapshot, 3)
+        if (!candidateEligible(input.displayedCandidateSnapshot)) reasons += "no_visible_full_phrase_candidate_snapshot"
+
+        // A prescribed prefix is observable, its as-yet untouched suffix is not. Positional
+        // mismatch is deliberately separate from edit alignment and cannot create training labels.
+        val prefixEligible = validTarget && rawFullPinyin && !input.firstAttemptComplete &&
+            !first.isNullOrEmpty() && first.length < target.length && first.all { it in 'a'..'z' }
+        val prefixMismatch = if (prefixEligible) TypingTestFraction(
+            first!!.indices.count { first[it] != target[it] }, first.length) else notScored
+        val prefixAdjacent = if (prefixEligible) TypingTestFraction(
+            first!!.indices.count { TypingTestQwerty.areAdjacent(first[it], target[it]) }, first.length)
+            else notScored
 
         val validCounts = input.backspaceCount >= 0 && input.letterKeyCount >= 0
         if (!validCounts) reasons += "invalid_key_counts"
@@ -59,9 +83,11 @@ object TypingTestMetrics {
         val backspaceRate = if (validCounts && letters > 0) TypingTestFraction(backspaces, letters)
             else notScored
         val completed = input.committedText == input.prompt.text
-        val calibration = if (fullPinyin && validTarget && firstEligible && alignment != null &&
+        val calibration = if ((input.calibrationConfirmed ?: fullPinyin) && validTarget &&
+            firstEligible && alignment != null &&
             !alignment.ambiguous && final == target && completed && input.priorCommitCount == 0 &&
-            alignment.edits.all { it.kind == TypingTestEditKind.MATCH || it.kind == TypingTestEditKind.SUBSTITUTE }) {
+            alignment.edits.all { it.kind == TypingTestEditKind.MATCH || it.kind == TypingTestEditKind.SUBSTITUTE } &&
+            !hasAdjacentTransposition(first, target)) {
             calibrationSamples(first, input.firstAttemptTouches, alignment)
         } else emptyList()
         if (calibration.isEmpty()) reasons += "no_confirmed_prompted_touch_alignment"
@@ -70,7 +96,8 @@ object TypingTestMetrics {
             first?.take(TypingTestAligner.MAX_LENGTH), final?.take(TypingTestAligner.MAX_LENGTH),
             rawEdits, neighbourEdits, top1, top3, backspaceRate, backspaces, letters, alignment,
             reasons.toList(), calibration, latency(input.processingNanos),
-            stageLatencies(input.stageTimings), alternativeMetrics(input, validTarget && fullPinyin))
+            stageLatencies(input.stageTimings), alternativeMetrics(input, validTarget),
+            prefixMismatch, prefixAdjacent, displayedTop1, displayedTop3)
     }
 
     private fun alternativeMetrics(
@@ -87,6 +114,7 @@ object TypingTestMetrics {
                 .distinct().singleOrNull()
         }
         fun targetEligible(event: TypingTestAlternativeEvent) = knownTarget &&
+            (event.inputKindAtCapture ?: input.inputKind) == TypingTestInputKind.FULL_PINYIN &&
             event.fullPromptComposition && event.originalPinyin?.let {
                 it.length == input.prompt.pinyin.length && it.all { letter -> letter in 'a'..'z' }
             } == true && !event.candidateText.isNullOrEmpty()
@@ -114,6 +142,13 @@ object TypingTestMetrics {
             targetSelectionRate = targetRate(TypingTestAlternativeEventKind.Selected)
         )
     }
+
+    /** Two swapped contacts are not evidence of two independent per-key offsets. */
+    private fun hasAdjacentTransposition(actual: String, target: String): Boolean =
+        actual.length == target.length && (0 until actual.lastIndex).any { index ->
+            actual[index] != target[index] && actual[index] == target[index + 1] &&
+                actual[index + 1] == target[index]
+        }
 
     private fun calibrationSamples(
         first: String,
@@ -163,7 +198,10 @@ object TypingTestMetrics {
         latency(timings.sendKeyNanos, maximumSamples).copy(measurement = "send_key_ns"),
         latency(timings.touchSearchNanos, maximumSamples).copy(measurement = "touch_search_ns"),
         latency(timings.alternativeQueryNanos, maximumSamples).copy(measurement = "alternative_query_ns"),
-        latency(timings.offerReadyNanos, maximumSamples).copy(measurement = "enqueue_to_offer_publish_ns")
+        latency(timings.offerReadyNanos, maximumSamples).copy(measurement = "enqueue_to_offer_publish_ns"),
+        latency(timings.probeLibraryLoadNanos, maximumSamples).copy(measurement = "probe_library_load_ns"),
+        latency(timings.probeInitializationNanos, maximumSamples).copy(measurement = "probe_initialization_ns"),
+        latency(timings.probeNativeQueryNanos, maximumSamples).copy(measurement = "probe_native_query_ns")
     )
 
     fun summarize(
@@ -184,7 +222,15 @@ data class TypingTestSummary(
     val backspaceRate: TypingTestFraction,
     val latency: TypingTestLatency,
     val stageLatencies: TypingTestStageLatencies = TypingTestStageLatencies(),
-    val alternativeMetrics: TypingTestAlternativeMetrics = TypingTestAlternativeMetrics()
+    val alternativeMetrics: TypingTestAlternativeMetrics = TypingTestAlternativeMetrics(),
+    val earlyPrefixMismatchRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val earlyPrefixAdjacentRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val displayedTop1HitRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val displayedTop3HitRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val firstAttemptScoredTrialCount: Int = 0,
+    val earlyPrefixScoredTrialCount: Int = 0,
+    val repairTrialCount: Int = 0,
+    val backspacesPerRepairTrial: TypingTestFraction = TypingTestFraction(0, 0)
 )
 
 fun summarizeTypingTest(
@@ -221,5 +267,10 @@ fun summarizeTypingTest(
         sum { it.backspaceRate }, TypingTestMetrics.latency(processingNanos,
             TypingTestMetrics.MAX_SESSION_TIMING_SAMPLES),
         TypingTestMetrics.stageLatencies(stageTimings, TypingTestMetrics.MAX_SESSION_TIMING_SAMPLES),
-        alternativeMetrics)
+        alternativeMetrics, sum { it.earlyPrefixMismatchRate }, sum { it.earlyPrefixAdjacentRate },
+        sum { it.displayedTop1HitRate }, sum { it.displayedTop3HitRate },
+        trials.count { it.rawEditRate.denominator > 0 },
+        trials.count { it.earlyPrefixMismatchRate.denominator > 0 },
+        trials.count { it.backspaceCount > 0 },
+        TypingTestFraction(trials.sumOf { it.backspaceCount }, trials.count { it.backspaceCount > 0 }))
 }

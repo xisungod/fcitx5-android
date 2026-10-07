@@ -179,7 +179,13 @@ class PinyinMultiPathSearch internal constructor(
         val proposal = if (reason == PinyinMultiPathEvaluation.Reason.Offered) {
             val normalization = raw.length * (1.0 + LANGUAGE_WEIGHT)
             PinyinMultiPathProposal(raw, selected!!.spelling, -original.logScore / normalization,
-                -selected.logScore / normalization, confidence!!, selected.changes, editorSequence, enumerated)
+                -selected.logScore / normalization, confidence!!, selected.changes, editorSequence, enumerated,
+                PinyinTouchPromotionEvidence(advantage!!, selected.changes.map { index ->
+                    val contact = contacts[index]
+                    val alternative = contact.choices.first { it.letter == selected.spelling[index] }
+                    PinyinChangedContactSpatialEvidence(index, contact.original, alternative.letter,
+                        alternative.logSpatialProbability - contact.choices[0].logSpatialProbability)
+                }))
         } else null
         return PinyinMultiPathSearchResult(this, proposal, evaluation)
     }

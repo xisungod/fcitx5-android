@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="typing_test_apply_calibration">应用本轮已确认的落点校准</string>
+    <string name="typing_test_apply_calibration_help">只使用最终确认正确、触点可可靠对齐的练习；不会从猜测或普通输入自动学习。</string>
+    <string name="typing_test_apply_calibration_done">已应用 %1$d 条落点样本</string>
+    <string name="typing_test_apply_calibration_empty">本轮没有可确认的落点样本</string>
+    <string name="typing_test_apply_calibration_duplicate">这些样本已经应用过</string>
+    <string name="typing_test_apply_calibration_failed">落点校准未应用，请重新测试后再试</string>
     <string name="typing_test_title">打字测试</string>
     <string name="typing_test_entry_summary">用固定短句，看看准确度和响应是否改善</string>
     <string name="typing_test_hero">照常打字，看看哪里变好了</string>

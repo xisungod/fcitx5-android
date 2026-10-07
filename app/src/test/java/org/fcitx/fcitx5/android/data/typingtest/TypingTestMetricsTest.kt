@@ -209,4 +209,101 @@ class TypingTestMetricsTest {
         assertEquals(300, pooled.latency.sampleCount)
         assertEquals(0, pooled.latency.omittedSampleCount)
     }
+    @Test fun `frozen valid initial miss survives final unknown kind and later partial commits`() {
+        val source = input(wrong, listOf("井场灰", prompt.text)).copy(
+            inputKind = TypingTestInputKind.UNKNOWN,
+            firstAttemptInputKind = TypingTestInputKind.FULL_PINYIN,
+            priorCommitCount = 2,
+            finalCandidateSnapshot = TypingTestCandidateSnapshot(wrong, listOf("井场灰", prompt.text),
+                inputKindAtCapture = TypingTestInputKind.FULL_PINYIN, priorCommitCountAtCapture = 0))
+        val result = TypingTestMetrics.evaluate(source)
+        assertEquals(TypingTestFraction(2, prompt.pinyin.length), result.rawEditRate)
+        assertEquals(TypingTestFraction(0, 1), result.top1HitRate)
+        assertEquals(TypingTestFraction(1, 1), result.top3HitRate)
+        assertTrue(result.calibrationSamples.isEmpty())
+    }
+
+    @Test fun `frozen unsupported snapshot does not gain eligibility after full pinyin repair`() {
+        val source = input().copy(firstAttemptInputKind = TypingTestInputKind.UNKNOWN,
+            finalCandidateSnapshot = TypingTestCandidateSnapshot(prompt.pinyin, listOf(prompt.text),
+                inputKindAtCapture = TypingTestInputKind.UNKNOWN, priorCommitCountAtCapture = 0))
+        assertEquals(TypingTestFraction(0, 0), TypingTestMetrics.evaluate(source).top1HitRate)
+        assertEquals(TypingTestFraction(0, 0), TypingTestMetrics.evaluate(source).rawEditRate)
+    }
+
+    @Test fun `early prefix mismatch scores only three observed positions`() {
+        val result = TypingTestMetrics.evaluate(input("jib", complete = false))
+        assertEquals(TypingTestFraction(1, 3), result.earlyPrefixMismatchRate)
+        assertEquals(TypingTestFraction(1, 3), result.earlyPrefixAdjacentRate)
+        assertEquals(TypingTestFraction(0, 0), result.rawEditRate)
+        assertEquals(TypingTestFraction(0, 0), result.top1HitRate)
+        assertTrue(result.calibrationSamples.isEmpty())
+    }
+
+    @Test fun `visible candidate ranks are distinct from native ranks`() {
+        val source = input(candidates = listOf("井场灰", prompt.text)).copy(
+            displayedCandidateSnapshot = TypingTestCandidateSnapshot(prompt.pinyin, listOf(prompt.text, "井场灰")))
+        val result = TypingTestMetrics.evaluate(source)
+        assertEquals(TypingTestFraction(0, 1), result.top1HitRate)
+        assertEquals(TypingTestFraction(1, 1), result.displayedTop1HitRate)
+        val stale = source.copy(displayedCandidateSnapshot = source.displayedCandidateSnapshot!!.copy(rawPinyin = wrong))
+        assertEquals(TypingTestFraction(0, 0), TypingTestMetrics.evaluate(stale).displayedTop1HitRate)
+    }
+
+    @Test fun `initialization actual native query and total latency remain independent`() {
+        val source = input().copy(stageTimings = TypingTestStageTimings(
+            alternativeQueryNanos = listOf(25_000_000), probeLibraryLoadNanos = listOf(3_000_000),
+            probeInitializationNanos = listOf(21_000_000), probeNativeQueryNanos = listOf(500_000)))
+        val stages = TypingTestMetrics.evaluate(source).stageLatencies
+        assertEquals(25_000_000L, stages.alternativeQuery.p95Nanos)
+        assertEquals(3_000_000L, stages.probeLibraryLoad.p95Nanos)
+        assertEquals(21_000_000L, stages.probeInitialization.p95Nanos)
+        assertEquals(500_000L, stages.probeNativeQuery.p95Nanos)
+    }
+
+    @Test fun `backspaces per repaired trial never claims a per error denominator`() {
+        val results = listOf(TypingTestMetrics.evaluate(input().copy(backspaceCount = 20)),
+            TypingTestMetrics.evaluate(input().copy(backspaceCount = 40)),
+            TypingTestMetrics.evaluate(input()))
+        val summary = TypingTestMetrics.summarize(results)
+        assertEquals(2, summary.repairTrialCount)
+        assertEquals(TypingTestFraction(60, 2), summary.backspacesPerRepairTrial)
+        assertEquals(3, summary.firstAttemptScoredTrialCount)
+    }
+
+    @Test fun `known adjacent swap does not learn two fictional key offsets`() {
+        val swapPrompt = TypingTestPrompt(101, "练习", "nb")
+        val swap = "bn"
+        val source = input().copy(prompt = swapPrompt, firstAttemptPinyin = swap,
+            firstAttemptTouches = touches(swap), finalInputPinyin = swapPrompt.pinyin,
+            committedText = swapPrompt.text, letterKeyCount = 2, calibrationConfirmed = true)
+        val result = TypingTestMetrics.evaluate(source)
+        assertEquals(TypingTestFraction(2, 2), result.rawEditRate)
+        assertTrue(result.calibrationSamples.isEmpty())
+    }
+
+    @Test fun `extra tail in raw first attempt scores an insertion but does not invent a touch label`() {
+        val target = TypingTestPrompts.byId(1)!!
+        val result = TypingTestMetrics.evaluate(TypingTestTrialInput(target, TypingTestInputKind.FULL_PINYIN,
+            firstAttemptPinyin = "nihaoaa", firstAttemptComplete = true,
+            finalInputPinyin = target.pinyin, observedAttemptPinyin = target.pinyin,
+            candidateInputPinyin = target.pinyin,
+            finalCandidateSnapshot = TypingTestCandidateSnapshot(target.pinyin, listOf(target.text)),
+            committedText = target.text, firstAttemptTouches = touches("nihaoaa")))
+        assertEquals(TypingTestFraction(1, 6), result.rawEditRate)
+        assertEquals(TypingTestFraction(1, 1), result.top1HitRate)
+        assertTrue(result.calibrationSamples.isEmpty())
+    }
+
+    @Test fun `unsupported later raw window cannot retroactively suppress frozen native ranks`() {
+        val source = input().copy(firstAttemptInputKind = TypingTestInputKind.FULL_PINYIN,
+            rawAttemptInputKind = TypingTestInputKind.UNKNOWN,
+            finalCandidateSnapshot = TypingTestCandidateSnapshot(prompt.pinyin, listOf(prompt.text),
+                inputKindAtCapture = TypingTestInputKind.FULL_PINYIN, priorCommitCountAtCapture = 0))
+        val result = TypingTestMetrics.evaluate(source)
+        assertEquals(TypingTestFraction(0, 0), result.rawEditRate)
+        assertEquals(TypingTestFraction(1, 1), result.top1HitRate)
+        assertTrue(result.calibrationSamples.isEmpty())
+    }
+
 }

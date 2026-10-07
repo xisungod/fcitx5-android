@@ -38,6 +38,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.bar.ui.idle.KeyboardLayoutChoice
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
@@ -267,9 +268,14 @@ class LightEffectSettingsUiTest {
             override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T = error("Native engine is outside this UI test")
             override fun runIfReady(block: suspend FcitxAPI.() -> Unit) {}
         }
+        // Complete the listener's service dependency without starting the native daemon.
+        val queuedService = Robolectric.buildService(FcitxInputMethodService::class.java).get()
+        ReflectionHelpers.setField(queuedService, "fcitx", connection)
+        assertTrue(connection.lifecycleScope.coroutineContext[Job]!!.isCancelled)
         scope += themedContext.wrapToUniqueComponent()
         scope += theme.wrapToUniqueComponent()
         scope += connection.wrapToUniqueComponent()
+        scope += queuedService.wrapToUniqueComponent()
         scope += broadcaster
         scope += windows
         scope += CommonKeyActionListener()

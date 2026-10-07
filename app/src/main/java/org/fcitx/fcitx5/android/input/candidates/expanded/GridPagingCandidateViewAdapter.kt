@@ -5,13 +5,15 @@
 
 package org.fcitx.fcitx5.android.input.candidates.expanded
 
-import android.graphics.Paint
-import android.graphics.Rect
+import android.text.Layout
+import android.text.TextPaint
 import android.util.LruCache
 import android.view.ViewGroup
 import androidx.recyclerview.widget.GridLayoutManager
 import org.fcitx.fcitx5.android.data.theme.Theme
+import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.styledCandidateText
 import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
 
@@ -23,18 +25,17 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     }
 
     // cache measureWidth
-    private val measuredWidths = object : LruCache<String, Float>(200) {
-        private val cachedPaint = Paint().apply { textSize = TEXT_SIZE }
-        private val cachedRect = Rect()
-        override fun create(key: String): Float {
-            cachedPaint.getTextBounds(key, 0, key.length, cachedRect)
-            return cachedRect.width() / TEXT_SIZE
+    private val measuredWidths = object : LruCache<CandidateWord, Float>(200) {
+        private val cachedPaint = TextPaint().apply { textSize = TEXT_SIZE }
+        override fun create(key: CandidateWord): Float {
+            return Layout.getDesiredWidth(styledCandidateText(key,
+                theme.candidateTextColor, theme.candidateCommentColor), cachedPaint) / TEXT_SIZE
         }
     }
 
     fun measureWidth(position: Int): Float {
         val candidate = getItem(position) ?: return 0f
-        return measuredWidths[candidate.textWithComment()]
+        return measuredWidths[candidate]
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {

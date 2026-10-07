@@ -8,22 +8,32 @@ data class PinyinTouchCandidateOffer(
     val token: Long,
     val text: String,
     val originalSpelling: String,
-    val alternativeSpelling: String
+    val alternativeSpelling: String,
+    /** Native candidate indices remain unchanged; default-key selection resolves this offer. */
+    val promotedToFirst: Boolean = false,
+    /** Bounded machine reason, useful when inspecting the experiment locally. */
+    val promotionReason: String? = null
 )
 
 /** One generation covers queued taps, the delayed query and its explicit selection. */
 internal class PinyinTouchCandidateRuntime {
     data class Pending(val offer: PinyinTouchCandidateOffer, val editorIdentity: Any,
-                       val proposal: PinyinMultiPathProposal)
+                       val proposal: PinyinMultiPathProposal,
+                       val expectedPreedit: String, val expectedCursor: Int)
+    /** A deliberate selection belongs to its already queued position, not later tap generations. */
+    data class Reserved(val offer: PinyinTouchCandidateOffer, val editorIdentity: Any,
+                        val expectedPreedit: String, val expectedCursor: Int)
     private var sequence = 0L
     private var lastClearSequence = 0L
     private var tracker: PinyinMultiPathTracker? = null
+    private var promotionPolicy: PinyinTouchPromotionPolicy? = null
     private var pending: Pending? = null
     private val mutableOffer = MutableStateFlow<PinyinTouchCandidateOffer?>(null)
     val offer = mutableOffer.asStateFlow()
 
     @Synchronized fun tracker(model: PinyinTouchLanguageModel): PinyinMultiPathTracker =
         (tracker ?: PinyinMultiPathTracker(model, model.syllables).also {
+            promotionPolicy = PinyinTouchPromotionPolicy(model.syllables)
             if (lastClearSequence > 0) {
                 it.advanceSequence(lastClearSequence - 1)
                 it.clear()
@@ -58,11 +68,14 @@ internal class PinyinTouchCandidateRuntime {
             tracker?.matchesProposal(sequence, editor, text, cursor) == true
 
     @Synchronized fun publish(proposal: PinyinMultiPathProposal, editor: Any,
-                              text: String, currentText: String, cursor: Int): Boolean {
+                              text: String, currentText: String, cursor: Int,
+                              originalCandidates: List<String> = emptyList(),
+                              allowFirstPromotion: Boolean = false): Boolean {
         if (!matches(proposal, editor, currentText, cursor) || text.isBlank()) return false
+        val promotion = if (allowFirstPromotion) promotionPolicy?.evaluate(proposal, text, originalCandidates) else null
         val offer = PinyinTouchCandidateOffer(sequence, text, proposal.originalSpelling,
-            proposal.alternativeSpelling)
-        pending = Pending(offer, editor, proposal)
+            proposal.alternativeSpelling, promotion?.promoteToFirst == true, promotion?.reason?.name)
+        pending = Pending(offer, editor, proposal, currentText, cursor)
         mutableOffer.value = offer
         return true
     }
@@ -78,5 +91,17 @@ internal class PinyinTouchCandidateRuntime {
         pending = null
         mutableOffer.value = null
         return result
+    }
+
+    /** Capture a selected slot now, then validate its exact native state at its queue position. */
+    @Synchronized fun reserve(token: Long, editor: Any?, requirePromotedFirst: Boolean = false): Reserved? {
+        val selected = pending?.takeIf {
+            token == sequence && it.offer.token == token && it.editorIdentity === editor &&
+                (!requirePromotedFirst || it.offer.promotedToFirst)
+        } ?: return null
+        pending = null
+        mutableOffer.value = null
+        return Reserved(selected.offer, selected.editorIdentity,
+            selected.expectedPreedit, selected.expectedCursor)
     }
 }

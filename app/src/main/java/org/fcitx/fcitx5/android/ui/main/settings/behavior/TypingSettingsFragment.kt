@@ -68,6 +68,7 @@ class TypingSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().
         KeyboardPreferenceSections.arrange(screen, AppPrefs.getInstance().keyboard,
             KeyboardPreferenceSections.Page.Typing)
         KeyboardPreferenceSections.addRelated(screen,
+            R.string.touch_probe_self_check_title to SettingsRoute.TouchProbeSelfCheck,
             R.string.axiang_keyboard_layout_entry to SettingsRoute.VirtualKeyboard,
             R.string.axiang_typing_candidate_window_entry to SettingsRoute.CandidatesWindow) {
             navigateWithAnim(it)

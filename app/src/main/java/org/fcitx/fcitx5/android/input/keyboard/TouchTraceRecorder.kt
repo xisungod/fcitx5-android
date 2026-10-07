@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticStore
 import org.json.JSONArray
 import org.json.JSONObject
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapEvidence
 import java.util.UUID
 
 /** Observes original MotionEvents; never supplies events or decisions to the keyboard. */
@@ -31,6 +32,7 @@ internal class TouchTraceRecorder(context: Context) {
     private var trace: Trace? = null
     private var dispatchPointer: Int? = null
     private var dispatchKey: Int? = null
+    private var dispatchEvidence: PinyinTapEvidence? = null
 
     internal val currentTraceId: String?
         get() = trace?.takeIf(::valid)?.body?.optString("id")
@@ -44,6 +46,7 @@ internal class TouchTraceRecorder(context: Context) {
         trace = null
         dispatchPointer = null
         dispatchKey = null
+        dispatchEvidence = null
     }
 
     fun beforeEvent(event: MotionEvent, boundarySettling: Boolean, layout: () -> JSONObject,
@@ -97,6 +100,7 @@ internal class TouchTraceRecorder(context: Context) {
                     val i = event.actionIndex
                     current.activeContacts[event.getPointerId(i)]?.apply {
                         put("up_t", event.eventTime - current.downAt)
+                        put("physical_up_t", event.eventTime - current.downAt)
                         put("up", JSONArray().put(event.getX(i)).put(event.getY(i)))
                         put("up_hit_key", hitKey(event.getX(i), event.getY(i)) ?: JSONObject.NULL)
                         if (!has("release_reason")) put("up_key", JSONObject.NULL)
@@ -106,6 +110,15 @@ internal class TouchTraceRecorder(context: Context) {
                     if (!it.has("release_reason"))
                         it.put("cancelled", true).put("cancel_t", event.eventTime - current.downAt)
                 }
+            }
+        }.onFailure { discard() }
+    }
+
+    /** Associates the actual DOWN record with the contact used by the input path. */
+    fun contact(pointerId: Int, contactId: Long, downSequence: Long) {
+        runCatching {
+            trace?.takeIf(::valid)?.activeContacts?.get(pointerId)?.apply {
+                put("contact_id", contactId).put("down_sequence", downSequence)
             }
         }.onFailure { discard() }
     }
@@ -148,14 +161,17 @@ internal class TouchTraceRecorder(context: Context) {
         }.onFailure { discard() }
     }
 
-    fun <T> dispatch(pointerId: Int, keyId: Int, block: () -> T): T {
+    fun <T> dispatch(pointerId: Int, keyId: Int, evidence: PinyinTapEvidence? = null, block: () -> T): T {
         val previousPointer = dispatchPointer
         val previousKey = dispatchKey
+        val previousEvidence = dispatchEvidence
         dispatchPointer = pointerId
         dispatchKey = keyId
+        dispatchEvidence = evidence
         try { return block() } finally {
             dispatchPointer = previousPointer
             dispatchKey = previousKey
+            dispatchEvidence = previousEvidence
         }
     }
 
@@ -173,6 +189,14 @@ internal class TouchTraceRecorder(context: Context) {
             .put("type", action.javaClass.simpleName).put("source", source.name)
         dispatchPointer?.let { payload.put("pointer_id", it) }
         dispatchKey?.let { payload.put("key_id", it) }
+        dispatchEvidence?.let { evidence ->
+            payload.put("contact_id", evidence.contactId)
+            evidence.downSequence?.let { payload.put("down_sequence", it) }
+            evidence.dispatchSequence?.let { payload.put("dispatch_sequence", it) }
+            evidence.dispatchTime?.let { payload.put("dispatch_t", it - current.downAt) }
+            payload.put("physical_up_t", evidence.physicalUpTime?.minus(current.downAt) ?: JSONObject.NULL)
+            payload.put("confirmation_kind", if (evidence.physicalUpTime == null) "down_order" else "physical_up")
+        }
         when (action) {
             is KeyAction.FcitxKeyAction -> payload.put("act", action.act).put("code", action.code)
                 .put("states", action.states.toInt())

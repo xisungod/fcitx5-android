@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchProfile
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.util.UUID
 import java.security.MessageDigest
 import kotlin.math.ceil
 import java.util.IdentityHashMap
@@ -41,6 +42,7 @@ data class TypingTestState(
     val reportSummary: String? = null,
     val failure: String? = null,
     val reportAvailable: Boolean = false,
+    val reportWarning: String? = null,
     val lastCommittedText: String? = null
 )
 
@@ -51,6 +53,10 @@ class TypingTestKeyTicket internal constructor(
     internal val letter: Char?,
     internal val letterOrdinal: Int,
     internal val enqueueNanos: Long,
+    internal val keyOrdinal: Int,
+    internal val backspace: Boolean,
+    internal val contactId: Long?,
+    internal val belongsToRawAttempt: Boolean,
     internal var startNanos: Long? = null,
     internal var finished: Boolean = false
 )
@@ -87,19 +93,31 @@ object TypingTestSession {
     private val inputs = mutableListOf<TypingTestTrialInput>()
     private val trialMetadata = mutableListOf<JSONObject>()
     private var startedAt = 0L
+    private var sessionReceipt = UUID.randomUUID().toString()
     private var reportRevision = 0L
     private var readyGeneration = -1L
     private val nativeReceipts = IdentityHashMap<FcitxEvent.CommitStringEvent, CommitReceipt>()
     private var discardedTrials = 0
+    private data class ContactReceipt(val generation: Long, val trial: Trial, val index: Int)
+    private val contactReceipts = mutableMapOf<Long, ContactReceipt>()
     private data class CommitReceipt(val generation: Long, val editor: EditorInfo)
     private data class PublishedOfferReceipt(val ticket: TypingTestObservationTicket, val publishedNanos: Long)
+
+    private data class KeyTiming(val keyOrdinal: Int, val letter: Char?, val backspace: Boolean,
+        val contactId: Long?, val enqueueNanos: Long, val startNanos: Long?, val finishedNanos: Long)
 
     private class Trial(val prompt: TypingTestPrompt, val settings: JSONObject) {
         val firstLetters = StringBuilder()
         val firstTouches = mutableListOf<TypingTestTouch>()
         var firstFrozen = false
         var firstComplete = false
+        var firstOmittedLetters = 0
+        var firstKind: TypingTestInputKind? = null
+        var rawKind: TypingTestInputKind? = null
+        var pendingRawKeys = 0
+        var actions = 0
         var letters = 0
+        val keyTimeline = mutableListOf<KeyTiming>()
         var backspaces = 0
         var commits = 0
         var nativeCommits = 0
@@ -109,6 +127,7 @@ object TypingTestSession {
         var initialRaw: String? = null
         var initialSnapshot: TypingTestCandidateSnapshot? = null
         var initialCaptured = false
+        var displayedSnapshot: TypingTestCandidateSnapshot? = null
         var selectedRaw: String? = null
         var selectedSnapshot: TypingTestCandidateSnapshot? = null
         val turnaroundNanos = mutableListOf<Long>()
@@ -119,10 +138,15 @@ object TypingTestSession {
         val touchSearchNanos = mutableListOf<Long>()
         val alternativeQueryNanos = mutableListOf<Long>()
         val offerReadyNanos = mutableListOf<Long>()
+        val probeLibraryLoadNanos = mutableListOf<Long>()
+        val probeInitializationNanos = mutableListOf<Long>()
+        val probeNativeQueryNanos = mutableListOf<Long>()
         val timedOfferTokens = mutableSetOf<Long>()
         val publishedOfferReceipts = mutableMapOf<Long, PublishedOfferReceipt>()
         val omittedStageSamples = mutableMapOf<TypingTestStage, Int>()
         val alternativeEvents = mutableListOf<TypingTestAlternativeEvent>()
+        val probeQueries = mutableListOf<TypingTestProbeQuery>()
+        var omittedProbeQueries = 0
         var omittedAlternativeEvents = 0
         val unsupported = linkedSetOf<String>()
     }
@@ -147,9 +171,11 @@ object TypingTestSession {
         inputs.clear()
         trialMetadata.clear()
         startedAt = System.currentTimeMillis()
+        sessionReceipt = UUID.randomUUID().toString()
         discardedTrials = 0
         generation++
         nativeReceipts.clear()
+        contactReceipts.clear()
         pending = 0
         active = false
         trial = Trial(prompts.first(), currentSettings())
@@ -178,10 +204,15 @@ object TypingTestSession {
     }
 
     private fun invalidatePending(reason: String) {
-        if (pending > 0) trial?.unsupported?.add(reason)
+        if (pending > 0) trial?.let { current ->
+            current.unsupported.add(reason)
+            if (current.pendingRawKeys > 0) current.rawKind = TypingTestInputKind.UNKNOWN
+            current.pendingRawKeys = 0
+        }
         generation++
         pending = 0
         nativeReceipts.clear()
+        contactReceipts.clear()
     }
 
     fun isEligibleEditor(info: EditorInfo?): Boolean = synchronized(lock) { eligible(info) }
@@ -203,11 +234,30 @@ object TypingTestSession {
             TypingTestStage.SendKey -> current.sendKeyNanos
             TypingTestStage.TouchSearch -> current.touchSearchNanos
             TypingTestStage.AlternativeQuery -> current.alternativeQueryNanos
+            TypingTestStage.ProbeLibraryLoad -> current.probeLibraryLoadNanos
+            TypingTestStage.ProbeInitialization -> current.probeInitializationNanos
+            TypingTestStage.ProbeNativeQuery -> current.probeNativeQueryNanos
             // This duration must be bound to an actually published token, never fabricated.
             TypingTestStage.OfferReady -> return
         }
         if (samples.size < TypingTestMetrics.MAX_TIMING_SAMPLES) samples.add(elapsedNanos)
         else current.omittedStageSamples[stage] = (current.omittedStageSamples[stage] ?: 0) + 1
+    }
+
+    /** Only the actual completed call is recorded; cache and cold creation remain distinguishable. */
+    internal fun recordProbeQuery(ticket: TypingTestObservationTicket?, offerToken: Long,
+                                  result: RimeTouchProbe.QueryResult) = synchronized(lock) {
+        if (!valid(ticket) || offerToken < 0) return@synchronized
+        val current = trial ?: return@synchronized
+        if (current.probeQueries.any { it.offerToken == offerToken }) return@synchronized
+        if (current.probeQueries.size >= MAX_ALTERNATIVE_EVENTS) {
+            current.omittedProbeQueries++
+            return@synchronized
+        }
+        current.probeQueries.add(TypingTestProbeQuery(offerToken, result.elapsedNanos,
+            result.libraryLoadNanos, result.initializationNanos, result.nativeQueryNanos,
+            result.cacheHit, result.coldInitialization, result.available, result.withinBudget,
+            result.nativeWithinBudget, result.failureReason?.take(64)))
     }
 
     /** The same enqueue receipt survives key completion, search and query callbacks. */
@@ -260,7 +310,8 @@ object TypingTestSession {
         current.alternativeEvents.add(TypingTestAlternativeEvent(offerToken, event, raw, alternative,
             text, reason?.take(64), success, fullPrompt,
             originalRank?.takeIf { it >= 0 } ?: prior?.originalRank,
-            searchPathCount?.takeIf { it >= 0 } ?: prior?.searchPathCount))
+            searchPathCount?.takeIf { it >= 0 } ?: prior?.searchPathCount,
+            prior?.inputKindAtCapture ?: if (fullPrompt) TypingTestInputKind.FULL_PINYIN else qualification(current)))
         if (event == TypingTestAlternativeEventKind.Published)
             current.publishedOfferReceipts[offerToken] = PublishedOfferReceipt(ticket!!, System.nanoTime())
     }
@@ -275,21 +326,30 @@ object TypingTestSession {
                  orientation: Int = 0): TypingTestKeyTicket? = synchronized(lock) {
         if (!eligible(info)) return null
         val current = trial ?: return null
-        if (current.letters + current.backspaces >= MAX_KEYS) {
+        if (current.actions >= MAX_KEYS) {
             current.unsupported.add("key_limit_reached")
             return null
         }
-        if (!supported) current.unsupported.add("unsupported_key")
-        if (current.settings.toString() != currentSettings().toString())
+        if (!supported) {
+            current.unsupported.add("unsupported_key")
+            if (!current.firstFrozen) current.rawKind = TypingTestInputKind.UNKNOWN
+        }
+        if (current.settings.toString() != currentSettings().toString()) {
             current.unsupported.add("settings_changed_during_trial")
+            if (!current.firstFrozen) current.rawKind = TypingTestInputKind.UNKNOWN
+        }
+        val belongsToRawAttempt = letter != null && !current.firstFrozen
+        if (belongsToRawAttempt) current.pendingRawKeys++
         if (backspace) {
             current.backspaces++
-            current.firstFrozen = true
+            freezeFirstAttempt(current)
         }
         if (letter != null) {
             current.letters++
             if (letter !in 'a'..'z') current.unsupported.add("non_lowercase_letter")
-            if (!current.firstFrozen && current.firstLetters.length < 64) {
+            if (!current.firstFrozen && current.firstLetters.length >= TypingTestAligner.MAX_LENGTH)
+                current.firstOmittedLetters++
+            if (!current.firstFrozen && current.firstLetters.length < TypingTestAligner.MAX_LENGTH) {
                 current.firstLetters.append(letter)
                 if (evidence != null && evidence.tap.original == letter) {
                     current.firstTouches.add(TypingTestTouch(letter, evidence.tap.downX,
@@ -298,16 +358,24 @@ object TypingTestSession {
                             Configuration.ORIENTATION_PORTRAIT -> "portrait"
                             Configuration.ORIENTATION_LANDSCAPE -> "landscape"
                             else -> "unknown"
-                        }))
+                        }, contactId = evidence.contactId.takeIf { it > 0 },
+                        pointerId = evidence.pointerId, downTime = evidence.downTime,
+                        downSequence = evidence.downSequence, dispatchSequence = evidence.dispatchSequence,
+                        dispatchTime = evidence.dispatchTime, physicalUpTime = evidence.physicalUpTime,
+                        physicalUpX = evidence.physicalUpX, physicalUpY = evidence.physicalUpY))
+                    if (evidence.contactId > 0) contactReceipts[evidence.contactId] =
+                        ContactReceipt(generation, current, current.firstTouches.lastIndex)
                 }
                 if (current.firstLetters.length == current.prompt.pinyin.length) {
-                    current.firstFrozen = true
                     current.firstComplete = true
+                    freezeFirstQualification(current)
                 }
             }
         }
         pending++
-        TypingTestKeyTicket(generation, info!!, letter, current.letters, System.nanoTime())
+        current.actions++
+        TypingTestKeyTicket(generation, info!!, letter, current.letters, System.nanoTime(),
+            current.actions, backspace, evidence?.contactId?.takeIf { it > 0 }, belongsToRawAttempt)
     }
 
     fun startKey(ticket: TypingTestKeyTicket) = synchronized(lock) {
@@ -327,7 +395,17 @@ object TypingTestSession {
         ticket.finished = true
         pending = (pending - 1).coerceAtLeast(0)
         val current = trial ?: return
-        if (!schemaSupported) current.unsupported.add("not_full_chinese_rime")
+        if (current.keyTimeline.size < MAX_KEYS) current.keyTimeline.add(KeyTiming(ticket.keyOrdinal,
+            ticket.letter, ticket.backspace, ticket.contactId, ticket.enqueueNanos, ticket.startNanos,
+            finishedAtNanos))
+        if (ticket.belongsToRawAttempt) current.pendingRawKeys = (current.pendingRawKeys - 1).coerceAtLeast(0)
+        if (!schemaSupported) {
+            if (ticket.belongsToRawAttempt) current.rawKind = TypingTestInputKind.UNKNOWN
+            current.unsupported.add("not_full_chinese_rime")
+            if (ticket.letter != null && ticket.letterOrdinal <= current.firstLetters.length &&
+                !current.initialCaptured)
+                current.firstKind = TypingTestInputKind.UNKNOWN
+        }
         if (ticket.letter != null) {
             current.turnaroundNanos.add(finishedAtNanos - ticket.enqueueNanos)
             ticket.startNanos?.let {
@@ -342,18 +420,68 @@ object TypingTestSession {
                 it.take(3).map { word -> word.take(MAX_COMMITTED) },
                 completePromptComposition = current.nativeCommits == 0 && current.commits == 0 &&
                     raw.length == current.prompt.pinyin.length,
-                coherent = schemaSupported) }
+                coherent = schemaSupported,
+                inputKindAtCapture = qualification(current),
+                priorCommitCountAtCapture = maxOf(current.nativeCommits, current.commits)) }
             if (!current.initialCaptured && current.firstComplete &&
                 ticket.letter != null && ticket.letterOrdinal == current.prompt.pinyin.length) {
                 current.initialCaptured = true
                 current.initialRaw = raw
-                current.initialSnapshot = current.latestSnapshot
+                // Later edits and commits must not reclassify evidence that was valid now.
+                current.initialSnapshot = current.latestSnapshot?.copy(
+                    inputKindAtCapture = if (schemaSupported) current.firstKind else TypingTestInputKind.UNKNOWN)
             }
         }
     }
 
+    /** First visible layout for the first complete composition, independent of native ordering. */
+    fun recordDisplayedCandidates(info: EditorInfo?, raw: String, candidates: List<String>) =
+        synchronized(lock) {
+            if (!eligible(info)) return@synchronized
+            val current = trial ?: return@synchronized
+            if (current.displayedSnapshot != null || !current.initialCaptured || current.firstFrozen ||
+                raw != current.initialRaw || raw != current.latestRaw ||
+                current.nativeCommits != 0 || current.commits != 0) return@synchronized
+            val initial = current.initialSnapshot ?: return@synchronized
+            if (!initial.completePromptComposition || !initial.coherent ||
+                initial.inputKindAtCapture != TypingTestInputKind.FULL_PINYIN) return@synchronized
+            current.displayedSnapshot = initial.copy(candidates = candidates.take(3)
+                .map { it.take(MAX_COMMITTED) })
+        }
+
+    /** A physically later UP can complete an early DOWN-order confirmation, never another trial. */
+    fun completeTouchEvidence(contactId: Long, physicalUpTime: Long, x: Float, y: Float) =
+        synchronized(lock) {
+            val receipt = contactReceipts.remove(contactId) ?: return@synchronized
+            if (receipt.generation != generation || trial !== receipt.trial || !eligible(editor) ||
+                !x.isFinite() || !y.isFinite()) return@synchronized
+            val touch = receipt.trial.firstTouches.getOrNull(receipt.index) ?: return@synchronized
+            if (touch.contactId != contactId || touch.physicalUpTime != null ||
+                touch.downTime?.let { physicalUpTime < it } == true) return@synchronized
+            receipt.trial.firstTouches[receipt.index] = touch.copy(physicalUpTime = physicalUpTime,
+                physicalUpX = x, physicalUpY = y)
+        }
+
+    private fun qualification(current: Trial) = if (current.unsupported.isEmpty() &&
+        current.commits == 0 && current.nativeCommits == 0) TypingTestInputKind.FULL_PINYIN
+        else TypingTestInputKind.UNKNOWN
+
+    private fun freezeFirstQualification(current: Trial) {
+        if (current.firstKind == null) current.firstKind = qualification(current)
+    }
+
+    private fun freezeFirstAttempt(current: Trial) {
+        if (current.firstFrozen) return
+        current.firstFrozen = true
+        freezeFirstQualification(current)
+        if (current.rawKind == null) current.rawKind = qualification(current)
+    }
+
     fun markUnsupported(info: EditorInfo?, reason: String) = synchronized(lock) {
-        if (eligible(info)) trial?.unsupported?.add(reason.take(64))
+        if (eligible(info)) trial?.let { current ->
+            if (reason == "non_typing_action") freezeFirstAttempt(current)
+            current.unsupported.add(reason.take(64))
+        }
     }
 
     /** Freeze on fcitx-main before the asynchronous UI flow can deliver a newer composition. */
@@ -386,7 +514,7 @@ object TypingTestSession {
     }
 
     private fun freezeFirstCommit(current: Trial) {
-        current.firstFrozen = true
+        freezeFirstAttempt(current)
         current.selectedRaw = current.latestRaw
         current.selectedSnapshot = current.latestSnapshot
     }
@@ -420,6 +548,7 @@ object TypingTestSession {
             return
         }
         if (committedText.length > MAX_COMMITTED) current.unsupported.add("text_limit_reached")
+        freezeFirstAttempt(current)
         val final = committedText.take(MAX_COMMITTED)
         if (current.commits == 0 || current.committed.toString() != final)
             current.unsupported.add("unobserved_or_edited_commit")
@@ -439,26 +568,51 @@ object TypingTestSession {
             candidateInputPinyin = current.initialRaw,
             stageTimings = TypingTestStageTimings(current.sendKeyNanos.toList(),
                 current.touchSearchNanos.toList(), current.alternativeQueryNanos.toList(),
-                current.offerReadyNanos.toList()),
-            alternativeEvents = current.alternativeEvents.toList())
+                current.offerReadyNanos.toList(), current.probeLibraryLoadNanos.toList(),
+                current.probeInitializationNanos.toList(), current.probeNativeQueryNanos.toList()),
+            alternativeEvents = current.alternativeEvents.toList(),
+            firstAttemptInputKind = current.firstKind ?: qualification(current),
+            displayedCandidateSnapshot = current.displayedSnapshot,
+            calibrationConfirmed = current.commits == 1 && current.nativeCommits <= 1 && current.committed.toString() == final &&
+                current.unsupported.all { it == "non_typing_action" } &&
+                current.selectedRaw == current.prompt.pinyin && final == current.prompt.text,
+            probeQueries = current.probeQueries.toList(), firstAttemptOmittedLetterCount = current.firstOmittedLetters,
+            rawAttemptInputKind = current.rawKind ?: qualification(current))
         inputs.add(input)
         trialMetadata.add(JSONObject().put("settings", current.settings)
             .put("session_exclusions", JSONArray(current.unsupported.toList()))
             .put("queue_wait_ns", JSONArray(current.queueNanos))
             .put("engine_processing_ns", JSONArray(current.engineNanos))
             .put("test_snapshot_ns", JSONArray(current.snapshotNanos))
+            .put("key_timeline", JSONArray().apply {
+                current.keyTimeline.forEach { key -> put(JSONObject()
+                    .put("key_ordinal", key.keyOrdinal).put("letter", key.letter?.toString() ?: JSONObject.NULL)
+                    .put("backspace", key.backspace).put("contact_id", key.contactId ?: JSONObject.NULL)
+                    .put("enqueue_monotonic_ns", key.enqueueNanos)
+                    .put("started_monotonic_ns", key.startNanos ?: JSONObject.NULL)
+                    .put("finished_monotonic_ns", key.finishedNanos)
+                    .put("turnaround_ns", key.finishedNanos - key.enqueueNanos)
+                    .put("queue_wait_ns", key.startNanos?.let { it - key.enqueueNanos } ?: JSONObject.NULL)) }
+            })
             .put("stage_omitted_counts", JSONObject().apply {
                 current.omittedStageSamples.forEach { (stage, count) -> put(stage.name, count) }
             })
-            .put("alternative_event_omitted_count", current.omittedAlternativeEvents))
-        val result = TypingTestMetrics.evaluate(input)
+            .put("alternative_event_omitted_count", current.omittedAlternativeEvents)
+            .put("probe_query_omitted_count", current.omittedProbeQueries))
+        val receipt = MessageDigest.getInstance("SHA-256")
+            .digest("$sessionReceipt:${inputs.lastIndex}".toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        val evaluated = TypingTestMetrics.evaluate(input)
+        val result = evaluated.copy(calibrationSamples = evaluated.calibrationSamples.map {
+            it.copy(confirmationId = receipt)
+        })
         val results = mutableState.value.results + result
         active = false
         generation++
         trial = null
         mutableState.value = mutableState.value.copy(phase = TypingTestPhase.Completed,
             completed = results.size, results = results, failure = null,
-            lastCommittedText = final, reportSummary = summary(results))
+            lastCommittedText = final, reportSummary = summary(results), reportWarning = queryWarning(results))
         saveReport(false)
     }
 
@@ -467,7 +621,7 @@ object TypingTestSession {
         if (old.phase != TypingTestPhase.Completed) return
         if (old.completed >= prompts.size) {
             mutableState.value = old.copy(phase = TypingTestPhase.Report, prompt = null,
-                reportSummary = summary(old.results))
+                reportSummary = summary(old.results), reportWarning = queryWarning(old.results))
             return
         }
         generation++
@@ -487,7 +641,7 @@ object TypingTestSession {
         if (old.results.isNotEmpty()) {
             saveReport(true)
             mutableState.value = mutableState.value.copy(phase = TypingTestPhase.Report,
-                prompt = null, reportSummary = summary(old.results), failure = null)
+                prompt = null, reportSummary = summary(old.results), reportWarning = queryWarning(old.results), failure = null)
         } else mutableState.value = TypingTestState(reportAvailable = reportJson != null)
     }
 
@@ -520,6 +674,25 @@ object TypingTestSession {
             .put("inline_correction", prefs.pinyinTouchCorrection.getValue())
             .put("boundary_settling", prefs.touchBoundarySettling.getValue())
             .put("personalization", prefs.pinyinTouchPersonalization.getValue())
+            .put("candidate_promotion", prefs.pinyinTouchPromotion.getValue())
+    }
+
+    /** Prescribed, explicitly completed labels only. Reading never trains or applies a profile. */
+    fun confirmedCalibrationSamples(): List<TypingTestCalibrationSample> = synchronized(lock) {
+        mutableState.value.results.flatMap { it.calibrationSamples }.toList()
+    }
+
+    private fun queryWarning(results: List<TypingTestTrialResult>): String? {
+        val reasons = results.flatMap { it.alternativeMetrics.rejectionReasons.entries }
+        val unavailable = reasons.filter { it.key.startsWith("ProbeUnavailable") }.sumOf { it.value }
+        val timeouts = reasons.filter { it.key == "ProbeOverBudget" || it.key == "ProbeTimeout" ||
+            it.key == "ProbeColdInitializationOverBudget" }.sumOf { it.value }
+        return when {
+            unavailable > 0 -> "触点纠错查询不可用 $unavailable 次；这些请求没有产生建议，请先查看触点纠错自检。" +
+                if (timeouts > 0) "另有 $timeouts 次查询超时。" else ""
+            timeouts > 0 -> "触点纠错查询超时 $timeouts 次；对应建议已丢弃，不能视作纠错成功。"
+            else -> null
+        }
     }
 
     private fun summary(results: List<TypingTestTrialResult>): String {
@@ -536,9 +709,36 @@ object TypingTestSession {
                 "%.2f ms（%d 次）", times[(ceil(times.size * .95).toInt() - 1)
                     .coerceIn(0, times.lastIndex)] / 1_000_000.0, times.size)
         }
+        val aggregate = TypingTestMetrics.summarize(results)
+        val completeCoverage = results.count { it.rawEditRate.denominator > 0 }
+        val originalCoverage = results.count { it.top1HitRate.denominator > 0 }
+        val visibleCoverage = results.count { it.displayedTop1HitRate.denominator > 0 }
+        val prefixCoverage = results.count { it.earlyPrefixMismatchRate.denominator > 0 }
+        val exclusions = results.flatMap { result -> result.unscoredReasons }
+            .groupingBy { it }.eachCount()
+        val reasonLabels = mapOf("unsupported_target" to "目标拼音不支持",
+            "unsupported_input_kind" to "未确认全拼输入",
+            "unsupported_raw_attempt_window" to "首轮原始拼音窗口不支持", "incomplete_first_attempt" to "首轮提前停止（只记前缀）",
+            "unsupported_first_attempt" to "首轮拼音格式不支持",
+            "first_attempt_capture_limit" to "首轮超过记录长度上限",
+            "first_attempt_exceeds_alignment_budget" to "错位过多，无法安全对齐触点",
+            "ambiguous_alignment" to "触点对齐存在多解",
+            "no_coherent_full_phrase_candidate_snapshot" to "缺少完整一致的原候选快照",
+            "no_visible_full_phrase_candidate_snapshot" to "缺少完整首轮可见候选快照",
+            "no_confirmed_prompted_touch_alignment" to "无法确认校准标签",
+            "invalid_key_counts" to "按键计数无效",
+            "final_input_kind_changed_after_first_attempt" to "后续输入方式改变（首轮仍保留）")
+        val exclusionText = exclusions.entries.joinToString(" · ") { (reason, count) ->
+            "${reasonLabels[reason] ?: "其他记录限制"}：$count 句"
+        }
+        val repairMean = aggregate.backspacesPerRepairTrial.value?.let {
+            String.format(Locale.ROOT, "%.1f 次（%d 次退格 / %d 条发生退格的句子）", it,
+                aggregate.backspacesPerRepairTrial.numerator, aggregate.backspacesPerRepairTrial.denominator)
+        } ?: "--（本轮无退格句子）"
         val alternatives = results.map { it.alternativeMetrics }
         val limited = trialMetadata.any { metadata ->
             metadata.optInt("alternative_event_omitted_count", 0) > 0 ||
+                metadata.optInt("probe_query_omitted_count", 0) > 0 ||
                 metadata.optJSONObject("stage_omitted_counts")?.length()?.let { it > 0 } == true
         }
         val counts = "生成 ${alternatives.sumOf { it.generatedCount }} · " +
@@ -548,11 +748,19 @@ object TypingTestSession {
             "选中 ${alternatives.sumOf { it.selectedCount }} · " +
             "执行成功 ${alternatives.sumOf { it.resolvedSuccessCount }}"
         return "完成 ${results.size} 句 · 最终文字正确 ${results.count { it.targetCompleted }} 句\n\n" +
+            (queryWarning(results)?.let { "注意：$it\n\n" } ?: "") +
+            "首轮原始拼音覆盖：$completeCoverage/${results.size} 句；原 Rime 快照覆盖：$originalCoverage/${results.size} 句\n" +
+            "实际可见候选覆盖：$visibleCoverage/${results.size} 句；早退格前缀覆盖：$prefixCoverage/${results.size} 句\n" +
             "原 Rime 第一候选命中：${fraction { it.top1HitRate }}\n" +
             "原 Rime 前三候选命中：${fraction { it.top3HitRate }}\n" +
+            "首次可见第一候选命中：${fraction { it.displayedTop1HitRate }}\n" +
+            "首次可见前三候选命中：${fraction { it.displayedTop3HitRate }}\n" +
             "首轮拼音编辑率：${fraction { it.rawEditRate }}\n" +
             "首轮邻键替换率：${fraction { it.adjacentSubstitutionRate }}\n" +
+            "早退格已输入前缀错位率：${fraction { it.earlyPrefixMismatchRate }}\n" +
+            "早退格前缀邻键错位率：${fraction { it.earlyPrefixAdjacentRate }}\n" +
             "退格 / 字母按键：${fraction { it.backspaceRate }}\n" +
+            "每条发生退格句子的平均退格：$repairMean\n" +
             "\n* 建议：$counts\n" +
             "* 全句建议命中：${fraction { it.alternativeMetrics.publishedHitRate }}\n" +
             "* 选择执行成功：${fraction { it.alternativeMetrics.selectionSuccessRate }}\n" +
@@ -560,16 +768,21 @@ object TypingTestSession {
             "\n按键入队到处理完成 P95：${p95(inputs.flatMap { it.processingNanos })}\n" +
             "原引擎按键调用 P95：${p95(inputs.flatMap { it.stageTimings.sendKeyNanos })}\n" +
             "触点备选搜索 P95：${p95(inputs.flatMap { it.stageTimings.touchSearchNanos })}\n" +
-            "只读备选查询 P95：${p95(inputs.flatMap { it.stageTimings.alternativeQueryNanos })}\n\n" +
+            "备选查询总耗时 P95：${p95(inputs.flatMap { it.stageTimings.alternativeQueryNanos })}\n" +
+            "查询库加载 P95：${p95(inputs.flatMap { it.stageTimings.probeLibraryLoadNanos })}\n" +
+            "查询引擎初始化 P95：${p95(inputs.flatMap { it.stageTimings.probeInitializationNanos })}\n" +
+            "实际原生查词 P95：${p95(inputs.flatMap { it.stageTimings.probeNativeQueryNanos })}\n\n" +
             "按键入队到建议提供 P95：${p95(inputs.flatMap { it.stageTimings.offerReadyNanos })}\n\n" +
-            "原 Rime 指标仍取首次完整输入；* 建议独立统计，不算进前三候选。\n" +
+            "原 Rime 指标取首次达到目标字母数时的快照；原始首轮拼音另采集到首次退格、上屏或停止。* 建议独立统计。\n" +
             "提供表示已发布到候选数据流；显示需可见 UI 回调。执行成功不等于目标正确。\n" +
             "各段时延分别计样，不相加；按键完成不等待独立后台搜索。\n" +
             "建议提供时延仅取成功提供的建议，含等待与排队；它与分段耗时重叠，不是绘帧时间。\n" +
             "排队与快照耗时另存报告，不含手指按住和屏幕绘制。\n" +
             (if (limited) "部分记录达到上限，以上统计仅使用保留样本。\n" else "") +
+            "首轮资格在输入时冻结；后续删改不抹掉当时的失败。早退格前缀只比较已输入位置，未知后缀不计漏字。\n" +
+            "不可评分原因（各指标可重叠）：$exclusionText\n" +
             "简拼、分段上屏、外部输入和无法确认的片段不参与对应评分。\n" +
-            "本版只测量，不自动训练或调整落点模型。"
+            "练习不会自动训练；只有点击应用校准才导入已确认样本。"
     }
 
     private fun saveReport(aborted: Boolean) {
@@ -583,21 +796,45 @@ object TypingTestSession {
             .put("discarded_on_view_recreation", discardedTrials)
             .put("aborted", aborted).put("automatic_touch_training", false)
             .put("measurement", "enqueue_to_key_action_completion_ns")
-            .put("candidate_measurement", "original_rime_first_complete_attempt_top3")
+            .put("key_timeline_clock", "System.nanoTime_ns")
+            .put("touch_event_clock", "MotionEvent_uptime_ms")
+            .put("candidate_measurement", "original_rime_first_target_length_observation_top3")
+            .put("first_attempt_qualification", "frozen_at_first_target_length_observation_or_early_stop")
+            .put("raw_first_attempt_window", "letters_until_first_backspace_commit_or_explicit_stop_max64")
+            .put("displayed_candidate_measurement", "first_visible_layout_same_first_complete_composition_top3")
+            .put("early_prefix_measurement", "position_mismatch_on_observed_prefix_only")
+            .put("query_warning", queryWarning(mutableState.value.results) ?: JSONObject.NULL)
             .put("alternative_measurement", "explicit_touch_offer_lifecycle_full_prompt_target")
             .put("alternative_display_measurement", "displayed_requires_visible_ui_callback")
             .put("stage_measurements", JSONObject()
                 .put("SendKey", "native_send_key_call_ns")
                 .put("TouchSearch", "touch_alternative_search_ns")
-                .put("AlternativeQuery", "native_read_only_rime_probe_ns"))
+                .put("AlternativeQuery", "native_read_only_rime_probe_total_ns")
+                .put("ProbeLibraryLoad", "probe_library_load_ns")
+                .put("ProbeInitialization", "probe_initialization_ns")
+                .put("ProbeNativeQuery", "probe_native_query_ns"))
             .put("offer_ready_measurement", "enqueue_to_offer_publish_ns")
             .put("touch_probe_runtime", JSONObject()
                 .put("measurement", "cached_bridge_status_at_report_save")
+                .put("counter_scope", "process_lifetime_calls_including_self_check_and_cache")
                 .put("expected_version", RimeTouchProbeStatus.EXPECTED_VERSION)
                 .put("library_available", probe.libraryAvailable ?: JSONObject.NULL)
                 .put("status", probe.runtimeStatus?.code ?: JSONObject.NULL)
                 .put("runtime_version", probe.runtimeStatus?.runtimeVersion ?: JSONObject.NULL)
-                .put("last_failure", probe.lastFailure ?: JSONObject.NULL))
+                .put("last_failure", probe.lastFailure ?: JSONObject.NULL)
+                .put("last_outcome", probe.lastOutcome ?: JSONObject.NULL)
+                .put("last_query_elapsed_ns", probe.lastQueryElapsedNanos ?: JSONObject.NULL)
+                .put("last_library_load_ns", probe.lastLibraryLoadNanos ?: JSONObject.NULL)
+                .put("last_initialization_ns", probe.lastInitializationNanos ?: JSONObject.NULL)
+                .put("last_native_query_ns", probe.lastNativeQueryNanos ?: JSONObject.NULL)
+                .put("last_query_monotonic_ns", probe.lastQueryMonotonicNanos ?: JSONObject.NULL)
+                .put("last_cache_hit", probe.lastCacheHit ?: JSONObject.NULL)
+                .put("query_count", probe.queryCount).put("success_count", probe.successCount)
+                .put("no_candidate_count", probe.noCandidateCount).put("timeout_count", probe.timeoutCount)
+                .put("unavailable_count", probe.unavailableCount).put("cache_hit_count", probe.cacheHitCount)
+                .put("native_query_count", probe.nativeQueryCount)
+                .put("last_success_monotonic_ns", probe.lastSuccessMonotonicNanos ?: JSONObject.NULL)
+                .put("ready_handle", probe.readyHandle))
             .put("summary", summary(mutableState.value.results))
         val layouts = linkedMapOf<String, JSONObject>()
         fun layoutOf(touch: TypingTestTouch): String {
@@ -623,6 +860,10 @@ object TypingTestSession {
                 .put("target_pinyin", input.prompt.pinyin).put("input_kind", input.inputKind.name)
                 .put("first_attempt_pinyin", input.firstAttemptPinyin ?: JSONObject.NULL)
                 .put("first_attempt_complete", input.firstAttemptComplete)
+                .put("first_attempt_omitted_letters", input.firstAttemptOmittedLetterCount)
+                .put("first_attempt_input_kind", input.firstAttemptInputKind?.name ?: JSONObject.NULL)
+                .put("raw_attempt_input_kind", input.rawAttemptInputKind?.name ?: JSONObject.NULL)
+                .put("calibration_confirmed", input.calibrationConfirmed ?: JSONObject.NULL)
                 .put("final_pinyin", input.finalInputPinyin ?: JSONObject.NULL)
                 .put("initial_candidate_pinyin", input.candidateInputPinyin ?: JSONObject.NULL)
                 .put("committed_text", input.committedText).put("target_completed", result.targetCompleted)
@@ -632,17 +873,49 @@ object TypingTestSession {
                         .put("original", touch.originalKey.toString()).put("down_x", finite(touch.downX))
                         .put("down_y", finite(touch.downY)).put("density", finite(touch.density))
                         .put("orientation", touch.orientation).put("hand", touch.hand)
-                        .put("layout", layoutOf(touch))) }
+                        .put("layout", layoutOf(touch)).put("contact_id", touch.contactId ?: JSONObject.NULL)
+                        .put("pointer_id", touch.pointerId ?: JSONObject.NULL)
+                        .put("down_time_ms", touch.downTime ?: JSONObject.NULL)
+                        .put("down_sequence", touch.downSequence ?: JSONObject.NULL)
+                        .put("dispatch_sequence", touch.dispatchSequence ?: JSONObject.NULL)
+                        .put("dispatch_time_ms", touch.dispatchTime ?: JSONObject.NULL)
+                        .put("physical_up_time_ms", touch.physicalUpTime ?: JSONObject.NULL)
+                        .put("physical_up_x", touch.physicalUpX?.let(::finite) ?: JSONObject.NULL)
+                        .put("physical_up_y", touch.physicalUpY?.let(::finite) ?: JSONObject.NULL)) }
                 }).put("unscored_reasons", JSONArray(result.unscoredReasons))
                 .put("candidate_snapshot", input.finalCandidateSnapshot?.let {
                     JSONObject().put("raw", it.rawPinyin).put("candidates", JSONArray(it.candidates))
                         .put("complete_prompt", it.completePromptComposition).put("coherent", it.coherent)
+                        .put("input_kind_at_capture", it.inputKindAtCapture?.name ?: JSONObject.NULL)
+                        .put("prior_commit_count_at_capture", it.priorCommitCountAtCapture ?: JSONObject.NULL)
                 } ?: JSONObject.NULL)
+                .put("displayed_candidate_snapshot", input.displayedCandidateSnapshot?.let {
+                    JSONObject().put("raw", it.rawPinyin).put("candidates", JSONArray(it.candidates))
+                        .put("complete_prompt", it.completePromptComposition).put("coherent", it.coherent)
+                        .put("input_kind_at_capture", it.inputKindAtCapture?.name ?: JSONObject.NULL)
+                        .put("prior_commit_count_at_capture", it.priorCommitCountAtCapture ?: JSONObject.NULL)
+                } ?: JSONObject.NULL)
+                .put("repair_burden", JSONObject().put("backspaces", result.backspaceCount)
+                    .put("had_backspace", result.backspaceCount > 0)
+                    .put("measurement", "backspaces_per_completed_trial_not_per_error"))
                 .put("turnaround_ns", JSONArray(input.processingNanos))
                 .put("send_key_ns", JSONArray(input.stageTimings.sendKeyNanos))
                 .put("touch_search_ns", JSONArray(input.stageTimings.touchSearchNanos))
                 .put("alternative_query_ns", JSONArray(input.stageTimings.alternativeQueryNanos))
+                .put("probe_library_load_ns", JSONArray(input.stageTimings.probeLibraryLoadNanos))
+                .put("probe_initialization_ns", JSONArray(input.stageTimings.probeInitializationNanos))
+                .put("probe_native_query_ns", JSONArray(input.stageTimings.probeNativeQueryNanos))
                 .put("enqueue_to_offer_publish_ns", JSONArray(input.stageTimings.offerReadyNanos))
+                .put("probe_queries", JSONArray().apply {
+                    input.probeQueries.forEach { query -> put(JSONObject()
+                        .put("offer_token", query.offerToken).put("elapsed_ns", query.elapsedNanos)
+                        .put("library_load_ns", query.libraryLoadNanos)
+                        .put("initialization_ns", query.initializationNanos)
+                        .put("native_query_ns", query.nativeQueryNanos).put("cache_hit", query.cacheHit)
+                        .put("cold_initialization", query.coldInitialization).put("available", query.available)
+                        .put("within_budget", query.withinBudget).put("native_within_budget", query.nativeWithinBudget)
+                        .put("failure_reason", query.failureReason ?: JSONObject.NULL)) }
+                })
                 .put("alternative_events", JSONArray().apply {
                     input.alternativeEvents.forEach { event -> put(JSONObject()
                         .put("offer_token", event.offerToken).put("kind", event.kind.name)
@@ -653,14 +926,16 @@ object TypingTestSession {
                         .put("success", event.success ?: JSONObject.NULL)
                         .put("full_prompt_composition", event.fullPromptComposition)
                         .put("original_rank_zero_based", event.originalRank ?: JSONObject.NULL)
-                        .put("search_path_count", event.searchPathCount ?: JSONObject.NULL)) }
+                        .put("search_path_count", event.searchPathCount ?: JSONObject.NULL)
+                        .put("input_kind_at_capture", event.inputKindAtCapture?.name ?: JSONObject.NULL)) }
                 })
                 .put("calibration_labels", JSONArray().apply {
                     result.calibrationSamples.forEach { sample -> put(JSONObject()
                         .put("index", sample.inputIndex).put("original", sample.originalKey.toString())
                         .put("intended", sample.intendedKey.toString()).put("layout", sample.layoutSignature)
                         .put("orientation", sample.orientation).put("hand", sample.hand)
-                        .put("offset_x", sample.normalizedOffsetX).put("offset_y", sample.normalizedOffsetY)) }
+                        .put("offset_x", sample.normalizedOffsetX).put("offset_y", sample.normalizedOffsetY)
+                        .put("confirmation_id", sample.confirmationId ?: JSONObject.NULL)) }
                 })
             val metadata = trialMetadata[i]
             metadata.keys().forEach { key -> row.put(key, metadata.get(key)) }
@@ -673,6 +948,10 @@ object TypingTestSession {
             metric("top1_hit_rate", result.top1HitRate)
             metric("top3_hit_rate", result.top3HitRate)
             metric("backspace_rate", result.backspaceRate)
+            metric("early_prefix_mismatch_rate", result.earlyPrefixMismatchRate)
+            metric("early_prefix_adjacent_rate", result.earlyPrefixAdjacentRate)
+            metric("displayed_top1_hit_rate", result.displayedTop1HitRate)
+            metric("displayed_top3_hit_rate", result.displayedTop3HitRate)
             val alternative = result.alternativeMetrics
             row.put("alternative_counts", JSONObject().put("generated", alternative.generatedCount)
                 .put("rejected", alternative.rejectedCount).put("published", alternative.publishedCount)
@@ -696,6 +975,9 @@ object TypingTestSession {
                 addStage("touch_search", result.stageLatencies.touchSearch)
                 addStage("alternative_query", result.stageLatencies.alternativeQuery)
                 addStage("offer_ready", result.stageLatencies.offerReady)
+                addStage("probe_library_load", result.stageLatencies.probeLibraryLoad)
+                addStage("probe_initialization", result.stageLatencies.probeInitialization)
+                addStage("probe_native_query", result.stageLatencies.probeNativeQuery)
             })
             rows.put(row)
         }

@@ -36,14 +36,20 @@ object TypingTestPrompts {
 enum class TypingTestInputKind { FULL_PINYIN, SHORTHAND_OR_MIXED, EXTERNAL, UNKNOWN }
 
 /** Actual observed durations. OfferReady overlaps processing blocks; samples are not additive. */
-enum class TypingTestStage { SendKey, TouchSearch, AlternativeQuery, OfferReady }
+enum class TypingTestStage {
+    SendKey, TouchSearch, AlternativeQuery, OfferReady,
+    ProbeLibraryLoad, ProbeInitialization, ProbeNativeQuery
+}
 
 data class TypingTestStageTimings(
     val sendKeyNanos: List<Long> = emptyList(),
     val touchSearchNanos: List<Long> = emptyList(),
     val alternativeQueryNanos: List<Long> = emptyList(),
     /** Original triggering action enqueue -> published offer, including debounce/queues. */
-    val offerReadyNanos: List<Long> = emptyList()
+    val offerReadyNanos: List<Long> = emptyList(),
+    val probeLibraryLoadNanos: List<Long> = emptyList(),
+    val probeInitializationNanos: List<Long> = emptyList(),
+    val probeNativeQueryNanos: List<Long> = emptyList()
 )
 
 enum class TypingTestAlternativeEventKind { Generated, Rejected, Published, Displayed, Selected, Resolved }
@@ -61,15 +67,19 @@ data class TypingTestAlternativeEvent(
     /** Native Rime order, zero-based; null if unavailable. Never a calibrated confidence. */
     val originalRank: Int? = null,
     /** Number of bounded spelling paths examined; explanatory evidence, not a model score. */
-    val searchPathCount: Int? = null
+    val searchPathCount: Int? = null,
+    val inputKindAtCapture: TypingTestInputKind? = null
 )
 
-/** Freeze at the FIRST complete full-pinyin attempt, before any correction/commit. */
+/** Freeze at the FIRST target-length full-pinyin observation, before any repair/commit. */
 data class TypingTestCandidateSnapshot(
     val rawPinyin: String,
     val candidates: List<String>,
     val completePromptComposition: Boolean = true,
-    val coherent: Boolean = true
+    val coherent: Boolean = true,
+    /** Explicitly frozen in the observation callback; null preserves legacy input adapters. */
+    val inputKindAtCapture: TypingTestInputKind? = null,
+    val priorCommitCountAtCapture: Int? = null
 )
 
 /** DOWN in unanimated key coordinates. This is observed evidence, never a corrected letter. */
@@ -80,7 +90,31 @@ data class TypingTestTouch(
     val density: Float,
     val cells: List<KeyCell>,
     val orientation: String = "unknown",
-    val hand: String = "unknown"
+    val hand: String = "unknown",
+    val contactId: Long? = null,
+    val pointerId: Int? = null,
+    val downTime: Long? = null,
+    val downSequence: Long? = null,
+    val dispatchSequence: Long? = null,
+    val dispatchTime: Long? = null,
+    val physicalUpTime: Long? = null,
+    val physicalUpX: Float? = null,
+    val physicalUpY: Float? = null
+)
+
+/** One completed query call, tied to its offer; cache reads are explicitly separate. */
+data class TypingTestProbeQuery(
+    val offerToken: Long,
+    val elapsedNanos: Long,
+    val libraryLoadNanos: Long,
+    val initializationNanos: Long,
+    val nativeQueryNanos: Long,
+    val cacheHit: Boolean,
+    val coldInitialization: Boolean,
+    val available: Boolean,
+    val withinBudget: Boolean,
+    val nativeWithinBudget: Boolean,
+    val failureReason: String? = null
 )
 
 data class TypingTestTrialInput(
@@ -91,7 +125,7 @@ data class TypingTestTrialInput(
     val firstAttemptComplete: Boolean = false,
     val firstAttemptTouches: List<TypingTestTouch> = emptyList(),
     val finalInputPinyin: String? = null,
-    /** Independently observed raw spelling at the first-complete candidate snapshot generation. */
+    /** Independently observed raw spelling at the first target-length snapshot generation. */
     val observedAttemptPinyin: String? = null,
     val finalCandidateSnapshot: TypingTestCandidateSnapshot? = null,
     val committedText: String = "",
@@ -100,10 +134,19 @@ data class TypingTestTrialInput(
     /** Enqueued letter action -> complete callback; detached search/probes are separate samples. */
     val processingNanos: List<Long> = emptyList(),
     val priorCommitCount: Int = 0,
-    /** First complete candidate spelling; finalInputPinyin can differ after the user repairs it. */
+    /** First target-length candidate spelling; raw first attempt may include later extra letters. */
     val candidateInputPinyin: String? = finalInputPinyin,
     val stageTimings: TypingTestStageTimings = TypingTestStageTimings(),
-    val alternativeEvents: List<TypingTestAlternativeEvent> = emptyList()
+    val alternativeEvents: List<TypingTestAlternativeEvent> = emptyList(),
+    /** First-attempt qualification is frozen before repairs or later unsupported actions. */
+    val firstAttemptInputKind: TypingTestInputKind? = null,
+    val displayedCandidateSnapshot: TypingTestCandidateSnapshot? = null,
+    /** Fail closed for final calibration confirmation, independent of first-attempt scoring. */
+    val calibrationConfirmed: Boolean? = null,
+    val probeQueries: List<TypingTestProbeQuery> = emptyList(),
+    val firstAttemptOmittedLetterCount: Int = 0,
+    /** Qualification of the raw stop-delimited window, separate from the earlier snapshot. */
+    val rawAttemptInputKind: TypingTestInputKind? = null
 )
 
 data class TypingTestFraction(val numerator: Int, val denominator: Int) {
@@ -126,7 +169,13 @@ data class TypingTestStageLatencies(
     val alternativeQuery: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0,
         "alternative_query_ns"),
     val offerReady: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0,
-        "enqueue_to_offer_publish_ns")
+        "enqueue_to_offer_publish_ns"),
+    val probeLibraryLoad: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0,
+        "probe_library_load_ns"),
+    val probeInitialization: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0,
+        "probe_initialization_ns"),
+    val probeNativeQuery: TypingTestLatency = TypingTestLatency(0, null, null, null, 0, 0,
+        "probe_native_query_ns")
 )
 
 /** Event counts describe the pipeline; target hit rates only describe eligible prescribed phrases. */
@@ -153,7 +202,9 @@ data class TypingTestCalibrationSample(
     val orientation: String,
     val hand: String,
     val normalizedOffsetX: Double,
-    val normalizedOffsetY: Double
+    val normalizedOffsetY: Double,
+    /** Opaque per-trial confirmation receipt; it contains no entered text. */
+    val confirmationId: String? = null
 )
 
 data class TypingTestTrialResult(
@@ -174,5 +225,10 @@ data class TypingTestTrialResult(
     val calibrationSamples: List<TypingTestCalibrationSample>,
     val latency: TypingTestLatency,
     val stageLatencies: TypingTestStageLatencies = TypingTestStageLatencies(),
-    val alternativeMetrics: TypingTestAlternativeMetrics = TypingTestAlternativeMetrics()
+    val alternativeMetrics: TypingTestAlternativeMetrics = TypingTestAlternativeMetrics(),
+    /** Prefix-only positional errors; never count the untouched target suffix as missing. */
+    val earlyPrefixMismatchRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val earlyPrefixAdjacentRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val displayedTop1HitRate: TypingTestFraction = TypingTestFraction(0, 0),
+    val displayedTop3HitRate: TypingTestFraction = TypingTestFraction(0, 0)
 )

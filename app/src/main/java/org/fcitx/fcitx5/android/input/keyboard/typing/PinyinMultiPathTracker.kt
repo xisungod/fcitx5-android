@@ -21,7 +21,9 @@ data class PinyinMultiPathProposal(
     val modelConfidence: Float,
     val changedIndices: List<Int>,
     val editorSequence: Long,
-    val enumeratedPathCount: Int
+    val enumeratedPathCount: Int,
+    /** Read-only spatial evidence, separate from the combined path score. */
+    val promotionEvidence: PinyinTouchPromotionEvidence? = null
 )
 
 /**

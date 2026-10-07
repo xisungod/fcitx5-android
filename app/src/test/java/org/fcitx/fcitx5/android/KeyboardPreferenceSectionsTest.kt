@@ -317,18 +317,19 @@ class KeyboardPreferenceSectionsTest {
             assertTrue("The visible switch must persist the opt-in", prefs.pinyinTouchCorrection.getValue())
             assertFalse("Correction must not start collecting diagnostic logs", prefs.touchDiagnosticLogging.getValue())
             assertFalse("Correction must not enable long-hold boundary adjustment", prefs.touchBoundarySettling.getValue())
-            assertFalse("Learning must remain a separate opt-in", prefs.pinyinTouchPersonalization.getValue())
+            assertTrue("Confirmed calibration is applied by default; this does not start learning",
+                prefs.pinyinTouchPersonalization.getValue())
             val learning = fragment.findPreference<Preference>(prefs.pinyinTouchPersonalization.key)!!
             assertEquals("typing_touch_correction", learning.parent!!.key)
             learning.performClick()
-            assertTrue(prefs.pinyinTouchPersonalization.getValue())
+            assertFalse(prefs.pinyinTouchPersonalization.getValue())
             assertEquals("typing_touch_correction", fragment.findPreference<Preference>(
                 KeyboardPreferenceSections.PINYIN_TOUCH_PROFILE_CLEAR_KEY)!!.parent!!.key)
             assertTrue("Touch correction must not trigger a Rime rebuild", engine.deployments.isEmpty())
             correction.performClick()
             assertFalse(prefs.pinyinTouchCorrection.getValue())
             learning.performClick()
-            assertFalse(prefs.pinyinTouchPersonalization.getValue())
+            assertTrue(prefs.pinyinTouchPersonalization.getValue())
         }
     }
 
@@ -347,7 +348,7 @@ class KeyboardPreferenceSectionsTest {
             }
             assertTrue(store.offsets(cells, 1f).isEmpty())
             assertFalse(AppPrefs.getInstance().keyboard.pinyinTouchCorrection.getValue())
-            assertFalse(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.getValue())
+            assertTrue(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.getValue())
             assertTrue(engine.deployments.isEmpty())
         }
     }

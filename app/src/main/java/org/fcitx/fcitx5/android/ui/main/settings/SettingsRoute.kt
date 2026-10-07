@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.behavior.CandidatesSettingsFrag
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.ClipboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.FeedbackSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.TypingSettingsFragment
+import org.fcitx.fcitx5.android.ui.main.settings.behavior.TouchProbeSelfCheckFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.KeyboardSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.SymbolSettingsFragment
 import org.fcitx.fcitx5.android.ui.main.settings.global.GlobalConfigFragment
@@ -86,6 +87,9 @@ sealed class SettingsRoute : Parcelable {
 
     @Serializable
     data object TypingTest : SettingsRoute()
+
+    @Serializable
+    data object TouchProbeSelfCheck : SettingsRoute()
 
     @Serializable
     data object EngineTools : SettingsRoute()
@@ -240,6 +244,9 @@ sealed class SettingsRoute : Parcelable {
             }
             fragment<TypingTestFragment, TypingTest> {
                 label = ctx.getString(R.string.typing_test_title)
+            }
+            fragment<TouchProbeSelfCheckFragment, TouchProbeSelfCheck> {
+                label = ctx.getString(R.string.touch_probe_self_check_title)
             }
             fragment<EngineToolsFragment, EngineTools> {
                 label = ctx.getString(R.string.ax_settings_tools)

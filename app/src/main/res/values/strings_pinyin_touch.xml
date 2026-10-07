@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="pinyin_touch_promotion">Prioritize high-confidence candidates</string>
+    <string name="pinyin_touch_promotion_summary">Prioritizes only candidates supported by reliable spatial evidence and complete Pinyin. The original candidate remains available.</string>
     <string name="pinyin_down_order">Two-finger typing order · experimental</string>
     <string name="pinyin_down_order_summary">Keeps ordinary Chinese letter taps in touch-down order when fingers overlap. Slide and long-press actions keep their own handling.</string>
     <string name="pinyin_touch_alternatives">Touch-based candidate correction · experimental</string>
@@ -9,7 +11,7 @@
     <string name="pinyin_touch_correction">Pinyin touch correction · experimental</string>
     <string name="pinyin_touch_correction_summary">Uses touch position and pinyin probabilities only near key boundaries. Clear center taps keep their original key. Your input is not uploaded.</string>
     <string name="pinyin_touch_personalization">Learn typing habits · experimental</string>
-    <string name="pinyin_touch_personalization_summary">Learns touch offsets locally only from keys you explicitly confirm or restore. Password fields are excluded.</string>
+    <string name="pinyin_touch_personalization_summary">Uses confirmed per-key calibration; keys with too few samples keep their original interpretation. Apply calibration after a typing test, or reset it.</string>
     <string name="pinyin_touch_profile_clear">Clear typing habit data</string>
     <string name="pinyin_touch_profile_clear_done">Typing habit data cleared</string>
     <string name="pinyin_touch_restore_letter">Restore %1$s</string>

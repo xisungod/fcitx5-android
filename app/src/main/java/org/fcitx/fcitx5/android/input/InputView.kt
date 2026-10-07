@@ -109,6 +109,11 @@ class InputView(
     private val preeditEmptyState = PreeditEmptyStateComponent()
     private val preedit = PreeditComponent()
     private val commonKeyActionListener = CommonKeyActionListener()
+
+    internal fun invalidateTouchFeedbackForExternalInput() {
+        commonKeyActionListener.clearPinyinTapFeedback()
+    }
+
     private val windowManager = InputWindowManager()
     private val kawaiiBar = KawaiiBarComponent()
     private val horizontalCandidate = HorizontalCandidateComponent()

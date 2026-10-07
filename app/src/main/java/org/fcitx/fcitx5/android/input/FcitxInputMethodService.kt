@@ -678,6 +678,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private lateinit var lastKnownConfig: Configuration
 
     override fun onConfigurationChanged(newConfig: Configuration) {
+        inputView?.invalidateTouchFeedbackForExternalInput()
         postFcitxJob { reset() }
         /**
          * skip keyboard|keyboardHidden changes, because we have [inputDeviceMgr]
@@ -768,6 +769,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onEvaluateFullscreenMode() = false
 
     private fun forwardKeyEvent(event: KeyEvent): Boolean {
+        inputView?.invalidateTouchFeedbackForExternalInput()
         TypingTestSession.markUnsupported(currentInputEditorInfo, "physical_keyboard")
         // reason to use a self increment index rather than timestamp:
         // KeyUp and KeyDown events actually can happen on the same time

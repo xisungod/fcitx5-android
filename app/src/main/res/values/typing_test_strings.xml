@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="typing_test_apply_calibration">Apply confirmed touch calibration from this test</string>
+    <string name="typing_test_apply_calibration_help">Only uses exercises confirmed correct and with reliably aligned touches. Guesses and everyday input are not used for automatic learning.</string>
+    <string name="typing_test_apply_calibration_done">Applied %1$d touch samples</string>
+    <string name="typing_test_apply_calibration_empty">This test has no confirmed touch samples</string>
+    <string name="typing_test_apply_calibration_duplicate">These samples have already been applied</string>
+    <string name="typing_test_apply_calibration_failed">Calibration was not applied. Please try a new typing test.</string>
     <string name="typing_test_title">Typing test</string>
     <string name="typing_test_entry_summary">Measure typing accuracy and response with fixed phrases</string>
     <string name="typing_test_hero">Type naturally. See what improves.</string>

@@ -39,6 +39,71 @@ class PinyinTouchCandidateRuntimeTest {
         assertTrue(runtime.publish(it, editor, "经常会", raw, raw.length))
     }
 
+    @Test fun `first promotion requires opt-in verified spatial evidence and survives normal claim guards`() {
+        val runtime = PinyinTouchCandidateRuntime()
+        val tracker = runtime.tracker(model)
+        val literal = "giren"
+        val offsets = mapOf('u' to CenterOffset(.12f, 0f), 'i' to CenterOffset(.12f, 0f))
+        var proposal: PinyinMultiPathProposal? = null
+        for (index in literal.indices) {
+            val cell = cells.first { it.letter == literal[index] }
+            val contact = PinyinTapEvidence(TapEvidence(literal[index],
+                if (index == 1) cell.left + .25f else cell.centerX, cell.centerY, 1f), cells)
+            proposal = tracker.recordTap(runtime.nextAction(), editor, literal.take(index), index,
+                literal.take(index + 1), index + 1, contact, offsets)
+        }
+        val evaluated = proposal!!
+        val words = listOf("一人", "古人", "此人")
+        assertTrue(runtime.publish(evaluated, editor, "古人", literal, literal.length,
+            originalCandidates = words))
+        assertFalse(runtime.offer.value!!.promotedToFirst)
+        assertNull(runtime.offer.value!!.promotionReason)
+        assertTrue(runtime.publish(evaluated, editor, "古人", literal, literal.length,
+            originalCandidates = words, allowFirstPromotion = true))
+        val offer = runtime.offer.value!!
+        assertTrue(offer.promotedToFirst)
+        assertEquals("Eligible", offer.promotionReason)
+        assertNull(runtime.claim(offer.token, Any(), literal, literal.length))
+        assertEquals(offer, runtime.claim(offer.token, editor, literal, literal.length)!!.offer)
+        assertNull(runtime.offer.value)
+        assertNull(runtime.claim(offer.token, editor, literal, literal.length))
+        assertTrue(runtime.isCurrent(offer.token))
+        runtime.nextAction()
+        assertFalse(runtime.isCurrent(offer.token))
+    }
+
+    @Test fun `first experiment reports a protection reason without changing second-slot advice`() {
+        val runtime = PinyinTouchCandidateRuntime()
+        val evaluated = type(runtime)
+        assertTrue(runtime.publish(evaluated, editor, "经常会", raw, raw.length,
+            originalCandidates = listOf("基本", "经常会"), allowFirstPromotion = true))
+        assertFalse(runtime.offer.value!!.promotedToFirst)
+        assertEquals("ProtectedAbbreviation", runtime.offer.value!!.promotionReason)
+    }
+
+    @Test fun `reservation consumes the exact published snapshot once and refuses a nonfirst default`() {
+        val runtime = PinyinTouchCandidateRuntime()
+        val ordinary = publish(runtime)
+        assertNull(runtime.reserve(ordinary.editorSequence, editor, requirePromotedFirst = true))
+        assertNotNull(runtime.offer.value)
+        assertNull(runtime.reserve(ordinary.editorSequence, Any()))
+        val formatted = "jibg' chsng hui"
+        assertTrue(runtime.publish(ordinary, editor, "经常会", formatted, formatted.length))
+        val reserved = runtime.reserve(ordinary.editorSequence, editor)!!
+        assertEquals(formatted, reserved.expectedPreedit)
+        assertEquals(formatted.length, reserved.expectedCursor)
+        assertSame(editor, reserved.editorIdentity)
+        assertEquals(ordinary.editorSequence, reserved.offer.token)
+        assertNull(runtime.offer.value)
+        assertNull(runtime.reserve(ordinary.editorSequence, editor))
+        val followingLetter = runtime.nextAction()
+        assertTrue(runtime.isCurrent(followingLetter))
+        assertFalse(runtime.isCurrent(reserved.offer.token))
+        // Reservation is a value fixed by the earlier explicit input action.
+        assertEquals(formatted, reserved.expectedPreedit)
+        assertEquals("经常会", reserved.offer.text)
+    }
+
     @Test fun `clear invalidates queued taps and aligns existing tracker with fresh action`() {
         val runtime = PinyinTouchCandidateRuntime()
         val tracker = runtime.tracker(model)

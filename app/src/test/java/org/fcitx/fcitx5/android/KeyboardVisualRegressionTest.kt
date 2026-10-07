@@ -27,6 +27,7 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
+import android.widget.TextView
 import org.fcitx.fcitx5.android.input.bar.ui.CandidateUi
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
@@ -428,7 +429,7 @@ class KeyboardVisualRegressionTest {
         save(render(root), "layout-candidate-ripple")
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1400))
         val first = candidates.findViewHolderForAdapterPosition(0)!!
-        val label = (first.itemView as ViewGroup).getChildAt(0) as AutoScaleTextView
+        val label = (first.itemView as ViewGroup).getChildAt(0) as TextView
         assertEquals(24f, label.textSize / activity.resources.displayMetrics.scaledDensity, 0.01f)
         assertTrue(candidates.canScrollHorizontally(1))
         val startLeft = manager.getChildAt(0)!!.left

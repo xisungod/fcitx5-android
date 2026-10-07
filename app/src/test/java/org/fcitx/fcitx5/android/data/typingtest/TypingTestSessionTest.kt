@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxEvent
+import org.fcitx.fcitx5.android.core.RimeTouchProbe
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
@@ -153,7 +154,8 @@ class TypingTestSessionTest {
         TypingTestSession.observeCommit(info, "secret text")
         assertNull(TypingTestSession.exportReport())
         assertFalse(AppPrefs.getInstance().keyboard.touchDiagnosticLogging.getValue())
-        assertFalse(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.getValue())
+        assertTrue(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.getValue())
+        assertTrue(TypingTestSession.confirmedCalibrationSamples().isEmpty())
     }
 
     @Test fun startingScreenDoesNotArmCollectionBeforeForegroundActivation() {
@@ -420,7 +422,7 @@ class TypingTestSessionTest {
         val result = TypingTestSession.state.value.results.single()
         assertFalse(result.targetCompleted)
         assertEquals(TypingTestInputKind.UNKNOWN, result.inputKind)
-        assertNull(result.top1HitRate.value)
+        assertEquals(TypingTestFraction(1, 1), result.top1HitRate)
         assertTrue(result.calibrationSamples.isEmpty())
     }
 
@@ -430,7 +432,8 @@ class TypingTestSessionTest {
         TypingTestSession.completePhrase(prompt.text)
         val result = TypingTestSession.state.value.results.single()
         assertEquals(TypingTestInputKind.UNKNOWN, result.inputKind)
-        assertNull(result.top1HitRate.value)
+        assertEquals(TypingTestFraction(1, 1), result.top1HitRate)
+        assertTrue(result.calibrationSamples.isEmpty())
     }
 
     @Test fun promptedTouchesRemainOriginalEvidenceAndReportsOmitEditorMetadata() {
@@ -455,7 +458,11 @@ class TypingTestSessionTest {
         assertFalse(report.contains("fieldId"))
         assertFalse(report.contains("packageName"))
         assertFalse(JSONObject(report).getBoolean("automatic_touch_training"))
-        assertFalse(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.getValue())
+        assertTrue(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.getValue())
+        assertEquals(prompt.pinyin.length, TypingTestSession.confirmedCalibrationSamples().size)
+        assertTrue(TypingTestSession.confirmedCalibrationSamples().all {
+            it.confirmationId?.matches(Regex("[a-f0-9]{64}")) == true
+        })
     }
 
     @Test fun actualKeyboardSuppliesControlGroupEvidenceOnlyWhileTestEditorIsEligible() {
@@ -837,6 +844,191 @@ class TypingTestSessionTest {
         val result = commitAndComplete(info)
         assertEquals(0, result.stageLatencies.offerReady.sampleCount)
         assertNull(result.stageLatencies.offerReady.p95Nanos)
+    }
+
+
+    @Test fun laterUnsupportedActionAndRepairCannotEraseInitialWrongFullPhrase() {
+        val info = start()
+        type(info, "nuhaoa", listOf("怒号啊", prompt.text))
+        TypingTestSession.markUnsupported(info, "non_typing_action")
+        val erase = TypingTestSession.beginKey(info, null, null, backspace = true)!!
+        finish(erase, "nuhao")
+        type(info, "a", prefix = "nuhao")
+        val result = commitAndComplete(info)
+        assertEquals(TypingTestInputKind.UNKNOWN, result.inputKind)
+        assertEquals(TypingTestFraction(1, prompt.pinyin.length), result.rawEditRate)
+        assertEquals(TypingTestFraction(0, 1), result.top1HitRate)
+        assertEquals(TypingTestFraction(1, 1), result.top3HitRate)
+        val report = JSONObject(TypingTestSession.exportReport()!!)
+        assertEquals("FULL_PINYIN", report.getJSONArray("trials").getJSONObject(0)
+            .getString("first_attempt_input_kind"))
+        assertTrue(report.getString("summary").contains("原 Rime 快照覆盖：1/1"))
+    }
+
+    @Test fun visibleSnapshotRequiresExactEditorSameFirstCompositionAndFreezesFirstLayout() {
+        val info = start()
+        type(info, candidates = listOf("你好呀", prompt.text))
+        TypingTestSession.recordDisplayedCandidates(editor(), prompt.pinyin, listOf("foreign"))
+        TypingTestSession.recordDisplayedCandidates(info, "nuhaoa", listOf("stale"))
+        TypingTestSession.recordDisplayedCandidates(info, prompt.pinyin, listOf(prompt.text, "你好呀"))
+        TypingTestSession.recordDisplayedCandidates(info, prompt.pinyin, listOf("newer"))
+        val result = commitAndComplete(info)
+        assertEquals(TypingTestFraction(0, 1), result.top1HitRate)
+        assertEquals(TypingTestFraction(1, 1), result.displayedTop1HitRate)
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertEquals(prompt.text, row.getJSONObject("displayed_candidate_snapshot")
+            .getJSONArray("candidates").getString(0))
+    }
+
+    @Test fun queryUnavailabilityAndTimeoutAreVisibleAndDistinctFromEmptyResults() {
+        val info = start()
+        val observation = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordAlternative(observation, 30, TypingTestAlternativeEventKind.Rejected,
+            reason = "ProbeUnavailable:VersionMismatch:1.12.0")
+        TypingTestSession.recordAlternative(observation, 31, TypingTestAlternativeEventKind.Rejected,
+            reason = "ProbeOverBudget")
+        type(info)
+        commitAndComplete(info)
+        assertTrue(TypingTestSession.state.value.reportWarning!!.contains("不可用 1 次"))
+        assertTrue(TypingTestSession.state.value.reportWarning!!.contains("1 次查询超时"))
+        assertTrue(JSONObject(TypingTestSession.exportReport()!!).getString("query_warning").contains("不可用"))
+        val next = start()
+        val empty = TypingTestSession.beginObservation(next)!!
+        TypingTestSession.recordAlternative(empty, 32, TypingTestAlternativeEventKind.Rejected,
+            reason = "ProbeNoCandidates")
+        type(next)
+        commitAndComplete(next)
+        assertNull(TypingTestSession.state.value.reportWarning)
+    }
+
+
+    @Test fun earlyConfirmationRecordsDispatchAndLaterPhysicalUpSeparately() {
+        val info = start()
+        val cell = KeyCell('n', 0f, 0f, 40f, 50f)
+        val evidence = PinyinTapEvidence(TapEvidence('n', 20f, 25f, 1f),
+            listOf(cell), pointerId = 1, downTime = 100L, contactId = 901L,
+            downSequence = 1L, dispatchSequence = 2L, dispatchTime = 140L)
+        val ticket = TypingTestSession.beginKey(info, 'n', evidence,
+            orientation = Configuration.ORIENTATION_PORTRAIT)!!
+        finish(ticket, "n")
+        TypingTestSession.completeTouchEvidence(901L, 160L, 21f, 26f)
+        TypingTestSession.completeTouchEvidence(901L, 200L, 22f, 27f)
+        commitAndComplete(info)
+        val touch = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials")
+            .getJSONObject(0).getJSONArray("first_attempt_touches").getJSONObject(0)
+        assertEquals(100L, touch.getLong("down_time_ms"))
+        assertEquals(140L, touch.getLong("dispatch_time_ms"))
+        assertEquals(160L, touch.getLong("physical_up_time_ms"))
+        assertEquals(21.0, touch.getDouble("physical_up_x"), 0.0)
+        assertEquals(1, touch.getInt("pointer_id"))
+        assertEquals(2L, touch.getLong("dispatch_sequence"))
+    }
+
+    @Test fun stalePhysicalUpCannotCompleteTouchAfterEditorReactivation() {
+        val info = start()
+        val cell = KeyCell('n', 0f, 0f, 40f, 50f)
+        val evidence = PinyinTapEvidence(TapEvidence('n', 20f, 25f, 1f),
+            listOf(cell), pointerId = 1, downTime = 100L, contactId = 902L)
+        val ticket = TypingTestSession.beginKey(info, 'n', evidence)!!
+        finish(ticket, "n")
+        TypingTestSession.setActive(false)
+        TypingTestSession.setActive(true)
+        TypingTestSession.completeTouchEvidence(902L, 160L, 21f, 26f)
+        commitAndComplete(info)
+        val touch = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials")
+            .getJSONObject(0).getJSONArray("first_attempt_touches").getJSONObject(0)
+        assertTrue(touch.isNull("physical_up_time_ms"))
+    }
+
+
+    @Test fun keyTimelineIncludesBackspaceAndQueueReceiptForRepairAssociation() {
+        val info = start()
+        type(info, "nu")
+        val erase = TypingTestSession.beginKey(info, null, null, backspace = true)!!
+        finish(erase, "n")
+        type(info, "ihaoa", prefix = "n")
+        commitAndComplete(info)
+        val timeline = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials")
+            .getJSONObject(0).getJSONArray("key_timeline")
+        assertEquals(8, timeline.length())
+        val deletion = timeline.getJSONObject(2)
+        assertEquals(3, deletion.getInt("key_ordinal"))
+        assertTrue(deletion.getBoolean("backspace"))
+        assertTrue(deletion.isNull("letter"))
+        assertTrue(deletion.getLong("finished_monotonic_ns") >= deletion.getLong("started_monotonic_ns"))
+        assertEquals(deletion.getLong("started_monotonic_ns") - deletion.getLong("enqueue_monotonic_ns"),
+            deletion.getLong("queue_wait_ns"))
+    }
+
+
+    @Test fun anExtraTailLetterIsRetainedUntilFirstRepairWithoutChangingNativeSnapshotWindow() {
+        val info = start()
+        type(info, prompt.pinyin + "a")
+        val erase = TypingTestSession.beginKey(info, null, null, backspace = true)!!
+        finish(erase, prompt.pinyin)
+        val result = commitAndComplete(info)
+        assertEquals(prompt.pinyin + "a", result.firstAttemptPinyin)
+        assertEquals(TypingTestFraction(1, prompt.pinyin.length), result.rawEditRate)
+        assertEquals(TypingTestFraction(1, 1), result.top1HitRate)
+        assertTrue(result.calibrationSamples.isEmpty())
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertEquals(prompt.pinyin, row.getJSONObject("candidate_snapshot").getString("raw"))
+    }
+
+    @Test fun eachProbeCallKeepsItsOfferStageAndCacheIdentityAndRejectsStaleReceipts() {
+        val info = start()
+        val observation = TypingTestSession.beginObservation(info)!!
+        val cold = RimeTouchProbe.QueryResult(emptyList(), 25_000_000, true, false,
+            libraryLoadNanos = 2_000_000, initializationNanos = 22_000_000,
+            nativeQueryNanos = 500_000, coldInitialization = true, nativeWithinBudget = true)
+        TypingTestSession.recordProbeQuery(observation, 40, cold)
+        TypingTestSession.recordProbeQuery(observation, 40, cold)
+        TypingTestSession.recordProbeQuery(observation, 41, cold.copy(elapsedNanos = 20_000,
+            libraryLoadNanos = 0, initializationNanos = 0, nativeQueryNanos = 0,
+            cacheHit = true, coldInitialization = false, withinBudget = true))
+        TypingTestSession.setActive(false)
+        TypingTestSession.setActive(true)
+        TypingTestSession.recordProbeQuery(observation, 42, cold)
+        type(info)
+        commitAndComplete(info)
+        val queries = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials")
+            .getJSONObject(0).getJSONArray("probe_queries")
+        assertEquals(2, queries.length())
+        assertTrue(queries.getJSONObject(0).getBoolean("cold_initialization"))
+        assertFalse(queries.getJSONObject(0).getBoolean("within_budget"))
+        assertTrue(queries.getJSONObject(0).getBoolean("native_within_budget"))
+        assertTrue(queries.getJSONObject(1).getBoolean("cache_hit"))
+        assertEquals(0L, queries.getJSONObject(1).getLong("native_query_ns"))
+    }
+
+
+    @Test fun unsupportedTailExcludesRawWindowButPreservesEarlierNativeCandidateTruth() {
+        val info = start()
+        type(info)
+        val extra = TypingTestSession.beginKey(info, 'x', null, supported = false)!!
+        finish(extra, prompt.pinyin + "x")
+        val result = commitAndComplete(info)
+        assertEquals(prompt.pinyin + "x", result.firstAttemptPinyin)
+        assertEquals(TypingTestFraction(0, 0), result.rawEditRate)
+        assertEquals(TypingTestFraction(1, 1), result.top1HitRate)
+        assertTrue(result.calibrationSamples.isEmpty())
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertEquals("UNKNOWN", row.getString("raw_attempt_input_kind"))
+        assertEquals("FULL_PINYIN", row.getString("first_attempt_input_kind"))
+    }
+
+
+    @Test fun identicalSpellingAfterRepairCannotPretendItsVisibleCandidatesBelongToFirstLayout() {
+        val info = start()
+        type(info, "nuhaoa", listOf("怒号啊"))
+        val erase = TypingTestSession.beginKey(info, null, null, backspace = true)!!
+        finish(erase, "nuhao")
+        type(info, "a", prefix = "nuhao", candidates = listOf(prompt.text))
+        TypingTestSession.recordDisplayedCandidates(info, "nuhaoa", listOf(prompt.text))
+        val result = commitAndComplete(info)
+        assertEquals(TypingTestFraction(0, 1), result.top1HitRate)
+        assertEquals(TypingTestFraction(0, 0), result.displayedTop1HitRate)
+        assertEquals(TypingTestFraction(0, 0), result.displayedTop3HitRate)
     }
 
     companion object { private val FIELD_ID = R.id.typing_test_input }

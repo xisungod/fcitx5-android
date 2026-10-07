@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
+import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcaster
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
@@ -320,9 +321,15 @@ class KeyboardQuickSettingsImeContextTest {
                 override suspend fun <T> runOnReady(block: suspend FcitxAPI.() -> T): T = error("Native engine is outside this service-context test")
                 override fun runIfReady(block: suspend FcitxAPI.() -> Unit) {}
             }
+            // Listener cleanup uses the production serialized job queue. Supply its service
+            // dependency without creating the daemon; widget context remains host.imeContext.
+            val queuedService = Robolectric.buildService(FcitxInputMethodService::class.java).get()
+            ReflectionHelpers.setField(queuedService, "fcitx", connection)
+            assertTrue(connection.lifecycleScope.coroutineContext[Job]!!.isCancelled)
             scope += context.wrapToUniqueComponent()
             scope += theme.wrapToUniqueComponent()
             scope += connection.wrapToUniqueComponent()
+            scope += queuedService.wrapToUniqueComponent()
             scope += broadcaster
             scope += windows
             scope += CommonKeyActionListener()

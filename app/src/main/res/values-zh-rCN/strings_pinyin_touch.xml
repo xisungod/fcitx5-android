@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="pinyin_touch_promotion">高把握候选优先</string>
+    <string name="pinyin_touch_promotion_summary">仅可靠空间证据与完整拼音同时支持时优先显示；保留原候选。</string>
     <string name="pinyin_down_order">双指快打顺序（实验）</string>
     <string name="pinyin_down_order_summary">两指重叠时，普通中文字母按按下先后提交；滑选和长按分别处理。</string>
     <string name="pinyin_touch_alternatives">触点候选纠错（实验）</string>
@@ -9,7 +11,7 @@
     <string name="pinyin_touch_correction">拼音触点纠错（实验）</string>
     <string name="pinyin_touch_correction_summary">只在拼音键位交界处结合落点和拼音概率判断，明确键心保持原键；不上传输入。</string>
     <string name="pinyin_touch_personalization">按键习惯学习（实验）</string>
-    <string name="pinyin_touch_personalization_summary">仅依据你明确确认或还原的按键，在本机学习落点偏移；密码框不参与。</string>
+    <string name="pinyin_touch_personalization_summary">应用已确认的逐键校准，样本不足时保持原判定。可在打字测试后应用或重置。</string>
     <string name="pinyin_touch_profile_clear">清除按键习惯数据</string>
     <string name="pinyin_touch_profile_clear_done">按键习惯数据已清除</string>
     <string name="pinyin_touch_restore_letter">还原 %1$s</string>

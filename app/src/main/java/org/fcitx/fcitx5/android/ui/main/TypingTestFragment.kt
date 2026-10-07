@@ -22,6 +22,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.typingtest.TypingTestSession
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinPromptCalibration
 import org.fcitx.fcitx5.android.utils.toast
 
 /** Opt-in, known-target exercise. It never activates measurement in another editor. */
@@ -73,7 +75,8 @@ class TypingTestFragment : Fragment() {
             export = ::exportReport,
             clear = ::clearReports,
             focusChanged = { updateActive() },
-            retry = { TypingTestSession.returnToIntro() }
+            retry = { TypingTestSession.returnToIntro() },
+            applyCalibration = ::applyCalibration
         )).also { ui = it }.root
     }
 
@@ -94,6 +97,7 @@ class TypingTestFragment : Fragment() {
                         lastCommittedText = state.lastCommittedText,
                         reportSummary = state.reportSummary,
                         reportAvailable = state.reportAvailable,
+                        reportWarning = state.reportWarning,
                         failure = state.failure
                     )
                     val previousInput = ui?.input
@@ -184,6 +188,29 @@ class TypingTestFragment : Fragment() {
         }
         exportSnapshot = report
         document.launch("AXiang-typing-test-${System.currentTimeMillis()}.json")
+    }
+
+    private fun applyCalibration() {
+        val context = context ?: return
+        val samples = TypingTestSession.confirmedCalibrationSamples()
+        if (samples.isEmpty()) {
+            context.toast(getString(R.string.typing_test_apply_calibration_empty))
+            return
+        }
+        // An explicit Apply action also activates calibrated scoring for upgraded installations.
+        AppPrefs.getInstance().keyboard.pinyinTouchPersonalization.setValue(true)
+        lifecycleScope.launch {
+            val result = PinyinPromptCalibration.applyConfirmedSamples(context, samples)
+            val message = when {
+                result.reason == PinyinPromptCalibration.Reason.Applied && result.appliedCount > 0 -> getString(R.string.typing_test_apply_calibration_done, result.appliedCount)
+                result.reason == PinyinPromptCalibration.Reason.AlreadyApplied ->
+                    getString(R.string.typing_test_apply_calibration_duplicate)
+                result.reason == PinyinPromptCalibration.Reason.Empty ->
+                    getString(R.string.typing_test_apply_calibration_empty)
+                else -> getString(R.string.typing_test_apply_calibration_failed)
+            }
+            context.toast(message)
+        }
     }
 
     private fun clearReports() {

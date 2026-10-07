@@ -1,0 +1,37 @@
+<resources>
+    <string name="touch_probe_self_check_title">Touch correction self-check</string>
+    <string name="touch_probe_self_check_summary">Check the query interface and its latest result</string>
+    <string name="touch_probe_self_check_description">See whether correction queries are working. Interface availability and query results are shown separately.</string>
+    <string name="touch_probe_last_query">Latest completed query</string>
+    <string name="touch_probe_query_not_run">Not checked yet</string>
+    <string name="touch_probe_query_success">Candidates returned</string>
+    <string name="touch_probe_query_empty">Completed · no candidates</string>
+    <string name="touch_probe_query_timeout">Timed out · result discarded</string>
+    <string name="touch_probe_query_unavailable">Query unavailable</string>
+    <string name="touch_probe_unknown">Unknown</string>
+    <string name="touch_probe_available">Available</string>
+    <string name="touch_probe_unavailable">Unavailable</string>
+    <string name="touch_probe_ready">Ready</string>
+    <string name="touch_probe_idle">Loaded · query instance closed</string>
+    <string name="touch_probe_runtime_version">Actual Rime: %1$s\nExpected interface version: %2$s</string>
+    <string name="touch_probe_library_status">Query library: %1$s</string>
+    <string name="touch_probe_interface_status">Interface: %1$s</string>
+    <string name="touch_probe_source_cache">Source: temporary candidate cache</string>
+    <string name="touch_probe_source_native">Source: native query</string>
+    <string name="touch_probe_source_unknown">No completed query in this process</string>
+    <string name="touch_probe_last_native_success">Last native query with candidates: %1$d seconds ago</string>
+    <string name="touch_probe_no_native_success">No native query has returned candidates in this process</string>
+    <string name="touch_probe_failure_reason">Reason: %1$s</string>
+    <string name="touch_probe_timing_title">Latest query timing</string>
+    <string name="touch_probe_timing">Total: %1$s ms\nLibrary load: %2$s ms\nInitialization: %3$s ms\nNative query: %4$s ms</string>
+    <string name="touch_probe_query_counts">This process: %1$d calls · %7$d native queries · %2$d with candidates · %3$d empty · %4$d timed out · %5$d unavailable · %6$d cache hits</string>
+    <string name="touch_probe_check_now">Run self-check</string>
+    <string name="touch_probe_checking">Checking…</string>
+    <string name="touch_probe_checking_note">Checking on the input engine queue. This screen stays responsive.</string>
+    <string name="touch_probe_check_complete">Check complete. See the latest query result above.</string>
+    <string name="touch_probe_cold_check_timeout">First-time initialization exceeded the budget. Run the check again to measure a warm query.</string>
+    <string name="touch_probe_select_pinyin">Select AXiang Pinyin before running the check.</string>
+    <string name="touch_probe_policy_blocked">The engine lifecycle guard blocked this check. Check the deployment and synchronization shortcuts.</string>
+    <string name="touch_probe_check_failed">The check did not complete. The displayed snapshot remains the last completed query.</string>
+    <string name="touch_probe_readonly_note">The check uses the fixed public spelling “nihao” in a read-only query. It does not commit text or learn from your input. Opening this screen only reads cached status.</string>
+</resources>

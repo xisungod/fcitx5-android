@@ -11,6 +11,12 @@ import kotlin.math.roundToInt
  * A profile retains no spelling, editor identity, timestamps or individual taps.
  */
 class PinyinTouchProfile {
+    /** Only a known prompted test, explicitly confirmed by the user, may supply these labels. */
+    data class ConfirmedSample(val layout: String, val intended: Char, val x: Double, val y: Double) {
+        internal fun isValid() = layout.matches(Regex("[a-f0-9]{64}")) && intended in 'a'..'z' &&
+            x.isFinite() && y.isFinite() && abs(x) <= MAX_SAMPLE_OFFSET && abs(y) <= MAX_SAMPLE_OFFSET
+    }
+
     data class Statistics(
         val count: Int,
         val meanX: Double,
@@ -27,6 +33,9 @@ class PinyinTouchProfile {
     private val layouts = LinkedHashMap<String, MutableMap<Char, Statistics>>()
 
     fun offsets(cells: List<KeyCell>, density: Float): Map<Char, CenterOffset> {
+        // Fresh installs have no confirmed samples. Enabling application by default
+        // must not hash all key geometry on every tap until a profile exists.
+        if (layouts.isEmpty()) return emptyMap()
         val key = layoutSignature(cells, density) ?: return emptyMap()
         val statistics = layouts[key] ?: return emptyMap()
         return statistics.mapNotNull { (letter, sample) ->
@@ -51,8 +60,13 @@ class PinyinTouchProfile {
         val cell = cells.firstOrNull { it.letter == intended } ?: return false
         val x = (tap.downX.toDouble() - cell.centerX) / cell.width
         val y = (tap.downY.toDouble() - cell.centerY) / cell.height
-        // Confirmation cannot align a far-away key or a stale layout to this tap.
-        if (!x.isFinite() || !y.isFinite() || abs(x) > MAX_SAMPLE_OFFSET || abs(y) > MAX_SAMPLE_OFFSET) return false
+        return observeConfirmed(ConfirmedSample(key, intended, x, y))
+    }
+
+    /** Same bounded aggregate for already validated, uniquely aligned prompted-test labels. */
+    internal fun observeConfirmed(sample: ConfirmedSample): Boolean {
+        if (!sample.isValid()) return false
+        val (key, intended, x, y) = sample
         val values = layouts.remove(key) ?: linkedMapOf()
         var old = values[intended]
         if (old != null && old.count == MAXIMUM_COUNT) {

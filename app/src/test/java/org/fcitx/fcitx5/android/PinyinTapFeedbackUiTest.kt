@@ -12,19 +12,35 @@ import org.fcitx.fcitx5.android.input.bar.ui.CandidateUi
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapFeedback
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class, qualifiers = "zh-rCN-w600dp-h900dp-mdpi")
 class PinyinTapFeedbackUiTest {
     private val context get() = RuntimeEnvironment.getApplication()
+    private var previousApplication: FcitxApplication? = null
 
     @Before fun prepare() {
+        val instance = FcitxApplication::class.java.getDeclaredField("instance").apply { isAccessible = true }
+        previousApplication = instance.get(null) as? FcitxApplication
+        val app = FcitxApplication()
+        ReflectionHelpers.callInstanceMethod<Void>(app, "attachBaseContext",
+            ReflectionHelpers.ClassParameter.from(Context::class.java, context))
+        instance.set(null, app)
         AppPrefs.init(context.getSharedPreferences("pinyin-feedback-ui", Context.MODE_PRIVATE))
+    }
+
+    @After fun restoreApplication() {
+        FcitxApplication::class.java.getDeclaredField("instance").apply {
+            isAccessible = true
+            set(null, previousApplication)
+        }
     }
 
     private fun layout(view: View) {

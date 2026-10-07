@@ -11,7 +11,8 @@ internal sealed interface HorizontalCandidateEntry {
 }
 
 /**
- * An alternative already in the engine's top three may move to second. Other
+ * A spatially verified first offer is resolved through its own selection path.
+ * Other alternatives already in the engine's top three may move to second. Other
  * suggestions follow the original top three, so an unverified new word cannot
  * displace them. Only display duplicates disappear; raw words stay unchanged.
  */
@@ -21,7 +22,11 @@ internal fun horizontalCandidateEntries(
     val first = words.firstOrNull() ?: return emptyList()
     val touch = offer?.takeIf { it.text.isNotBlank() && it.text != first.text }
     val originalIndex = touch?.let { candidate -> words.indexOfFirst { it.text == candidate.text } }
-    val insertionIndex = if (originalIndex != null && originalIndex in 1..2) 1 else minOf(3, words.size)
+    val insertionIndex = when {
+        touch?.promotedToFirst == true && originalIndex != null && originalIndex in 1..2 -> 0
+        originalIndex != null && originalIndex in 1..2 -> 1
+        else -> minOf(3, words.size)
+    }
     return buildList {
         words.forEachIndexed { index, word ->
             if (index == insertionIndex && touch != null) add(HorizontalCandidateEntry.Touch(touch))

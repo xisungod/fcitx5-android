@@ -50,6 +50,8 @@ class SettingsHomeUi(private val context: Context, private val open: (SettingsRo
             R.drawable.ic_baseline_list_alt_24, SettingsRoute.Typing, "词典 拼音 n l 模糊音 dictionary pinyin candidate"),
         Destination("typing-test", R.string.typing_test_title, R.string.typing_test_entry_summary,
             R.drawable.ic_baseline_keyboard_24, SettingsRoute.TypingTest, "测试 校准 准确度 邻键 test accuracy calibration"),
+        Destination("touch-probe", R.string.touch_probe_self_check_title, R.string.touch_probe_self_check_summary,
+            R.drawable.ic_baseline_info_24, SettingsRoute.TouchProbeSelfCheck, "触点 纠错 自检 版本 查询库 Rime 状态 查询 touch correction check status version library"),
         Destination("clipboard", R.string.clipboard, R.string.ax_settings_clipboard_summary,
             R.drawable.ic_clipboard, SettingsRoute.Clipboard, "复制 粘贴 短信 clipboard verification"),
         Destination("symbols", R.string.emoji_and_symbols, R.string.ax_settings_symbols_summary,
@@ -260,9 +262,9 @@ class SettingsHomeUi(private val context: Context, private val open: (SettingsRo
         }
         content.addView(appearance, LinearLayout.LayoutParams(-1, -2))
         section(R.string.ax_settings_input)
-        group(destinations.subList(2, 8))
+        group(destinations.subList(2, 9))
         section(R.string.ax_settings_general)
-        group(destinations.subList(8, destinations.size))
+        group(destinations.subList(9, destinations.size))
         content.addView(text(context.getString(R.string.ax_settings_quick_tip), 12f, secondary).apply {
             gravity = Gravity.CENTER
             setPadding(dp(12), dp(22), dp(12), dp(8))

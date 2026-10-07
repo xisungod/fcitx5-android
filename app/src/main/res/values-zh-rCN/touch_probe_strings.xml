@@ -1,0 +1,37 @@
+<resources>
+    <string name="touch_probe_self_check_title">触点纠错自检</string>
+    <string name="touch_probe_self_check_summary">查看查询接口和最近一次结果</string>
+    <string name="touch_probe_self_check_description">确认纠错查询是否正常。接口可用与查询结果分别显示，不把“已加载”当作“查询成功”。</string>
+    <string name="touch_probe_last_query">最近一次已完成查询</string>
+    <string name="touch_probe_query_not_run">尚未查询</string>
+    <string name="touch_probe_query_success">成功 · 已返回候选</string>
+    <string name="touch_probe_query_empty">完成 · 无候选</string>
+    <string name="touch_probe_query_timeout">超时 · 已丢弃结果</string>
+    <string name="touch_probe_query_unavailable">查询不可用</string>
+    <string name="touch_probe_unknown">尚未确认</string>
+    <string name="touch_probe_available">可用</string>
+    <string name="touch_probe_unavailable">不可用</string>
+    <string name="touch_probe_ready">就绪</string>
+    <string name="touch_probe_idle">已加载 · 查询实例已关闭</string>
+    <string name="touch_probe_runtime_version">实际 Rime：%1$s\n接口预期版本：%2$s</string>
+    <string name="touch_probe_library_status">查询库：%1$s</string>
+    <string name="touch_probe_interface_status">接口状态：%1$s</string>
+    <string name="touch_probe_source_cache">结果来源：临时候选缓存</string>
+    <string name="touch_probe_source_native">结果来源：原生查询</string>
+    <string name="touch_probe_source_unknown">本次进程尚无已完成查询</string>
+    <string name="touch_probe_last_native_success">最近成功实际查词：%1$d 秒前</string>
+    <string name="touch_probe_no_native_success">本次进程尚无返回候选的原生查询</string>
+    <string name="touch_probe_failure_reason">原因：%1$s</string>
+    <string name="touch_probe_timing_title">最近查询耗时</string>
+    <string name="touch_probe_timing">总耗时：%1$s ms\n加载查询库：%2$s ms\n初始化：%3$s ms\n实际查词：%4$s ms</string>
+    <string name="touch_probe_query_counts">本次进程：调用 %1$d 次 · 实际查词 %7$d 次 · 返回候选 %2$d 次 · 无候选 %3$d 次 · 超时 %4$d 次 · 不可用 %5$d 次 · 缓存命中 %6$d 次</string>
+    <string name="touch_probe_check_now">立即自检</string>
+    <string name="touch_probe_checking">正在自检…</string>
+    <string name="touch_probe_checking_note">正在输入引擎队列中检查，页面可以正常操作。</string>
+    <string name="touch_probe_check_complete">自检已完成，请查看上方最近查询结果。</string>
+    <string name="touch_probe_cold_check_timeout">首次初始化超出时间预算，可以再自检一次，查看热查询结果。</string>
+    <string name="touch_probe_select_pinyin">请先启用并选择 AXiang 拼音，再运行自检。</string>
+    <string name="touch_probe_policy_blocked">输入引擎保护阻止了自检，请检查部署和同步快捷键设置。</string>
+    <string name="touch_probe_check_failed">自检未完成，页面仍显示最近一次已完成查询的状态。</string>
+    <string name="touch_probe_readonly_note">自检仅用固定拼写 nihao 做只读查询，不上屏、不学习你的输入。打开本页只读取缓存状态。</string>
+</resources>

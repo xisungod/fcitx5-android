@@ -47,6 +47,8 @@ class HorizontalCandidateComponent :
     private val buffer = CandidatePageBuffer()
     private var pageJob: Job? = null
     private var displayedTouchToken: Long? = null
+    private var visibilityCheckPosted = false
+    private var candidateSpelling: String? = null
     private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
     private val maxSpanCountPref by lazy {
         AppPrefs.getInstance().keyboard.run {
@@ -84,7 +86,7 @@ class HorizontalCandidateComponent :
                 commonKeyActionListener.listener.onKeyAction(
                     KeyAction.SelectTouchCandidateAction(token), KeyActionListener.Source.Keyboard)
             }
-            onTouchLayoutRequested = { scheduleTouchVisibilityCheck() }
+            onCandidatesLayoutRequested = { scheduleTouchVisibilityCheck() }
         }
     }
     val layoutManager: LinearLayoutManager by lazy { LinearLayoutManager(context, RecyclerView.HORIZONTAL, false) }
@@ -106,26 +108,48 @@ class HorizontalCandidateComponent :
     }
 
     fun setTouchCandidate(offer: PinyinTouchCandidateOffer?) {
-        adapter.setTouchCandidate(offer)
+        adapter.setTouchCandidate(offer?.takeIf { it.originalSpelling == candidateSpelling })
         scheduleTouchVisibilityCheck()
     }
 
-    /** This records an attached, laid-out visible slot, not a display presentation timestamp. */
+    /** Records only attached, laid-out visible slots, never the adapter's offscreen top three. */
     private fun scheduleTouchVisibilityCheck() {
-        val position = adapter.entries.indexOfFirst { it is HorizontalCandidateEntry.Touch }
-        val entry = adapter.entries.getOrNull(position) as? HorizontalCandidateEntry.Touch ?: return
-        if (displayedTouchToken == entry.offer.token) return
-        val binding = adapter.binding(position)
+        if (visibilityCheckPosted) return
+        visibilityCheckPosted = true
         view.post {
-            if (!view.isAttachedToWindow || !view.isShown || !adapter.isCurrent(binding, position)) return@post
-            val holder = view.findViewHolderForAdapterPosition(position) ?: return@post
-            if (adapter.currentBinding(holder) != binding) return@post
-            val bounds = Rect()
-            if (!holder.itemView.isShown || !holder.itemView.getGlobalVisibleRect(bounds) ||
-                bounds.width() <= 0 || bounds.height() <= 0) return@post
-            if (displayedTouchToken == entry.offer.token) return@post
-            displayedTouchToken = entry.offer.token
-            commonKeyActionListener.onTouchCandidateDisplayed(entry.offer.token)
+            visibilityCheckPosted = false
+            if (!view.isAttachedToWindow || !view.isShown) return@post
+            val viewport = Rect()
+            if (!view.getGlobalVisibleRect(viewport) || viewport.isEmpty) return@post
+            val visible = (0 until view.childCount).mapNotNull { index ->
+                val child = view.getChildAt(index)
+                val holder = view.getChildViewHolder(child) as? CandidateViewHolder ?: return@mapNotNull null
+                val binding = adapter.currentBinding(holder) ?: return@mapNotNull null
+                val bounds = Rect()
+                if (!child.isShown || !holder.ui.visibleTextBounds(bounds) ||
+                    !bounds.intersect(viewport) || bounds.isEmpty) return@mapNotNull null
+                val body = Rect()
+                val fullyVisible = holder.ui.mainTextBounds(body) && bounds.contains(body)
+                Triple(holder.bindingAdapterPosition, binding.entry, fullyVisible)
+            }.sortedBy { it.first }
+            // Only the first-screen contiguous prefix counts as completely readable.
+            // A sliver, a clipped long phrase or a scrolled page cannot masquerade as top three.
+            val fullyVisiblePrefix = visible.withIndex()
+                .takeWhile { (index, entry) -> entry.first == index && entry.third }
+                .take(3).map { it.value }
+            if (fullyVisiblePrefix.isNotEmpty()) commonKeyActionListener.onCandidatesDisplayed(
+                fullyVisiblePrefix.map { (_, entry, _) ->
+                    when (entry) {
+                        is HorizontalCandidateEntry.Raw -> entry.word.text
+                        is HorizontalCandidateEntry.Touch -> entry.offer.text
+                    }
+                }, candidateSpelling)
+            visible.map { it.second }.filterIsInstance<HorizontalCandidateEntry.Touch>().firstOrNull()?.let { entry ->
+                if (displayedTouchToken != entry.offer.token) {
+                    displayedTouchToken = entry.offer.token
+                    commonKeyActionListener.onTouchCandidateDisplayed(entry.offer.token)
+                }
+            }
         }
     }
     private fun loadMoreIfNeeded() {
@@ -148,7 +172,10 @@ class HorizontalCandidateComponent :
         pageJob?.cancel()
         buffer.reset(data.candidates, data.total)
         view.stopScroll()
-        adapter.updateCandidates(data.candidates, data.total, commonKeyActionListener.touchCandidateOffer.value)
+        candidateSpelling = commonKeyActionListener.currentRenderedPinyinSpelling()
+        val offer = commonKeyActionListener.touchCandidateOffer.value
+            ?.takeIf { it.originalSpelling == candidateSpelling }
+        adapter.updateCandidates(data.candidates, data.total, offer)
         layoutManager.scrollToPositionWithOffset(0, 0)
         _expandedCandidateOffset.tryEmit(0)
         bar.expandButtonStateMachine.push(ExpandedCandidatesUpdated,

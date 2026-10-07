@@ -80,4 +80,19 @@ class PinyinTouchProfileTest {
         val restored = PinyinTouchProfile().apply { restore(profile.snapshot()) }
         assertEquals(profile.offsets(cells, 1f), restored.offsets(cells, 1f))
     }
+
+    @Test fun `personalization changes only confirmed keys and may learn opposite offsets`() {
+        val profile = PinyinTouchProfile()
+        val signature = PinyinTouchProfile.layoutSignature(cells, 1f)!!
+        repeat(8) { profile.observeConfirmed(PinyinTouchProfile.ConfirmedSample(signature, 'n', -.54, .1)) }
+        assertEquals(setOf('n'), profile.offsets(cells, 1f).keys)
+        repeat(8) { profile.observeConfirmed(PinyinTouchProfile.ConfirmedSample(signature, 'b', .50, -.1)) }
+        val learned = profile.offsets(cells, 1f)
+        assertTrue(learned.getValue('n').x < 0f)
+        assertTrue(learned.getValue('b').x > 0f)
+        assertEquals(-.12f * 8 / 28, learned.getValue('n').x, .000001f)
+        assertEquals(.12f * 8 / 28, learned.getValue('b').x, .000001f)
+        profile.clear()
+        assertTrue(profile.offsets(cells, 1f).isEmpty())
+    }
 }

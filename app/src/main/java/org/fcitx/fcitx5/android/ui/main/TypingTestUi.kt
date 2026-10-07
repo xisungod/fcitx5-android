@@ -34,7 +34,8 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
         val export: () -> Unit,
         val clear: () -> Unit,
         val focusChanged: (Boolean) -> Unit,
-        val retry: () -> Unit
+        val retry: () -> Unit,
+        val applyCalibration: () -> Unit = {}
     )
     enum class Phase { Intro, Typing, Completed, Report }
     data class State(
@@ -48,6 +49,7 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
         val lastCommittedText: String? = null,
         val reportSummary: String? = null,
         val reportAvailable: Boolean = false,
+        val reportWarning: String? = null,
         val failure: String? = null
     )
 
@@ -62,6 +64,7 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
     private var rendered: State? = null
     private var reportActions: LinearLayout? = null
     private var resultText: TextView? = null
+    private var reportWarning: TextView? = null
     private var status: TextView? = null
     private var pinyinShown = true
     var input: EditText? = null
@@ -151,6 +154,10 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
                 visibility = if (state.failure.isNullOrBlank()) View.GONE else View.VISIBLE
             }
             reportActions?.visibility = if (state.reportAvailable) View.VISIBLE else View.GONE
+            reportWarning?.apply {
+                text = state.reportWarning.orEmpty()
+                visibility = if (state.reportWarning.isNullOrBlank()) View.GONE else View.VISIBLE
+            }
             resultText?.text = state.reportSummary ?: context.getString(R.string.typing_test_result_no_samples)
             return
         }
@@ -159,6 +166,7 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
         status = null
         reportActions = null
         resultText = null
+        reportWarning = null
         body.removeAllViews()
         root.scrollTo(0, 0)
         when (state.phase) {
@@ -266,6 +274,14 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
         addText(label(context.getString(R.string.typing_test_completed_count, state.completed),
             14f, secondary), 10)
         addText(note(R.string.typing_test_result_intro), 10, 16)
+        reportWarning = label(state.reportWarning.orEmpty(), 15f, accent).apply {
+            tag = "typing-test-query-warning"
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            background = shape(surface)
+            setPadding(dp(18), dp(14), dp(18), dp(14))
+            visibility = if (state.reportWarning.isNullOrBlank()) View.GONE else View.VISIBLE
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }.also { addText(it, bottom = 12) }
         resultText = label(state.reportSummary ?: context.getString(R.string.typing_test_result_no_samples),
             16f).apply {
             tag = "typing-test-results"
@@ -276,6 +292,9 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
         addText(note(R.string.typing_test_unavailable_help), 14)
         addText(note(R.string.typing_test_alternative_help), 10)
         addText(note(R.string.typing_test_result_limitation), 10, 8)
+        addText(note(R.string.typing_test_apply_calibration_help), 14)
+        addButton(R.string.typing_test_apply_calibration, "typing-test-apply-calibration",
+            click = actions.applyCalibration)
         addReportActions(state.reportAvailable)
         addButton(R.string.typing_test_try_again, "typing-test-retry", true, actions.retry)
     }

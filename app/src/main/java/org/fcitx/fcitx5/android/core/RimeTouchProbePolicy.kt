@@ -1,10 +1,20 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 package org.fcitx.fcitx5.android.core
 
+import android.content.res.Configuration
+
 /** Lifecycle gates for the cached read-only translator. No native work here. */
 internal object RimeTouchProbePolicy {
+    /** Hardware selection runs through a different path; keep that path supplementary. */
+    fun allowsFirstPromotion(keyboardConfiguration: Int): Boolean =
+        keyboardConfiguration == Configuration.KEYBOARD_NOKEYS
+
     fun ordinaryKey(character: Char?, states: UInt): Boolean = character != null &&
         character in 'a'..'z' && (states == 0u || states == KeyStates.Virtual.states)
+
+    /** Missing touch evidence is not a context change that cancels an earlier queued selection. */
+    fun ordinaryVirtualLetter(character: Char?, states: UInt): Boolean = character != null &&
+        character in 'a'..'z' && states == KeyStates.Virtual.states
 
     /**
      * Native getAddonConfig returns { cfg: actual values, desc: descriptions }.

@@ -1,10 +1,19 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 package org.fcitx.fcitx5.android.core
 
+import android.content.res.Configuration
+
 import org.junit.Assert.*
 import org.junit.Test
 
 class RimeTouchProbePolicyTest {
+    @Test fun promotedFirstIsLimitedToKnownSoftwareOnlyKeyboardConfiguration() {
+        assertTrue(RimeTouchProbePolicy.allowsFirstPromotion(Configuration.KEYBOARD_NOKEYS))
+        for (configuration in listOf(Configuration.KEYBOARD_QWERTY,
+                Configuration.KEYBOARD_12KEY, Configuration.KEYBOARD_UNDEFINED, -1, 99))
+            assertFalse(RimeTouchProbePolicy.allowsFirstPromotion(configuration))
+    }
+
     private fun config(deploy: RawConfig = RawConfig("Deploy", ""),
                        sync: RawConfig = RawConfig("Synchronize", "")) = RawConfig(arrayOf(
         RawConfig("cfg", arrayOf(deploy, sync, RawConfig("PreeditMode", "Commit preview"))),
@@ -17,6 +26,17 @@ class RimeTouchProbePolicyTest {
             assertTrue(RimeTouchProbePolicy.ordinaryKey(letter, 0u))
             assertTrue(RimeTouchProbePolicy.ordinaryKey(letter, KeyStates.Virtual.states))
         }
+    }
+
+    @Test fun ordinarySoftLettersPreserveQueuedSelectionRegardlessOfMissingTouchEvidence() {
+        for (letter in 'a'..'z')
+            assertTrue(RimeTouchProbePolicy.ordinaryVirtualLetter(letter, KeyStates.Virtual.states))
+        for (letter in listOf(null, 'A', '0', ' ', '\n', '\b'))
+            assertFalse(RimeTouchProbePolicy.ordinaryVirtualLetter(letter, KeyStates.Virtual.states))
+        // Physical and modified key paths must retain external cancellation protection.
+        assertFalse(RimeTouchProbePolicy.ordinaryVirtualLetter('n', 0u))
+        assertFalse(RimeTouchProbePolicy.ordinaryVirtualLetter('n',
+            KeyStates.Virtual.states or KeyState.Ctrl.state))
     }
 
     @Test fun modifiersUppercaseControlsNonLettersAndUnknownKeysExpireTheCache() {

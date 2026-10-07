@@ -47,6 +47,7 @@ internal object KeyboardPreferenceSections {
                 listOf(buttonPressVibrationMilliseconds.key, buttonPressVibrationAmplitude.key)),
             Section(Page.Typing, "typing_touch_correction", R.string.pinyin_touch_correction_section,
                 listOf(pinyinDownOrder.key, pinyinTouchAlternatives.key,
+                    pinyinTouchPromotion.key,
                     pinyinTouchCorrection.key, pinyinTouchPersonalization.key,
                     PINYIN_TOUCH_PROFILE_CLEAR_KEY)),
             Section(Page.Typing, "typing_fuzzy", R.string.axiang_typing_fuzzy,

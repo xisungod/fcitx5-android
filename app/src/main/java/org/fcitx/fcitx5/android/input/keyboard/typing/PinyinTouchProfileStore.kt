@@ -64,10 +64,45 @@ class PinyinTouchProfileStore(context: Context) {
             if (expectedGeneration != state.generation) return@synchronized false
             if (runCatching { loadIfNeeded() }.isFailure) return@synchronized false
             if (!state.profile.observeConfirmed(cells, tap, intended)) return@synchronized false
-            val encoded = encode(state.profile.snapshot())
+            val encoded = encode(state.profile.snapshot(), state.receipts)
             // apply updates SharedPreferences memory before enqueueing its disk operation.
             // Holding the same lock as clear prevents a queued older write restoring data.
             runCatching { preferences().edit().putString(DATA_KEY, encoded).apply() }.isSuccess
+        }
+    }
+
+    data class ImportResult(val applied: Int, val alreadyApplied: Int, val unavailable: Boolean = false)
+
+    /**
+     * One explicit prompted-test confirmation group is atomic and may be imported once.
+     * Receipt hashes retain no prompt text, raw spelling, timestamps or individual taps.
+     */
+    internal fun observeConfirmedGroup(
+        receipt: String,
+        samples: List<PinyinTouchProfile.ConfirmedSample>,
+        expectedGeneration: Long,
+        stillAuthorized: () -> Boolean = { true }
+    ): ImportResult {
+        if (!receipt.matches(Regex("[a-f0-9]{64}")) || samples.isEmpty() || samples.size > 64 ||
+            samples.any { !it.isValid() }) return ImportResult(0, 0, unavailable = true)
+        if (!storageAvailable()) return ImportResult(0, 0, unavailable = true)
+        return synchronized(states) {
+            if (!stillAuthorized() || expectedGeneration != state.generation || runCatching { loadIfNeeded() }.isFailure)
+                return@synchronized ImportResult(0, 0, unavailable = true)
+            if (receipt in state.receipts) return@synchronized ImportResult(0, samples.size)
+            val before = state.profile.snapshot()
+            samples.forEach { check(state.profile.observeConfirmed(it)) }
+            state.receipts.add(receipt)
+            val removed = if (state.receipts.size > MAXIMUM_RECEIPTS) state.receipts.removeAt(0) else null
+            val saved = runCatching {
+                preferences().edit().putString(DATA_KEY, encode(state.profile.snapshot(), state.receipts)).apply()
+            }.isSuccess
+            if (!saved) {
+                state.profile.restore(before)
+                state.receipts.remove(receipt)
+                removed?.let { state.receipts.add(0, it) }
+                ImportResult(0, 0, unavailable = true)
+            } else ImportResult(samples.size, 0)
         }
     }
 
@@ -90,6 +125,16 @@ class PinyinTouchProfileStore(context: Context) {
         if (state.loaded) return
         val encoded = runCatching { preferences().getString(DATA_KEY, null) }.getOrNull()
         state.profile.restore(encoded?.let { runCatching { decode(it) }.getOrNull() } ?: emptyMap())
+        state.receipts.clear()
+        if (encoded != null) runCatching {
+            val receipts = JSONObject(encoded).optJSONArray("confirmed_receipts") ?: return@runCatching
+            require(receipts.length() <= MAXIMUM_RECEIPTS)
+            for (i in 0 until receipts.length()) {
+                val receipt = receipts.getString(i)
+                require(receipt.matches(Regex("[a-f0-9]{64}")))
+                if (receipt !in state.receipts) state.receipts.add(receipt)
+            }
+        }.onFailure { state.receipts.clear() }
         state.loaded = true
     }
 
@@ -97,16 +142,26 @@ class PinyinTouchProfileStore(context: Context) {
         private const val PREFERENCES_NAME = "axiang_pinyin_touch_profile"
         private const val DATA_KEY = "normalized_statistics_v1"
         private const val MAXIMUM_SERIALIZED_BYTES = 128 * 1024
+        private const val MAXIMUM_RECEIPTS = 32
         private val states = LinkedHashMap<String, State>()
 
         private class State {
             val profile = PinyinTouchProfile()
+            val receipts = mutableListOf<String>()
             var generation = 0L
             var loaded = false
             var pendingClear = false
         }
 
         private fun storageIdentity(context: Context) = context.dataDir.absolutePath
+
+        /** Captured before dispatching calibration IO; a subsequent reset invalidates the job. */
+        internal fun generation(context: Context): Long {
+            val app = context.applicationContext ?: context
+            return synchronized(states) {
+                states.getOrPut(storageIdentity(app)) { State() }.generation
+            }
+        }
 
         /** Clear affects every existing store and rejects observations queued before this call. */
         fun clear(context: Context) {
@@ -115,6 +170,7 @@ class PinyinTouchProfileStore(context: Context) {
                 val state = states.getOrPut(storageIdentity(credentialContext)) { State() }
                 state.generation++
                 state.profile.clear()
+                state.receipts.clear()
                 state.loaded = true
                 val accessible = !credentialContext.isDeviceProtectedStorage &&
                     runCatching { credentialContext.getSystemService(UserManager::class.java)?.isUserUnlocked }
@@ -127,9 +183,10 @@ class PinyinTouchProfileStore(context: Context) {
             }
         }
 
-        private fun encode(snapshot: Map<String, Map<Char, PinyinTouchProfile.Statistics>>): String =
+        private fun encode(snapshot: Map<String, Map<Char, PinyinTouchProfile.Statistics>>, receipts: List<String>): String =
             JSONObject().apply {
                 put("version", 1)
+                put("confirmed_receipts", JSONArray(receipts))
                 put("layouts", JSONArray().apply {
                     for ((layout, statistics) in snapshot) put(JSONObject().apply {
                         put("layout", layout)

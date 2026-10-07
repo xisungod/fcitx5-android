@@ -3,6 +3,7 @@ package org.fcitx.fcitx5.android
 
 import android.app.Application
 import android.content.Context
+import android.graphics.Rect
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
@@ -16,10 +17,12 @@ import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.bar.ui.CandidateUi
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateEntry
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateViewAdapter
+import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapFeedback
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateOffer
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -27,14 +30,30 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class, qualifiers = "zh-rCN-w600dp-h900dp-mdpi")
 class PinyinTouchCandidateUiTest {
     private val context get() = RuntimeEnvironment.getApplication()
+    private var previousApplication: FcitxApplication? = null
 
     @Before fun prepare() {
+        val instance = FcitxApplication::class.java.getDeclaredField("instance").apply { isAccessible = true }
+        previousApplication = instance.get(null) as? FcitxApplication
+        val app = FcitxApplication()
+        ReflectionHelpers.callInstanceMethod<Void>(app, "attachBaseContext",
+            ReflectionHelpers.ClassParameter.from(Context::class.java, context))
+        instance.set(null, app)
         AppPrefs.init(context.getSharedPreferences("pinyin-touch-candidate-ui", Context.MODE_PRIVATE))
+    }
+
+    @After fun restoreApplication() {
+        FcitxApplication::class.java.getDeclaredField("instance").apply {
+            isAccessible = true
+            set(null, previousApplication)
+        }
     }
 
     private fun buttons(view: View): List<TextView> = when (view) {
@@ -88,6 +107,51 @@ class PinyinTouchCandidateUiTest {
             assertEquals(listOf(0, 2), selectedRaw)
             assertEquals(listOf(17L), selectedTouch)
             assertEquals(listOf("基本", "经常会", "检查"), host.adapter.candidates.map { it.text })
+        }
+    }
+
+    @Test fun promotedFirstSlotKeepsLiteralSelectableAndUsesTheTouchToken() {
+        Host().use { host ->
+            val selectedRaw = mutableListOf<Int>()
+            val selectedTouch = mutableListOf<Long>()
+            host.adapter.onRawSelect = { selectedRaw += it }
+            host.adapter.onTouchSelect = { selectedTouch += it }
+            host.adapter.updateCandidates(arrayOf(word("基本"), word("经常会"), word("检查")), 90)
+            host.adapter.setTouchCandidate(offer().copy(promotedToFirst = true))
+            host.layout()
+            assertEquals(listOf("经常会*", "基本", "检查"),
+                (0 until host.adapter.itemCount).map { buttons(host.item(it)).single().text.toString() })
+            assertEquals(context.getString(R.string.pinyin_touch_alternative_description, "经常会"),
+                host.item(0).contentDescription.toString())
+            assertFalse(host.item(0).isLongClickable)
+            host.item(0).performClick()
+            host.item(1).performClick()
+            host.item(2).performClick()
+            assertEquals(listOf(17L), selectedTouch)
+            assertEquals(listOf(0, 2), selectedRaw)
+            assertEquals(listOf("基本", "经常会", "检查"), host.adapter.candidates.map { it.text })
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun visibilityRequiresCompleteChineseButAllowsAnOffscreenSpellingHint() {
+        Host().use { host ->
+            host.adapter.updateCandidates(arrayOf(CandidateWord("", "你是啊", "ni shi a")), 1)
+            host.layout(width = 80)
+            val holder = host.view.findViewHolderForAdapterPosition(0) as CandidateViewHolder
+            val visibleText = Rect()
+            val body = Rect()
+            assertTrue(holder.ui.visibleTextBounds(visibleText))
+            assertTrue(holder.ui.mainTextBounds(body))
+            assertFalse("a partial primary word cannot score: visible=$visibleText body=$body viewport=${host.view.width}",
+                visibleText.contains(body))
+            host.layout(width = 120)
+            assertTrue(holder.ui.visibleTextBounds(visibleText))
+            assertTrue(holder.ui.mainTextBounds(body))
+            assertTrue("the complete primary word can score even when its spelling hint is clipped",
+                visibleText.contains(body))
+            assertTrue(holder.itemView.width > host.view.width)
         }
     }
 

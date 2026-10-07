@@ -123,10 +123,19 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
             sendKeySymToFcitx(sym.sym, states.toInt(), code, up, timestamp)
         }
 
-    override suspend fun select(idx: Int): Boolean = withFcitxContext { selectCandidate(idx) }
+    override suspend fun select(idx: Int): Boolean = withFcitxContext {
+        RimeTouchProbe.close()
+        selectCandidate(idx)
+    }
     override suspend fun isEmpty(): Boolean = withFcitxContext { isInputPanelEmpty() }
-    override suspend fun reset() = withFcitxContext { resetInputContext() }
-    override suspend fun moveCursor(position: Int) = withFcitxContext { repositionCursor(position) }
+    override suspend fun reset() = withFcitxContext {
+        RimeTouchProbe.close()
+        resetInputContext()
+    }
+    override suspend fun moveCursor(position: Int) = withFcitxContext {
+        RimeTouchProbe.close()
+        repositionCursor(position)
+    }
     override suspend fun availableIme() =
         withFcitxContext { availableInputMethods() ?: emptyArray() }
 
@@ -136,10 +145,19 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     override suspend fun setEnabledIme(array: Array<String>) =
         withFcitxContext { setEnabledInputMethods(array) }
 
-    override suspend fun toggleIme() = withFcitxContext { toggleInputMethod() }
-    override suspend fun activateIme(ime: String) = withFcitxContext { setInputMethod(ime) }
+    override suspend fun toggleIme() = withFcitxContext {
+        RimeTouchProbe.close()
+        toggleInputMethod()
+    }
+    override suspend fun activateIme(ime: String) = withFcitxContext {
+        RimeTouchProbe.close()
+        setInputMethod(ime)
+    }
     override suspend fun enumerateIme(forward: Boolean) =
-        withFcitxContext { nextInputMethod(forward) }
+        withFcitxContext {
+            RimeTouchProbe.close()
+            nextInputMethod(forward)
+        }
 
     override suspend fun currentIme() =
         withFcitxContext { inputMethodStatus() ?: inputMethodEntryCached }
@@ -193,12 +211,24 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     private suspend fun setClipboard(string: String, password: Boolean = false) =
         withFcitxContext { setFcitxClipboard(string, password) }
 
-    override suspend fun focus(focus: Boolean) = withFcitxContext { focusInputContext(focus) }
-    override suspend fun focusOutIn() = withFcitxContext { focusInputContextOutIn() }
+    override suspend fun focus(focus: Boolean) = withFcitxContext {
+        RimeTouchProbe.close()
+        focusInputContext(focus)
+    }
+    override suspend fun focusOutIn() = withFcitxContext {
+        RimeTouchProbe.close()
+        focusInputContextOutIn()
+    }
     override suspend fun activate(uid: Int, pkgName: String) =
-        withFcitxContext { activateInputContext(uid, pkgName) }
+        withFcitxContext {
+            RimeTouchProbe.close()
+            activateInputContext(uid, pkgName)
+        }
 
-    override suspend fun deactivate(uid: Int) = withFcitxContext { deactivateInputContext(uid) }
+    override suspend fun deactivate(uid: Int) = withFcitxContext {
+        RimeTouchProbe.close()
+        deactivateInputContext(uid)
+    }
     override suspend fun setCapFlags(flags: CapabilityFlags) =
         withFcitxContext { setCapabilityFlags(flags.toLong()) }
 
@@ -220,7 +250,10 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
         withFcitxContext { getFcitxCandidateActions(idx) ?: emptyArray() }
 
     override suspend fun triggerCandidateAction(idx: Int, actionIdx: Int) =
-        withFcitxContext { triggerFcitxCandidateAction(idx, actionIdx) }
+        withFcitxContext {
+            RimeTouchProbe.close()
+            triggerFcitxCandidateAction(idx, actionIdx)
+        }
 
     override suspend fun setCandidatePagingMode(mode: Int) =
         withFcitxContext { setFcitxCandidatePagingMode(mode) }
