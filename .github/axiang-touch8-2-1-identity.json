@@ -1,0 +1,106 @@
+{
+  "format": "axiang-touch8-2-1-exact-delivery-identity-v1",
+  "repository": "xisungod/fcitx5-android",
+  "source_commit": "c9dbcc50e327f62a98ab0934d4ac4fa9bf20daa5",
+  "apk_name": "AXiang-1.2-touch.8.2.1-arm64.apk",
+  "apk_bytes": 273096708,
+  "apk_sha256": "a96209595d8def563cf0bea218d43c853ba233c8d1cfb7e597d2d5b342b76b17",
+  "signer_sha256": "ffede124b18d54af5d4cfa9f3a32504fa2ccc898563bc4816bacbe3e46ec0494",
+  "package": "org.fcitx.fcitx5.android.axiang.touch2",
+  "version_name": "1.2-touch.8.2.1",
+  "version_code": 12,
+  "unit_tests": 867,
+  "unit_test_scope": "full_application_suite",
+  "baseline_apk_sha256": "4690edd288ce06e8bcf9f829dced1cb1b5e449c92afcb2c86fe74c2e26705cbe",
+  "completion_resource_sha256": "e763c788f480dbc6934453c9c255173e2173ed9ca69d1cbeea405ddc3f7c4e88",
+  "completion_resource_bytes": 7702187,
+  "release_id": 405853342,
+  "release_tag": "axiang-touch-1.2-touch.8.2.1",
+  "contains_signing_key_or_user_logs": false,
+  "public_files": {
+    "AXiang-1.2-touch.8.2.1-arm64.apk": {
+      "bytes": 273096708,
+      "sha256": "a96209595d8def563cf0bea218d43c853ba233c8d1cfb7e597d2d5b342b76b17"
+    },
+    "GUIDE.zh-CN.md": {
+      "bytes": 2868,
+      "sha256": "f396f844713a1d91ebfefa236f269dbd87af4a0fc90f8bf3f33761c71249e7b7"
+    },
+    "SHA256SUMS.txt": {
+      "bytes": 1934,
+      "sha256": "fe01ec024506925b2f8deb1403c4f4db66382366f4498df418799d44d1809a96"
+    },
+    "build-verification.json": {
+      "bytes": 4854,
+      "sha256": "bde1a0a93dbd25e8b3c108b76809f69c18d63753cb641543867407d80b716420"
+    },
+    "completion-resource-test-summary.json": {
+      "bytes": 631,
+      "sha256": "324724d8269a378fd50b7356555f14df1441801bdeb7672f4acc08d254454208"
+    },
+    "full-junit-reports.zip": {
+      "bytes": 82785,
+      "sha256": "7dc64081f07013d4cba42b4d911f5474fb4f91840635a4937eda043a2757d960"
+    },
+    "inherited-feature-evidence.json": {
+      "bytes": 5033,
+      "sha256": "1cb8c81cb6316a15eb7190138b7c1d5368075f1941d8f90bdd67c16de6ff2587"
+    },
+    "inherited-native-prediction-evidence.json": {
+      "bytes": 1547,
+      "sha256": "d6d6b333eaccb3722830eff319d8a273a192f36f77ddd3a70e537cf794a1f78a"
+    },
+    "inherited-rime-evidence.json": {
+      "bytes": 1369,
+      "sha256": "3e2d32a3e9c2db38347ec10b74c4d20874d4b51b383f38c650c1ce06c40266fe"
+    },
+    "native-prediction-provenance.json": {
+      "bytes": 40652,
+      "sha256": "e5c209ae1bac8f8a3f110e86631050ee6f38a60058a756a2776e620db99a2437"
+    },
+    "native-prediction-test-summary.json": {
+      "bytes": 6834,
+      "sha256": "cc9c900f1507971019e5348da058dd192755729fba64003c08230c7bf86d1bf6"
+    },
+    "packaged-rime-version.json": {
+      "bytes": 1245,
+      "sha256": "3b34810d8ac14b9b9a9af7f682d99bb5155805b1b3224dce5842fe4451f66753"
+    },
+    "prebuilt-manifest.json": {
+      "bytes": 137783,
+      "sha256": "a4b63d6de4059fb8f5bb70f871a7176524a186a77746c1199b021d7bcdf87e80"
+    },
+    "prediction-benchmark-baseline-candidates.json": {
+      "bytes": 35377,
+      "sha256": "1d7c50581014784126b8d4cc07a026b536f0a2f0b5611eb1ce01530378e64b7e"
+    },
+    "prediction-benchmark-current-candidates.json": {
+      "bytes": 36952,
+      "sha256": "d23a00391a040ebfbfa97e514fc93febc0b42bd633b72eac328532c3d2ad8592"
+    },
+    "prediction-benchmark-evaluation.json": {
+      "bytes": 195759,
+      "sha256": "eb426a68a5f5e6266298d8e1fa9627b9414982c7c6a9b3310507217176430099"
+    },
+    "prediction-benchmark-summary.json": {
+      "bytes": 6265,
+      "sha256": "716d8a3d33486f4539de7e412ef7676f2332c9dbfcf926263094c86dc6959d2b"
+    },
+    "source-patch-manifest.json": {
+      "bytes": 9838,
+      "sha256": "d622b68d8d9e38b0a2304eaa2e16ff8b5cfea1a0232a461edd3de5555ba9ed41"
+    },
+    "source-snapshot.json": {
+      "bytes": 487,
+      "sha256": "f7f7ddd4cb7dc95163a9cfef1148fbdee7524c425305d533f3f167a7c97fbfc9"
+    },
+    "typing-test-source.patch": {
+      "bytes": 122921,
+      "sha256": "66526a6baf633f76ccfedb3f673e95852cefee24d7324bd173ebb17139b5cd6f"
+    },
+    "unit-test-summary.json": {
+      "bytes": 31485,
+      "sha256": "d1d5d8d8dd12ab31d2f6d70848de9cb0f60d23096aa082702f939d4f00bbe94a"
+    }
+  }
+}
