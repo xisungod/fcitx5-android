@@ -97,7 +97,7 @@ object TypingTestMetrics {
             rawEdits, neighbourEdits, top1, top3, backspaceRate, backspaces, letters, alignment,
             reasons.toList(), calibration, latency(input.processingNanos),
             stageLatencies(input.stageTimings), alternativeMetrics(input, validTarget),
-            prefixMismatch, prefixAdjacent, displayedTop1, displayedTop3)
+            prefixMismatch, prefixAdjacent, displayedTop1, displayedTop3, evaluateTypingTestPredictions(input))
     }
 
     private fun alternativeMetrics(
@@ -230,7 +230,8 @@ data class TypingTestSummary(
     val firstAttemptScoredTrialCount: Int = 0,
     val earlyPrefixScoredTrialCount: Int = 0,
     val repairTrialCount: Int = 0,
-    val backspacesPerRepairTrial: TypingTestFraction = TypingTestFraction(0, 0)
+    val backspacesPerRepairTrial: TypingTestFraction = TypingTestFraction(0, 0),
+    val predictionMetrics: TypingTestPredictionMetrics = TypingTestPredictionMetrics()
 )
 
 fun summarizeTypingTest(
@@ -272,5 +273,6 @@ fun summarizeTypingTest(
         trials.count { it.rawEditRate.denominator > 0 },
         trials.count { it.earlyPrefixMismatchRate.denominator > 0 },
         trials.count { it.backspaceCount > 0 },
-        TypingTestFraction(trials.sumOf { it.backspaceCount }, trials.count { it.backspaceCount > 0 }))
+        TypingTestFraction(trials.sumOf { it.backspaceCount }, trials.count { it.backspaceCount > 0 }),
+        summarizeTypingTestPredictions(trials.map { it.predictionMetrics }))
 }

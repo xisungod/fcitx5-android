@@ -333,6 +333,41 @@ class KeyboardPreferenceSectionsTest {
         }
     }
 
+    @Test fun nextWordSuggestionsAreEnabledByDefaultAndTheirVisibleSwitchPersistsIndependently() {
+        withTypingFragment { _, fragment, engine, _ ->
+            val prefs = AppPrefs.getInstance().keyboard
+            val switch = fragment.findPreference<Preference>(prefs.localNextWordPrediction.key)!!
+            assertTrue(prefs.localNextWordPrediction.getValue())
+            assertSame(prefs.localNextWordPrediction.sharedPreferences, switch.sharedPreferences)
+            assertEquals("typing_next_word_prediction", switch.parent!!.key)
+            assertEquals("typing_next_word_prediction", fragment.preferenceScreen.getPreference(0).key)
+            val otherSettings = stored.all.filterKeys { it != prefs.localNextWordPrediction.key }
+            switch.performClick()
+            assertFalse(prefs.localNextWordPrediction.getValue())
+            assertFalse("Recreating preferences must preserve a saved opt-out",
+                AppPrefs(stored).keyboard.localNextWordPrediction.getValue())
+            assertEquals(otherSettings, stored.all.filterKeys { it != prefs.localNextWordPrediction.key })
+            assertTrue("Toggling suggestions must not deploy Rime", engine.deployments.isEmpty())
+            switch.performClick()
+            assertTrue(prefs.localNextWordPrediction.getValue())
+        }
+    }
+
+    @Test fun suggestionPrivacyHelpOpensWithoutChangingPredictionOrLearningSettings() {
+        withTypingFragment { activity, fragment, engine, _ ->
+            val before = stored.all.toMap()
+            val help = fragment.findPreference<Preference>(KeyboardPreferenceSections.NEXT_WORD_PREDICTION_HELP_KEY)!!
+            assertEquals("typing_next_word_prediction", help.parent!!.key)
+            help.performClick()
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            val message = dialog.findViewById<android.widget.TextView>(android.R.id.message)!!
+            assertEquals(activity.getString(R.string.next_word_prediction_privacy_message), message.text.toString())
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            assertEquals("Reading help must not enable diagnostics or create learning settings", before, stored.all)
+            assertTrue(engine.deployments.isEmpty())
+        }
+    }
+
     @Test fun clickingTypingHabitResetClearsTheActualLocalProfileWithoutChangingSettings() {
         withTypingFragment { activity, fragment, engine, _ ->
             shadowOf(activity.application.getSystemService(UserManager::class.java)).setUserUnlocked(true)

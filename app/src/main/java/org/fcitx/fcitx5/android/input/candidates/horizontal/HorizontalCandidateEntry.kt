@@ -3,11 +3,13 @@ package org.fcitx.fcitx5.android.input.candidates.horizontal
 
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateOffer
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOffer
 
 /** Display positions are independent of the live engine's selection and paging indices. */
 internal sealed interface HorizontalCandidateEntry {
     data class Raw(val nativeIndex: Int, val word: CandidateWord) : HorizontalCandidateEntry
     data class Touch(val offer: PinyinTouchCandidateOffer) : HorizontalCandidateEntry
+    data class Prediction(val token: Long, val index: Int, val text: String) : HorizontalCandidateEntry
 }
 
 /**
@@ -17,9 +19,16 @@ internal sealed interface HorizontalCandidateEntry {
  * displace them. Only display duplicates disappear; raw words stay unchanged.
  */
 internal fun horizontalCandidateEntries(
-    words: Array<CandidateWord>, offer: PinyinTouchCandidateOffer?
+    words: Array<CandidateWord>, offer: PinyinTouchCandidateOffer?,
+    prediction: NextWordPredictionOffer? = null
 ): List<HorizontalCandidateEntry> {
-    val first = words.firstOrNull() ?: return emptyList()
+    val first = words.firstOrNull() ?: return if (offer == null) {
+        prediction?.candidates?.mapIndexedNotNull { index, text ->
+            text.takeIf { it.isNotBlank() }?.let {
+                HorizontalCandidateEntry.Prediction(prediction.token, index, it)
+            }
+        } ?: emptyList()
+    } else emptyList()
     val touch = offer?.takeIf { it.text.isNotBlank() && it.text != first.text }
     val originalIndex = touch?.let { candidate -> words.indexOfFirst { it.text == candidate.text } }
     val insertionIndex = when {

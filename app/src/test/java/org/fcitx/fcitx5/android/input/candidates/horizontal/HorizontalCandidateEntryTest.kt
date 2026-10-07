@@ -3,6 +3,7 @@ package org.fcitx.fcitx5.android.input.candidates.horizontal
 
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateOffer
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOffer
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -66,6 +67,7 @@ class HorizontalCandidateEntryTest {
             when (entry) {
                 is HorizontalCandidateEntry.Raw -> entry.word.text
                 is HorizontalCandidateEntry.Touch -> entry.offer.text
+                is HorizontalCandidateEntry.Prediction -> entry.text
             }
         })
         assertEquals(listOf(0, 1, 3), rows.filterIsInstance<HorizontalCandidateEntry.Raw>().map { it.nativeIndex })
@@ -101,11 +103,25 @@ class HorizontalCandidateEntryTest {
             val topThree = rows.take(3).map { entry -> when (entry) {
                 is HorizontalCandidateEntry.Raw -> entry.word.text
                 is HorizontalCandidateEntry.Touch -> entry.offer.text
+                is HorizontalCandidateEntry.Prediction -> entry.text
             } }.toSet()
             assertEquals("Offer $text must retain the literal top three", originalTopThree, topThree)
             for (raw in rows.filterIsInstance<HorizontalCandidateEntry.Raw>())
                 assertEquals(words[raw.nativeIndex], raw.word)
         }
+    }
+
+    @Test fun `prediction only uses idle slots and keeps source indices distinct from native indices`() {
+        val prediction = NextWordPredictionOffer(45, listOf("", "快乐", "朋友"))
+        assertEquals(listOf(
+            HorizontalCandidateEntry.Prediction(45, 1, "快乐"),
+            HorizontalCandidateEntry.Prediction(45, 2, "朋友")
+        ), horizontalCandidateEntries(emptyArray(), null, prediction))
+        val words = arrayOf(word("原词"), word("经常会"), word("第三"))
+        assertEquals(horizontalCandidateEntries(words, offer()), horizontalCandidateEntries(words, offer(), prediction))
+        assertTrue(horizontalCandidateEntries(emptyArray(), offer(), prediction).isEmpty())
+        assertEquals(words.toList(), horizontalCandidateEntries(words, null, prediction)
+            .filterIsInstance<HorizontalCandidateEntry.Raw>().map { it.word })
     }
 
     @Test fun `synthetic slot does not change page offsets totals or late page guard`() {

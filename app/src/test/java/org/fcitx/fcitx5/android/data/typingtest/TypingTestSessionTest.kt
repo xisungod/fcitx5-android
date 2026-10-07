@@ -1031,5 +1031,145 @@ class TypingTestSessionTest {
         assertEquals(TypingTestFraction(0, 0), result.displayedTop3HitRate)
     }
 
+    private fun beginPrediction(info: EditorInfo, prefix: String = "你",
+                                token: Long = 1L): TypingTestObservationTicket {
+        val observation = TypingTestSession.beginObservation(info)!!
+        // Production observes this native receipt only after editor commit success.
+        TypingTestSession.observeCommit(info, prefix)
+        TypingTestSession.recordPredictionCommit(observation, token, true, prefix, 100L)
+        TypingTestSession.recordPredictionPublished(observation, token, token + 100L,
+            TypingTestPredictionWarmth.Warm)
+        return observation
+    }
+
+    @Test fun predictionDirectSuccessUpdatesLedgerExactlyOnceWithoutManualRawOrCalibrationTruth() {
+        val info = start()
+        type(info, "ni", listOf("你"))
+        val observation = beginPrediction(info)
+        TypingTestSession.recordPredictionDrawn(observation, 101L, listOf(0), 140L)
+        TypingTestSession.recordPredictionSelected(observation, 101L, 0)
+        TypingTestSession.recordPredictionResolved(observation, 101L, 0, "好啊", true)
+        // The controller reports the successful newly inserted word afterwards to chain predictions.
+        val clickObservation = TypingTestSession.beginObservation(info)!!
+        TypingTestSession.recordPredictionCommit(clickObservation, 2L, true, "好啊", 160L)
+        TypingTestSession.recordPredictionResolved(observation, 101L, 0, "好啊", true)
+        TypingTestSession.completePhrase(prompt.text)
+        val result = TypingTestSession.state.value.results.single()
+        assertTrue(result.targetCompleted)
+        assertEquals(1, result.predictionMetrics.adoptedCount)
+        assertEquals(4, result.predictionMetrics.estimatedPinyinLetterKeys)
+        assertEquals(40L, result.predictionMetrics.drawLatency.p95Nanos)
+        assertNull(result.top1HitRate.value)
+        assertNull(result.rawEditRate.value)
+        assertTrue(result.calibrationSamples.isEmpty())
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertFalse(row.getJSONArray("session_exclusions").toString().contains("unobserved_or_edited_commit"))
+        assertEquals(prompt.text, row.getString("committed_text"))
+        assertEquals(2, row.getJSONArray("prediction_commits").length())
+        val events = row.getJSONArray("prediction_events")
+        for (index in 0 until events.length()) {
+            assertFalse(events.getJSONObject(index).has("candidate_text"))
+            assertFalse(events.getJSONObject(index).has("context"))
+        }
+        assertFalse(row.getBoolean("calibration_confirmed"))
+        assertTrue(TypingTestSession.state.value.reportSummary!!.contains("4"))
+    }
+
+    @Test fun predictionCheckedFailureDoesNotAppendTextOrAdopt() {
+        val info = start()
+        val observation = beginPrediction(info)
+        TypingTestSession.recordPredictionDrawn(observation, 101L, listOf(0), 140L)
+        TypingTestSession.recordPredictionSelected(observation, 101L, 0)
+        TypingTestSession.recordPredictionResolved(observation, 101L, 0, "好啊", false)
+        TypingTestSession.completePhrase("你")
+        val result = TypingTestSession.state.value.results.single()
+        assertEquals(0, result.predictionMetrics.adoptedCount)
+        assertNull(result.predictionMetrics.targetHitRate.value)
+        val row = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials").getJSONObject(0)
+        assertEquals("你", row.getString("committed_text"))
+        assertFalse(row.getJSONArray("session_exclusions").toString().contains("prediction_input_used"))
+    }
+
+    @Test fun stalePredictionReceiptCannotCaptureAnotherTrialOrEditor() {
+        val info = start()
+        val observation = beginPrediction(info)
+        val replacement = editor()
+        TypingTestSession.attachEditor(replacement)
+        TypingTestSession.recordPredictionDrawn(observation, 101L, listOf(0), 140L)
+        TypingTestSession.recordPredictionSelected(observation, 101L, 0)
+        TypingTestSession.recordPredictionResolved(observation, 101L, 0, "好啊", true)
+        TypingTestSession.recordPredictionQuery(observation, 1L, "Unavailable",
+            TypingTestPredictionWarmth.Cold, false, 10L, 9L, 1L)
+        TypingTestSession.completePhrase("你")
+        val result = TypingTestSession.state.value.results.single().predictionMetrics
+        assertEquals(0, result.drawnCount)
+        assertEquals(0, result.selectedCount)
+        assertEquals(0, result.adoptedCount)
+        assertTrue(result.queryOutcomes.isEmpty())
+    }
+
+    @Test fun predictionPasswordAndOrdinaryFieldsReceiveNoTestReceiptsOrRecords() {
+        for (info in listOf(editor().apply { inputType = InputType.TYPE_CLASS_TEXT or
+            InputType.TYPE_TEXT_VARIATION_PASSWORD }, editor().apply { fieldId = FIELD_ID + 1 })) {
+            start(info)
+            val observation = TypingTestSession.beginObservation(info)
+            assertNull(observation)
+            TypingTestSession.recordPredictionCommit(observation, 1L, true, "private context", 100L)
+            TypingTestSession.recordPredictionPublished(observation, 1L, 101L, TypingTestPredictionWarmth.Warm)
+            TypingTestSession.recordPredictionDrawn(observation, 101L, listOf(0), 140L)
+            TypingTestSession.recordPredictionSelected(observation, 101L, 0)
+            TypingTestSession.recordPredictionResolved(observation, 101L, 0, "private suggestion", true)
+            TypingTestSession.completePhrase("")
+            val result = TypingTestSession.state.value.results.single().predictionMetrics
+            assertEquals(0, result.successfulCommitCount)
+            assertEquals(0, result.publishedCount)
+            assertEquals(0, result.adoptedCount)
+            assertFalse(TypingTestSession.exportReport()!!.contains("private context"))
+            assertFalse(TypingTestSession.exportReport()!!.contains("private suggestion"))
+        }
+    }
+
+    @Test fun explicitCursorEditMakesEstimateUnknownWhilePreservingActualPredictionUsage() {
+        val info = start()
+        val observation = beginPrediction(info)
+        TypingTestSession.markUnsupported(info, "prediction_context_edited")
+        TypingTestSession.recordPredictionDrawn(observation, 101L, listOf(0), 140L)
+        TypingTestSession.recordPredictionSelected(observation, 101L, 0)
+        TypingTestSession.recordPredictionResolved(observation, 101L, 0, "好啊", true)
+        TypingTestSession.completePhrase(prompt.text)
+        val result = TypingTestSession.state.value.results.single().predictionMetrics
+        assertEquals(1, result.adoptedCount)
+        assertEquals(1, result.drawLatency.sampleCount)
+        assertNull(result.targetHitRate.value)
+        assertEquals(TypingTestFraction(0, 1), result.savingsCoverage)
+        assertEquals(1, result.unscoredReasons["append_scope_not_reliable"])
+    }
+
+    @Test fun nativeCandidateSelectionCanStillSupplyReliablePredictionTargetAlignment() {
+        val info = start()
+        TypingTestSession.markUnsupported(info, "non_typing_action")
+        val observation = beginPrediction(info)
+        TypingTestSession.recordPredictionSelected(observation, 101L, 0)
+        TypingTestSession.recordPredictionResolved(observation, 101L, 0, "好啊", true)
+        TypingTestSession.completePhrase(prompt.text)
+        assertEquals(4, TypingTestSession.state.value.results.single().predictionMetrics.estimatedPinyinLetterKeys)
+    }
+
+    @Test fun predictionUnavailableAndTimeoutAreVisibleDiagnosticsWithUnknownAccuracy() {
+        val info = start()
+        val observation = beginPrediction(info)
+        TypingTestSession.recordPredictionQuery(observation, 1L, "Unavailable",
+            TypingTestPredictionWarmth.Cold, false, 10L, 9L, 1L)
+        TypingTestSession.completePhrase("你")
+        val state = TypingTestSession.state.value
+        assertNotNull(state.reportWarning)
+        assertEquals(1, state.results.single().predictionMetrics.queryOutcomes["Unavailable"])
+        assertNull(state.results.single().predictionMetrics.targetHitRate.value)
+        val report = JSONObject(TypingTestSession.exportReport()!!)
+        assertEquals(1, report.getJSONObject("prediction_summary").getJSONObject("query_outcomes")
+            .getInt("Unavailable"))
+        assertTrue(report.getString("prediction_draw_measurement").contains("not_hardware_frame"))
+    }
+
     companion object { private val FIELD_ID = R.id.typing_test_input }
 }

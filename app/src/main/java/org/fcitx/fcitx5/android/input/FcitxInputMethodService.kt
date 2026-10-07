@@ -47,6 +47,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlags
 import org.fcitx.fcitx5.android.core.FcitxAPI
@@ -55,19 +56,28 @@ import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
+import org.fcitx.fcitx5.android.core.LibimeNextWordPredictor
 import org.fcitx.fcitx5.android.core.ScancodeMapping
 import org.fcitx.fcitx5.android.core.SubtypeManager
+import org.fcitx.fcitx5.android.core.data.DataManager
 import org.fcitx.fcitx5.android.core.data.BuiltinRimeProfile
 import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.diagnostics.TouchDiagnosticStore
 import org.fcitx.fcitx5.android.data.typingtest.TypingTestSession
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestObservationTicket
+import org.fcitx.fcitx5.android.data.typingtest.TypingTestPredictionWarmth
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionController
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionRuntime
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionPrivacyPolicy
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionReceiptContext
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import org.fcitx.fcitx5.android.input.voice.DictationEditorWriter
@@ -86,6 +96,7 @@ import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
 import splitties.resources.styledColor
 import timber.log.Timber
+import java.io.File
 import kotlin.math.max
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
@@ -113,6 +124,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun revokeTouchDiagnosticEditor() {
         touchDiagnostics.updateEditor(null)
         TypingTestSession.revokeEditor()
+        if (nextWordControllerDelegate.isInitialized()) nextWordController.resetEditor()
+        inputView?.showNextWordPrediction(null)
     }
 
     private var offlineDictationEditorGeneration = 0L
@@ -123,6 +136,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     /** The session owns its original editor; late results can never enter another field. */
     fun createOfflineDictationSession(): OfflineDictationSession {
+        invalidateNextWordPrediction(clearContext = true)
         finishOfflineDictation()
         val generation = offlineDictationEditorGeneration
         val editor = currentInputConnection
@@ -226,6 +240,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     )
 
     private fun replaceInputView(theme: Theme): InputView {
+        invalidateNextWordPrediction(clearContext = true)
         finishOfflineDictation()
         val newInputView = InputView(this, fcitx, theme)
         setInputView(newInputView)
@@ -307,6 +322,119 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return job
     }
 
+    // This model is independent of Rime and initialized only on its own serial worker.
+    private val nextWordBackendDelegate = lazy {
+        LibimeNextWordPredictor(File(DataManager.dataDir, "usr/share/libime/zh_CN.lm"))
+    }
+    private val nextWordBackend by nextWordBackendDelegate
+    private var nextWordNativeCandidateCount = -1
+    private fun nextWordEnvironment(): NextWordPredictionRuntime.Environment {
+        val native = if (::fcitx.isInitialized) fcitx.runImmediately {
+            val panel = inputPanelCached
+            val im = inputMethodEntryCached
+            Pair(im.uniqueName == "rime" && !TextKeyboard.isEnglish(im),
+                clientPreeditCached.isEmpty() && panel.preedit.isEmpty() &&
+                    panel.auxUp.isEmpty() && panel.auxDown.isEmpty() &&
+                    nextWordNativeCandidateCount == 0)
+        } else false to false
+        return NextWordPredictionRuntime.Environment(
+            currentInputEditorInfo, currentInputConnection,
+            prefs.keyboard.localNextWordPrediction.getValue() && native.first &&
+                offlineDictationSession == null &&
+                NextWordPredictionPrivacyPolicy.allows(currentInputEditorInfo, capabilityFlags),
+            isInputViewShown && inputView?.visibility == View.VISIBLE,
+            native.second && inputView?.nextWordPredictionSurfaceVisible() == true,
+            selection.latest.start, selection.latest.end)
+    }
+    private fun predictionWarmth(result: LibimeNextWordPredictor.Result?) = when {
+        result == null -> TypingTestPredictionWarmth.Unknown
+        result.coldInitialization -> TypingTestPredictionWarmth.Cold
+        else -> TypingTestPredictionWarmth.Warm
+    }
+    private val nextWordControllerDelegate = lazy {
+        NextWordPredictionController(lifecycleScope, ::nextWordEnvironment,
+            predict = { text, limit -> nextWordBackend.query(text, limit) },
+            closePredictor = { if (nextWordBackendDelegate.isInitialized()) nextWordBackend.close() },
+            callbacks = NextWordPredictionController.Callbacks(
+                onCommitted = { event ->
+                    TypingTestSession.recordPredictionCommit(
+                        event.anchor.origin.observation as? TypingTestObservationTicket,
+                        event.anchor.commitToken, true, event.text, event.anchor.committedAtNanos)
+                },
+                onReady = { event ->
+                    TypingTestSession.recordPredictionPublished(
+                        event.anchor.origin.observation as? TypingTestObservationTicket,
+                        event.anchor.commitToken, event.offerToken, predictionWarmth(event.result))
+                },
+                onDrawn = { event ->
+                    TypingTestSession.recordPredictionDrawn(
+                        event.anchor.origin.observation as? TypingTestObservationTicket,
+                        event.offerToken, event.indices, event.drawnAtNanos)
+                },
+                onSelected = { event ->
+                    TypingTestSession.recordPredictionSelected(
+                        event.anchor.origin.observation as? TypingTestObservationTicket,
+                        event.offerToken, event.index)
+                },
+                onChosen = { event ->
+                    TypingTestSession.recordPredictionResolved(
+                        event.anchor.origin.observation as? TypingTestObservationTicket,
+                        event.offerToken, event.index, event.text, event.success)
+                },
+                onQuery = { event ->
+                    TypingTestSession.recordPredictionQuery(
+                        event.anchor.origin.observation as? TypingTestObservationTicket,
+                        event.anchor.commitToken, event.outcome.name, predictionWarmth(event.result),
+                        event.result?.available, event.result?.elapsedNanos,
+                        event.result?.initializationNanos, event.result?.queryNanos)
+                }))
+    }
+    private val nextWordController by nextWordControllerDelegate
+
+    /** Capture at UI enqueue, then restore across suspension on the existing native FIFO. */
+    fun postPredictionFcitxJob(
+        observation: TypingTestObservationTicket? = TypingTestSession.beginObservation(currentInputEditorInfo),
+        block: suspend FcitxAPI.() -> Unit
+    ): Job {
+        val origin = nextWordController.captureOrigin(observation)
+        return postFcitxJob {
+            val api = this
+            withContext(NextWordPredictionReceiptContext.element(origin)) { block(api) }
+        }
+    }
+
+    fun invalidateNextWordPrediction(clearContext: Boolean = false) {
+        if (nextWordControllerDelegate.isInitialized())
+            nextWordController.onUserAction(clearContext)
+        inputView?.showNextWordPrediction(null)
+        if (clearContext) TypingTestSession.markUnsupported(
+            currentInputEditorInfo, "prediction_context_edited")
+    }
+
+    fun refreshNextWordPrediction() {
+        if (!nextWordControllerDelegate.isInitialized()) return
+        nextWordController.refresh()
+        // Native empty events clear the adapter independently; restore only the current offer.
+        inputView?.showNextWordPrediction(nextWordController.offer.value)
+    }
+
+    fun selectNextWordPrediction(token: Long, index: Int) {
+        if (!nextWordControllerDelegate.isInitialized()) return
+        val observation = TypingTestSession.beginObservation(currentInputEditorInfo)
+        nextWordController.select(token, index, observation) { text -> commitText(text) }
+        inputView?.showNextWordPrediction(nextWordController.offer.value)
+    }
+
+    fun onNextWordPredictionDrawn(token: Long, indices: List<Int>, drawnAtNanos: Long) {
+        if (nextWordControllerDelegate.isInitialized())
+            nextWordController.onDrawn(token, indices, drawnAtNanos)
+    }
+
+    @Keep
+    private val nextWordPreferenceListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        invalidateNextWordPrediction(clearContext = true)
+    }
+
     private var smsCodeReceiver: org.fcitx.fcitx5.android.data.otp.SmsCodeReceiver? = null
 
     /** listen for SMS codes only while the user wants it and has granted RECEIVE_SMS */
@@ -342,6 +470,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 handleFcitxEvent(it)
             }
         }
+        lifecycleScope.launch {
+            nextWordController.offer.collect { inputView?.showNextWordPrediction(it) }
+        }
+        prefs.keyboard.localNextWordPrediction.registerOnChangeListener(nextWordPreferenceListener)
         pkgNameCache = PackageNameCache(this)
         recreateInputViewPrefs.forEach {
             it.registerOnChangeListener(recreateInputViewListener)
@@ -362,11 +494,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
-                TypingTestSession.observeCommit(currentInputEditorInfo, event)
                 if (offlineDictationSession != null) finishOfflineDictation()
-                commitText(event.data.text, event.data.cursor)
+                val start = if (composing.isEmpty()) selection.latest.start else composing.start
+                val replacesSelection = composing.isEmpty() && selection.latest.start != selection.latest.end
+                val end = start + if (event.data.cursor == -1) event.data.text.length else event.data.cursor
+                val accepted = commitText(event.data.text, event.data.cursor)
+                val acceptedAtNanos = System.nanoTime()
+                if (accepted) {
+                    TypingTestSession.observeCommit(currentInputEditorInfo, event)
+                    if (!replacesSelection) nextWordController.onActualCommitted(
+                        event.nextWordPredictionOrigin, event.data.text, start, end, acceptedAtNanos)
+                    else invalidateNextWordPrediction(clearContext = true)
+                } else invalidateNextWordPrediction(clearContext = true)
             }
             is FcitxEvent.KeyEvent -> event.data.let event@{
+                // Native forwarded Space/Return, Latin characters and navigation are context boundaries.
+                invalidateNextWordPrediction(clearContext = true)
                 if (offlineDictationSession != null) finishOfflineDictation()
                 if (it.states.virtual) {
                     // KeyEvent from virtual keyboard
@@ -443,12 +586,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 if (offlineDictationSession != null && event.data.isNotEmpty()) finishOfflineDictation()
                 if (!dictationOwnsComposition) updateComposingText(event.data)
             }
+            is FcitxEvent.CandidateListEvent -> {
+                nextWordNativeCandidateCount = event.data.total
+                refreshNextWordPrediction()
+            }
             is FcitxEvent.DeleteSurroundingEvent -> {
+                invalidateNextWordPrediction(clearContext = true)
                 if (offlineDictationSession != null) finishOfflineDictation()
                 val (before, after) = event.data
                 handleDeleteSurrounding(before, after)
             }
             is FcitxEvent.IMChangeEvent -> {
+                invalidateNextWordPrediction(clearContext = true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     val im = event.data.uniqueName
                     val subtype = SubtypeManager.subtypeOf(im) ?: return
@@ -563,37 +712,37 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         currentInputConnection.setSelection(target, target)
     }
 
-    fun commitText(text: String, cursor: Int = -1) {
-        val ic = currentInputConnection ?: return
-        // when composing text equals commit content, finish composing text as-is
+    /** Return the editor's actual acceptance, including composing-text confirmation. */
+    fun commitText(text: String, cursor: Int = -1): Boolean {
+        val ic = currentInputConnection ?: return false
         if (composing.isNotEmpty() && composingText.toString() == text) {
             val c = if (cursor == -1) text.length else cursor
             val target = composing.start + c
             resetComposingState()
+            var accepted = false
             ic.withBatchEdit {
-                if (selection.current.start != target) {
+                val moved = if (selection.current.start != target) {
                     selection.predict(target)
-                    ic.setSelection(target, target)
-                }
-                ic.finishComposingText()
+                    setSelection(target, target)
+                } else true
+                accepted = finishComposingText() && moved
             }
-            return
+            return accepted
         }
-        // committed text should replace composing (if any), replace selected range (if any),
-        // or simply prepend before cursor
         val start = if (composing.isEmpty()) selection.latest.start else composing.start
         resetComposingState()
         if (cursor == -1) {
             selection.predict(start + text.length)
-            ic.commitText(text, 1)
-        } else {
-            val target = start + cursor
-            selection.predict(target)
-            ic.withBatchEdit {
-                commitText(text, 1)
-                setSelection(target, target)
-            }
+            return ic.commitText(text, 1)
         }
+        val target = start + cursor
+        selection.predict(target)
+        var accepted = false
+        ic.withBatchEdit {
+            val inserted = commitText(text, 1)
+            accepted = setSelection(target, target) && inserted
+        }
+        return accepted
     }
 
     private fun sendDownKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
@@ -678,6 +827,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private lateinit var lastKnownConfig: Configuration
 
     override fun onConfigurationChanged(newConfig: Configuration) {
+        invalidateNextWordPrediction(clearContext = true)
         inputView?.invalidateTouchFeedbackForExternalInput()
         postFcitxJob { reset() }
         /**
@@ -770,6 +920,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private fun forwardKeyEvent(event: KeyEvent): Boolean {
         inputView?.invalidateTouchFeedbackForExternalInput()
+        invalidateNextWordPrediction(clearContext = true)
         TypingTestSession.markUnsupported(currentInputEditorInfo, "physical_keyboard")
         // reason to use a self increment index rather than timestamp:
         // KeyUp and KeyDown events actually can happen on the same time
@@ -893,6 +1044,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         updateSmsCodeReceiver()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
+        nextWordController.attach(attribute, currentInputConnection)
+        inputView?.showNextWordPrediction(null)
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -918,6 +1071,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         touchDiagnostics.updateEditor(info)
         TypingTestSession.attachEditor(info)
+        nextWordController.attach(info, currentInputConnection)
+        inputView?.showNextWordPrediction(null)
         Timber.d("onStartInputView: restarting=$restarting")
         postFcitxJob {
             focus(true)
@@ -1035,6 +1190,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         } else {
             // cursor update can't match any prediction: it's treated as a user input
             selection.resetTo(newSelStart, newSelEnd)
+            if (nextWordControllerDelegate.isInitialized()) {
+                nextWordController.onSelectionChanged(newSelStart, newSelEnd)
+                inputView?.showNextWordPrediction(nextWordController.offer.value)
+            }
+            TypingTestSession.markUnsupported(currentInputEditorInfo, "prediction_context_edited")
             if (offlineDictationSession != null) {
                 // A user cursor move invalidates the dictation range as well as a focus change.
                 finishOfflineDictation()
@@ -1280,6 +1440,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
+        prefs.keyboard.localNextWordPrediction.unregisterOnChangeListener(nextWordPreferenceListener)
+        if (nextWordControllerDelegate.isInitialized()) nextWordController.close()
         super.onDestroy()
         // Fcitx might be used in super.onDestroy()
         FcitxDaemon.disconnect(javaClass.name)

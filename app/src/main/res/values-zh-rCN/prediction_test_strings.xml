@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="typing_test_prediction_help">测下一词联想时，可以把目标分成短词上屏，例如“明天 → 一起 → 吃饭”。只记录当前测试框，练习不会训练联想。整句已上屏后，下一词的真实意图未知。</string>
+    <string name="typing_test_prediction_report_help">联想使用情况独立于原始拼音准确率。“省键”仅按目标拼音估算少打的字母数，不能当作实测总点击节省。时延终点为完整可见正文绘制结束，不是硬件屏幕呈现。</string>
+    <string name="typing_test_prediction_title">下一词联想 · 独立指标</string>
+    <string name="typing_test_prediction_counts">成功上屏 %1$d · 上屏失败 %2$d\n提供 %3$d · 实际绘制 %4$d · 选择 %5$d · 成功采用 %6$d</string>
+    <string name="typing_test_prediction_coverage">上屏到实际绘制覆盖：%1$s\n已显示联想采用率：%2$s\n成功采用的绘制证据覆盖：%3$s\n已采用联想匹配目标：%4$s\n目标命中评分覆盖：%5$s</string>
+    <string name="typing_test_prediction_savings">估算少打的拼音字母：%1$s\n省键估算覆盖：%2$s</string>
+    <string name="typing_test_prediction_no_samples">--（无可评证据）</string>
+    <string name="typing_test_prediction_fraction">%1$.1f%%（%2$d/%3$d）</string>
+    <string name="typing_test_prediction_latency">%1$s上屏成功 → 实际可见绘制：P50 %2$s · P95 %3$s（%4$d 次；无效 %5$d 次）</string>
+    <string name="typing_test_prediction_all">全部</string>
+    <string name="typing_test_prediction_cold">冷启动</string>
+    <string name="typing_test_prediction_warm">已初始化</string>
+    <string name="typing_test_prediction_cache">缓存</string>
+    <string name="typing_test_prediction_unknown">状态未知</string>
+    <string name="typing_test_prediction_query">%1$s查询 %2$d 次 · 总耗时 P95 %3$s · 初始化 P95 %4$s · 原生查询 P95 %5$s</string>
+    <string name="typing_test_prediction_outcomes">查询结果：%1$s</string>
+    <string name="typing_test_prediction_reasons">联想不可评原因：%1$s</string>
+    <string name="typing_test_prediction_limits">联想记录达到上限，省略 %1$d 条；以上只统计已保留证据。</string>
+    <string name="typing_test_prediction_warning">下一词联想查询不可用或失败 %1$d 次，超时 %2$d 次。对应请求没有产生可用建议，不计作准确率错误；请查看下一词联想状态。</string>
+    <string name="typing_test_prediction_empty_reasons">保留证据中无此项</string>
+</resources>

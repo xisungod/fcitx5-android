@@ -60,6 +60,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     inner class Keyboard : ManagedPreferenceCategory(R.string.virtual_keyboard, sharedPreferences) {
+        val localNextWordPrediction = switch(
+            R.string.local_next_word_prediction, "local_next_word_prediction", true,
+            R.string.local_next_word_prediction_summary)
         val hapticStrength = int(
             R.string.haptic_strength, "haptic_strength_percent", 100, 0, 100, "%"
         )

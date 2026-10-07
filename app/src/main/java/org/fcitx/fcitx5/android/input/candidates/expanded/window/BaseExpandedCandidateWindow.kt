@@ -179,7 +179,8 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     fun bindCandidateUiViewHolder(holder: CandidateViewHolder) {
         holder.itemView.setOnClickListener {
-            fcitx.launchOnReady { it.select(holder.idx) }
+            service.invalidateNextWordPrediction(clearContext = false)
+            service.postPredictionFcitxJob { select(holder.idx) }
         }
         holder.itemView.setOnLongClickListener {
             inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)

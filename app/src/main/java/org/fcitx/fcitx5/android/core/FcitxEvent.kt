@@ -41,6 +41,10 @@ sealed class FcitxEvent<T>(open val data: T) {
     data class CommitStringEvent(override val data: Data) :
         FcitxEvent<CommitStringEvent.Data>(data) {
 
+        /** Captured on the native input coroutine, before a delayed UI collector receives this event. */
+        internal var nextWordPredictionOrigin:
+            org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOrigin? = null
+
         override val eventType = EventType.Commit
 
         data class Data(val text: String, val cursor: Int)

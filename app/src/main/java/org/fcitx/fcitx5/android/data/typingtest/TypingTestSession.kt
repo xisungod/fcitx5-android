@@ -149,6 +149,7 @@ object TypingTestSession {
         var omittedProbeQueries = 0
         var omittedAlternativeEvents = 0
         val unsupported = linkedSetOf<String>()
+        val predictions = TypingTestPredictionRecorder(prompt)
     }
 
     suspend fun loadHistory(context: Context) {
@@ -204,6 +205,8 @@ object TypingTestSession {
     }
 
     private fun invalidatePending(reason: String) {
+        trial?.takeIf { it.actions > 0 || it.commits > 0 || it.predictions.commits.isNotEmpty() }
+            ?.predictions?.invalidateScope()
         if (pending > 0) trial?.let { current ->
             current.unsupported.add(reason)
             if (current.pendingRawKeys > 0) current.rawKind = TypingTestInputKind.UNKNOWN
@@ -316,6 +319,60 @@ object TypingTestSession {
             current.publishedOfferReceipts[offerToken] = PublishedOfferReceipt(ticket!!, System.nanoTime())
     }
 
+    /** Actual InputConnection success only, tied to the original action receipt. */
+    fun recordPredictionCommit(ticket: TypingTestObservationTicket?, commitToken: Long,
+        success: Boolean, committedText: String, committedAtNanos: Long): Unit = synchronized(lock) {
+        if (!valid(ticket)) return@synchronized
+        trial?.predictions?.commit(ticket!!, commitToken, success, committedText, committedAtNanos)
+    }
+
+    fun recordPredictionPublished(ticket: TypingTestObservationTicket?, commitToken: Long,
+        offerToken: Long, warmth: TypingTestPredictionWarmth): Unit = synchronized(lock) {
+        if (!valid(ticket)) return@synchronized
+        trial?.predictions?.publish(ticket!!, commitToken, offerToken, warmth)
+    }
+
+    /** Invoked only after UI dispatchDraw has drawn complete visible candidate bodies. */
+    fun recordPredictionDrawn(ticket: TypingTestObservationTicket?, offerToken: Long,
+        visibleIndices: List<Int>, drawnAtNanos: Long): Unit = synchronized(lock) {
+        if (!valid(ticket)) return@synchronized
+        trial?.predictions?.draw(ticket!!, offerToken, visibleIndices, drawnAtNanos)
+    }
+
+    fun recordPredictionSelected(ticket: TypingTestObservationTicket?, offerToken: Long,
+        index: Int): Unit = synchronized(lock) {
+        if (!valid(ticket)) return@synchronized
+        trial?.predictions?.select(ticket!!, offerToken, index)
+    }
+
+    /** Direct prediction commits bypass native receipts, so add only their successful append. */
+    fun recordPredictionResolved(ticket: TypingTestObservationTicket?, offerToken: Long,
+        index: Int, appendText: String, success: Boolean): Unit = synchronized(lock) {
+        if (!valid(ticket)) return@synchronized
+        val current = trial ?: return@synchronized
+        val append = current.predictions.resolve(ticket!!, offerToken, index, appendText, success)
+            ?: return@synchronized
+        freezeFirstAttempt(current)
+        when (current.committed.toString()) {
+            append.prefixBeforeAppend -> recordCommit(appendText)
+            append.prefixAfterAppend -> Unit // A delivered receipt already accounted for this append.
+            else -> {
+                current.unsupported.add("prediction_commit_ledger_mismatch")
+                current.predictions.invalidateScope()
+            }
+        }
+        // Prediction usage is not manually typed raw pinyin, and cannot create touch labels.
+        current.unsupported.add("prediction_input_used")
+    }
+
+    fun recordPredictionQuery(ticket: TypingTestObservationTicket?, commitToken: Long,
+        outcome: String, warmth: TypingTestPredictionWarmth, available: Boolean?,
+        elapsedNanos: Long?, initializationNanos: Long?, queryNanos: Long?): Unit = synchronized(lock) {
+        if (!valid(ticket)) return@synchronized
+        trial?.predictions?.query(ticket!!, commitToken, outcome, warmth, available,
+            elapsedNanos, initializationNanos, queryNanos)
+    }
+
     private fun eligible(info: EditorInfo?): Boolean = active && trial != null &&
         mutableState.value.phase == TypingTestPhase.Typing && info != null && info === editor &&
         info.packageName == BuildConfig.APPLICATION_ID && info.fieldId == fieldId &&
@@ -331,16 +388,19 @@ object TypingTestSession {
             return null
         }
         if (!supported) {
+            current.predictions.invalidateScope()
             current.unsupported.add("unsupported_key")
             if (!current.firstFrozen) current.rawKind = TypingTestInputKind.UNKNOWN
         }
         if (current.settings.toString() != currentSettings().toString()) {
+            current.predictions.invalidateScope()
             current.unsupported.add("settings_changed_during_trial")
             if (!current.firstFrozen) current.rawKind = TypingTestInputKind.UNKNOWN
         }
         val belongsToRawAttempt = letter != null && !current.firstFrozen
         if (belongsToRawAttempt) current.pendingRawKeys++
         if (backspace) {
+            current.predictions.invalidateScope()
             current.backspaces++
             freezeFirstAttempt(current)
         }
@@ -400,6 +460,7 @@ object TypingTestSession {
             finishedAtNanos))
         if (ticket.belongsToRawAttempt) current.pendingRawKeys = (current.pendingRawKeys - 1).coerceAtLeast(0)
         if (!schemaSupported) {
+            current.predictions.invalidateScope()
             if (ticket.belongsToRawAttempt) current.rawKind = TypingTestInputKind.UNKNOWN
             current.unsupported.add("not_full_chinese_rime")
             if (ticket.letter != null && ticket.letterOrdinal <= current.firstLetters.length &&
@@ -479,8 +540,15 @@ object TypingTestSession {
 
     fun markUnsupported(info: EditorInfo?, reason: String) = synchronized(lock) {
         if (eligible(info)) trial?.let { current ->
+            if (reason == "prediction_context_edited") {
+                current.predictions.invalidateScope()
+                return@synchronized // Prediction-only guard; do not reclassify legacy raw evidence.
+            }
             if (reason == "non_typing_action") freezeFirstAttempt(current)
             current.unsupported.add(reason.take(64))
+            // Normal candidate selection and optional snapshot errors do not edit the field.
+            if (reason !in setOf("non_typing_action", "candidate_snapshot_failed"))
+                current.predictions.invalidateScope()
         }
     }
 
@@ -577,7 +645,11 @@ object TypingTestSession {
                 current.unsupported.all { it == "non_typing_action" } &&
                 current.selectedRaw == current.prompt.pinyin && final == current.prompt.text,
             probeQueries = current.probeQueries.toList(), firstAttemptOmittedLetterCount = current.firstOmittedLetters,
-            rawAttemptInputKind = current.rawKind ?: qualification(current))
+            rawAttemptInputKind = current.rawKind ?: qualification(current),
+            predictionCommits = current.predictions.commits,
+            predictionEvents = current.predictions.events,
+            predictionQueries = current.predictions.queries,
+            predictionOmittedRecordCount = current.predictions.omittedRecordCount)
         inputs.add(input)
         trialMetadata.add(JSONObject().put("settings", current.settings)
             .put("session_exclusions", JSONArray(current.unsupported.toList()))
@@ -675,6 +747,7 @@ object TypingTestSession {
             .put("boundary_settling", prefs.touchBoundarySettling.getValue())
             .put("personalization", prefs.pinyinTouchPersonalization.getValue())
             .put("candidate_promotion", prefs.pinyinTouchPromotion.getValue())
+            .put("next_word_prediction", prefs.localNextWordPrediction.getValue())
     }
 
     /** Prescribed, explicitly completed labels only. Reading never trains or applies a profile. */
@@ -687,12 +760,15 @@ object TypingTestSession {
         val unavailable = reasons.filter { it.key.startsWith("ProbeUnavailable") }.sumOf { it.value }
         val timeouts = reasons.filter { it.key == "ProbeOverBudget" || it.key == "ProbeTimeout" ||
             it.key == "ProbeColdInitializationOverBudget" }.sumOf { it.value }
-        return when {
+        val touchWarning = when {
             unavailable > 0 -> "触点纠错查询不可用 $unavailable 次；这些请求没有产生建议，请先查看触点纠错自检。" +
                 if (timeouts > 0) "另有 $timeouts 次查询超时。" else ""
             timeouts > 0 -> "触点纠错查询超时 $timeouts 次；对应建议已丢弃，不能视作纠错成功。"
             else -> null
         }
+        val predictionWarning = context?.let { TypingTestPredictionReport.warning(it,
+            TypingTestMetrics.summarize(results).predictionMetrics) }
+        return listOfNotNull(touchWarning, predictionWarning).takeIf { it.isNotEmpty() }?.joinToString("\n")
     }
 
     private fun summary(results: List<TypingTestTrialResult>): String {
@@ -782,7 +858,8 @@ object TypingTestSession {
             "首轮资格在输入时冻结；后续删改不抹掉当时的失败。早退格前缀只比较已输入位置，未知后缀不计漏字。\n" +
             "不可评分原因（各指标可重叠）：$exclusionText\n" +
             "简拼、分段上屏、外部输入和无法确认的片段不参与对应评分。\n" +
-            "练习不会自动训练；只有点击应用校准才导入已确认样本。"
+            "练习不会自动训练；只有点击应用校准才导入已确认样本。" +
+            (context?.let { "\n\n" + TypingTestPredictionReport.summary(it, aggregate.predictionMetrics) } ?: "")
     }
 
     private fun saveReport(aborted: Boolean) {
@@ -806,6 +883,12 @@ object TypingTestSession {
             .put("query_warning", queryWarning(mutableState.value.results) ?: JSONObject.NULL)
             .put("alternative_measurement", "explicit_touch_offer_lifecycle_full_prompt_target")
             .put("alternative_display_measurement", "displayed_requires_visible_ui_callback")
+            .put("prediction_measurement", "test_editor_only_successful_commit_bound_offer_lifecycle")
+            .put("prediction_draw_measurement", "actual_commit_success_to_first_full_body_dispatch_draw_ns_not_hardware_frame")
+            .put("prediction_savings_measurement", "estimated_prescribed_pinyin_letter_keys_not_actual_total_taps")
+            .put("prediction_target_metadata", "evaluation_only_never_passed_to_predictor_or_learning")
+            .put("prediction_summary", predictionMetricsJson(
+                TypingTestMetrics.summarize(mutableState.value.results).predictionMetrics))
             .put("stage_measurements", JSONObject()
                 .put("SendKey", "native_send_key_call_ns")
                 .put("TouchSearch", "touch_alternative_search_ns")
@@ -857,7 +940,9 @@ object TypingTestSession {
         inputs.forEachIndexed { i, input ->
             val result = mutableState.value.results[i]
             val row = JSONObject().put("prompt_id", input.prompt.id).put("target", input.prompt.text)
-                .put("target_pinyin", input.prompt.pinyin).put("input_kind", input.inputKind.name)
+                .put("target_pinyin", input.prompt.pinyin)
+                .put("target_pinyin_syllables", JSONArray(input.prompt.pinyinSyllables))
+                .put("input_kind", input.inputKind.name)
                 .put("first_attempt_pinyin", input.firstAttemptPinyin ?: JSONObject.NULL)
                 .put("first_attempt_complete", input.firstAttemptComplete)
                 .put("first_attempt_omitted_letters", input.firstAttemptOmittedLetterCount)
@@ -916,6 +1001,27 @@ object TypingTestSession {
                         .put("within_budget", query.withinBudget).put("native_within_budget", query.nativeWithinBudget)
                         .put("failure_reason", query.failureReason ?: JSONObject.NULL)) }
                 })
+                .put("prediction_commits", JSONArray().apply {
+                    input.predictionCommits.forEach { commit -> put(JSONObject()
+                        .put("commit_token", commit.commitToken).put("success", commit.success)
+                        .put("committed_monotonic_ns", commit.committedAtNanos)
+                        .put("scope_reliable", commit.scopeReliable)) }
+                })
+                .put("prediction_events", JSONArray().apply {
+                    input.predictionEvents.forEach { event -> put(JSONObject()
+                        .put("commit_token", event.commitToken).put("offer_token", event.offerToken)
+                        .put("kind", event.kind.name).put("warmth", event.warmth.name)
+                        .put("visible_indices", JSONArray(event.visibleIndices))
+                        .put("selected_index", event.selectedIndex ?: JSONObject.NULL)
+                        .put("success", event.success ?: JSONObject.NULL)
+                        .put("commit_to_draw_ns", event.commitToDrawNanos ?: JSONObject.NULL)
+                        .put("target_matched", event.targetMatched ?: JSONObject.NULL)
+                        .put("estimated_pinyin_letter_keys", event.estimatedPinyinLetterKeys ?: JSONObject.NULL)
+                        .put("unscored_reason", event.unscoredReason ?: JSONObject.NULL)) }
+                })
+                .put("prediction_queries", predictionQueriesJson(input.predictionQueries))
+                .put("prediction_omitted_record_count", input.predictionOmittedRecordCount)
+                .put("prediction_metrics", predictionMetricsJson(result.predictionMetrics))
                 .put("alternative_events", JSONArray().apply {
                     input.alternativeEvents.forEach { event -> put(JSONObject()
                         .put("offer_token", event.offerToken).put("kind", event.kind.name)
@@ -999,6 +1105,49 @@ object TypingTestSession {
                     } }
             }
         }
+    }
+
+    private fun predictionQueriesJson(queries: List<TypingTestPredictionQuery>) = JSONArray().apply {
+        queries.forEach { query -> put(JSONObject().put("commit_token", query.commitToken)
+            .put("outcome", query.outcome).put("warmth", query.warmth.name)
+            .put("available", query.available ?: JSONObject.NULL)
+            .put("elapsed_ns", query.elapsedNanos ?: JSONObject.NULL)
+            .put("initialization_ns", query.initializationNanos ?: JSONObject.NULL)
+            .put("native_query_ns", query.queryNanos ?: JSONObject.NULL)) }
+    }
+
+    private fun predictionMetricsJson(metrics: TypingTestPredictionMetrics) = JSONObject().apply {
+        put("successful_commits", metrics.successfulCommitCount).put("failed_commits", metrics.failedCommitCount)
+        put("published", metrics.publishedCount).put("drawn", metrics.drawnCount)
+        put("selected", metrics.selectedCount).put("adopted", metrics.adoptedCount)
+        fun fraction(key: String, value: TypingTestFraction) {
+            put(key, JSONObject().put("numerator", value.numerator).put("denominator", value.denominator)
+                .put("rate", value.value ?: JSONObject.NULL))
+        }
+        fraction("commit_draw_coverage", metrics.commitDrawCoverage)
+        fraction("adoption_rate", metrics.adoptionRate)
+        fraction("adoption_draw_coverage", metrics.adoptionDrawCoverage)
+        fraction("target_hit_rate", metrics.targetHitRate)
+        fraction("target_scoring_coverage", metrics.targetScoringCoverage)
+        fraction("savings_coverage", metrics.savingsCoverage)
+        put("estimated_pinyin_letter_keys", if (metrics.savingsCoverage.numerator > 0)
+            metrics.estimatedPinyinLetterKeys else JSONObject.NULL)
+        put("unscored_reasons", JSONObject(metrics.unscoredReasons))
+        put("query_outcomes", JSONObject(metrics.queryOutcomes))
+        put("omitted_records", metrics.omittedRecordCount)
+        fun latency(value: TypingTestLatency) = JSONObject().put("samples", value.sampleCount)
+            .put("p50_ns", value.p50Nanos ?: JSONObject.NULL).put("p95_ns", value.p95Nanos ?: JSONObject.NULL)
+            .put("maximum_ns", value.maximumNanos ?: JSONObject.NULL)
+            .put("invalid_samples", value.invalidSampleCount).put("omitted_samples", value.omittedSampleCount)
+            .put("measurement", value.measurement)
+        put("commit_to_draw_latency", latency(metrics.drawLatency))
+        put("commit_to_draw_latency_by_warmth", JSONObject().apply {
+            metrics.drawLatencyByWarmth.forEach { (warmth, value) -> put(warmth.name, latency(value)) }
+        })
+        put("commit_to_draw_samples", JSONArray().apply {
+            metrics.drawLatencySamples.forEach { sample -> put(JSONObject()
+                .put("warmth", sample.warmth.name).put("elapsed_ns", sample.elapsedNanos)) }
+        })
     }
 
     private fun finite(value: Float): Any = if (value.isFinite()) value.toDouble() else JSONObject.NULL

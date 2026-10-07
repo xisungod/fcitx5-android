@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.candidates.CandidateItemUi
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateOffer
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOffer
 import java.util.WeakHashMap
 import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
@@ -34,6 +35,7 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
         private set
 
     private var touchOffer: PinyinTouchCandidateOffer? = null
+    private var predictionOffer: NextWordPredictionOffer? = null
     internal var entries: List<HorizontalCandidateEntry> = emptyList()
         private set
     internal var renderGeneration = 0L
@@ -41,6 +43,7 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
     internal var onRawSelect: (Int) -> Unit = {}
     internal var onRawLongClick: (Int, CandidateWord, View) -> Unit = { _, _, _ -> }
     internal var onTouchSelect: (Long) -> Unit = {}
+    internal var onPredictionSelect: (Long, Int) -> Unit = { _, _ -> }
     internal var onCandidatesLayoutRequested: () -> Unit = {}
     private val holderBindings = WeakHashMap<CandidateViewHolder, Binding>()
 
@@ -56,13 +59,22 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
     @SuppressLint("NotifyDataSetChanged")
     private fun render() {
         renderGeneration++
-        entries = horizontalCandidateEntries(candidates, touchOffer)
+        entries = horizontalCandidateEntries(candidates, touchOffer, predictionOffer)
         notifyDataSetChanged()
     }
 
     fun setTouchCandidate(offer: PinyinTouchCandidateOffer?) {
+        if (offer != null) predictionOffer = null
         if (offer == touchOffer) return
         touchOffer = offer
+        render()
+    }
+
+    fun setPredictionOffer(offer: NextWordPredictionOffer?) {
+        val accepted = offer?.takeIf { candidates.isEmpty() && touchOffer == null }
+            ?.let { it.copy(candidates = it.candidates.toList()) }
+        if (accepted == predictionOffer) return
+        predictionOffer = accepted
         render()
     }
 
@@ -72,12 +84,14 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
         this.candidates = data
         this.total = total
         this.touchOffer = offer
+        predictionOffer = null
         render()
     }
 
     override fun getItemCount() = entries.size
 
     fun appendCandidates(data: Array<CandidateWord>, total: Int) {
+        predictionOffer = null
         candidates += data
         this.total = total
         render()
@@ -116,11 +130,18 @@ open class HorizontalCandidateViewAdapter(val theme: Theme) :
                 holder.itemView.setOnLongClickListener(null)
                 holder.itemView.isLongClickable = false
             }
+            is HorizontalCandidateEntry.Prediction -> {
+                holder.update(-1, CandidateWord("", entry.text, ""))
+                holder.itemView.contentDescription = entry.text
+                holder.itemView.setOnLongClickListener(null)
+                holder.itemView.isLongClickable = false
+            }
         }
         holder.itemView.setOnClickListener {
             if (isCurrent(binding, holder.bindingAdapterPosition)) when (entry) {
                 is HorizontalCandidateEntry.Raw -> onRawSelect(entry.nativeIndex)
                 is HorizontalCandidateEntry.Touch -> onTouchSelect(entry.offer.token)
+                is HorizontalCandidateEntry.Prediction -> onPredictionSelect(entry.token, entry.index)
             }
         }
         onCandidatesLayoutRequested()

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="next_word_prediction_section">Next-word suggestions</string>
+    <string name="local_next_word_prediction">Suggest words after committing text</string>
+    <string name="local_next_word_prediction_summary">Offline suggestions. Tap to insert; Space and Enter keep their normal actions.</string>
+    <string name="next_word_prediction_privacy_title">Suggestions and privacy</string>
+    <string name="next_word_prediction_privacy_summary">Disabled in sensitive fields. Suggestions do not learn personal input.</string>
+    <string name="next_word_prediction_privacy_message">Uses offline dictionaries to suggest next words after you commit text. Tap a suggestion to insert it. Space and Enter never choose a next-word suggestion.\n\nSuggestions are disabled in password and other sensitive fields. This suggestion feature does not learn personal habits or save input records.</string>
+</resources>

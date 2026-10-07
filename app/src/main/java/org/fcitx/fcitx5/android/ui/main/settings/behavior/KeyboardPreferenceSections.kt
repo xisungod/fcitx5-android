@@ -21,6 +21,7 @@ internal object KeyboardPreferenceSections {
     const val TOUCH_DIAGNOSTIC_EXPORT_KEY = "touch_diagnostic_export"
     const val TOUCH_DIAGNOSTIC_CLEAR_KEY = "touch_diagnostic_clear"
     const val PINYIN_TOUCH_PROFILE_CLEAR_KEY = "pinyin_touch_profile_clear"
+    const val NEXT_WORD_PREDICTION_HELP_KEY = "local_next_word_prediction_help"
 
     private data class Section(
         val page: Page,
@@ -45,6 +46,8 @@ internal object KeyboardPreferenceSections {
                 listOf(soundOnKeyPress.key, soundOnKeyPressVolume.key)),
             Section(Page.Feedback, "keyboard_haptic_details", R.string.axiang_keyboard_haptic_details,
                 listOf(buttonPressVibrationMilliseconds.key, buttonPressVibrationAmplitude.key)),
+            Section(Page.Typing, "typing_next_word_prediction", R.string.next_word_prediction_section,
+                listOf(localNextWordPrediction.key, NEXT_WORD_PREDICTION_HELP_KEY)),
             Section(Page.Typing, "typing_touch_correction", R.string.pinyin_touch_correction_section,
                 listOf(pinyinDownOrder.key, pinyinTouchAlternatives.key,
                     pinyinTouchPromotion.key,

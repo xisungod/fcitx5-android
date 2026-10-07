@@ -114,9 +114,21 @@ class InputView(
         commonKeyActionListener.clearPinyinTapFeedback()
     }
 
-    private val windowManager = InputWindowManager()
+    private val windowManager = InputWindowManager().apply {
+        onWindowChanged = { service.refreshNextWordPrediction() }
+    }
     private val kawaiiBar = KawaiiBarComponent()
     private val horizontalCandidate = HorizontalCandidateComponent()
+
+    internal fun showNextWordPrediction(
+        offer: org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOffer?
+    ) {
+        horizontalCandidate.setPredictionOffer(offer)
+        kawaiiBar.setNextWordPredictionVisible(offer != null && offer.candidates.isNotEmpty())
+    }
+
+    internal fun nextWordPredictionSurfaceVisible(): Boolean =
+        visibility == View.VISIBLE && windowManager.currentWindow === keyboardWindow
     private val keyboardWindow = KeyboardWindow()
     private val symbolPicker = symbolPicker()
     private val emojiPicker = emojiPicker()
@@ -499,6 +511,9 @@ class InputView(
             }
             else -> {}
         }
+        if (it is FcitxEvent.CandidateListEvent || it is FcitxEvent.ClientPreeditEvent ||
+            it is FcitxEvent.InputPanelEvent || it is FcitxEvent.IMChangeEvent ||
+            it is FcitxEvent.StatusAreaEvent) service.refreshNextWordPrediction()
     }
 
     fun updateSelection(start: Int, end: Int) {

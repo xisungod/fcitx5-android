@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="typing_test_prediction_help">To measure next-word suggestions, commit short parts of the target (for example: tomorrow → together → eat). Only this active test field is measured; practice does not train predictions. Once the full target is committed, the intended next word is unknown.</string>
+    <string name="typing_test_prediction_report_help">Prediction usage is separate from raw pinyin accuracy. Estimated savings count prescribed pinyin letter keys, not measured total taps. Latency ends after complete visible candidate text is drawn; it is not hardware screen presentation time.</string>
+    <string name="typing_test_prediction_title">Next-word suggestions · separate measurements</string>
+    <string name="typing_test_prediction_counts">Accepted commits %1$d · rejected commits %2$d\nPublished %3$d · drawn %4$d · selected %5$d · adopted %6$d</string>
+    <string name="typing_test_prediction_coverage">Commit-to-draw coverage: %1$s\nDrawn offer adoption: %2$s\nDraw evidence for adopted offers: %3$s\nAdopted suggestions matching target: %4$s\nTarget scoring coverage: %5$s</string>
+    <string name="typing_test_prediction_savings">Estimated pinyin letter keys avoided: %1$s\nSavings scoring coverage: %2$s</string>
+    <string name="typing_test_prediction_no_samples">— (no eligible evidence)</string>
+    <string name="typing_test_prediction_fraction">%1$.1f%% (%2$d/%3$d)</string>
+    <string name="typing_test_prediction_latency">%1$s commit → visible draw: P50 %2$s · P95 %3$s (%4$d samples; %5$d invalid)</string>
+    <string name="typing_test_prediction_all">All</string>
+    <string name="typing_test_prediction_cold">Cold</string>
+    <string name="typing_test_prediction_warm">Warm</string>
+    <string name="typing_test_prediction_cache">Cached</string>
+    <string name="typing_test_prediction_unknown">Unknown</string>
+    <string name="typing_test_prediction_query">%1$s query calls: %2$d · total P95 %3$s · initialization P95 %4$s · native query P95 %5$s</string>
+    <string name="typing_test_prediction_outcomes">Query outcomes: %1$s</string>
+    <string name="typing_test_prediction_reasons">Unscored prediction evidence: %1$s</string>
+    <string name="typing_test_prediction_limits">%1$d prediction records omitted at the limit; measurements use retained evidence.</string>
+    <string name="typing_test_prediction_warning">Next-word prediction had %1$d unavailable or failed queries and %2$d timeouts. These requests produced no usable suggestion; they are not accuracy misses. Check next-word prediction status.</string>
+    <string name="typing_test_prediction_empty_reasons">None in retained evidence</string>
+</resources>

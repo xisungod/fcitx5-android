@@ -59,6 +59,14 @@ class AXiangSettingsHomeTest {
         assertNotNull(ui.root.findViewWithTag<View>("settings-about"))
     }
 
+    @Test fun nextWordSearchOpensEverydayTypingSettings() = fixture { ui, routes ->
+        ui.search.setText("下一词")
+        val row = ui.root.findViewWithTag<View>("settings-typing")
+        assertNotNull(row)
+        row.performClick()
+        assertEquals(listOf(SettingsRoute.Typing), routes)
+    }
+
     @Test fun everyHomeDestinationNavigatesAndRendersAtPhoneWidth() = fixture { ui, routes ->
         ui.destinations.forEach { entry ->
             val row = ui.root.findViewWithTag<View>("settings-${entry.id}")

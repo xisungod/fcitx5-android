@@ -684,6 +684,16 @@ class CommonKeyActionListener :
                     null
                 }
             }
+            val keepsPredictionContext = when (action) {
+                is FcitxKeyAction -> source == KeyActionListener.Source.Keyboard &&
+                    action.states == KeyStates.Virtual && action.act.singleOrNull()?.let { it in 'a'..'z' } == true
+                is SymAction -> source == KeyActionListener.Source.Keyboard &&
+                    action.states == KeyStates.Virtual && action.sym.sym in listOf(
+                        FcitxKeyMapping.FcitxKey_space, FcitxKeyMapping.FcitxKey_Return)
+                is SelectTouchCandidateAction -> true
+                else -> false
+            }
+            service.invalidateNextWordPrediction(clearContext = !keepsPredictionContext)
             val epoch = editorEpoch
             val feedbackAction = action is RestorePinyinTapAction || action is ConfirmPinyinTapAction
             val sequence = if (feedbackAction) -1L else pinyinTapRuntime.nextAction()
@@ -723,12 +733,12 @@ class CommonKeyActionListener :
             }
             if (touchFeaturesEnabled()) pinyinTouchModels.preload(service.lifecycleScope)
             when (action) {
-                is FcitxKeyAction -> service.postFcitxJob {
+                is FcitxKeyAction -> service.postPredictionFcitxJob(observation) {
                     withTypingTestKey(typingTestTicket, editor) {
                         sendPinyinTap(action, source, editor, epoch, sequence, touchSequence, observation)
                     }
                 }
-                is SelectTouchCandidateAction -> service.postFcitxJob {
+                is SelectTouchCandidateAction -> service.postPredictionFcitxJob(observation) {
                     selectedTouch?.let { selectReservedTouchCandidate(it, editor, epoch) }
                 }
                 is RestorePinyinTapAction -> service.postFcitxJob {
@@ -737,7 +747,7 @@ class CommonKeyActionListener :
                 is ConfirmPinyinTapAction -> service.postFcitxJob {
                     resolvePinyinFeedback(action.token, false, editor, epoch)
                 }
-                is SymAction -> service.postFcitxJob {
+                is SymAction -> service.postPredictionFcitxJob(observation) {
                     withTypingTestKey(typingTestTicket, editor) {
                         if (promotedDefault != null) {
                             // Resolution uses live Rime's normal selection path.

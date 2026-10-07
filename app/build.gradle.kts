@@ -22,6 +22,7 @@ android {
                 targets(
                     // jni
                     "native-lib",
+                    "axiangpredict",
                     // copy fcitx5 built-in addon libraries
                     "copy-fcitx5-modules",
                     // android specific modules

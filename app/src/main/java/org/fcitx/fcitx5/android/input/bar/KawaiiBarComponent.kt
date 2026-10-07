@@ -115,6 +115,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private var clipboardTimeoutJob: Job? = null
     private var pinyinFeedbackJob: Job? = null
     private var keyboardLayoutPopup: PopupMenu? = null
+    private var nextWordPredictionVisible = false
+    private var nativePreeditEmpty = true
+    private var nativeCandidatesEmpty = true
 
     private var isClipboardFresh: Boolean = false
     private var isInlineSuggestionPresent: Boolean = false
@@ -483,6 +486,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     fun setEffectKeyboard(keyboard: BaseKeyboard?) { view.keyboard = keyboard }
 
+    /** Predictions use the idle row without pretending to be native expandable candidates. */
+    fun setNextWordPredictionVisible(visible: Boolean) {
+        nextWordPredictionVisible = visible
+        barStateMachine.push(PreeditUpdated, PreeditEmpty to (nativePreeditEmpty && !visible))
+        barStateMachine.push(CandidatesUpdated, CandidateEmpty to (nativeCandidatesEmpty && !visible))
+    }
+
     override val view by lazy {
         RippleBarView(context).apply {
             backgroundColor =
@@ -539,6 +549,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         keyboardLayoutPopup?.dismiss()
+        nativePreeditEmpty = true
+        nativeCandidatesEmpty = true
+        setNextWordPredictionVisible(false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             idleUi.privateMode(info.imeOptions.hasFlag(EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
         }
@@ -552,11 +565,13 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
-        barStateMachine.push(PreeditUpdated, PreeditEmpty to empty)
+        nativePreeditEmpty = empty
+        barStateMachine.push(PreeditUpdated, PreeditEmpty to (empty && !nextWordPredictionVisible))
     }
 
     override fun onCandidateUpdate(data: CandidateListEvent.Data) {
-        barStateMachine.push(CandidatesUpdated, CandidateEmpty to data.candidates.isEmpty())
+        nativeCandidatesEmpty = data.candidates.isEmpty()
+        setNextWordPredictionVisible(false)
     }
 
     override fun onWindowAttached(window: InputWindow) {
@@ -575,6 +590,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onWindowDetached(window: InputWindow) {
         keyboardLayoutPopup?.dismiss()
+        setNextWordPredictionVisible(false)
         barStateMachine.push(WindowDetached)
     }
 

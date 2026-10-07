@@ -192,6 +192,7 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
         addButton(R.string.typing_test_full, "typing-test-start-full") { actions.start(20) }
         addText(note(R.string.typing_test_full_summary), 8, 16)
         addText(note(R.string.typing_test_privacy), 12, 8)
+        addText(note(R.string.typing_test_prediction_help), 8, 8)
         addReportActions(state.reportAvailable)
     }
 
@@ -291,6 +292,7 @@ class TypingTestUi(private val context: Context, private val actions: Actions) {
         }.also { addText(it) }
         addText(note(R.string.typing_test_unavailable_help), 14)
         addText(note(R.string.typing_test_alternative_help), 10)
+        addText(note(R.string.typing_test_prediction_report_help), 10)
         addText(note(R.string.typing_test_result_limitation), 10, 8)
         addText(note(R.string.typing_test_apply_calibration_help), 14)
         addButton(R.string.typing_test_apply_calibration, "typing-test-apply-calibration",

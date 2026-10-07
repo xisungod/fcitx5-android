@@ -42,6 +42,21 @@ class TypingSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().
         dictionaryImport.attach(screen, viewModel)
         touchDiagnostics.attach(screen)
         screen.addPreference(Preference(requireContext()).apply {
+            key = KeyboardPreferenceSections.NEXT_WORD_PREDICTION_HELP_KEY
+            setTitle(R.string.next_word_prediction_privacy_title)
+            setSummary(R.string.next_word_prediction_privacy_summary)
+            isIconSpaceReserved = false
+            isSingleLineTitle = false
+            setOnPreferenceClickListener {
+                AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.next_word_prediction_privacy_title)
+                    .setMessage(R.string.next_word_prediction_privacy_message)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+                true
+            }
+        })
+        screen.addPreference(Preference(requireContext()).apply {
             key = KeyboardPreferenceSections.PINYIN_TOUCH_PROFILE_CLEAR_KEY
             setTitle(R.string.pinyin_touch_profile_clear)
             isIconSpaceReserved = false

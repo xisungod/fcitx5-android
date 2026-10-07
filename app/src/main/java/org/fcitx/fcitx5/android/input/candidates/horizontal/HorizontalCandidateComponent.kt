@@ -3,6 +3,7 @@ package org.fcitx.fcitx5.android.input.candidates.horizontal
 
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.graphics.Canvas
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -14,7 +15,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxEvent
-import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateOffer
+import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOffer
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import timber.log.Timber
@@ -49,6 +50,11 @@ class HorizontalCandidateComponent :
     private var displayedTouchToken: Long? = null
     private var visibilityCheckPosted = false
     private var candidateSpelling: String? = null
+    private var drawnPredictionToken: Long? = null
+    private val drawnPredictionIndices = mutableSetOf<Int>()
+    internal var onPredictionDrawn: (Long, List<Int>, Long) -> Unit = { token, indices, atNanos ->
+        service.onNextWordPredictionDrawn(token, indices, atNanos)
+    }
     private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
     private val maxSpanCountPref by lazy {
         AppPrefs.getInstance().keyboard.run {
@@ -76,12 +82,15 @@ class HorizontalCandidateComponent :
         }.apply {
             onRawSelect = { index ->
                 commonKeyActionListener.invalidateTouchCandidates()
-                fcitx.launchOnReady { it.select(index) }
+                service.invalidateNextWordPrediction(clearContext = false)
+                service.postPredictionFcitxJob { select(index) }
             }
             onRawLongClick = { index, candidate, anchor ->
                 commonKeyActionListener.invalidateTouchCandidates()
+                service.invalidateNextWordPrediction(clearContext = false)
                 inputView.showCandidateActionMenu(index, candidate.text, anchor)
             }
+            onPredictionSelect = { token, index -> service.selectNextWordPrediction(token, index) }
             onTouchSelect = { token ->
                 commonKeyActionListener.listener.onKeyAction(
                     KeyAction.SelectTouchCandidateAction(token), KeyActionListener.Source.Keyboard)
@@ -91,7 +100,12 @@ class HorizontalCandidateComponent :
     }
     val layoutManager: LinearLayoutManager by lazy { LinearLayoutManager(context, RecyclerView.HORIZONTAL, false) }
     override val view: RecyclerView by lazy {
-        RecyclerView(context).apply {
+        object : RecyclerView(context) {
+            override fun dispatchDraw(canvas: Canvas) {
+                super.dispatchDraw(canvas)
+                reportDrawnPredictions()
+            }
+        }.apply {
             id = R.id.candidate_view
             itemAnimator = null
             overScrollMode = RecyclerView.OVER_SCROLL_NEVER
@@ -110,6 +124,43 @@ class HorizontalCandidateComponent :
     fun setTouchCandidate(offer: PinyinTouchCandidateOffer?) {
         adapter.setTouchCandidate(offer?.takeIf { it.originalSpelling == candidateSpelling })
         scheduleTouchVisibilityCheck()
+    }
+
+    fun setPredictionOffer(offer: NextWordPredictionOffer?) {
+        val previousToken = (adapter.entries.firstOrNull() as? HorizontalCandidateEntry.Prediction)?.token
+        adapter.setPredictionOffer(offer)
+        val acceptedToken = (adapter.entries.firstOrNull() as? HorizontalCandidateEntry.Prediction)?.token
+        if (acceptedToken != null && acceptedToken != previousToken) {
+            view.stopScroll()
+            layoutManager.scrollToPositionWithOffset(0, 0)
+        }
+    }
+
+    /** A layout or publication alone does not prove that the user saw a prediction. */
+    private fun reportDrawnPredictions() {
+        val first = adapter.entries.firstOrNull() as? HorizontalCandidateEntry.Prediction ?: return
+        if (!view.isShown || view.alpha <= 0f) return
+        if (first.token != drawnPredictionToken) {
+            drawnPredictionToken = first.token
+            drawnPredictionIndices.clear()
+        }
+        val viewport = Rect()
+        if (!view.getGlobalVisibleRect(viewport) || viewport.isEmpty) return
+        val indices = (0 until view.childCount).mapNotNull { childIndex ->
+            val child = view.getChildAt(childIndex)
+            val holder = view.getChildViewHolder(child) as? CandidateViewHolder ?: return@mapNotNull null
+            val binding = adapter.currentBinding(holder) ?: return@mapNotNull null
+            val entry = binding.entry as? HorizontalCandidateEntry.Prediction ?: return@mapNotNull null
+            val visible = Rect()
+            val body = Rect()
+            if (entry.token != first.token || !child.isShown || child.alpha <= 0f ||
+                !holder.ui.visibleTextBounds(visible) || !visible.intersect(viewport) ||
+                !holder.ui.mainTextBounds(body) || !visible.contains(body)) return@mapNotNull null
+            holder.bindingAdapterPosition to entry.index
+        }.sortedBy { it.first }.map { it.second }.filterNot { it in drawnPredictionIndices }
+        if (indices.isEmpty()) return
+        drawnPredictionIndices.addAll(indices)
+        onPredictionDrawn(first.token, indices, System.nanoTime())
     }
 
     /** Records only attached, laid-out visible slots, never the adapter's offscreen top three. */
@@ -135,13 +186,15 @@ class HorizontalCandidateComponent :
             // Only the first-screen contiguous prefix counts as completely readable.
             // A sliver, a clipped long phrase or a scrolled page cannot masquerade as top three.
             val fullyVisiblePrefix = visible.withIndex()
-                .takeWhile { (index, entry) -> entry.first == index && entry.third }
+                .takeWhile { (index, entry) -> entry.first == index && entry.third &&
+                    entry.second !is HorizontalCandidateEntry.Prediction }
                 .take(3).map { it.value }
             if (fullyVisiblePrefix.isNotEmpty()) commonKeyActionListener.onCandidatesDisplayed(
                 fullyVisiblePrefix.map { (_, entry, _) ->
                     when (entry) {
                         is HorizontalCandidateEntry.Raw -> entry.word.text
                         is HorizontalCandidateEntry.Touch -> entry.offer.text
+                        is HorizontalCandidateEntry.Prediction -> entry.text
                     }
                 }, candidateSpelling)
             visible.map { it.second }.filterIsInstance<HorizontalCandidateEntry.Touch>().firstOrNull()?.let { entry ->
@@ -153,6 +206,7 @@ class HorizontalCandidateComponent :
         }
     }
     private fun loadMoreIfNeeded() {
+        if (adapter.entries.firstOrNull() is HorizontalCandidateEntry.Prediction) return
         if (layoutManager.findLastVisibleItemPosition() < adapter.itemCount - 5) return
         val request = buffer.request() ?: return
         pageJob = service.lifecycleScope.launch {

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="next_word_prediction_section">联想输入</string>
+    <string name="local_next_word_prediction">上屏后联想下一词</string>
+    <string name="local_next_word_prediction_summary">离线运行，点选即可输入；空格和回车保持原有操作。</string>
+    <string name="next_word_prediction_privacy_title">联想与隐私</string>
+    <string name="next_word_prediction_privacy_summary">敏感输入框禁用；联想不学习个人输入。</string>
+    <string name="next_word_prediction_privacy_message">基于本机词库，在文字上屏后提供下一词建议。只有点选建议才会输入，空格和回车不会自动选择联想词。\n\n密码等敏感输入框中不运行联想。该联想功能不进行个性化学习，也不保存输入记录。</string>
+</resources>

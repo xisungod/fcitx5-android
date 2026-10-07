@@ -47,7 +47,7 @@ class SettingsHomeUi(private val context: Context, private val open: (SettingsRo
         Destination("feedback", R.string.ax_settings_feedback, R.string.ax_settings_feedback_summary,
             R.drawable.ic_baseline_tune_24, SettingsRoute.Feedback, "振动 震感 触感 触觉 haptic vibration volume"),
         Destination("typing", R.string.ax_settings_typing, R.string.ax_settings_typing_summary,
-            R.drawable.ic_baseline_list_alt_24, SettingsRoute.Typing, "词典 拼音 n l 模糊音 dictionary pinyin candidate"),
+            R.drawable.ic_baseline_list_alt_24, SettingsRoute.Typing, "词典 拼音 n l 模糊音 联想 下一词 dictionary pinyin candidate prediction next word"),
         Destination("typing-test", R.string.typing_test_title, R.string.typing_test_entry_summary,
             R.drawable.ic_baseline_keyboard_24, SettingsRoute.TypingTest, "测试 校准 准确度 邻键 test accuracy calibration"),
         Destination("touch-probe", R.string.touch_probe_self_check_title, R.string.touch_probe_self_check_summary,
