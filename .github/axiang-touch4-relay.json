@@ -1,0 +1,240 @@
+{
+  "format": "axiang-exact-public-git-blob-relay-v1",
+  "repository": "xisungod/fcitx5-android",
+  "source_commit": "5d496f38f2ee7762c3c359fb6f870309eb672d36",
+  "release_id": 405260378,
+  "release_tag": "axiang-touch-1.2-touch.4",
+  "identity_sha256": "af3c97fe9fa6e96b169303373115f671e64457f2aa433b5da46ae92b9273926f",
+  "apk_sha256": "a6f787993ee076551ed2f06ead15a9551fe62f5df81dfa1e862e49444ff344ab",
+  "signer_sha256": "ffede124b18d54af5d4cfa9f3a32504fa2ccc898563bc4816bacbe3e46ec0494",
+  "files": [
+    {
+      "kind": "apk",
+      "name": "AXiang-1.2-touch.4-arm64.apk",
+      "bytes": 268230058,
+      "sha256": "a6f787993ee076551ed2f06ead15a9551fe62f5df81dfa1e862e49444ff344ab",
+      "chunks": [
+        {
+          "offset": 0,
+          "bytes": 8388608,
+          "git_blob_sha": "7d1558cd9f1ef1f644e5d18622c1d06a621f319d",
+          "sha256": "1de0ee683c6f6e71c594539b4b166b0c829893d8d4161fa37b0d9dc257309610"
+        },
+        {
+          "offset": 8388608,
+          "bytes": 8388608,
+          "git_blob_sha": "67fd04adc954cb0591edc19f21e9b7be8d84aa42",
+          "sha256": "113a4d896a5225027da5a38716421ee9f514e0d139235341239794d31a23e606"
+        },
+        {
+          "offset": 16777216,
+          "bytes": 8388608,
+          "git_blob_sha": "2378e4100a9c9ab8ec0a2936f8fee30b92949414",
+          "sha256": "b14610c375224a5f8c5214fd9338f04e02c3148e371da3e19967797d0a3d19b8"
+        },
+        {
+          "offset": 25165824,
+          "bytes": 8388608,
+          "git_blob_sha": "03a29d53cce318eb58c3275260cbb92451d3508a",
+          "sha256": "94343f1172eaae6cff2dc56ba019d8213e0a85b3404cb28f18e86b7ac3e31d44"
+        },
+        {
+          "offset": 33554432,
+          "bytes": 8388608,
+          "git_blob_sha": "e2dcf95fef10a8da4f3617e88fc31a25841f7c47",
+          "sha256": "637f2c81e73295339eca5bb865e2e3ffc2ef1ebb615b80f0fea87db2eb3ad762"
+        },
+        {
+          "offset": 41943040,
+          "bytes": 8388608,
+          "git_blob_sha": "4d193f30eda3a2783207b3fee3009dfbad4c555e",
+          "sha256": "7e81a2e3f4ffe154df3167d48a8816d17f9c55a9d2507aae93af7e4dce3a1085"
+        },
+        {
+          "offset": 50331648,
+          "bytes": 8388608,
+          "git_blob_sha": "b8a08196931ccb785d5fc822149f279a78d886e0",
+          "sha256": "26c22e1577721e1a31eb5aa020875c784c6d9d657a02066d45821a4eb6afa22c"
+        },
+        {
+          "offset": 58720256,
+          "bytes": 8388608,
+          "git_blob_sha": "49780c0b780f025b0bb525917497fd336d6714c5",
+          "sha256": "e0f592b302a770f563f383526110c6129a8da13c5e41d43339b96a879555cdfd"
+        },
+        {
+          "offset": 67108864,
+          "bytes": 8388608,
+          "git_blob_sha": "ee91f8c33287475bfc2238ff657c6101e9a770a8",
+          "sha256": "a0943490ad7626d6eeb1e870712927655a60d8740b63aafc9b9987ff4f7be4f5"
+        },
+        {
+          "offset": 75497472,
+          "bytes": 8388608,
+          "git_blob_sha": "f5b1e929b7b7c049fe5a310127cef8b3e7698e91",
+          "sha256": "4b173def60f338f28f75d3efe545d28187fb3a6c93a20f6b1ecd45e8181d30bf"
+        },
+        {
+          "offset": 83886080,
+          "bytes": 8388608,
+          "git_blob_sha": "0351307afc8abed0212aa87eebf47bcf18e7192c",
+          "sha256": "cd3d42da5ebe3a42882634b99936968085f944517f11ea87057cf8c17a61b4d4"
+        },
+        {
+          "offset": 92274688,
+          "bytes": 8388608,
+          "git_blob_sha": "1bf64253290a9838e6d68c2f2233c9adcad508e6",
+          "sha256": "8de7171bb9983d5201706af50248d4f86b03d8c2e093d76f8c5c5d2d4bd0293e"
+        },
+        {
+          "offset": 100663296,
+          "bytes": 8388608,
+          "git_blob_sha": "704a86897e18c1d76de7d21f889ec33eca544ba4",
+          "sha256": "61d223629813a0525debfd5c115941d59a746fa2c4fc67ecc70bbacc308b952f"
+        },
+        {
+          "offset": 109051904,
+          "bytes": 8388608,
+          "git_blob_sha": "997848c67f3976b0c66caf341384f1bc257fd64e",
+          "sha256": "9cb00a60fb676ee2a5f172dd23f07113f95f60b1cee42dc18d77a4cbea1dcd71"
+        },
+        {
+          "offset": 117440512,
+          "bytes": 8388608,
+          "git_blob_sha": "8fde3a513ba6a93c8f4f07030542639a95606502",
+          "sha256": "1a994965d5dfa0aacdaf92e2d9513e41e0dab43217d5b18f59e5382aaf3737cc"
+        },
+        {
+          "offset": 125829120,
+          "bytes": 8388608,
+          "git_blob_sha": "7bfcd62c0551c1043a4d7e55f6e69b32eb154b55",
+          "sha256": "5a4478e60c8de65c5191c7d19b61e0fb1d172245e2a5b49478683ffcaecc9ac1"
+        },
+        {
+          "offset": 134217728,
+          "bytes": 8388608,
+          "git_blob_sha": "a3920700d8496629d067fa56e3820941a6657a32",
+          "sha256": "072fef20cc6e179b262c5152a056c5700348ace71f2b8d5749ddba39c422ad47"
+        },
+        {
+          "offset": 142606336,
+          "bytes": 8388608,
+          "git_blob_sha": "790082088fd1cc22bf89ff68c175c147f576bfc9",
+          "sha256": "f064a27556815ed2d2250331b57d1c949d71569f587d5bfd0e96d78c29988c2c"
+        },
+        {
+          "offset": 150994944,
+          "bytes": 8388608,
+          "git_blob_sha": "f3d4dbfb192239b3ee21b12187ae0acb0c407c87",
+          "sha256": "c12133a2532a2a0ad35436e5c7e11adeacf451e8b845892c10c56143b4cf4b47"
+        },
+        {
+          "offset": 159383552,
+          "bytes": 8388608,
+          "git_blob_sha": "e61b9f62952f3453b624a57364f964ba2bdb4b23",
+          "sha256": "e407a636248b54973634caf02b8f928c0146a326c0b466305d76a1e465107def"
+        },
+        {
+          "offset": 167772160,
+          "bytes": 8388608,
+          "git_blob_sha": "f06797e971aa36737ceacd714e992537b92f54c7",
+          "sha256": "a9fc40069708046f7d8d542e940fe377fec8c55374fd4d982d2dc61e74858ec8"
+        },
+        {
+          "offset": 176160768,
+          "bytes": 8388608,
+          "git_blob_sha": "09faa3de5e6f8c2460e7259c4ee469a8e2dbb252",
+          "sha256": "2c359a5ad62a35e681123f9e1748c9b90af9e4a29727fb1e97ee71a0ce010f67"
+        },
+        {
+          "offset": 184549376,
+          "bytes": 8388608,
+          "git_blob_sha": "fdd0d5e0594feab0b87b66da08b17defea37956a",
+          "sha256": "786899e3745dc0fc1ea30a96788001b7e73f6084789d5d78237c0de2216a5603"
+        },
+        {
+          "offset": 192937984,
+          "bytes": 8388608,
+          "git_blob_sha": "91a2ea149fcaf29d89432c46592633f31321d7d5",
+          "sha256": "fccb4a62de7b5189054fc1e560e7f32a3e7e867d4addebdeead319c82b984594"
+        },
+        {
+          "offset": 201326592,
+          "bytes": 8388608,
+          "git_blob_sha": "bba41c19fce457bc2562fb7b86ef29844b02ecc3",
+          "sha256": "dec708838e59cfc607489abff944ca8bc2d73b5a860cdcb77bf126e91407b0df"
+        },
+        {
+          "offset": 209715200,
+          "bytes": 8388608,
+          "git_blob_sha": "f82367e203aec9de78a8d50ed707c8dd1ee8a465",
+          "sha256": "285769ca71befc33d6da365ef28363021c89568c6a3edeb1e9d7e11d599ccb79"
+        },
+        {
+          "offset": 218103808,
+          "bytes": 8388608,
+          "git_blob_sha": "74d84f9430277a1b5d59be2f97aee135bd795990",
+          "sha256": "65502629777153d3c2b81c43fb286c3622d56f3c8595052ce71fb3eb818364a3"
+        },
+        {
+          "offset": 226492416,
+          "bytes": 8388608,
+          "git_blob_sha": "118196e30c47c8a5a95c2aa6cf5eeab2782348f8",
+          "sha256": "dfe46932ed11ef0a1fb43e7dea9d9de2fdc14fec50d7b97e4a9979d1a98b4fa2"
+        },
+        {
+          "offset": 234881024,
+          "bytes": 8388608,
+          "git_blob_sha": "4a1c0d4126c804a31864b2c337fb99a7d862e576",
+          "sha256": "e5ec7f3c59f0f35613721ff1ec8af207f0dc1ddced939913aa37809104d7544b"
+        },
+        {
+          "offset": 243269632,
+          "bytes": 8388608,
+          "git_blob_sha": "2257c75247aa6bfc0bfebccafb0334e539c359b2",
+          "sha256": "1014ac5092499a92c30808d4837ecce464f90c97d2a4fd2b7491502bbac5f2ab"
+        },
+        {
+          "offset": 251658240,
+          "bytes": 8388608,
+          "git_blob_sha": "a15acdce90e0e0cc6e7536715c185353cd7e9e3e",
+          "sha256": "6720bfa22cc745d06219505bc749e7382ef68147a0ceeb5f1db7060e5fd04245"
+        },
+        {
+          "offset": 260046848,
+          "bytes": 8183210,
+          "git_blob_sha": "d27315c3f52db75d45ac4a628a3b1ebeea898dc2",
+          "sha256": "b5a08278380eee40df872923b47b5ef35e685ea7fac5245766c5fc78e62705f2"
+        }
+      ]
+    },
+    {
+      "kind": "metadata",
+      "name": "metadata.zip",
+      "bytes": 148892,
+      "sha256": "51dd9bbe9713730ae91591e97c82856d57a736680792cb49afca2aa555c9fca2",
+      "chunks": [
+        {
+          "offset": 0,
+          "bytes": 148892,
+          "git_blob_sha": "98d7c21490e203e05829d944e08264640ea5c4a5",
+          "sha256": "51dd9bbe9713730ae91591e97c82856d57a736680792cb49afca2aa555c9fca2"
+        }
+      ]
+    }
+  ],
+  "public_files": [
+    "AXiang-1.2-touch.4-arm64.apk",
+    "GUIDE.zh-CN.md",
+    "SHA256SUMS.txt",
+    "build-verification.json",
+    "full-junit-reports.zip",
+    "prebuilt-manifest.json",
+    "source-patch-manifest.json",
+    "source-snapshot.json",
+    "typing-test-source.patch",
+    "unit-test-summary.json"
+  ],
+  "binary_objects_referenced_by_commit": false,
+  "contains_signing_key_or_user_logs": false
+}
