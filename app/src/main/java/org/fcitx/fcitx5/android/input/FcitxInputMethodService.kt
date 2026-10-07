@@ -73,6 +73,7 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceProvider
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.prediction.NextWordSuggestionBackend
 import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionController
 import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionRuntime
 import org.fcitx.fcitx5.android.input.prediction.NextWordPredictionPrivacyPolicy
@@ -327,6 +328,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         LibimeNextWordPredictor(File(DataManager.dataDir, "usr/share/libime/zh_CN.lm"))
     }
     private val nextWordBackend by nextWordBackendDelegate
+    private val nextWordSuggestions by lazy {
+        NextWordSuggestionBackend(
+            nativeQuery = { text, limit -> nextWordBackend.query(text, limit) },
+            loadIndex = {
+                assets.open("typing/next_word_completions.tsv").use { it.readBytes() }
+            })
+    }
     private var nextWordNativeCandidateCount = -1
     private fun nextWordEnvironment(): NextWordPredictionRuntime.Environment {
         val native = if (::fcitx.isInitialized) fcitx.runImmediately {
@@ -353,7 +361,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
     private val nextWordControllerDelegate = lazy {
         NextWordPredictionController(lifecycleScope, ::nextWordEnvironment,
-            predict = { text, limit -> nextWordBackend.query(text, limit) },
+            predict = { text, limit -> nextWordSuggestions.query(text, limit) },
             closePredictor = { if (nextWordBackendDelegate.isInitialized()) nextWordBackend.close() },
             callbacks = NextWordPredictionController.Callbacks(
                 onCommitted = { event ->
@@ -386,7 +394,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                         event.anchor.origin.observation as? TypingTestObservationTicket,
                         event.anchor.commitToken, event.outcome.name, predictionWarmth(event.result),
                         event.result?.available, event.result?.elapsedNanos,
-                        event.result?.initializationNanos, event.result?.queryNanos)
+                        event.result?.initializationNanos, event.result?.queryNanos,
+                        event.result?.completionAvailable, event.result?.completionInitializationNanos,
+                        event.result?.completionFailureReason)
                 }))
     }
     private val nextWordController by nextWordControllerDelegate

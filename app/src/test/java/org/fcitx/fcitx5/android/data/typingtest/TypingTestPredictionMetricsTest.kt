@@ -337,6 +337,54 @@ class TypingTestPredictionMetricsTest {
             it.kind == TypingTestPredictionEventKind.Drawn }.visibleIndices)
     }
 
+    @Test fun unavailableCompletionIndexPreservesWorkingNativeFallbackAndActualEvidence() {
+        val recorder = TypingTestPredictionRecorder(prompt)
+        val observation = Any()
+        offer(recorder, observation)
+        choose(recorder, observation)
+        recorder.query(observation, 1L, "Published", TypingTestPredictionWarmth.Cold,
+            true, 100L, 70L, 20L, completionAvailable = false,
+            completionInitializationNanos = 10L, completionFailureReason = "CompletionIndexMissing")
+        val result = metrics(recorder)
+        assertEquals(1, result.queryOutcomes["Published"])
+        assertNull(result.queryOutcomes["Unavailable"])
+        val query = result.queryRecords.single()
+        assertEquals(true, query.available)
+        assertEquals(false, query.completionAvailable)
+        assertEquals(10L, query.completionInitializationNanos)
+        assertEquals("CompletionIndexMissing", query.completionFailureReason)
+        // The real base suggestion can still be correct; the query flag never invents correctness.
+        assertEquals(TypingTestFraction(1, 1), result.targetHitRate)
+        assertEquals(1, result.adoptedCount)
+    }
+
+    @Test fun unobservedCompletionFieldsRemainUnknownAndQueryOnlyNeverCreatesPerfectAccuracy() {
+        val recorder = TypingTestPredictionRecorder(prompt)
+        val observation = Any()
+        recorder.commit(observation, 1L, true, "你", 100L)
+        recorder.query(observation, 1L, "Published", TypingTestPredictionWarmth.Warm,
+            true, 10L, 0L, 10L) // Existing callers retain the old signature.
+        val result = metrics(recorder)
+        val query = result.queryRecords.single()
+        assertNull(query.completionAvailable)
+        assertNull(query.completionInitializationNanos)
+        assertNull(query.completionFailureReason)
+        assertNull(result.targetHitRate.value)
+        assertNull(result.savingsCoverage.value)
+        assertNull(result.drawLatency.p95Nanos)
+    }
+
+    @Test fun completionFailureRecordsOnlyFixedCodesRatherThanArbitraryExceptionOrContextText() {
+        val recorder = TypingTestPredictionRecorder(prompt)
+        val observation = Any()
+        recorder.commit(observation, 1L, true, "你", 100L)
+        recorder.query(observation, 1L, "Published", TypingTestPredictionWarmth.Warm,
+            true, 10L, 0L, 10L, false, 1L, "private-context-with-candidate-text")
+        val query = metrics(recorder).queryRecords.single()
+        assertEquals("CompletionIndexUnavailable", query.completionFailureReason)
+        assertFalse(query.toString().contains("private-context"))
+    }
+
     @Test fun conflictingExportedDuplicateEvidenceIsExcludedRatherThanScoredTwice() {
         val recorder = TypingTestPredictionRecorder(prompt)
         val observation = Any()

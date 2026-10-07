@@ -274,7 +274,11 @@ data class TypingTestPredictionQuery(
     val available: Boolean? = null,
     val elapsedNanos: Long? = null,
     val initializationNanos: Long? = null,
-    val queryNanos: Long? = null
+    val queryNanos: Long? = null,
+    /** Independent read-only completion index status; null means not observed. */
+    val completionAvailable: Boolean? = null,
+    val completionInitializationNanos: Long? = null,
+    val completionFailureReason: String? = null
 )
 
 data class TypingTestPredictionLatencySample(

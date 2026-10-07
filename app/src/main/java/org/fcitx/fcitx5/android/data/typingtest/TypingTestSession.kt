@@ -367,10 +367,13 @@ object TypingTestSession {
 
     fun recordPredictionQuery(ticket: TypingTestObservationTicket?, commitToken: Long,
         outcome: String, warmth: TypingTestPredictionWarmth, available: Boolean?,
-        elapsedNanos: Long?, initializationNanos: Long?, queryNanos: Long?): Unit = synchronized(lock) {
+        elapsedNanos: Long?, initializationNanos: Long?, queryNanos: Long?,
+        completionAvailable: Boolean? = null, completionInitializationNanos: Long? = null,
+        completionFailureReason: String? = null): Unit = synchronized(lock) {
         if (!valid(ticket)) return@synchronized
         trial?.predictions?.query(ticket!!, commitToken, outcome, warmth, available,
-            elapsedNanos, initializationNanos, queryNanos)
+            elapsedNanos, initializationNanos, queryNanos, completionAvailable,
+            completionInitializationNanos, completionFailureReason)
     }
 
     private fun eligible(info: EditorInfo?): Boolean = active && trial != null &&
@@ -1113,7 +1116,10 @@ object TypingTestSession {
             .put("available", query.available ?: JSONObject.NULL)
             .put("elapsed_ns", query.elapsedNanos ?: JSONObject.NULL)
             .put("initialization_ns", query.initializationNanos ?: JSONObject.NULL)
-            .put("native_query_ns", query.queryNanos ?: JSONObject.NULL)) }
+            .put("native_query_ns", query.queryNanos ?: JSONObject.NULL)
+            .put("completion_available", query.completionAvailable ?: JSONObject.NULL)
+            .put("completion_initialization_ns", query.completionInitializationNanos ?: JSONObject.NULL)
+            .put("completion_failure_reason", query.completionFailureReason ?: JSONObject.NULL)) }
     }
 
     private fun predictionMetricsJson(metrics: TypingTestPredictionMetrics) = JSONObject().apply {

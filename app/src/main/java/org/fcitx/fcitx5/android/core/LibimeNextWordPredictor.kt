@@ -15,7 +15,11 @@ internal class LibimeNextWordPredictor(private val modelFile: File) : AutoClosea
         val queryNanos: Long = 0,
         val coldInitialization: Boolean = false,
         val available: Boolean = true,
-        val failureReason: String? = null
+        val failureReason: String? = null,
+        val suggestionPool: List<String> = emptyList(),
+        val completionAvailable: Boolean? = null,
+        val completionInitializationNanos: Long = 0,
+        val completionFailureReason: String? = null
     )
 
     private var handle = 0L
@@ -29,8 +33,8 @@ internal class LibimeNextWordPredictor(private val modelFile: File) : AutoClosea
         var nativeNanos = 0L
         var cold = false
         fun result(values: List<String> = emptyList(), available: Boolean = true,
-                   reason: String? = null) = Result(values.toList(), System.nanoTime() - started,
-            loadNanos, initializeNanos, nativeNanos, cold, available, reason)
+                   reason: String? = null, pool: List<String> = emptyList()) = Result(values.toList(), System.nanoTime() - started,
+            loadNanos, initializeNanos, nativeNanos, cold, available, reason, pool.toList())
         if (closed) return result(available = false, reason = "Closed")
         if (context.isBlank() || maxCandidates !in 1..8) return result()
         // Count code points so supplementary Han characters are never split.
@@ -48,11 +52,14 @@ internal class LibimeNextWordPredictor(private val modelFile: File) : AutoClosea
                 if (handle == 0L) return result(available = false, reason = nativeStatus())
             }
             val begin = System.nanoTime()
-            val output = nativeQuery(handle, bounded.toByteArray(Charsets.UTF_8), maxCandidates)
+            val output = nativeQuery(handle, bounded.toByteArray(Charsets.UTF_8), 32)
             nativeNanos = System.nanoTime() - begin
             val status = nativeStatus()
             if (status != "Ready") result(available = false, reason = status)
-            else result(output.orEmpty().map { it.toString(Charsets.UTF_8) }.distinct().take(maxCandidates))
+            else {
+                val pool = output.orEmpty().map { it.toString(Charsets.UTF_8) }.distinct().take(32)
+                result(pool.take(maxCandidates), pool = pool)
+            }
         } catch (_: LinkageError) {
             result(available = false, reason = "NativeLinkageFailure")
         } catch (_: Exception) {

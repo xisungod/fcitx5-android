@@ -142,7 +142,8 @@ int main(int argc, char** argv) {
         const auto initialization = Nanos(begin);
         Require(handle > 0 && status_string() == "Ready", "Actual libime model initialized");
         Require(create(&environment, nullptr, reinterpret_cast<jbyteArray>(&path)) == 0 && status_string() == "AlreadyCreated", "Duplicate handle rejected");
-        std::vector<std::string> examples = {"你好", "你好啊", "小姑娘", "经常会", "改了么", "我想喝", "今天天气", "今天", "谢谢", "再见", "我正在打字", "明天去北京"};
+        std::vector<std::string> examples = {"你好", "你好啊", "小姑娘", "经常会", "改了么", "我想喝", "今天天气", "今天", "谢谢", "再见", "我正在打字", "明天去北京",
+                                             "做", "我想做", "你在做", "想", "今天要"};
         std::cout << "{\"passed\":true,\"runtime\":\"Android_bionic_actual_shared_libime_FakeJNI_not_ART\",\"library_load_nanos\":" << load
                   << ",\"cold_initialization_nanos\":" << initialization << ",\"qemu_process_rss_before_kib\":" << rss_before << ",\"queries\":[";
         int nonempty = 0;
@@ -152,6 +153,12 @@ int main(int argc, char** argv) {
             auto elapsed = Nanos(begin);
             Require(status_string() == "Ready" && output.size() <= 5, "Query remains ready and bounded");
             for (const auto& value : output) Require(axiang::predict::HanCandidate(value), "Real candidate remains Han text");
+            if (examples[index] == "你在做") Require(!output.empty() && output.front() == "什么", "Known-word segmentation puts what first after you are doing");
+            if (examples[index] == "我想做") Require(std::find(output.begin(), output.begin() + std::min<size_t>(3, output.size()), "什么") != output.begin() + std::min<size_t>(3, output.size()), "Known-word segmentation puts what in first three after I want to do");
+            if (examples[index] == "今天要") Require(output == std::vector<std::string>({"去", "和", "做", "不", "在"}), "Today stays a word rather than a forced character split");
+            if (examples[index] == "谢谢") Require(!output.empty() && output.front() == "你", "Thanks keeps its useful existing continuation");
+            if (examples[index] == "你好") Require(!output.empty() && output.front() == "吗", "Hello keeps its useful existing continuation");
+            if (examples[index] == "我想喝") Require(std::find(output.begin(), output.end(), "茶") != output.end() && std::find(output.begin(), output.end(), "咖啡") != output.end(), "I want to drink keeps real content-word continuations");
             if (!output.empty()) ++nonempty;
             if (index) std::cout << ',';
             std::cout << "{\"context\":\"" << examples[index] << "\",\"query_nanos\":" << elapsed << ",\"candidates\":[";
@@ -165,7 +172,14 @@ int main(int argc, char** argv) {
         }
         Bytes known("我想喝");
         Require(Values(query(&environment, nullptr, handle, reinterpret_cast<jbyteArray>(&known), 0)).empty(), "Zero query limit cannot search unboundedly");
-        Require(Values(query(&environment, nullptr, handle, reinterpret_cast<jbyteArray>(&known), 9)).empty(), "Over query limit rejected");
+        Require(Values(query(&environment, nullptr, handle, reinterpret_cast<jbyteArray>(&known), 99)).empty(), "Over query limit rejected");
+        Require(Values(query(&environment, nullptr, handle, reinterpret_cast<jbyteArray>(&known), 33)).empty(), "Limit above internal pool rejected");
+        Bytes doing("做");
+        const auto pool = Values(query(&environment, nullptr, handle, reinterpret_cast<jbyteArray>(&doing), 32));
+        Require(pool.size() <= 32 && std::find(pool.begin(), pool.end(), "什么") != pool.end(), "Full bounded Han pool retains a real model word beyond old raw top ten");
+        Require(std::find(pool.begin(), pool.end(), "准备") != pool.end() && std::find(pool.begin(), pool.end(), "生意") != pool.end(), "Pool contains real multi-character alternatives rather than hardcoded examples");
+        const auto one = Values(query(&environment, nullptr, handle, reinterpret_cast<jbyteArray>(&doing), 1));
+        Require(!pool.empty() && one == std::vector<std::string>{pool.front()}, "Display limit does not change the model search pool");
         Require(Values(query(&environment, nullptr, -1, reinterpret_cast<jbyteArray>(&known), 5)).empty() && status_string() == "HandleUnavailable", "Invalid handle rejected");
         std::thread worker([&] { Require(!Values(query(&environment, nullptr, handle, reinterpret_cast<jbyteArray>(&known), 5)).empty(), "Serial bridge accepts separate worker thread"); });
         worker.join();
@@ -174,8 +188,10 @@ int main(int argc, char** argv) {
         const auto recreated = create(&environment, nullptr, reinterpret_cast<jbyteArray>(&path));
         Require(recreated > handle, "Handle recreated without stale identity");
         destroy(&environment, nullptr, recreated);
-        Require(nonempty >= 8, "Public examples must show useful actual-model coverage");
+        Require(nonempty == static_cast<int>(examples.size()), "All public examples must show actual-model coverage");
         std::cout << "],\"nonempty_queries\":" << nonempty << ",\"checks\":" << checks
+                  << ",\"internal_candidate_pool_limit\":32,\"tokenization_plan_limit\":16,\"recent_greedy_tokens_refined\":3"
+                  << ",\"quality_regressions\":{\"you_are_doing_what_first\":true,\"want_to_do_what_top3\":true,\"today_word_preserved\":true,\"thanks_hello_preserved\":true,\"real_full_pool_retained\":true}"
                   << ",\"qemu_process_rss_after_kib\":" << Rss()
                   << ",\"art_verified\":false,\"phone_latency_verified\":false,\"model_learning\":false}\n";
 #endif

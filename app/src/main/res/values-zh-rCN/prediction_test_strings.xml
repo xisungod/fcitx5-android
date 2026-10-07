@@ -20,4 +20,5 @@
     <string name="typing_test_prediction_limits">联想记录达到上限，省略 %1$d 条；以上只统计已保留证据。</string>
     <string name="typing_test_prediction_warning">下一词联想查询不可用或失败 %1$d 次，超时 %2$d 次。对应请求没有产生可用建议，不计作准确率错误；请查看下一词联想状态。</string>
     <string name="typing_test_prediction_empty_reasons">保留证据中无此项</string>
+    <string name="typing_test_prediction_completion_warning">词组补全不可用 %1$d 次，已回退基础联想。</string>
 </resources>

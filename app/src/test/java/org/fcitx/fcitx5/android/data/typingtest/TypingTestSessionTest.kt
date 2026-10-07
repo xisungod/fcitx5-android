@@ -1171,5 +1171,43 @@ class TypingTestSessionTest {
         assertTrue(report.getString("prediction_draw_measurement").contains("not_hardware_frame"))
     }
 
+    @Test fun completionIndexFailureHasSeparateFallbackWarningAndNativeStaysAvailable() {
+        val info = start()
+        val observation = beginPrediction(info)
+        TypingTestSession.recordPredictionQuery(observation, 1L, "Published",
+            TypingTestPredictionWarmth.Cold, true, 20L, 10L, 7L,
+            completionAvailable = false, completionInitializationNanos = 3L,
+            completionFailureReason = "CompletionIndexInvalid")
+        TypingTestSession.completePhrase("你")
+        val state = TypingTestSession.state.value
+        assertEquals(context.getString(R.string.typing_test_prediction_completion_warning, 1), state.reportWarning)
+        assertNull(state.results.single().predictionMetrics.queryOutcomes["Unavailable"])
+        assertNull(state.results.single().predictionMetrics.targetHitRate.value)
+        val query = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials")
+            .getJSONObject(0).getJSONArray("prediction_queries").getJSONObject(0)
+        assertTrue(query.getBoolean("available"))
+        assertFalse(query.getBoolean("completion_available"))
+        assertEquals("Published", query.getString("outcome"))
+        assertEquals(3L, query.getLong("completion_initialization_ns"))
+        assertEquals("CompletionIndexInvalid", query.getString("completion_failure_reason"))
+    }
+
+    @Test fun missingCompletionObservationExportsNullAndDoesNotClaimPerfectPrediction() {
+        val info = start()
+        val observation = beginPrediction(info)
+        TypingTestSession.recordPredictionQuery(observation, 1L, "Published",
+            TypingTestPredictionWarmth.Warm, true, 10L, 0L, 10L)
+        TypingTestSession.completePhrase("你")
+        val state = TypingTestSession.state.value
+        assertNull(state.reportWarning)
+        assertNull(state.results.single().predictionMetrics.targetHitRate.value)
+        assertNull(state.results.single().predictionMetrics.savingsCoverage.value)
+        val query = JSONObject(TypingTestSession.exportReport()!!).getJSONArray("trials")
+            .getJSONObject(0).getJSONArray("prediction_queries").getJSONObject(0)
+        assertTrue(query.isNull("completion_available"))
+        assertTrue(query.isNull("completion_initialization_ns"))
+        assertTrue(query.isNull("completion_failure_reason"))
+    }
+
     companion object { private val FIELD_ID = R.id.typing_test_input }
 }

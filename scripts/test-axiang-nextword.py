@@ -51,7 +51,8 @@ def main():
         if digest(path) != record["sha256"] or path.stat().st_size != record["bytes"]:
             raise ValueError("Actual dependency/model differs: " + path.name)
     harness = a.root / "scripts/check-axiang-nextword.cpp"; text = a.root / "app/src/main/cpp/axiangpredict-text.cpp"
-    source_hashes = {str(path.relative_to(a.root)): digest(path) for path in (harness, text)}
+    source_hashes = {str(path.relative_to(a.root)): digest(path) for path in
+                     (harness, text, a.root / "scripts/test-axiang-nextword.py")}
     run(["g++", "-std=c++17", "-O2", "-DAXIANG_PREDICT_TEXT_ONLY", "-I", a.root / "app/src/main/cpp",
          harness, text, "-o", a.work / "host-text-check"], a.work / "host-compile.log")
     run([a.work / "host-text-check"], a.work / "host-check.log")

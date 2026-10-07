@@ -10,8 +10,14 @@ internal object TypingTestPredictionReport {
     fun warning(context: Context, metrics: TypingTestPredictionMetrics): String? {
         val failures = (metrics.queryOutcomes["Unavailable"] ?: 0) + (metrics.queryOutcomes["Failed"] ?: 0)
         val timeouts = metrics.queryOutcomes["Timeout"] ?: 0
-        return if (failures > 0 || timeouts > 0) context.getString(
+        val nativeWarning = if (failures > 0 || timeouts > 0) context.getString(
             R.string.typing_test_prediction_warning, failures, timeouts) else null
+        val completionFailures = metrics.queryRecords.count {
+            it.available == true && (it.completionAvailable == false || it.completionFailureReason != null)
+        }
+        val completionWarning = if (completionFailures > 0) context.getString(
+            R.string.typing_test_prediction_completion_warning, completionFailures) else null
+        return listOfNotNull(nativeWarning, completionWarning).takeIf { it.isNotEmpty() }?.joinToString("\n")
     }
 
     fun summary(context: Context, metrics: TypingTestPredictionMetrics): String {

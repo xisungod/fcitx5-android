@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "axiangpredict.h"
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <libime/core/languagemodel.h>
 #include <libime/core/prediction.h>
@@ -28,6 +29,8 @@ std::vector<size_t> Boundaries(const std::string& han) {
 
 class Predictor::Impl {
 public:
+    static constexpr size_t CandidatePool = 32;
+    static constexpr size_t TokenizationPlans = 16;
     explicit Impl(const std::string& path) : model(path.c_str()) {
         // Force the read-only prediction sidecar into the measured cold phase.
         // A missing/corrupt sidecar must not become a silently ready predictor.
@@ -44,7 +47,9 @@ public:
         const auto offsets = Boundaries(text);
         size_t end = offsets.size() - 1;
         std::vector<std::string> reversed;
-        while (end && reversed.size() < 8) {
+        // HanSuffix already bounds the entire context to 64 code points. Keep
+        // every original token; suffix refinement must not discard earlier text.
+        while (end) {
             size_t chosen = end - 1;
             for (size_t length = std::min<size_t>(8, end); length > 0; --length) {
                 const size_t start = end - length;
@@ -57,9 +62,60 @@ public:
         std::reverse(reversed.begin(), reversed.end());
         return reversed;
     }
+    std::vector<std::string> Refine(const std::vector<std::string>& original) const {
+        if (original.empty()) return original;
+        // Only the last three greedy tokens can change their boundaries. Each
+        // proposal splits a known token into two known words, retaining all
+        // preceding tokens and exactly the same Han text. Breadth first keeps
+        // single boundary changes ahead of combinations within the fixed cap.
+        const size_t fixed = original.size() - std::min<size_t>(3, original.size());
+        auto key = [](const std::vector<std::string>& words) {
+            std::string result;
+            for (const auto& word : words) { result += word; result += '|'; }
+            return result;
+        };
+        std::vector<std::vector<std::string>> plans{original};
+        std::unordered_set<std::string> seen{key(original)};
+        for (size_t plan = 0; plan < plans.size() && plans.size() < TokenizationPlans; ++plan) {
+            const auto words = plans[plan];
+            for (size_t index = words.size(); index > fixed && plans.size() < TokenizationPlans;) {
+                --index;
+                const auto offsets = Boundaries(words[index]);
+                for (size_t cut = 1; cut + 1 < offsets.size() && plans.size() < TokenizationPlans; ++cut) {
+                    const auto left = words[index].substr(0, offsets[cut]);
+                    const auto right = words[index].substr(offsets[cut]);
+                    if (!Known(left) || !Known(right)) continue;
+                    auto next = words;
+                    next[index] = left;
+                    next.insert(next.begin() + index + 1, right);
+                    if (seen.emplace(key(next)).second) plans.push_back(std::move(next));
+                }
+            }
+        }
+        auto score = [this](const std::vector<std::string>& words) {
+            std::vector<std::string_view> views;
+            views.reserve(words.size());
+            for (const auto& word : words) views.emplace_back(word);
+            return model.wordsScore(model.nullState(), views);
+        };
+        size_t best = 0;
+        auto best_score = score(original);
+        for (size_t plan = 1; plan < plans.size(); ++plan) {
+            const auto value = score(plans[plan]);
+            // Exact ties retain the original path rather than introducing a
+            // segmentation preference unrelated to the actual language model.
+            if (std::isfinite(value) && (!std::isfinite(best_score) || value > best_score)) {
+                best = plan;
+                best_score = value;
+            }
+        }
+        return plans[best];
+    }
     std::vector<std::string> Predict(const std::vector<std::string>& tokens, int limit) {
         if (tokens.empty() || !Known(tokens.back())) return {};
-        auto raw = prediction.predict(tokens, static_cast<size_t>(limit * 2));
+        // Model search and Han filtering use a stable bounded internal pool;
+        // the requested display size no longer truncates raw words prematurely.
+        auto raw = prediction.predict(tokens, CandidatePool);
         std::vector<std::string> result;
         std::unordered_set<std::string> seen;
         for (auto& word : raw) {
@@ -80,10 +136,10 @@ Predictor::Predictor(const std::string& model_file) {
 }
 Predictor::~Predictor() = default;
 std::vector<std::string> Predictor::Query(const std::string& context, int limit) {
-    if (limit <= 0 || limit > 8) return {};
+    if (limit <= 0 || limit > static_cast<int>(Impl::CandidatePool)) return {};
     const auto han = HanSuffix(context);
     if (han.empty()) return {};
-    const auto tokens = impl_->Tokens(han);
+    const auto tokens = impl_->Refine(impl_->Tokens(han));
     auto result = impl_->Predict(tokens, limit);
     if (!result.empty()) return result;
     // Whole committed sentences are not vocabulary tokens. Try at most three
@@ -95,6 +151,9 @@ std::vector<std::string> Predictor::Query(const std::string& context, int limit)
         const size_t start = offsets[length - size];
         const auto suffix = han.substr(start);
         if ((!tokens.empty() && suffix == tokens.back()) || !impl_->Known(suffix)) continue;
+        // The one full-context refinement above owns the 16-plan budget.
+        // Fallback only changes the queried trailing word, preserving preceding
+        // text without starting another tokenization search.
         auto alternate = impl_->Tokens(han.substr(0, start));
         alternate.push_back(suffix);
         ++calls;

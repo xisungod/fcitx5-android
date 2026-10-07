@@ -127,14 +127,21 @@ internal class TypingTestPredictionRecorder(private val prompt: TypingTestPrompt
     }
 
     fun query(observation: Any, commitToken: Long, outcome: String, warmth: TypingTestPredictionWarmth,
-        available: Boolean?, elapsedNanos: Long?, initializationNanos: Long?, queryNanos: Long?) {
+        available: Boolean?, elapsedNanos: Long?, initializationNanos: Long?, queryNanos: Long?,
+        completionAvailable: Boolean? = null, completionInitializationNanos: Long? = null,
+        completionFailureReason: String? = null) {
         val anchor = anchors[commitToken]?.takeIf { it.observation === observation && it.record.success }
             ?: return
         if (mutableQueries.any { it.commitToken == anchor.record.commitToken }) return
         if (mutableQueries.size >= MAX_COMMITS) { omittedRecordCount++; return }
         mutableQueries.add(TypingTestPredictionQuery(commitToken,
             outcome.takeIf { it in queryOutcomes } ?: "Unknown", warmth, available,
-            elapsedNanos, initializationNanos, queryNanos))
+            elapsedNanos, initializationNanos, queryNanos, completionAvailable,
+            completionInitializationNanos, completionFailureReason?.let {
+                // Only fixed diagnostic codes are exportable; never retain exception/context text.
+                if (it in setOf("CompletionIndexMissing", "CompletionIndexInvalid")) it
+                else "CompletionIndexUnavailable"
+            }))
     }
 
     private fun reserveEvent(): Boolean {

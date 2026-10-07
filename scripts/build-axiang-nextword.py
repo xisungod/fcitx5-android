@@ -15,8 +15,8 @@ import tarfile
 import urllib.request
 import zipfile
 
-BASE_APK_SHA = "4aff6ece07e080e90a3d3376171b69f7d315d93a17ad0fd9484c91f1a4d2ddf1"
-BASE_APK_BYTES = 268353151
+BASE_APK_SHA = "5f04bd499df1552878cf353cad882bad709837d6f3ad257edcd34cb26e6eb441"
+BASE_APK_BYTES = 268488294
 LIBIME_REV = "ecd23795ff7ea63a55a1b88fc4767946b999e102"
 FCITX_REV = "1e00551899f9d0fa5418d899f468b6e421401adf"
 ARCHIVES = {
@@ -90,7 +90,7 @@ def main():
     a = p.parse_args()
     a.root = a.root.resolve(); a.work = a.work.resolve(); a.work.mkdir(parents=True, exist_ok=True)
     if digest(a.apk) != BASE_APK_SHA or a.apk.stat().st_size != BASE_APK_BYTES:
-        raise ValueError("Expected the actual signed public touch.7.1 APK")
+        raise ValueError("Expected the actual signed public touch.8 APK")
     if subprocess.check_output(["git", "-C", str(a.root), "ls-tree", "HEAD", "lib/libime/src/main/cpp/libime"], text=True).split()[2] != LIBIME_REV:
         raise ValueError("Libime source ABI revision differs")
     if subprocess.check_output(["git", "-C", str(a.root), "ls-tree", "HEAD", "lib/fcitx5/src/main/cpp/fcitx5"], text=True).split()[2] != FCITX_REV:

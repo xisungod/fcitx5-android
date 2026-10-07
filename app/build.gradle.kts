@@ -99,6 +99,8 @@ fcitxComponent {
 
 generateDataDescriptor {
     symlinks.put("usr/share/rime-data/opencc", "usr/share/opencc")
+    // The prediction worker reads this index from APK assets directly.
+    excludes.add("typing/next_word_completions.tsv")
     // Sherpa reads its bundled assets directly. Do not copy another model set into
     // Fcitx's data directory or include it in the input-method configuration export.
     excludes.addAll(provider {

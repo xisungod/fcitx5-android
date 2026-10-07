@@ -20,4 +20,5 @@
     <string name="typing_test_prediction_limits">%1$d prediction records omitted at the limit; measurements use retained evidence.</string>
     <string name="typing_test_prediction_warning">Next-word prediction had %1$d unavailable or failed queries and %2$d timeouts. These requests produced no usable suggestion; they are not accuracy misses. Check next-word prediction status.</string>
     <string name="typing_test_prediction_empty_reasons">None in retained evidence</string>
+    <string name="typing_test_prediction_completion_warning">Phrase completion unavailable in %1$d queries; using base next-word predictions.</string>
 </resources>
