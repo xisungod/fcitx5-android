@@ -7,11 +7,7 @@ on:
       - reopened
       # pull request's head branch was updated
       - synchronize
-  # A pull request event does not always start a run. A push to a test branch,
-  # or the Run workflow button, builds the same tree without one.
-  push:
-    branches:
-      - "claude/**"
+  # The Run workflow button builds the selected branch without a pull request event.
   workflow_dispatch:
 
 permissions:
@@ -23,16 +19,19 @@ concurrency:
 
 jobs:
   build_pull_request:
-    # The bundled offline speech runtime is prepared for arm64 only. Use the
-    # same complete data/native checks as the development build on Linux.
+    # The touch series changes application code and resources only. Like touch.2 to
+    # touch.8, the test package reuses every asset and native library of the last
+    # published package byte for byte and compiles the checked-out Kotlin tree.
+    # full-source-build.yml keeps the complete native and data build.
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       BUILD_ABI: arm64-v8a
-      BUILD_VERSION_CODE: "1"
-      BUILD_VERSION_NAME: pr-${{ github.event.pull_request.number || 'branch' }}.${{ github.run_number }}
+      BUILD_VERSION_CODE: "14"
+      BUILD_VERSION_NAME: 1.2-touch.9
       BUILD_COMMIT_HASH: ${{ github.sha }}
-      XUANCAI_APP_SUFFIX: .axiang.pr.r${{ github.run_id }}
+      XUANCAI_APP_SUFFIX: .axiang.touch9
+      APP_LABEL: 阿翔 触点测试9
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -49,74 +48,94 @@ jobs:
       - name: Setup Android environment
         uses: android-actions/setup-android@v4
 
-      - name: Install CMake and Rime verification dependencies
+      - name: Install the pinned SDK tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Verify and extract the published touch.8.2.2 assets and native libraries
         run: |
-          sdkmanager --install "cmake;3.31.6"
-          sudo apt-get update -qq
-          sudo apt-get install -y extra-cmake-modules gettext cmake ninja-build pkg-config libboost-regex-dev libyaml-cpp-dev libmarisa-dev libopencc-dev libleveldb-dev liblua5.4-dev libgoogle-glog-dev python3-yaml
+          python3 scripts/prepare-axiang-touch9-build.py prepare \
+            --work "$RUNNER_TEMP/axiang-touch9" --label "$APP_LABEL"
 
-      - name: Prepare pinned Rime dictionaries and grammar
-        run: python3 scripts/prepare-xuancai-rime.py
-
-      - name: Prepare complete offline speech runtime and models
-        run: python3 scripts/prepare-axiang-asr.py
-
-      - name: Verify actual offline speech and punctuation inference
-        run: |
-          python3 -m venv "$RUNNER_TEMP/axiang-asr-check"
-          "$RUNNER_TEMP/axiang-asr-check/bin/pip" install sherpa-onnx==1.13.8 numpy
-          "$RUNNER_TEMP/axiang-asr-check/bin/python" scripts/check-axiang-asr.py --output "$RUNNER_TEMP/axiang-asr-checks.json"
-
-      - name: Precompile Rime dictionaries and verify native candidates
-        run: python3 scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/axiang-rime-host"
+      # Later builds of the same pull request keep one debug certificate, so a newer
+      # test package installs over the previous one.
+      - name: Reuse this pull request's debug certificate
+        uses: actions/cache@v5
+        with:
+          path: ~/.android/debug.keystore
+          key: axiang-touch9-debug-certificate-v1
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build the complete PR APK
-        # Validate the checked-out PR merge tree, including native code and data.
-        # Do not reconstruct an older checkout from the distribution patches.
-        run: ./gradlew :app:assembleDebug
+      - name: Build the test APK
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 \
+            -I "$RUNNER_TEMP/axiang-touch9/touch9.init.gradle" \
+            :app:assembleDebug \
+            -x :app:generateDataDescriptor \
+            -x :app:installFcitxComponent \
+            -x :app:deleteFcitxComponentExcludeFiles \
+            2>&1 | tee "$RUNNER_TEMP/axiang-touch9/build.log"
 
-      - name: Verify the signed APK and all bundled offline assets
+      - name: Verify the signature, alignment and the 380 reused assets and libraries
         run: |
           shopt -s nullglob
           apks=(app/build/outputs/apk/debug/*.apk)
           test "${#apks[@]}" -eq 1
           mkdir -p "$RUNNER_TEMP/axiang-pr"
-          cp "${apks[0]}" "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk"
+          apk="$RUNNER_TEMP/axiang-pr/AXiang-$BUILD_VERSION_NAME-arm64.apk"
+          cp "${apks[0]}" "$apk"
           sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
-          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk"
-          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk" \
-            --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" \
-            --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" \
-            --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE"
+          "$sdk_tools/apksigner" verify --verbose --print-certs "$apk"
+          "$sdk_tools/zipalign" -c -P 16 4 "$apk"
+          "$sdk_tools/aapt" dump badging "$apk" | head -n 3
+          python3 scripts/prepare-axiang-touch9-build.py verify \
+            --work "$RUNNER_TEMP/axiang-touch9" --apk "$apk"
           cd "$RUNNER_TEMP/axiang-pr"
-          sha256sum axiang-pr-arm64.apk > SHA256SUMS.txt
+          sha256sum "AXiang-$BUILD_VERSION_NAME-arm64.apk" > SHA256SUMS.txt
 
-      - name: Upload verified PR APK
+      - name: Upload the test APK
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-pr-${{ github.run_id }}-arm64
+          name: axiang-touch9-${{ github.run_id }}-arm64
           path: ${{ runner.temp }}/axiang-pr/*
           if-no-files-found: error
           retention-days: 14
 
-      # After the APK upload: a failing test still fails this job, but no longer withholds
-      # the package from the person who has to try it on a phone.
-      - name: Run JVM tests
-        # Validate the checked-out PR merge tree, including native code and data.
-        # Do not reconstruct an older checkout from the distribution patches.
-        run: ./gradlew :app:testDebugUnitTest
+      # After the APK upload: a failing check still fails this job, but no longer
+      # withholds the package from the person who has to try it on a phone.
+      - name: Verify the package contents, permissions and identity
+        run: |
+          sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
+          python3 scripts/verify-xuancai-rime-package.py \
+            "$RUNNER_TEMP/axiang-pr/AXiang-$BUILD_VERSION_NAME-arm64.apk" \
+            --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" --apksigner "$sdk_tools/apksigner" \
+            --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" \
+            --expected-app-label "$APP_LABEL" \
+            --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE"
 
-      - name: Upload test and native verification evidence
+      - name: Run JVM tests
+        if: always()
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 \
+            -I "$RUNNER_TEMP/axiang-touch9/touch9.init.gradle" \
+            :app:testDebugUnitTest \
+            -x :app:generateDataDescriptor \
+            -x :app:installFcitxComponent \
+            -x :app:deleteFcitxComponentExcludeFiles \
+            2>&1 | tee "$RUNNER_TEMP/axiang-touch9/test.log"
+
+      - name: Upload build log and test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-pr-checks-${{ github.run_id }}
+          name: axiang-touch9-checks-${{ github.run_id }}
           path: |
             app/build/test-results/testDebugUnitTest/
-            ${{ runner.temp }}/axiang-rime-host/checks/
-            ${{ runner.temp }}/axiang-asr-checks.json
+            ${{ runner.temp }}/axiang-touch9/build.log
+            ${{ runner.temp }}/axiang-touch9/test.log
+            ${{ runner.temp }}/axiang-touch9/prebuilt-manifest.json
           if-no-files-found: warn
           retention-days: 14
