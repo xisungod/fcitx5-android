@@ -13,10 +13,12 @@ internal sealed interface HorizontalCandidateEntry {
 }
 
 /**
- * A spatially verified first offer is resolved through its own selection path.
- * Other alternatives already in the engine's top three may move to second. Other
- * suggestions follow the original top three, so an unverified new word cannot
- * displace them. Only display duplicates disappear; raw words stay unchanged.
+ * A first-slot offer is resolved through its own selection path, whether or not the
+ * engine already listed that word: the promotion policy only grants it when the typed
+ * letters are not pinyin, so the literal first word is not something the user asked for.
+ * The literal words follow it unchanged. Without that grant, an alternative already in
+ * the engine's top three may move to second and any other suggestion follows the top
+ * three. Only display duplicates disappear; raw words stay unchanged.
  */
 internal fun horizontalCandidateEntries(
     words: Array<CandidateWord>, offer: PinyinTouchCandidateOffer?,
@@ -32,7 +34,7 @@ internal fun horizontalCandidateEntries(
     val touch = offer?.takeIf { it.text.isNotBlank() && it.text != first.text }
     val originalIndex = touch?.let { candidate -> words.indexOfFirst { it.text == candidate.text } }
     val insertionIndex = when {
-        touch?.promotedToFirst == true && originalIndex != null && originalIndex in 1..2 -> 0
+        touch?.promotedToFirst == true -> 0
         originalIndex != null && originalIndex in 1..2 -> 1
         else -> minOf(3, words.size)
     }

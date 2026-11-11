@@ -471,7 +471,12 @@ class CommonKeyActionListener :
                         return@withInputTransaction
                     }
                     if (!allowsTouchAlternatives(editor, epoch)) return@withInputTransaction
-                    val existing = getCandidates(0, 24).map { it.text }
+                    val existingWords = getCandidates(0, 24)
+                    val existing = existingWords.map { it.text }
+                    // Rime's own typo repair already leads the list. It ranks by word
+                    // frequency; this spatial suggestion then stays supplementary.
+                    val engineCorrectionLeads = existingWords.firstOrNull()?.comment
+                        ?.let { "纠错" in it || "糾錯" in it } == true
                     // Agreement with the literal first word needs no extra suggestion.
                     // A matching second/third word is still useful spatial evidence.
                     val candidate = result.candidates.firstOrNull()
@@ -484,6 +489,7 @@ class CommonKeyActionListener :
                     if (touchCandidateRuntime.publish(proposal, editor, candidate.text,
                             current.toString(), current.cursor, existing,
                             allowFirstPromotion = kbdPrefs.pinyinTouchPromotion.getValue() &&
+                                !engineCorrectionLeads &&
                                 RimeTouchProbePolicy.allowsFirstPromotion(
                                     context.resources.configuration.keyboard))) {
                         TypingTestSession.recordAlternative(observation, proposal.editorSequence,

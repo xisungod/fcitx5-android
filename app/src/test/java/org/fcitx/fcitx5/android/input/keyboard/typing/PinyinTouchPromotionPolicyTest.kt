@@ -17,7 +17,7 @@ class PinyinTouchPromotionPolicyTest {
     private val candidates = listOf("一人", "古人", "此人")
 
     private fun proposal(raw: String = "giren", alternative: String = "guren",
-                         spatial: Double = .6, path: Double = 4.0): PinyinMultiPathProposal {
+                         spatial: Double = -1.0, path: Double = 5.0): PinyinMultiPathProposal {
         val changes = raw.indices.filter { raw[it] != alternative[it] }
         return PinyinMultiPathProposal(raw, alternative, 2.0, 1.0, .95f, changes, 7, 3,
             PinyinTouchPromotionEvidence(path, changes.map {
@@ -25,11 +25,20 @@ class PinyinTouchPromotionPolicyTest {
             }))
     }
 
-    @Test fun `strict first slot can activate with independent spatial support and literal agreement`() {
+    @Test fun `letters that are not pinyin yield the first slot to a nearby-key spelling without calibration`() {
+        // The tap was inside the literal key (negative log ratio): no personal offsets involved.
         val decision = policy.evaluate(proposal(), "古人", candidates)
         assertEquals(PinyinTouchPromotionPolicy.Reason.Eligible, decision.reason)
         assertTrue(decision.promoteToFirst)
-        assertTrue(policy.evaluate(proposal(), "古人", listOf("一人", "此人", "古人")).promoteToFirst)
+        // The word need not already be among the literal candidates.
+        for (rawWords in listOf(listOf("一人", "此人", "古人"), listOf("其他", "第三"),
+            listOf("其他", "第三", "第四", "古人"), listOf("其他"))) {
+            assertTrue(rawWords.toString(), policy.evaluate(proposal(), "古人", rawWords).promoteToFirst)
+        }
+        assertTrue(policy.evaluate(proposal("nihso", "nihao", spatial = -1.2), "你好",
+            listOf("你和所哦")).promoteToFirst)
+        assertTrue(policy.evaluate(proposal("jibgchsnghui", "jingchanghui", spatial = -.3), "经常会",
+            listOf("机兵工厂商会")).promoteToFirst)
     }
 
     @Test fun `correct full spelling wins even against extreme scores including screenshot and gaileme`() {
@@ -59,16 +68,29 @@ class PinyinTouchPromotionPolicyTest {
             "几号啊", listOf("你好啊", "几号啊")).promoteToFirst)
     }
 
-    @Test fun `full syllables plus initials remain valid protected input including zj and xh`() {
-        for (raw in listOf("zj", "xh", "jch", "bj", "nijch", "jchnihao", "niwjintian",
-            "wozjengzaidazi", "xhoumochuqusanbu", "jibgchsnghui")) {
-            val alternative = raw.replaceRange(0, 1, if (raw[0] == 'z') "x" else "z")
-            assertFalse(raw, policy.evaluate(proposal(raw, alternative, 100.0, 100.0), "其他",
-                listOf("原词", "其他")).promoteToFirst)
+    @Test fun `initials and unfinished endings are never overridden however strong the scores`() {
+        for ((raw, alternative) in listOf("zj" to "zu", "xh" to "xu", "bj" to "bu", "jch" to "jue",
+            "nijch" to "nijiu", "jingch" to "jingcu", "changh" to "changu", "wom" to "won")) {
+            val decision = policy.evaluate(proposal(raw, alternative, 0.0, 100.0), "其他", listOf("原词", "其他"))
+            assertEquals(raw, PinyinTouchPromotionPolicy.Reason.ProtectedIncompletePrefix, decision.reason)
         }
-        assertEquals(PinyinTouchPromotionPolicy.Reason.ProtectedAbbreviation,
-            policy.evaluate(proposal("wozjengzaidazi", "wozhengzaidazi"), "我正在打字",
-                listOf("我自己而能够在打字", "我正在打字")).reason)
+    }
+
+    @Test fun `letters that also read as syllables plus initials need a tap close to the border`() {
+        for ((raw, alternative) in listOf("xhuan" to "shuan", "zhge" to "zhue",
+            "wozjengzaidazi" to "wozhengzaidazi", "nihso" to "nihao")) {
+            assertEquals(raw, PinyinTouchPromotionPolicy.Reason.ProtectedAbbreviation,
+                policy.evaluate(proposal(raw, alternative, spatial = -2.0), "其他", listOf("原词")).reason)
+            assertEquals(raw, PinyinTouchPromotionPolicy.Reason.Eligible,
+                policy.evaluate(proposal(raw, alternative, spatial = -1.4), "其他", listOf("原词")).reason)
+            // Such letters also need a clearly better spelling, not just any better one.
+            assertEquals(raw, PinyinTouchPromotionPolicy.Reason.ProtectedAbbreviation,
+                policy.evaluate(proposal(raw, alternative, spatial = -1.4, path = 3.9), "其他",
+                    listOf("原词")).reason)
+        }
+        assertTrue(policy.evaluate(proposal(spatial = -1.4, path = 2.1), "古人", candidates).promoteToFirst)
+        // No initials reading exists for these letters, so the general limit applies.
+        assertTrue(policy.evaluate(proposal(spatial = -2.9), "古人", candidates).promoteToFirst)
     }
 
     @Test fun `unfinished current syllables and unsupported spellings never promote`() {
@@ -83,15 +105,15 @@ class PinyinTouchPromotionPolicyTest {
         }
     }
 
-    @Test fun `mixed score confidence cannot substitute for missing or weaker spatial evidence`() {
+    @Test fun `scores cannot substitute for missing or implausible spatial evidence`() {
         val original = proposal()
         assertEquals(PinyinTouchPromotionPolicy.Reason.MissingSpatialEvidence,
             policy.evaluate(original.copy(promotionEvidence = null, modelConfidence = 1f), "古人", candidates).reason)
-        for (spatial in listOf(-3.0, 0.0, .29, Double.NaN, Double.POSITIVE_INFINITY)) {
+        for (spatial in listOf(-3.01, -100.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
             assertEquals(PinyinTouchPromotionPolicy.Reason.InsufficientSpatialAdvantage,
                 policy.evaluate(proposal(spatial = spatial, path = 100.0), "古人", candidates).reason)
         }
-        for (path in listOf(0.0, 2.99, Double.NaN, Double.POSITIVE_INFINITY)) {
+        for (path in listOf(0.0, 1.99, Double.NaN, Double.POSITIVE_INFINITY)) {
             assertEquals(PinyinTouchPromotionPolicy.Reason.InsufficientPathAdvantage,
                 policy.evaluate(proposal(path = path), "古人", candidates).reason)
         }
@@ -101,16 +123,16 @@ class PinyinTouchPromotionPolicyTest {
                 "古人", candidates).reason)
     }
 
-    @Test fun `novel words far ranks partial alternatives and English are not first-slot evidence`() {
-        for (rawWords in listOf(emptyList(), listOf("古人", "其他"), listOf("其他", "第三"),
-            listOf("其他", "第三", "第四", "古人"))) {
-            assertEquals(PinyinTouchPromotionPolicy.Reason.MissingLiteralAgreement,
-                policy.evaluate(proposal(), "古人", rawWords).reason)
-        }
+    @Test fun `many edits partial alternatives and non Chinese words are not first-slot evidence`() {
+        assertTrue(policy.evaluate(proposal("gireb", "guren"), "古人", candidates).promoteToFirst)
+        assertEquals(PinyinTouchPromotionPolicy.Reason.EditScope,
+            policy.evaluate(proposal("gorwb", "guren"), "古人", candidates).reason)
         assertEquals(PinyinTouchPromotionPolicy.Reason.NonChineseCandidate,
             policy.evaluate(proposal(), "古人", listOf("jungle", "古人")).reason)
         assertEquals(PinyinTouchPromotionPolicy.Reason.NonChineseCandidate,
             policy.evaluate(proposal(), "jing", listOf("一人", "jing")).reason)
+        assertEquals(PinyinTouchPromotionPolicy.Reason.NonChineseCandidate,
+            policy.evaluate(proposal(), "古人", emptyList()).reason)
         assertEquals(PinyinTouchPromotionPolicy.Reason.AlternativeNotFullPinyin,
             policy.evaluate(proposal(alternative = "gireg"), "古人", candidates).reason)
     }
@@ -135,16 +157,18 @@ class PinyinTouchPromotionPolicyTest {
         return result
     }
 
-    @Test fun `real search attaches spatial evidence and uniform contacts stay supplementary`() {
+    @Test fun `real search attaches spatial evidence and promotes without personal offsets`() {
         val uniform = trackerProposal(emptyMap())!!
         assertEquals("guren", uniform.alternativeSpelling)
         assertTrue(uniform.promotionEvidence!!.changedContacts.single().logAlternativeOverOriginal < 0.0)
-        assertEquals(PinyinTouchPromotionPolicy.Reason.InsufficientSpatialAdvantage,
-            policy.evaluate(uniform, "古人", candidates).reason)
+        assertTrue(policy.evaluate(uniform, "古人", candidates).promoteToFirst)
         val calibrated = trackerProposal(mapOf('u' to CenterOffset(.12f, 0f), 'i' to CenterOffset(.12f, 0f)))!!
         assertEquals("guren", calibrated.alternativeSpelling)
         assertTrue(policy.evaluate(calibrated, "古人", candidates).promoteToFirst)
-        assertNull(trackerProposal(mapOf('u' to CenterOffset(.12f, 0f), 'i' to CenterOffset(.12f, 0f)), center = true))
+        // A tap on the middle of the literal key never reaches the first slot.
+        assertNull(trackerProposal(emptyMap(), center = true))
+        val centered = trackerProposal(mapOf('u' to CenterOffset(.12f, 0f), 'i' to CenterOffset(.12f, 0f)), center = true)
+        if (centered != null) assertFalse(policy.evaluate(centered, "古人", candidates).promoteToFirst)
     }
 
     @Test fun `every directed shared-edge pair preserves complete literal spelling`() {

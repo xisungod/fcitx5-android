@@ -618,8 +618,15 @@ abstract class BaseKeyboard(
             .filter { it.visibility == View.VISIBLE }.mapNotNull { key ->
                 val text = (key.def as? KeyDef.Appearance.Text)?.displayText?.lowercase()
                 text?.singleOrNull()?.takeIf { it in 'a'..'z' }?.let { letter ->
-                    KeyCell(letter, (key.left + row.left).toFloat(), (key.top + row.top).toFloat(),
-                        (key.right + row.left).toFloat(), (key.bottom + row.top).toFloat())
+                    // An edge key expanded to the screen border keeps its drawn keycap where it was.
+                    // Describe that keycap, not the widened touch area: the spatial model measures
+                    // distance from the centre the user aims at. Taps in the added strip fall
+                    // outside this cell and are simply treated as unambiguous.
+                    val width = (key.right - key.left).toFloat()
+                    KeyCell(letter, key.left + row.left + width * key.layoutMarginLeft,
+                        (key.top + row.top).toFloat(),
+                        key.right + row.left - width * key.layoutMarginRight,
+                        (key.bottom + row.top).toFloat())
                 }
             }.toList()
     }

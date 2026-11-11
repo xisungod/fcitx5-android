@@ -1,12 +1,8 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 package org.fcitx.fcitx5.android.input.keyboard.typing
 
-import kotlin.math.abs
 import kotlin.math.exp
-import kotlin.math.hypot
 import kotlin.math.ln
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * One optional whole-spelling backup. Costs and confidence describe this model's
@@ -32,13 +28,19 @@ data class PinyinMultiPathProposal(
  * [nextAction], and [clear] on conversion, cursor movement, or unsupported edits.
  * Native before/after snapshots verify every change; uncertain history is dropped.
  *
- * There is no word model, beam, trie search, or engine query here. At most two
- * boundary contacts may differ in one bounded, exhaustively scored backup.
+ * There is no word model or engine query here. Each contact keeps its literal
+ * letter plus the nearest keys that remain spatially plausible; the search then
+ * scores every full-pinyin spelling those contacts allow.
  */
-class PinyinMultiPathTracker(
+class PinyinMultiPathTracker internal constructor(
     private val languageModel: NextLetterProbabilityModel,
-    syllables: Set<String>
+    syllables: Set<String>,
+    private val settings: PinyinMultiPathSettings,
+    private val maxSpatialLogDeficit: Double
 ) {
+    constructor(languageModel: NextLetterProbabilityModel, syllables: Set<String>) :
+        this(languageModel, syllables, PinyinMultiPathSettings(), MAX_SPATIAL_LOG_DEFICIT)
+
     private val inventory = PinyinSyllableInventory(syllables)
     private val contacts = ArrayList<PinyinPathContact>()
     private var literalSpelling = ""
@@ -183,7 +185,7 @@ class PinyinMultiPathTracker(
         if (actionSequence != sequence || actionSequence != lastProcessedSequence || contacts.isEmpty()) return null
         val identity = editorIdentity ?: return null
         return PinyinMultiPathSearch(literalSpelling, actionSequence, identity, contacts.toList(),
-            languageModel, inventory)
+            languageModel, inventory, settings)
     }
 
     /** A result is usable only for its exact snapshot and the still-current composition. */
@@ -203,6 +205,12 @@ class PinyinMultiPathTracker(
         return if (acceptSearch(search, result)) result.proposal else null
     }
 
+    /**
+     * The literal key first, then the nearest other keys whose likelihood for this DOWN
+     * point is within [maxSpatialLogDeficit] of it. No hard band around the border: a tap
+     * deeper inside a key simply carries a larger deficit, which the search must overcome
+     * with language evidence. The centre of a key leaves no plausible neighbour at all.
+     */
     private fun spatialChoices(evidence: PinyinTapEvidence, offsets: Map<Char, CenterOffset>): List<PinyinPathChoice> {
         val tap = evidence.tap
         fun originalOnly() = listOf(PinyinPathChoice(tap.original, 0.0))
@@ -212,27 +220,19 @@ class PinyinMultiPathTracker(
             evidence.cells.groupingBy { it.letter }.eachCount().any { it.value != 1 }) return originalOnly()
         val original = evidence.cells.firstOrNull { it.letter == tap.original } ?: return originalOnly()
         if (!original.contains(tap.downX, tap.downY)) return originalOnly()
-        if (tap.downX >= original.left + original.width * CORE_INSET &&
-            tap.downX <= original.right - original.width * CORE_INSET &&
-            tap.downY >= original.top + original.height * CORE_INSET &&
-            tap.downY <= original.bottom - original.height * CORE_INSET) return originalOnly()
-        val band = min(MAX_BOUNDARY_DP * tap.density, min(original.width, original.height) * CORE_INSET)
-        val neighbours = evidence.cells.filter { cell ->
-            cell.letter != tap.original && sharedBoundaryDistance(original, cell, tap.downX, tap.downY)
-                ?.let { it <= band } == true
-        }
-        // A contact near an unknown junction must not silently discard competitors.
-        if (neighbours.isEmpty() || neighbours.size > MAX_NEIGHBOURS_PER_TOUCH) return originalOnly()
-        val cells = listOf(original) + neighbours.sortedBy { it.letter }
-        val scores = cells.map { cell ->
-            spatialLogLikelihood(cell, tap.downX, tap.downY, offsets[cell.letter]) +
-                if (cell.letter == tap.original) ORIGINAL_LOG_BONUS else 0.0
-        }
+        val originalScore = spatialLogLikelihood(original, tap.downX, tap.downY, offsets[original.letter]) +
+            ORIGINAL_LOG_BONUS
+        val neighbours = evidence.cells.asSequence().filter { it.letter != tap.original }
+            .map { it to spatialLogLikelihood(it, tap.downX, tap.downY, offsets[it.letter]) }
+            .filter { it.second.isFinite() && originalScore - it.second <= maxSpatialLogDeficit }
+            .sortedWith(compareByDescending<Pair<KeyCell, Double>> { it.second }.thenBy { it.first.letter })
+            .take(MAX_NEIGHBOURS_PER_TOUCH).toList()
+        if (neighbours.isEmpty() || !originalScore.isFinite()) return originalOnly()
+        val scores = listOf(originalScore) + neighbours.map { it.second }
         val greatest = scores.maxOrNull()!!
         val logTotal = greatest + ln(scores.sumOf { exp(it - greatest) })
-        val choices = cells.mapIndexed { index, cell -> PinyinPathChoice(cell.letter, scores[index] - logTotal) }
-        return if (exp(choices[0].logSpatialProbability) >= MIN_UNAMBIGUOUS_SPATIAL_PROBABILITY)
-            originalOnly() else choices
+        return listOf(PinyinPathChoice(tap.original, originalScore - logTotal)) +
+            neighbours.map { PinyinPathChoice(it.first.letter, it.second - logTotal) }
     }
 
     private fun spatialLogLikelihood(cell: KeyCell, x: Float, y: Float, offset: CenterOffset?): Double {
@@ -247,46 +247,15 @@ class PinyinMultiPathTracker(
             ln(cell.width.toDouble() * SIGMA_X) - ln(cell.height.toDouble() * SIGMA_Y)
     }
 
-    /** Keys that share only a corner, or have a gap/overlap, are not neighbours. */
-    private fun sharedBoundaryDistance(a: KeyCell, b: KeyCell, x: Float, y: Float): Float? {
-        val epsilon = min(min(a.width, a.height), min(b.width, b.height)) * EDGE_EPSILON
-        val overlapTop = max(a.top, b.top)
-        val overlapBottom = min(a.bottom, b.bottom)
-        if (overlapBottom - overlapTop > epsilon) {
-            val edge = when {
-                abs(a.right - b.left) <= epsilon -> (a.right + b.left) / 2f
-                abs(b.right - a.left) <= epsilon -> (b.right + a.left) / 2f
-                else -> null
-            }
-            if (edge != null) return hypot(x - edge, y - y.coerceIn(overlapTop, overlapBottom))
-        }
-        val overlapLeft = max(a.left, b.left)
-        val overlapRight = min(a.right, b.right)
-        if (overlapRight - overlapLeft > epsilon) {
-            val edge = when {
-                abs(a.bottom - b.top) <= epsilon -> (a.bottom + b.top) / 2f
-                abs(b.bottom - a.top) <= epsilon -> (b.bottom + a.top) / 2f
-                else -> null
-            }
-            if (edge != null) return hypot(y - edge, x - x.coerceIn(overlapLeft, overlapRight))
-        }
-        return null
-    }
-
     companion object {
         const val MAX_CONTACTS = 64
-        const val MAX_AMBIGUOUS_CONTACTS = 15
-        // 1 original + 30 single changes + 4 * C(15, 2) pairs = 451, below 512.
-        const val MAX_ENUMERATED_PATHS = 451
-        private const val MAX_NEIGHBOURS_PER_TOUCH = 2
-        private const val CORE_INSET = 0.20f
-        private const val MAX_BOUNDARY_DP = 6f
+        private const val MAX_NEIGHBOURS_PER_TOUCH = 3
         private const val SIGMA_X = 0.32
         private const val SIGMA_Y = 0.30
-        private const val EDGE_EPSILON = 0.0001f
         private const val MAX_CENTER_OFFSET = 0.12f
         private const val ORIGINAL_LOG_BONUS = 0.26236426446749106
-        private const val MIN_UNAMBIGUOUS_SPATIAL_PROBABILITY = 0.90
+        /** exp(-4) is about 2 percent of the literal key's likelihood. */
+        internal const val MAX_SPATIAL_LOG_DEFICIT = 4.0
 
         /** Rime may insert spaces/apostrophes; neither changes the typed letters. */
         fun spellingAtEnd(text: String, cursor: Int): String? {

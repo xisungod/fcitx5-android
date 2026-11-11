@@ -12,7 +12,7 @@ import java.util.Collections
  * Loading must happen outside the per-key path. Parsing failures are surfaced to
  * the caller so the keyboard can keep literal input without a language model.
  */
-class PinyinTouchLanguageModel(reader: Reader) : NextLetterProbabilityModel {
+class PinyinTouchLanguageModel(reader: Reader) : ContextualNextLetterModel {
     private val probabilities: Map<String, FloatArray>
     val syllables: Set<String>
     private val syllablePrefixes: Set<String>
@@ -77,6 +77,18 @@ class PinyinTouchLanguageModel(reader: Reader) : NextLetterProbabilityModel {
             ?: segment.lastOrNull()?.let { probabilities[it.toString()] }
             ?: probabilities.getValue("-")
         return row.copyOf()
+    }
+
+    /** The same backoff [nextLetterProbabilities] applies to a supported prefix with this ending. */
+    override fun contextProbabilities(secondLast: Char?, last: Char?): FloatArray {
+        val context = when {
+            last == null -> "^"
+            secondLast == null -> "^$last"
+            else -> "$secondLast$last"
+        }
+        return probabilities[context]
+            ?: last?.let { probabilities[it.toString()] }
+            ?: probabilities.getValue("-")
     }
 
     private fun supportsFullPinyinPrefix(segment: String): Boolean {

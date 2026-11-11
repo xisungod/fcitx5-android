@@ -14,6 +14,15 @@ fun interface NextLetterProbabilityModel {
     fun nextLetterProbabilities(prefix: String): FloatArray?
 }
 
+/**
+ * A model whose distribution depends only on the last two letters of a supported
+ * full-pinyin prefix. A lattice can then share one row between every path with that ending.
+ */
+interface ContextualNextLetterModel : NextLetterProbabilityModel {
+    /** [secondLast] and [last] are null before the spelling has that many letters. Read-only result. */
+    fun contextProbabilities(secondLast: Char?, last: Char?): FloatArray
+}
+
 /** Hit rectangles and DOWN coordinates must share the keyboard's unanimated pixel space. */
 data class KeyCell(
     val letter: Char,

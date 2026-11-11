@@ -63,12 +63,12 @@ class PinyinMultiPathTrackerTest {
         assertEquals(listOf(2, 6), proposal.changedIndices)
         assertTrue(proposal.originalCost.isFinite())
         assertTrue(proposal.alternativeCost < proposal.originalCost)
-        assertTrue(proposal.modelConfidence >= .82f)
-        assertTrue(proposal.enumeratedPathCount <= 512)
+        assertTrue(proposal.modelConfidence >= .6f)
+        assertTrue(proposal.enumeratedPathCount > 0)
         assertTrue(tracker.matchesProposal(proposal.editorSequence, editor, formatted(raw), formatted(raw).length))
     }
 
-    @Test fun `center contacts are hard protected even under strong language evidence`() {
+    @Test fun `center contacts keep no neighbour even under strong language evidence`() {
         val tracker = tracker()
         assertNull(type(tracker, boundary = false))
         assertEquals(raw, tracker.rawSpelling)
@@ -82,10 +82,41 @@ class PinyinMultiPathTrackerTest {
         }
     }
 
-    @Test fun `third error cannot be repaired by a two substitution path`() {
+    @Test fun `a third boundary error is repaired in the same search`() {
         val tracker = tracker()
-        assertNull(type(tracker, "jibgchsnghyi"))
+        val proposal = type(tracker, "jibgchsnghyi")!!
+        assertEquals(corrected, proposal.alternativeSpelling)
+        assertEquals(listOf(2, 6, 10), proposal.changedIndices)
         assertEquals("jibgchsnghyi", tracker.rawSpelling)
+    }
+
+    @Test fun `a tap deeper inside the wrong key is still repaired when the letters are not pinyin`() {
+        // A quarter of a key from the border: outside the former 6dp band.
+        for (inset in listOf(7f, 15f, 25f)) {
+            val proposal = type(tracker(), inset = inset)
+            assertEquals("inset=$inset", corrected, proposal?.alternativeSpelling)
+        }
+        // Past the plausibility limit the neighbour is no longer a hypothesis at all.
+        assertNull(type(tracker(), inset = 45f))
+    }
+
+    @Test fun `correct full pinyin typed near borders is never given an alternative`() {
+        for (spelling in listOf("jingchanghui", "nihao", "women", "shijian", "zhongguo", "xiexie",
+            "meiguanxi", "jintiantianqibucuo", "woxiangqubeijing")) {
+            for (inset in listOf(.25f, 5f, 15f)) {
+                val tracker = tracker()
+                var proposal: PinyinMultiPathProposal? = null
+                for (i in spelling.indices) {
+                    val cell = cells.first { it.letter == spelling[i] }
+                    // Alternate sides so every contact has a plausible horizontal neighbour.
+                    val x = if (i % 2 == 0) cell.left + inset else cell.right - inset
+                    proposal = tracker.recordTap(tracker.nextAction(), editor, spelling.take(i), i,
+                        spelling.take(i + 1), i + 1,
+                        PinyinTapEvidence(TapEvidence(spelling[i], x, cell.centerY, 1f), cells))
+                }
+                assertNull("$spelling inset=$inset -> ${proposal?.alternativeSpelling}", proposal)
+            }
+        }
     }
 
     @Test fun `density normalized jitter retains the constructed double error backup`() {
@@ -120,12 +151,11 @@ class PinyinMultiPathTrackerTest {
         assertTrue(proposal.alternativeCost.isFinite())
     }
 
-    @Test fun `corner-only neighbours and touches outside the boundary band stay literal`() {
+    @Test fun `a key that only touches at a distant corner is not a neighbour`() {
         val b = cells.first { it.letter == 'b' }
         val cornerOnly = cells.filter { it.letter != 'n' } +
             KeyCell('n', b.right, b.bottom, b.right + 100f, b.bottom + 140f)
         assertNull(type(tracker(), geometry = cornerOnly))
-        assertNull(type(tracker(), inset = 7f))
     }
 
     @Test fun `unknown geometry and malformed distributions cannot create a backup`() {
@@ -156,12 +186,15 @@ class PinyinMultiPathTrackerTest {
         }
     }
 
-    @Test fun `excessive ambiguous contacts retain raw without pruning into a speculative path`() {
+    @Test fun `every contact may be ambiguous without a cap on their number`() {
+        // Sixteen boundary contacts, all already full pinyin: searched, nothing offered.
         val tracker = tracker()
-        val spelling = "ba".repeat(PinyinMultiPathTracker.MAX_AMBIGUOUS_CONTACTS + 1)
+        val spelling = "ba".repeat(16)
         assertNull(type(tracker, spelling))
         assertEquals(spelling, tracker.rawSpelling)
-        assertTrue(PinyinMultiPathTracker.MAX_ENUMERATED_PATHS <= 512)
+        val stats = tracker.evaluationStats!!
+        assertEquals(16, stats.ambiguousContactCount)
+        assertTrue(stats.attemptedPaths > 0)
     }
 
     @Test fun `queued older letters update literal history but cannot publish stale offers`() {
@@ -395,14 +428,14 @@ class PinyinMultiPathTrackerTest {
         assertNull(tracker.currentProposal)
     }
 
-    @Test fun `two alternatives at every allowed contact stay within exhaustive path cap`() {
-        // Synthetic equal-probability inventory exercises the largest search,
-        // including rare rows, without adding words to the production model.
+    @Test fun `search work stays linear in length when every contact has alternatives`() {
+        // Synthetic equal-probability inventory: every substitution is valid, so an
+        // exhaustive enumeration would be exponential. The lattice merges equal endings.
         val geometry = listOf(KeyCell('a', 0f, 0f, 100f, 100f),
             KeyCell('s', 100f, 0f, 200f, 100f), KeyCell('z', 100f, 100f, 200f, 200f))
         val tracker = PinyinMultiPathTracker(NextLetterProbabilityModel { FloatArray(26) { 1f / 26f } },
             setOf("a", "s", "z"))
-        val spelling = "s".repeat(PinyinMultiPathTracker.MAX_AMBIGUOUS_CONTACTS)
+        val spelling = "s".repeat(PinyinMultiPathTracker.MAX_CONTACTS)
         val tap = PinyinTapEvidence(TapEvidence('s', 100.25f, 99.75f, 1f), geometry)
         for (i in spelling.indices) {
             tracker.recordTap(tracker.nextAction(), editor, spelling.take(i), i,
@@ -410,11 +443,9 @@ class PinyinMultiPathTrackerTest {
         }
         val search = tracker.captureSearch(spelling.length.toLong())!!
         val result = search.evaluate()
-        assertEquals(PinyinMultiPathTracker.MAX_ENUMERATED_PATHS, result.evaluation.attemptedPaths)
-        assertEquals(result.evaluation.attemptedPaths, result.evaluation.validPaths)
-        assertEquals(15, result.evaluation.ambiguousContactCount)
-        assertTrue(result.evaluation.cacheHits > 0)
-        assertTrue(result.evaluation.modelQueries < result.evaluation.attemptedPaths * spelling.length)
+        assertEquals(spelling.length, result.evaluation.ambiguousContactCount)
+        // At most (state x last two letters x changed) endings per contact, three choices each.
+        assertTrue(result.evaluation.attemptedPaths <= spelling.length * 3 * 3 * 9 * 2)
         assertEquals(PinyinMultiPathEvaluation.Reason.InsufficientAdvantage, result.evaluation.reason)
         assertNull(result.proposal)
         assertEquals(spelling, tracker.rawSpelling)
