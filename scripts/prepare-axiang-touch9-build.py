@@ -143,7 +143,16 @@ gradle.beforeProject {{ p ->
         }}
         if (nativeInstaller) task.enabled = false
     }}
-    p.tasks.withType(Test).configureEach {{ maxHeapSize = '2g' }}
+    p.tasks.withType(Test).configureEach {{
+        maxHeapSize = '2g'
+        // The result files are only reachable as a download; keep each failure readable in the log.
+        testLogging {{
+            events 'failed'
+            exceptionFormat 'full'
+            showCauses true
+            showStackTraces true
+        }}
+    }}
     ['com.android.application', 'com.android.library'].each {{ androidPlugin ->
         p.plugins.withId(androidPlugin) {{
             p.extensions.getByName('androidComponents').finalizeDsl {{ dsl ->
