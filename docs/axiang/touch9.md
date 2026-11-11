@@ -27,3 +27,7 @@
 - 最后一个字母打成辅音（如 nihap）：会被当作未写完的音节，不纠正。
 - 超过 32 个字母的输入不查询备选。
 - 真机落点分布未知，以上阈值来自模拟。
+
+## 构建状态
+
+合并时 Android 侧改动（工具栏、键盘、设置、字符串）尚未经过完整构建，界面测试也未运行。touch.9 不改原生代码、词库和模型，测试包由 Pull Request 流程构建：按 touch.2 至 touch.8 的做法，逐字节复用已发布 touch.8.2.2 包内的 351 个资源文件和 29 个原生库（含 `libaxiangtouch.so`），只编译当前的 Kotlin 代码和资源（`scripts/prepare-axiang-touch9-build.py`）。测试包由 GitHub Actions 的调试证书签名，包名为 `org.fcitx.fcitx5.android.axiang.touch9`，与 touch.8.2.2 并存安装，不能覆盖升级。原先从源码完整构建的流程保留为手动的 `full-source-build.yml`，它目前在主机 Rime 整句纠错检查处失败，尚未修复。

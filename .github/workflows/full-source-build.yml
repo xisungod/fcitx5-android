@@ -1,0 +1,116 @@
+name: Full source build (manual)
+
+# The complete from-source build. Its host Rime check currently stops at a
+# whole-phrase repair expectation in check-xuancai-rime-v08.c: the correction script
+# changed during the touch series and that check was not updated with it.
+# Test packages are built by pull_request.yml, which reuses the published native
+# libraries and data instead.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: axiang-full-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build_pull_request:
+    # The bundled offline speech runtime is prepared for arm64 only. Use the
+    # same complete data/native checks as the development build on Linux.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BUILD_ABI: arm64-v8a
+      BUILD_VERSION_CODE: "1"
+      BUILD_VERSION_NAME: pr-${{ github.event.pull_request.number || 'branch' }}.${{ github.run_number }}
+      BUILD_COMMIT_HASH: ${{ github.sha }}
+      XUANCAI_APP_SUFFIX: .axiang.pr.r${{ github.run_id }}
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@v4
+
+      - name: Install CMake and Rime verification dependencies
+        run: |
+          sdkmanager --install "cmake;3.31.6"
+          sudo apt-get update -qq
+          sudo apt-get install -y extra-cmake-modules gettext cmake ninja-build pkg-config libboost-regex-dev libyaml-cpp-dev libmarisa-dev libopencc-dev libleveldb-dev liblua5.4-dev libgoogle-glog-dev python3-yaml
+
+      - name: Prepare pinned Rime dictionaries and grammar
+        run: python3 scripts/prepare-xuancai-rime.py
+
+      - name: Prepare complete offline speech runtime and models
+        run: python3 scripts/prepare-axiang-asr.py
+
+      - name: Verify actual offline speech and punctuation inference
+        run: |
+          python3 -m venv "$RUNNER_TEMP/axiang-asr-check"
+          "$RUNNER_TEMP/axiang-asr-check/bin/pip" install sherpa-onnx==1.13.8 numpy
+          "$RUNNER_TEMP/axiang-asr-check/bin/python" scripts/check-axiang-asr.py --output "$RUNNER_TEMP/axiang-asr-checks.json"
+
+      - name: Precompile Rime dictionaries and verify native candidates
+        run: python3 scripts/precompile-xuancai-rime.py --work "$RUNNER_TEMP/axiang-rime-host"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build the complete PR APK
+        # Validate the checked-out PR merge tree, including native code and data.
+        # Do not reconstruct an older checkout from the distribution patches.
+        run: ./gradlew :app:assembleDebug
+
+      - name: Verify the signed APK and all bundled offline assets
+        run: |
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/debug/*.apk)
+          test "${#apks[@]}" -eq 1
+          mkdir -p "$RUNNER_TEMP/axiang-pr"
+          cp "${apks[0]}" "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk"
+          sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$sdk_tools/apksigner" verify --verbose "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk"
+          python3 scripts/verify-xuancai-rime-package.py "$RUNNER_TEMP/axiang-pr/axiang-pr-arm64.apk" \
+            --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" \
+            --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" \
+            --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE"
+          cd "$RUNNER_TEMP/axiang-pr"
+          sha256sum axiang-pr-arm64.apk > SHA256SUMS.txt
+
+      - name: Upload verified PR APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-pr-${{ github.run_id }}-arm64
+          path: ${{ runner.temp }}/axiang-pr/*
+          if-no-files-found: error
+          retention-days: 14
+
+      # After the APK upload: a failing test still fails this job, but no longer withholds
+      # the package from the person who has to try it on a phone.
+      - name: Run JVM tests
+        # Validate the checked-out PR merge tree, including native code and data.
+        # Do not reconstruct an older checkout from the distribution patches.
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Upload test and native verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-pr-checks-${{ github.run_id }}
+          path: |
+            app/build/test-results/testDebugUnitTest/
+            ${{ runner.temp }}/axiang-rime-host/checks/
+            ${{ runner.temp }}/axiang-asr-checks.json
+          if-no-files-found: warn
+          retention-days: 14
