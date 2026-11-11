@@ -180,8 +180,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             true
         )
 
+        // On by default: otherwise the half-key strips beside A and L are dead zones
+        // where a tap aimed at those letters is dropped.
         val expandKeypressArea =
-            switch(R.string.expand_keypress_area, "expand_keypress_area", false)
+            switch(R.string.expand_keypress_area, "expand_keypress_area", true)
         val swipeSymbolDirection = enumList(
             R.string.swipe_symbol_behavior,
             "swipe_symbol_behavior",

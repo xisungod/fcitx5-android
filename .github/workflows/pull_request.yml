@@ -67,10 +67,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build the complete PR APK and run JVM tests
+      - name: Build the complete PR APK
         # Validate the checked-out PR merge tree, including native code and data.
         # Do not reconstruct an older checkout from the distribution patches.
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest
+        run: ./gradlew :app:assembleDebug
 
       - name: Verify the signed APK and all bundled offline assets
         run: |
@@ -88,6 +88,21 @@ jobs:
           cd "$RUNNER_TEMP/axiang-pr"
           sha256sum axiang-pr-arm64.apk > SHA256SUMS.txt
 
+      - name: Upload verified PR APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: axiang-pr-${{ github.run_id }}-arm64
+          path: ${{ runner.temp }}/axiang-pr/*
+          if-no-files-found: error
+          retention-days: 14
+
+      # After the APK upload: a failing test still fails this job, but no longer withholds
+      # the package from the person who has to try it on a phone.
+      - name: Run JVM tests
+        # Validate the checked-out PR merge tree, including native code and data.
+        # Do not reconstruct an older checkout from the distribution patches.
+        run: ./gradlew :app:testDebugUnitTest
+
       - name: Upload test and native verification evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -98,12 +113,4 @@ jobs:
             ${{ runner.temp }}/axiang-rime-host/checks/
             ${{ runner.temp }}/axiang-asr-checks.json
           if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload verified PR APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: axiang-pr-${{ github.run_id }}-arm64
-          path: ${{ runner.temp }}/axiang-pr/*
-          if-no-files-found: error
           retention-days: 14

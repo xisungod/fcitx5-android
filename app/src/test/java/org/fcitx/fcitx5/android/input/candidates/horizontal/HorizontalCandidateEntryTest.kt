@@ -24,10 +24,21 @@ class HorizontalCandidateEntryTest {
             .filterIsInstance<HorizontalCandidateEntry.Raw>().map { it.word })
     }
 
-    @Test fun `stale first designation cannot promote novel or lower ranked word`() {
+    @Test fun `granted first slot also holds a novel or lower ranked word and keeps every literal word`() {
         val words = arrayOf(word("原词"), word("其他"), word("第三"), word("经常会"))
         for (text in listOf("经常会", "新词")) {
-            val rows = horizontalCandidateEntries(words, offer(text).copy(promotedToFirst = true))
+            val promoted = offer(text).copy(promotedToFirst = true)
+            val rows = horizontalCandidateEntries(words, promoted)
+            assertEquals(promoted, (rows[0] as HorizontalCandidateEntry.Touch).offer)
+            assertEquals(1, rows.count { it is HorizontalCandidateEntry.Touch })
+            assertEquals(words.filter { it.text != text },
+                rows.drop(1).map { (it as HorizontalCandidateEntry.Raw).word })
+            assertEquals(words.indices.filter { words[it].text != text },
+                rows.filterIsInstance<HorizontalCandidateEntry.Raw>().map { it.nativeIndex })
+        }
+        // Without the grant the same words stay behind the literal top three.
+        for (text in listOf("经常会", "新词")) {
+            val rows = horizontalCandidateEntries(words, offer(text))
             assertEquals(words.take(3), rows.take(3).map { (it as HorizontalCandidateEntry.Raw).word })
         }
     }

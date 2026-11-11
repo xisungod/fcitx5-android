@@ -466,7 +466,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
     }
 
-    private val candidateUi by lazy {
+    private val candidateUiHolder = lazy {
         CandidateUi(context, theme, horizontalCandidate.view).apply {
             expandButton.apply {
                 swipeEnabled = true
@@ -476,6 +476,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
     }
 
+    private val candidateUi by candidateUiHolder
+
     private val titleUi by lazy {
         TitleUi(context, theme)
     }
@@ -484,8 +486,20 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         switchUiByState(it)
     }
 
+    private var expandButtonState = Hidden
+
     val expandButtonStateMachine = ExpandButtonStateMachine.new {
-        when (it) {
+        expandButtonState = it
+        syncExpandButton()
+    }
+
+    /**
+     * Next-word predictions occupy the candidate row but have no expandable native list,
+     * which used to leave the row's end slot empty: the idle row's hide-keyboard button was
+     * covered and nothing replaced it. Offer the same hide action there while predictions show.
+     */
+    private fun syncExpandButton() {
+        when (expandButtonState) {
             ClickToAttachWindow -> {
                 setExpandButtonToAttach()
                 setExpandButtonEnabled(true)
@@ -495,9 +509,20 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 setExpandButtonEnabled(true)
             }
             Hidden -> {
-                setExpandButtonEnabled(false)
+                if (nextWordPredictionVisible && !isSmsCodeSuggestionActive()) {
+                    setExpandButtonToHideKeyboard()
+                } else if (candidateUiHolder.isInitialized()) {
+                    setExpandButtonEnabled(false)
+                }
             }
         }
+    }
+
+    private fun setExpandButtonToHideKeyboard() {
+        candidateUi.expandButton.setOnClickListener(hideKeyboardCallback)
+        candidateUi.expandButton.setIcon(R.drawable.ic_keyboard_hide_24)
+        candidateUi.expandButton.contentDescription = context.getString(R.string.hide_keyboard)
+        candidateUi.expandButton.visibility = View.VISIBLE
     }
 
     // set expand candidate button to create expand candidate
@@ -548,6 +573,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         val showPrediction = visible && !isSmsCodeSuggestionActive()
         barStateMachine.push(PreeditUpdated, PreeditEmpty to (nativePreeditEmpty && !showPrediction))
         barStateMachine.push(CandidatesUpdated, CandidateEmpty to (nativeCandidatesEmpty && !showPrediction))
+        syncExpandButton()
     }
 
     override val view by lazy {

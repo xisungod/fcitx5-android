@@ -413,7 +413,7 @@
     <string name="sms_code_status_title">簡訊驗證碼狀態</string>
     <string name="sms_code_status_summary">功能：%1$s · 權限：%2$s · 接收器：%3$s\n本次啟動：收到 %4$d 則通知，辨識 %5$d 次，準備 %6$d 次提示</string>
     <string name="sms_code_status_details">AXiang %1$s\nAndroid %2$s（API %3$d，應用程式目標 API %4$d）\n功能：%5$s\n簡訊權限：%6$s\n接收器：%7$s\n系統接收檢查：%8$s\n\n本次啟動\n收到通知：%9$d\n匹配驗證碼：%10$d\n準備提示：%11$d\n被應用程式權限阻擋的通知：%12$d\n無法解析的通知：%13$d\n未匹配的通知：%14$d</string>
-    <string name="sms_code_status_explanation">這些計數只反映本次程序，不含簡訊內容、寄件人或驗證碼，程序重新啟動後會歸零。收到 0 則通知不等於已證明系統攔截。準備提示不代表已在螢幕顯示，正在組詞時仍優先顯示正常候選。</string>
+    <string name="sms_code_status_explanation">這些計數只反映本次程序，不含簡訊內容、寄件人或驗證碼，程序重新啟動後會歸零。收到 0 則通知不等於已證明系統攔截。準備提示不代表已在螢幕顯示，正在組詞時仍優先顯示正常候選。\n\n如果功能、權限、接收器都已開啟，但收到的通知數一直是 0，通常是系統沒有把驗證碼簡訊交給其他應用程式。榮耀、華為：訊息 > 設定 > 關閉「驗證碼安全保護」。Android 15 以上且不是從應用程式商店安裝：應用程式資訊 > 右上角選單 > 允許受限制的設定，然後重新授予簡訊權限。不改設定也可以在簡訊通知上點「複製驗證碼」，鍵盤會從剪貼簿顯示。</string>
     <string name="sms_code_status_copy">複製狀態</string>
     <string name="sms_code_status_clear">清除計數</string>
     <string name="sms_code_state_on">開啟</string>

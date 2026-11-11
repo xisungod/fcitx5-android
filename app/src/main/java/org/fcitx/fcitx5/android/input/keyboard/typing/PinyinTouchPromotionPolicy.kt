@@ -17,13 +17,38 @@ data class PinyinTouchPromotionEvidence(
 )
 
 /**
- * A deliberately narrow first-slot experiment. It does not rewrite letters or
- * decide whether a sentence sounds natural. Complete literal pinyin and any
- * supported full-pinyin/initials interpretation win even when a backup exists.
- * A new word remains supplementary; only agreement with literal rank 2/3 may
- * be promoted, and only with independent spatial support for its one edit.
+ * Thresholds of the first-slot decision. Defaults are the shipped behaviour, chosen on a
+ * synthetic Gaussian-tap simulation over the bundled dictionary (docs/axiang/touch9.md).
  */
-internal class PinyinTouchPromotionPolicy(syllables: Set<String>) {
+internal data class PinyinTouchPromotionSettings(
+    /** Combined spatial and language log advantage of the alternative over the literal letters. */
+    val minPathLogAdvantage: Double = 2.0,
+    val maxChanges: Int = 2,
+    /** A changed contact must keep at least this likelihood relative to the literal key. */
+    val minSpatialLogRatio: Double = -3.0,
+    /**
+     * Stricter limit when the literal letters could also be read as syllables plus bare
+     * initials (xhuan, zhge). Only a tap close to the border may then override them.
+     */
+    val minSpatialLogRatioWithInitials: Double = -1.5,
+    /** The same letters also need a larger combined advantage. */
+    val minPathLogAdvantageWithInitials: Double = 4.0
+)
+
+/**
+ * Decides whether a corrected spelling's word may take the first slot.
+ *
+ * No personal calibration is required. The literal letters always win when they are
+ * complete full pinyin, an unfinished syllable, or initials only. Promotion is for
+ * letters that are not full pinyin, where a nearby-key spelling is, and both the touch
+ * positions and the language model favour it. Letters that could also be a mix of
+ * syllables and initials need the changed tap to be close to the border. The literal
+ * candidates stay in the bar directly after the promoted word.
+ */
+internal class PinyinTouchPromotionPolicy(
+    syllables: Set<String>,
+    private val settings: PinyinTouchPromotionSettings = PinyinTouchPromotionSettings()
+) {
     private val inventory = PinyinSyllableInventory(syllables)
     private val syllablesByInitial = syllables.filter { it.isNotEmpty() && it.all { c -> c in 'a'..'z' } }
         .groupBy { it.first() }
@@ -32,7 +57,7 @@ internal class PinyinTouchPromotionPolicy(syllables: Set<String>) {
         Eligible, UnsupportedSpelling, InvalidModelScores, MissingInventory, CompleteLiteralPinyin,
         ProtectedIncompletePrefix, ProtectedAbbreviation, AlternativeNotFullPinyin,
         EditScope, MissingSpatialEvidence, InsufficientSpatialAdvantage,
-        InsufficientPathAdvantage, MissingLiteralAgreement, NonChineseCandidate
+        InsufficientPathAdvantage, NonChineseCandidate
     }
 
     data class Decision(val reason: Reason) {
@@ -55,25 +80,32 @@ internal class PinyinTouchPromotionPolicy(syllables: Set<String>) {
         if (rawBoundaries[raw.length]) return reject(Reason.CompleteLiteralPinyin)
         if (inventory.hasProtectedIncompleteEnding(raw, rawBoundaries))
             return reject(Reason.ProtectedIncompletePrefix)
-        if (hasInitialsInterpretation(raw)) return reject(Reason.ProtectedAbbreviation)
         if (!inventory.fullBoundaries(alternative)[alternative.length])
             return reject(Reason.AlternativeNotFullPinyin)
         val actualChanges = raw.indices.filter { raw[it] != alternative[it] }
-        // More edits remain useful suggestions, but are outside this first-slot experiment.
-        if (actualChanges.size != 1 || proposal.changedIndices != actualChanges)
-            return reject(Reason.EditScope)
+        if (actualChanges.isEmpty() || actualChanges.size > settings.maxChanges ||
+            proposal.changedIndices != actualChanges) return reject(Reason.EditScope)
         val evidence = proposal.promotionEvidence ?: return reject(Reason.MissingSpatialEvidence)
-        val contact = evidence.changedContacts.singleOrNull()
-            ?: return reject(Reason.MissingSpatialEvidence)
-        val index = actualChanges.single()
-        if (contact.index != index || contact.original != raw[index] ||
-            contact.alternative != alternative[index]) return reject(Reason.MissingSpatialEvidence)
-        if (!contact.logAlternativeOverOriginal.isFinite() ||
-            contact.logAlternativeOverOriginal < MIN_SPATIAL_LOG_ADVANTAGE)
-            return reject(Reason.InsufficientSpatialAdvantage)
-        if (!evidence.logModelAdvantage.isFinite() || evidence.logModelAdvantage < MIN_PATH_LOG_ADVANTAGE)
+        if (evidence.changedContacts.size != actualChanges.size)
+            return reject(Reason.MissingSpatialEvidence)
+        for ((position, index) in actualChanges.withIndex()) {
+            val contact = evidence.changedContacts[position]
+            if (contact.index != index || contact.original != raw[index] ||
+                contact.alternative != alternative[index]) return reject(Reason.MissingSpatialEvidence)
+            if (!contact.logAlternativeOverOriginal.isFinite() ||
+                contact.logAlternativeOverOriginal < settings.minSpatialLogRatio)
+                return reject(Reason.InsufficientSpatialAdvantage)
+        }
+        if (!evidence.logModelAdvantage.isFinite() ||
+            evidence.logModelAdvantage < settings.minPathLogAdvantage)
             return reject(Reason.InsufficientPathAdvantage)
-        if (originalCandidates.indexOf(text) !in 1..2) return reject(Reason.MissingLiteralAgreement)
+        // Letters that also read as an abbreviation are overridden only on close spatial
+        // evidence and a clearly better spelling.
+        if (hasInitialsInterpretation(raw) &&
+            (evidence.logModelAdvantage < settings.minPathLogAdvantageWithInitials ||
+                evidence.changedContacts.any {
+                    it.logAlternativeOverOriginal < settings.minSpatialLogRatioWithInitials }))
+            return reject(Reason.ProtectedAbbreviation)
         if (!allHan(text) || !allHan(originalCandidates.firstOrNull().orEmpty()))
             return reject(Reason.NonChineseCandidate)
         return Decision(Reason.Eligible)
@@ -112,9 +144,6 @@ internal class PinyinTouchPromotionPolicy(syllables: Set<String>) {
     }
 
     private companion object {
-        // Explicit model likelihood ratios, not calibrated correctness probabilities.
-        val MIN_SPATIAL_LOG_ADVANTAGE = ln(1.35)
-        const val MIN_PATH_LOG_ADVANTAGE = 3.0
         const val INITIAL_LETTERS = "bpmfdtnlgkhjqxrzcsyw"
         val DOUBLE_INITIALS = setOf("zh", "ch", "sh")
     }

@@ -39,7 +39,7 @@ class PinyinTouchCandidateRuntimeTest {
         assertTrue(runtime.publish(it, editor, "经常会", raw, raw.length))
     }
 
-    @Test fun `first promotion requires opt-in verified spatial evidence and survives normal claim guards`() {
+    @Test fun `first promotion requires opt-in and survives normal claim guards`() {
         val runtime = PinyinTouchCandidateRuntime()
         val tracker = runtime.tracker(model)
         val literal = "giren"
@@ -72,13 +72,22 @@ class PinyinTouchCandidateRuntimeTest {
         assertFalse(runtime.isCurrent(offer.token))
     }
 
-    @Test fun `first experiment reports a protection reason without changing second-slot advice`() {
+    @Test fun `letters that are not pinyin are promoted without personal offsets even for a novel word`() {
         val runtime = PinyinTouchCandidateRuntime()
         val evaluated = type(runtime)
         assertTrue(runtime.publish(evaluated, editor, "经常会", raw, raw.length,
-            originalCandidates = listOf("基本", "经常会"), allowFirstPromotion = true))
+            originalCandidates = listOf("基本", "其他"), allowFirstPromotion = true))
+        assertTrue(runtime.offer.value!!.promotedToFirst)
+        assertEquals("Eligible", runtime.offer.value!!.promotionReason)
+    }
+
+    @Test fun `a protection reason is reported without changing second-slot advice`() {
+        val runtime = PinyinTouchCandidateRuntime()
+        val evaluated = type(runtime)
+        assertTrue(runtime.publish(evaluated, editor, "经常会", raw, raw.length,
+            originalCandidates = listOf("jungle", "经常会"), allowFirstPromotion = true))
         assertFalse(runtime.offer.value!!.promotedToFirst)
-        assertEquals("ProtectedAbbreviation", runtime.offer.value!!.promotionReason)
+        assertEquals("NonChineseCandidate", runtime.offer.value!!.promotionReason)
     }
 
     @Test fun `reservation consumes the exact published snapshot once and refuses a nonfirst default`() {
