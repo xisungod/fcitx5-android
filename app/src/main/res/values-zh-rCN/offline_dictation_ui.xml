@@ -17,4 +17,6 @@
     <string name="offline_dictation_ui_finished_hint">轻点继续</string>
     <string name="offline_dictation_ui_unavailable_hint">可以返回键盘继续输入</string>
     <string name="offline_dictation_ui_error_hint">轻点重试</string>
+    <string name="offline_dictation_inline_dismiss">知道了</string>
+    <string name="offline_dictation_inline_done">完成</string>
 </resources>

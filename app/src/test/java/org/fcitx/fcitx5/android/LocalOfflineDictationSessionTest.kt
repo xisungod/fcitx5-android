@@ -47,8 +47,10 @@ class LocalOfflineDictationSessionTest {
         request: () -> Unit = {},
         unavailable: String? = null,
         apply: DictationTranscriptCallback = { _, _, current, delivered -> delivered(current()) },
-        abandon: () -> Unit = {}
-    ) = LocalOfflineDictationSession(unavailable, permission, request, audio, engine, apply, abandon, failureMessage = { it.name })
+        abandon: () -> Unit = {},
+        captureFirst: Boolean = false
+    ) = LocalOfflineDictationSession(unavailable, permission, request, audio, engine, apply, abandon,
+        failureMessage = { it.name }, captureWhileLoading = captureFirst)
 
     @Test fun openingThePanelDoesNotLoadTheModelOrCaptureAudio() {
         val calls = AtomicInteger()
@@ -255,6 +257,150 @@ class LocalOfflineDictationSessionTest {
             assertTrue(displayed.isEmpty())
             assertEquals(OfflineDictationPhase.Unavailable, session.state.value.phase)
         } finally { session.close() }
+    }
+
+    /** Counts every decoded chunk, so a test can tell whether early audio reached the engine. */
+    private class CountingEngine : DictationSpeechEngine {
+        val closed = CountDownLatch(1)
+        val chunks = AtomicInteger()
+        val finished = AtomicInteger()
+        override fun accept(samples: FloatArray) { chunks.incrementAndGet() }
+        override fun text() = DictationTranscript(partial = "听".repeat(chunks.get()))
+        override fun finish(): DictationTranscript {
+            finished.incrementAndGet()
+            return DictationTranscript(committed = "听".repeat(chunks.get()), complete = true)
+        }
+        override fun close() { closed.countDown() }
+    }
+
+    @Test fun captureFirstListensWhileTheModelLoadsAndDecodesWhatWasSaidMeanwhile() {
+        val loading = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val audio = Audio()
+        val engine = CountingEngine()
+        val session = session(audio = { audio }, engine = {
+            loading.countDown(); release.await(3, TimeUnit.SECONDS); engine
+        }, captureFirst = true)
+        try {
+            session.start()
+            waitFor(session, OfflineDictationPhase.Recording)
+            assertTrue("The microphone is already open while the model is still loading",
+                audio.started.await(3, TimeUnit.SECONDS))
+            assertTrue(loading.await(3, TimeUnit.SECONDS))
+            repeat(3) { audio.chunks.offer(FloatArray(1_600) { 0.2f }) }
+            // The reader has taken all three chunks once the queue is empty and it blocks again.
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            while (audio.chunks.isNotEmpty() && System.nanoTime() < deadline) Thread.sleep(5)
+            assertEquals(0, engine.chunks.get())
+            assertTrue("Loudness is reported before any text exists", session.level.value > 0f)
+            release.countDown()
+            // The reader notices the finished load when its next chunk arrives.
+            val wake = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            while (session.state.value.transcript.isEmpty() && System.nanoTime() < wake) {
+                audio.chunks.offer(FloatArray(1_600) { 0.2f })
+                Thread.sleep(5)
+            }
+            val heard = session.state.value
+            assertEquals(OfflineDictationPhase.Recording, heard.phase)
+            assertTrue("Everything said during loading was decoded", heard.transcript.length >= 4)
+            session.stop()
+            val result = waitFor(session, OfflineDictationPhase.Finished)
+            assertTrue(result.transcript.length >= heard.transcript.length)
+            assertTrue(audio.closed.await(3, TimeUnit.SECONDS))
+            assertTrue(engine.closed.await(3, TimeUnit.SECONDS))
+            assertEquals(0f, session.level.value, 0f)
+        } finally { release.countDown(); session.close() }
+    }
+
+    @Test fun captureFirstStopBeforeTheModelIsReadyStillTranscribesTheRecording() {
+        val loading = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val audio = Audio()
+        val engine = CountingEngine()
+        val session = session(audio = { audio }, engine = {
+            loading.countDown(); release.await(3, TimeUnit.SECONDS); engine
+        }, captureFirst = true)
+        try {
+            session.start()
+            waitFor(session, OfflineDictationPhase.Recording)
+            assertTrue(loading.await(3, TimeUnit.SECONDS))
+            repeat(2) { audio.chunks.offer(FloatArray(1_600) { 0.2f }) }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            while (audio.chunks.isNotEmpty() && System.nanoTime() < deadline) Thread.sleep(5)
+            session.stop()
+            assertEquals(OfflineDictationPhase.Finishing, session.state.value.phase)
+            assertTrue(audio.stopped)
+            release.countDown()
+            val result = waitFor(session, OfflineDictationPhase.Finished)
+            assertEquals("听听", result.transcript)
+            assertEquals(1, engine.finished.get())
+            assertTrue(engine.closed.await(3, TimeUnit.SECONDS))
+        } finally { release.countDown(); session.close() }
+    }
+
+    @Test fun captureFirstCancelDuringLoadClosesTheMicrophoneAndTheEngineThatArrivesLate() {
+        val loading = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val audio = Audio()
+        val engine = CountingEngine()
+        val session = session(audio = { audio }, engine = {
+            loading.countDown(); release.await(3, TimeUnit.SECONDS); engine
+        }, captureFirst = true)
+        try {
+            session.start()
+            waitFor(session, OfflineDictationPhase.Recording)
+            assertTrue(loading.await(3, TimeUnit.SECONDS))
+            audio.chunks.offer(FloatArray(1_600) { 0.2f })
+            session.cancel()
+            assertTrue(audio.stopped)
+            assertEquals(OfflineDictationPhase.Ready, session.state.value.phase)
+            release.countDown()
+            assertTrue(audio.closed.await(3, TimeUnit.SECONDS))
+            assertTrue(engine.closed.await(3, TimeUnit.SECONDS))
+            assertEquals(0, engine.chunks.get())
+            assertEquals(0, engine.finished.get())
+        } finally { release.countDown(); session.close() }
+    }
+
+    @Test fun captureFirstModelFailureStopsTheMicrophoneAndReportsTheEngine() {
+        val audio = Audio()
+        val abandoned = AtomicInteger()
+        session(audio = { audio }, engine = { error("model cannot load") },
+            abandon = { abandoned.incrementAndGet() }, captureFirst = true).use {
+            it.start()
+            assertTrue(audio.started.await(3, TimeUnit.SECONDS))
+            // The failed load is noticed when the reader receives its next chunk, as a real
+            // microphone delivers one every 100 ms.
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3)
+            while (it.state.value.phase != OfflineDictationPhase.Unavailable && System.nanoTime() < deadline) {
+                audio.chunks.offer(FloatArray(1_600))
+                Thread.sleep(5)
+            }
+            val result = waitFor(it, OfflineDictationPhase.Unavailable)
+            assertEquals("Engine", result.message)
+            assertTrue(audio.stopped)
+            assertTrue(audio.closed.await(3, TimeUnit.SECONDS))
+            assertEquals(1, abandoned.get())
+        }
+    }
+
+    @Test fun captureFirstMicrophoneFailureNeverStartsLoadingTheModel() {
+        val engines = AtomicInteger()
+        val closed = CountDownLatch(1)
+        val audio = object : DictationAudioSource {
+            override fun start() { error("microphone is in use") }
+            override fun read(): FloatArray? = null
+            override fun stop() = Unit
+            override fun close() { closed.countDown() }
+        }
+        session(audio = { audio }, engine = { engines.incrementAndGet(); CountingEngine() },
+            captureFirst = true).use {
+            it.start()
+            val result = waitFor(it, OfflineDictationPhase.Error)
+            assertEquals("Audio", result.message)
+            assertTrue(closed.await(3, TimeUnit.SECONDS))
+            assertEquals(0, engines.get())
+        }
     }
 
 }

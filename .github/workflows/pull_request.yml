@@ -27,11 +27,11 @@ jobs:
     timeout-minutes: 45
     env:
       BUILD_ABI: arm64-v8a
-      BUILD_VERSION_CODE: "14"
-      BUILD_VERSION_NAME: 1.2-touch.9
+      BUILD_VERSION_CODE: "15"
+      BUILD_VERSION_NAME: 1.2-touch.10
       BUILD_COMMIT_HASH: ${{ github.sha }}
-      XUANCAI_APP_SUFFIX: .axiang.touch9
-      APP_LABEL: 阿翔 触点测试9
+      XUANCAI_APP_SUFFIX: .axiang.touch10
+      APP_LABEL: 阿翔 触点测试10
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -62,7 +62,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.android/debug.keystore
-          key: axiang-touch9-debug-certificate-v1
+          key: axiang-touch10-debug-certificate-v1
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -98,7 +98,7 @@ jobs:
       - name: Upload the test APK
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-touch9-${{ github.run_id }}-arm64
+          name: axiang-touch10-${{ github.run_id }}-arm64
           path: ${{ runner.temp }}/axiang-pr/*
           if-no-files-found: error
           retention-days: 14
@@ -131,7 +131,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-touch9-checks-${{ github.run_id }}
+          name: axiang-touch10-checks-${{ github.run_id }}
           path: |
             app/build/test-results/testDebugUnitTest/
             ${{ runner.temp }}/axiang-touch9/build.log

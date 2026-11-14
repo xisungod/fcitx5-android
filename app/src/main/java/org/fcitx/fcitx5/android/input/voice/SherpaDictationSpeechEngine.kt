@@ -11,37 +11,90 @@ import com.k2fsa.sherpa.onnx.OfflinePunctuation
 import com.k2fsa.sherpa.onnx.OfflinePunctuationConfig
 import com.k2fsa.sherpa.onnx.OfflinePunctuationModelConfig
 
-/** "OnlineRecognizer" is Sherpa's streaming API; provider=cpu never uses a network. */
-internal class SherpaDictationSpeechEngine(assets: AssetManager) : DictationSpeechEngine {
-    private val recognizer = OnlineRecognizer(assets, OnlineRecognizerConfig(
-        featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
-        modelConfig = OnlineModelConfig(
-            transducer = OnlineTransducerModelConfig(
-                encoder = "$MODEL_PATH/encoder.int8.onnx",
-                decoder = "$MODEL_PATH/decoder.onnx",
-                joiner = "$MODEL_PATH/joiner.int8.onnx"
+/**
+ * The recognizer and punctuation models stay loaded for a while after a dictation ends, so the
+ * next tap on the microphone starts listening at once instead of reloading about 100 MB.
+ * Each dictation owns only its stream. Memory is given back after [IDLE_KEEP_MS] without use.
+ */
+internal object SherpaModels {
+    class Loaded(val recognizer: OnlineRecognizer, val punctuation: OfflinePunctuation)
+
+    private val lock = Any()
+    private var loaded: Loaded? = null
+    private var users = 0
+    private var idleToken = 0L
+
+    /** "OnlineRecognizer" is Sherpa's streaming API; provider=cpu never uses a network. */
+    private fun load(assets: AssetManager): Loaded {
+        val recognizer = OnlineRecognizer(assets, OnlineRecognizerConfig(
+            featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
+            modelConfig = OnlineModelConfig(
+                transducer = OnlineTransducerModelConfig(
+                    encoder = "${SherpaDictationSpeechEngine.MODEL_PATH}/encoder.int8.onnx",
+                    decoder = "${SherpaDictationSpeechEngine.MODEL_PATH}/decoder.onnx",
+                    joiner = "${SherpaDictationSpeechEngine.MODEL_PATH}/joiner.int8.onnx"
+                ),
+                tokens = "${SherpaDictationSpeechEngine.MODEL_PATH}/tokens.txt",
+                numThreads = 2,
+                debug = false,
+                provider = "cpu",
+                modelType = "zipformer"
             ),
-            tokens = "$MODEL_PATH/tokens.txt",
-            numThreads = 2,
-            debug = false,
-            provider = "cpu",
-            modelType = "zipformer"
-        ),
-        enableEndpoint = true,
-        decodingMethod = "greedy_search"
-    ))
+            enableEndpoint = true,
+            decodingMethod = "greedy_search"
+        ))
+        val punctuation = try {
+            OfflinePunctuation(assets, OfflinePunctuationConfig(OfflinePunctuationModelConfig(
+                ctTransformer = "asr/punctuation/model.int8.onnx", numThreads = 1, provider = "cpu")))
+        } catch (error: Throwable) {
+            recognizer.release()
+            throw error
+        }
+        return Loaded(recognizer, punctuation)
+    }
+
+    /** Blocks while a cold model loads. Every successful call needs one [release]. */
+    fun acquire(assets: AssetManager): Loaded = synchronized(lock) {
+        idleToken++ // a pending idle unload no longer applies
+        val current = loaded ?: load(assets).also { loaded = it }
+        users++
+        current
+    }
+
+    fun release() {
+        val token = synchronized(lock) {
+            if (users > 0) users--
+            if (users != 0 || loaded == null) return
+            ++idleToken
+        }
+        Thread({
+            try { Thread.sleep(IDLE_KEEP_MS) } catch (_: InterruptedException) { return@Thread }
+            unload(token)
+        }, "axiang-dictation-idle").apply { isDaemon = true }.start()
+    }
+
+    /** Frees the models now if no dictation uses them, for example when memory runs low. */
+    fun trim() = unload(null)
+
+    private fun unload(token: Long?) {
+        val idle = synchronized(lock) {
+            if (users != 0 || (token != null && token != idleToken)) return
+            loaded.also { loaded = null }
+        } ?: return
+        try { idle.recognizer.release() } finally { idle.punctuation.release() }
+    }
+
+    private const val IDLE_KEEP_MS = 120_000L
+}
+
+internal class SherpaDictationSpeechEngine(assets: AssetManager) : DictationSpeechEngine {
+    private val models = SherpaModels.acquire(assets)
+    private val recognizer = models.recognizer
+    private val punctuation = models.punctuation
     private val stream = try {
         recognizer.createStream()
     } catch (error: Throwable) {
-        recognizer.release()
-        throw error
-    }
-    private val punctuation = try {
-        OfflinePunctuation(assets, OfflinePunctuationConfig(OfflinePunctuationModelConfig(
-            ctTransformer = "asr/punctuation/model.int8.onnx", numThreads = 1, provider = "cpu")))
-    } catch (error: Throwable) {
-        stream.release()
-        recognizer.release()
+        SherpaModels.release()
         throw error
     }
     private val completed = StringBuilder()
@@ -86,9 +139,7 @@ internal class SherpaDictationSpeechEngine(assets: AssetManager) : DictationSpee
     override fun close() {
         if (closed) return
         closed = true
-        try { stream.release() } finally {
-            try { recognizer.release() } finally { punctuation.release() }
-        }
+        try { stream.release() } finally { SherpaModels.release() }
     }
 
     companion object {

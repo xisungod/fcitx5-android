@@ -184,14 +184,29 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         ).also { offlineDictationSession = it }
     }
 
+    /**
+     * Told on the main thread whenever a dictation is over, whoever ended it: the toolbar
+     * strip, a key press, a moved cursor or a changed input field.
+     */
+    internal var onOfflineDictationEnded: ((OfflineDictationSession) -> Unit)? = null
+
+    /** Ends [session] if it is still the current one; a stale caller changes nothing. */
+    fun endOfflineDictation(session: OfflineDictationSession) {
+        if (offlineDictationSession === session) finishOfflineDictation()
+    }
+
     private fun finishOfflineDictation() {
         if (offlineDictationEditor === currentInputConnection) offlineDictationWriter?.finish()
         offlineDictationWriter = null
         dictationOwnsComposition = false
         offlineDictationEditor = null
         offlineDictationEditorGeneration++
-        offlineDictationSession?.close()
+        // Forget the session before closing it: closing publishes a state change, and an
+        // observer that reacts at once must already see that no dictation is current.
+        val ended = offlineDictationSession ?: return
         offlineDictationSession = null
+        ended.close()
+        onOfflineDictationEnded?.invoke(ended)
     }
 
     private val navbarMgr = NavigationBarManager()

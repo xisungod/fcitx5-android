@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.bar.ui.idle.InlineSuggestionsUi
 import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.voice.InlineDictationBar
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.after
 import splitties.views.dsl.constraintlayout.before
@@ -127,9 +128,57 @@ class IdleUi(
         })
     }
 
+    /** Shown over the toolbar while the microphone is on; the keyboard below stays in place. */
+    val dictationBar = InlineDictationBar(
+        ctx, theme.altKeyTextColor, theme.accentKeyBackgroundColor, theme.accentKeyTextColor,
+        ctx.getDrawable(R.drawable.ic_offline_mic_24)
+    ).apply {
+        visibility = View.GONE
+        animationsAllowed = { !disableAnimation }
+    }
+
+    var dictationShown = false
+        private set
+
     override val root = frameLayout {
         add(idleBody, lParams(matchParent, matchParent))
         add(numberRow, lParams(matchParent, matchParent))
+        add(dictationBar, lParams(matchParent, matchParent))
+    }
+
+    /**
+     * The strip covers whichever toolbar state is current instead of becoming a state of
+     * its own, so the toolbar is exactly as it was when dictation ends.
+     */
+    fun showDictation(show: Boolean) {
+        if (show == dictationShown) return
+        dictationShown = show
+        val covered = if (show) 0f else 1f
+        val access = if (show) View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+        idleBody.importantForAccessibility = access
+        numberRow.importantForAccessibility = access
+        dictationBar.animate().cancel()
+        idleBody.animate().cancel()
+        numberRow.animate().cancel()
+        if (disableAnimation) {
+            idleBody.alpha = covered
+            numberRow.alpha = covered
+            dictationBar.alpha = 1f
+            dictationBar.visibility = if (show) View.VISIBLE else View.GONE
+            return
+        }
+        idleBody.animate().alpha(covered).setDuration(120L)
+        numberRow.animate().alpha(covered).setDuration(120L)
+        if (show) {
+            dictationBar.alpha = 0f
+            dictationBar.visibility = View.VISIBLE
+            dictationBar.animate().alpha(1f).setDuration(160L).withEndAction(null)
+        } else {
+            dictationBar.animate().alpha(0f).setDuration(120L).withEndAction {
+                dictationBar.visibility = View.GONE
+            }
+        }
     }
 
     fun privateMode(activate: Boolean = true) {
