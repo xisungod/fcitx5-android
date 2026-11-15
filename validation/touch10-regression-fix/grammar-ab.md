@@ -62,3 +62,10 @@ recommended by the model publisher.
 In T9, 「里斯本地铁」「东方明珠广播电视塔」「圣佩德罗德阿塔卡马」
 went from zero of three to three of three first choices. The same host ran
 the T9 composition, backspace, candidate selection and cancellation checks.
+
+The touch.10.4 review compared the same two fixed sets before changing the
+sentence-end penalty. A sweep found that `rear_penalty: -17` restores
+「这份报告需要明天上交吗」 while keeping the totals at 57/66 and
+41/60. It trades away the previously correct 「先试试市场行情再说吧」,
+however. The reviewed integer and fractional settings did not fix both.
+The shipped test configuration therefore keeps `rear_penalty: -20`.
