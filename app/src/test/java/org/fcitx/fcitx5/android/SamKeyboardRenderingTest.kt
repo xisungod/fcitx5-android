@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardSizePolicy
 import org.fcitx.fcitx5.android.input.keyboard.PressEffect
+import org.fcitx.fcitx5.android.input.keyboard.SamKeyLightField
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.junit.After
@@ -546,16 +547,18 @@ class SamKeyboardRenderingTest {
     }
 
     @Test
-    fun samColourTailRemainsVisibleAfterGeometryLandsWithEitherMotionPath() {
+    fun samColourTailIsIndependentOfTheKeyGeometry() {
         for (motion in listOf(ThemePrefs.KeyMotionEffect.Press, ThemePrefs.KeyMotionEffect.Off)) {
             Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
                 it.keyMotionEffect.setValue(motion)
                 it.reboundMotionDuration.setValue(400)
-                // Old, explicitly saved mist values must not shorten Sam's tail.
+                it.pressWaveHoldTime.setValue(40)
+                it.pressFadeOutTime.setValue(900)
+                // Old, explicitly saved face timings must not shorten the shared fade.
                 it.pressKeyHoldTime.setValue(20)
                 it.pressKeyRetreatTime.setValue(20)
-                it.samKeyHoldTime.setValue(80)
-                it.samKeyRetreatTime.setValue(800)
+                it.samKeyHoldTime.setValue(20)
+                it.samKeyRetreatTime.setValue(100)
             }).use { board ->
                 board.touch("f", MotionEvent.ACTION_DOWN)
                 board.go(50)
@@ -569,34 +572,72 @@ class SamKeyboardRenderingTest {
                     save(late.image, "release-tail-${motion.name}-650ms")
                 } finally { late.image.recycle() }
                 board.go(1600)
-                board.assertBlackSurface("$motion finishes the independent colour tail and wave")
+                board.assertBlackSurface("$motion finishes both the cap fade and propagating light")
             }
         }
     }
 
     @Test
-    fun samCapTimingPreferencesChangeRealPixelsWithoutChangingLegacyValues() {
-        val samples = listOf(200, 1600).map { fade ->
+    fun actualSamCapAndSourceHaloHaveTheSameAdjustableFade() {
+        for (fade in listOf(240L, 900L)) {
             Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
                 it.keyMotionEffect.setValue(ThemePrefs.KeyMotionEffect.Off)
-                it.samKeyHoldTime.setValue(120)
-                it.samKeyRetreatTime.setValue(fade)
-                it.pressKeyHoldTime.setValue(30)
-                it.pressKeyRetreatTime.setValue(100)
+                it.pressWaveHoldTime.setValue(80)
+                it.pressFadeOutTime.setValue(fade.toInt())
             }).use { board ->
+                val key = board.letters.getValue("f")
+                val mask = board.gapMask()
+                fun brightness(): Pair<Int, Int> {
+                    // Isolate the source: neighbours have an intentionally later
+                    // fade, and their overlapping halos should not count here.
+                    val cell = board.bounds(key)
+                    val cap = Rect(cell).apply { inset(key.hMargin, key.vMargin) }
+                    board.effect.setSamKeyGeometry(listOf(SamKeyLightField.KeyGeometry(key.id, cap, cell)))
+                    val frame = board.motionFrame(key)
+                    return try {
+                        intensity(frame.actualCapColour) to gapLevels(frame.image, mask).peak
+                    } finally { frame.image.recycle() }
+                }
                 board.touch("f", MotionEvent.ACTION_DOWN)
+                assertTrue("The face gives feedback on the very first frame", brightness().first >= 30)
                 board.go(50)
                 board.touch("f", MotionEvent.ACTION_UP, 0)
-                board.go(1200)
-                val frame = board.motionFrame(board.letters.getValue("f"))
-                try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
+                board.go(80)
+                val (capStart, haloStart) = brightness()
+                assertTrue("The source and cap both light up", capStart >= 30 && haloStart >= 30)
+                board.go(80 + fade / 2)
+                val (capMid, haloMid) = brightness()
+                val capFraction = capMid.toFloat() / capStart
+                val haloFraction = haloMid.toFloat() / haloStart
+                assertEquals("The key cap is halfway through its ${fade}ms fade", 0.5f, capFraction, 0.12f)
+                assertEquals("The source halo tracks the cap through its ${fade}ms fade", capFraction, haloFraction, 0.12f)
+                board.go(80 + fade)
+                assertEquals("Cap and source both finish at the configured cutoff", 0 to 0, brightness())
             }
         }
-        // The cap's own colour is gone; only the last of the fading pool shows through the glass.
-        assertTrue("A short selected Sam tail has fully ended: ${samples[0]}", samples[0] <= 8)
-        assertTrue("A long selected Sam tail is still visibly coloured", samples[1] >= 25)
-        assertEquals(30, ThemeManager.prefs.pressKeyHoldTime.getValue())
-        assertEquals(100, ThemeManager.prefs.pressKeyRetreatTime.getValue())
+    }
+
+    @Test
+    fun holdingAndReleasingPastTheFadeDoesNotReviveTheCap() {
+        Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
+            it.pressGlowBrightness.setValue(0)
+            it.pressWaveHoldTime.setValue(40)
+            it.pressFadeOutTime.setValue(280)
+        }).use { board ->
+            val key = board.letters.getValue("f")
+            fun capBrightness(): Int {
+                val frame = board.motionFrame(key)
+                return try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
+            }
+            board.touch("f", MotionEvent.ACTION_DOWN)
+            assertTrue("The face responds even with the gutter light disabled", capBrightness() >= 30)
+            board.go(350)
+            assertEquals("A held cap completes its fade", 0, capBrightness())
+            board.go(380)
+            board.touch("f", MotionEvent.ACTION_UP, 0)
+            board.go(450)
+            assertEquals("Releasing the held cap does not relight it", 0, capBrightness())
+        }
     }
 
     @Test

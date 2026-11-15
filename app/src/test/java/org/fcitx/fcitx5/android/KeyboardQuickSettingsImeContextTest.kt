@@ -483,10 +483,11 @@ class KeyboardQuickSettingsImeContextTest {
         }
     }
 
-    @Test fun quickSamColourSlidersStageTheirValuesWithoutOfferingLegacyControls() {
+    @Test fun quickFadeSliderStagesTheSharedDurationWithoutOfferingLegacyControls() {
         Host().use { host ->
             val storage = host.service.getSharedPreferences("ime-sam-colour-draft", Context.MODE_PRIVATE)
-            storage.edit().clear().putInt("press_key_retreat_time", 1783).commit()
+            storage.edit().clear().putInt("press_key_retreat_time", 1783)
+                .putInt("sam_key_hold_time", 160).putInt("sam_key_retreat_time", 1970).commit()
             val theme = ThemePrefs(storage)
             val draft = KeyboardQuickSettingsDraft(theme, AppPrefs(storage).keyboard)
             val ui = KeyboardQuickSettingsUi(host.imeContext, ThemePreset.Sam, draft, false,
@@ -498,14 +499,13 @@ class KeyboardQuickSettingsImeContextTest {
                 ui.root.findViewWithTag<View>("quick_open_effects").performClick()
                 host.settle()
                 assertNull(ui.root.findViewWithTag<View>("quick_ripple_shape"))
-                val hold = ui.root.findViewWithTag<SeekBar>("quick_sam_key_hold")
-                val fade = ui.root.findViewWithTag<SeekBar>("quick_sam_key_retreat")
+                val fade = ui.root.findViewWithTag<SeekBar>("quick_glow_fade")
+                assertNull(ui.root.findViewWithTag<View>("quick_sam_key_hold"))
+                assertNull(ui.root.findViewWithTag<View>("quick_sam_key_retreat"))
                 assertNull(ui.root.findViewWithTag<View>("quick_key_retreat"))
                 fun shown(bar: SeekBar) = (bar.parent as View).visibility == View.VISIBLE
-                assertTrue(shown(hold))
                 assertTrue(shown(fade))
-                assertEquals(8, hold.progress)
-                assertEquals(70, fade.progress)
+                assertEquals(40, fade.progress)
                 fun choose(bar: SeekBar, progress: Int) {
                     assertTrue(bar.performAccessibilityAction(
                         AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,
@@ -513,15 +513,14 @@ class KeyboardQuickSettingsImeContextTest {
                             putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, progress.toFloat())
                         }))
                 }
-                choose(hold, 16)
-                choose(fade, 130)
-                assertEquals(160, draft.values.samKeyHoldTime)
-                assertEquals(1400, draft.values.samKeyRetreatTime)
-                assertEquals(800, theme.samKeyRetreatTime.getValue())
-                assertEquals(130, fade.progress)
+                choose(fade, 65)
+                assertEquals(1400, draft.values.fadeDuration)
+                assertEquals(900, theme.pressFadeOutTime.getValue())
+                assertEquals(65, fade.progress)
                 assertTrue(ui.extension.findViewWithTag<View>("quick_done").performClick())
+                assertEquals(1400, theme.pressFadeOutTime.getValue())
                 assertEquals(160, theme.samKeyHoldTime.getValue())
-                assertEquals(1400, theme.samKeyRetreatTime.getValue())
+                assertEquals(1970, theme.samKeyRetreatTime.getValue())
                 assertEquals(1783, theme.pressKeyRetreatTime.getValue())
                 host.assertVisible()
             } finally {

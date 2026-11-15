@@ -175,14 +175,14 @@ class V15LightEffectPrefsTest {
     }
 
     @Test
-    fun samColourTimingsHaveIndependentDefaultsAndPreserveBothModesSavedValues() {
+    fun retiredKeyTimingsRemainReadableWithoutMigratingSavedValues() {
         val stored = storage("sam-independent-key-colour")
         stored.edit().putInt("press_key_hold_time", 37).putInt("press_key_retreat_time", 1783).commit()
         val before = stored.all.toMap()
         val prefs = ThemePrefs(stored)
         assertEquals(80, prefs.samKeyHoldTime.getValue())
         assertEquals(800, prefs.samKeyRetreatTime.getValue())
-        assertEquals("Using Sam defaults must not migrate mist or fluid timing", before, stored.all)
+        assertEquals("Reading old timing defaults must not modify storage", before, stored.all)
         prefs.samKeyHoldTime.setValue(130)
         prefs.samKeyRetreatTime.setValue(1270)
         val saved = stored.all.toMap()
@@ -195,11 +195,10 @@ class V15LightEffectPrefsTest {
     }
 
     @Test
-    fun capTimingControlsAllowShortFlashesWhileKeepingLongCustomExits() {
+    fun effectTimingControlsExposeBoundedSharedFadeAndHideLegacySamTimings() {
         val prefs = ThemePrefs(storage("v15-neon-ranges"))
+        assertFalse(prefs.managedPreferencesUi.any { it.key in setOf("sam_key_hold_time", "sam_key_retreat_time") })
         val expected = mapOf(
-            "sam_key_hold_time" to (0 to 1000),
-            "sam_key_retreat_time" to (100 to 5000),
             "press_expansion_time" to (100 to 4000),
             "press_wave_hold_time" to (0 to 2000),
             "press_fade_out_time" to (100 to 5000)

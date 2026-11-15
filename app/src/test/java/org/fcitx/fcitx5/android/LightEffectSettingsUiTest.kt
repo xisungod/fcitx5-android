@@ -183,7 +183,7 @@ class LightEffectSettingsUiTest {
             assertTrue(ui.root.findViewWithTag<View>(prefs.idleBreathing.key).isShown)
             assertTrue(ui.modeButtons.getValue(ThemePrefs.PressColorMode.Random).isShown)
             val toggle = ui.root.findViewWithTag<View>("effect-advanced-toggle")
-            val timing = ui.durationControls.getValue(prefs.samKeyRetreatTime.key)
+            val timing = ui.durationControls.getValue(prefs.pressFadeOutTime.key)
             assertFalse(timing.root.isShown)
             assertEquals(ui.context.getString(R.string.ax_light_collapsed), ViewCompat.getStateDescription(toggle))
             toggle.performClick()
@@ -216,7 +216,7 @@ class LightEffectSettingsUiTest {
             assertTrue("Text must remain readable on cards", androidx.core.graphics.ColorUtils.calculateContrast(ink, surface) >= 4.5)
             val toggle = ui.root.findViewWithTag<Switch>(ThemeManager.prefs.pressEffect.key)
             assertEquals(ink, toggle.currentTextColor)
-            val control = ui.durationControls.getValue(ThemeManager.prefs.samKeyRetreatTime.key)
+            val control = ui.durationControls.getValue(ThemeManager.prefs.pressFadeOutTime.key)
             assertEquals(accent, control.slider.progressTintList!!.defaultColor)
             save(ui.root, "light-settings-night")
             ui.modeButtons.getValue(ThemePrefs.PressColorMode.Single).performClick()
@@ -466,7 +466,7 @@ class LightEffectSettingsUiTest {
         assertEquals(350, prefs.pressWaveHoldTime.getValue())
     }
 
-    @Test fun samTimingControlsExcludeLegacyTimingsAndPreserveSavedValues() {
+    @Test fun samTimingControlsUseOneSharedFadeAndPreserveLegacyValues() {
         val controller = activity()
         val prefs = ThemeManager.prefs
         prefs.rippleShape.setValue(ThemePrefs.RippleShape.IrregularFluid)
@@ -481,27 +481,23 @@ class LightEffectSettingsUiTest {
             controller.get().setContentView(ui.root)
             shadowOf(Looper.getMainLooper()).idle()
             assertEquals("Opening timing settings cannot normalize saved values", before, stored.all)
-            fun visible(pref: org.fcitx.fcitx5.android.data.prefs.ManagedPreference.PInt) =
-                ui.durationControls.getValue(pref.key).root.visibility == View.VISIBLE
-            assertTrue(visible(prefs.samKeyHoldTime))
-            assertTrue(visible(prefs.samKeyRetreatTime))
-            assertFalse(ui.durationControls.containsKey(prefs.pressKeyHoldTime.key))
-            assertFalse(ui.durationControls.containsKey(prefs.pressKeyRetreatTime.key))
-            assertFalse(ui.durationControls.containsKey(prefs.pressIgnitionTime.key))
+            for (legacy in listOf(prefs.samKeyHoldTime, prefs.samKeyRetreatTime, prefs.pressKeyHoldTime,
+                    prefs.pressKeyRetreatTime, prefs.pressIgnitionTime))
+                assertFalse(ui.durationControls.containsKey(legacy.key))
             assertEquals(ui.context.getString(R.string.light_effect_total, 2650),
                 ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
             assertEquals(ui.context.getString(R.string.sam_wave_total_detail),
                 ui.root.findViewWithTag<TextView>("effect-total-detail").text.toString())
-            val hold = ui.durationControls.getValue(prefs.samKeyHoldTime.key)
-            val fade = ui.durationControls.getValue(prefs.samKeyRetreatTime.key)
-            assertEquals(8, hold.slider.progress)
-            assertEquals(70, fade.slider.progress)
-            hold.slider.progress = 16
-            hold.commit()
-            fade.slider.progress = 130
+            val fade = ui.durationControls.getValue(prefs.pressFadeOutTime.key)
+            assertEquals(View.VISIBLE, fade.root.visibility)
+            assertEquals(40, fade.slider.progress)
+            fade.slider.progress = 65
             fade.commit()
-            assertEquals(160, prefs.samKeyHoldTime.getValue())
-            assertEquals(1400, prefs.samKeyRetreatTime.getValue())
+            assertEquals(1400, prefs.pressFadeOutTime.getValue())
+            assertEquals(ui.context.getString(R.string.light_effect_total, 3150),
+                ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
+            assertEquals(80, prefs.samKeyHoldTime.getValue())
+            assertEquals(800, prefs.samKeyRetreatTime.getValue())
             assertEquals(37, prefs.pressKeyHoldTime.getValue())
             assertEquals(1783, prefs.pressKeyRetreatTime.getValue())
             assertNull(ui.root.findViewWithTag<View>("effect-ripple-shape"))
@@ -646,7 +642,8 @@ class LightEffectSettingsUiTest {
         shadowOf(Looper.getMainLooper()).idle()
         layout(ui.root)
         val body = ui.root.getChildAt(0) as ViewGroup
-        val firstTiming = ui.durationControls.getValue(prefs.pressFadeOutTime.key).root
+        val waveTimings = listOf(prefs.pressExpansionTime, prefs.pressWaveHoldTime, prefs.pressFadeOutTime)
+        val firstTiming = ui.durationControls.getValue(waveTimings.first().key).root
         val timingBounds = Rect(0, 0, firstTiming.width, firstTiming.height)
         body.offsetDescendantRectToMyCoords(firstTiming, timingBounds)
         val timingScroll = (timingBounds.top - 12).coerceAtLeast(0)
@@ -658,14 +655,14 @@ class LightEffectSettingsUiTest {
         ui.root.invalidate()
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue("Scroll must finish before capturing the timing screen", ui.root.scrollY > 0)
-        listOf(prefs.pressFadeOutTime, prefs.samKeyHoldTime, prefs.samKeyRetreatTime).forEach { pref ->
+        waveTimings.forEach { pref ->
             val control = ui.durationControls.getValue(pref.key).root
             val visible = Rect()
             assertTrue("${pref.key} must be visible in the timing screenshot", control.getGlobalVisibleRect(visible))
             assertTrue("${pref.key} must show its label and slider", visible.height() >= control.height)
         }
         val timing = captureScrollViewport(ui.root)
-        listOf(prefs.pressFadeOutTime, prefs.samKeyHoldTime, prefs.samKeyRetreatTime).forEach { pref ->
+        waveTimings.forEach { pref ->
             assertSliderPixelsAreVisible(timing, ui.root, ui.durationControls.getValue(pref.key).slider)
         }
         save(timing, "light-settings-timing")

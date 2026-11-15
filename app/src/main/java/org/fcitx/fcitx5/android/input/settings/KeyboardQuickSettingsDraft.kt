@@ -20,8 +20,7 @@ internal class KeyboardQuickSettingsDraft(
         val palette: ThemePrefs.PressEffectPalette,
         val glowBrightness: Int,
         val glowReach: Int,
-        val samKeyHoldTime: Int,
-        val samKeyRetreatTime: Int,
+        val fadeDuration: Int,
         val candidateGlow: Boolean,
         val idleBreathing: Boolean,
         val keyMotion: ThemePrefs.KeyMotionEffect,
@@ -45,7 +44,7 @@ internal class KeyboardQuickSettingsDraft(
         theme.pressEffect.getValue(), theme.pressColorMode.getValue(), theme.pressEffectPalette.getValue(),
         theme.pressGlowBrightness.getValue(),
         theme.pressGlowReach.getValue(),
-        theme.samKeyHoldTime.getValue(), theme.samKeyRetreatTime.getValue(),
+        theme.pressFadeOutTime.getValue(),
         theme.pressGlowOnCandidates.getValue(), theme.idleBreathing.getValue(),
         theme.keyMotionEffect.getValue(), KeyMotionSettings(
             pressAmplitude = theme.pressMotionAmplitude.getValue(),
@@ -86,8 +85,7 @@ internal class KeyboardQuickSettingsDraft(
         if (original.palette != next.palette) editor.putString(theme.pressEffectPalette.key, next.palette.name)
         int(theme.pressGlowBrightness, original.glowBrightness, next.glowBrightness, 0..100)
         int(theme.pressGlowReach, original.glowReach, next.glowReach, 20..100)
-        int(theme.samKeyHoldTime, original.samKeyHoldTime, next.samKeyHoldTime, 0..1000)
-        int(theme.samKeyRetreatTime, original.samKeyRetreatTime, next.samKeyRetreatTime, 100..5000)
+        int(theme.pressFadeOutTime, original.fadeDuration, next.fadeDuration, 100..5000)
         bool(theme.pressGlowOnCandidates, original.candidateGlow, next.candidateGlow)
         bool(theme.idleBreathing, original.idleBreathing, next.idleBreathing)
         if (original.keyMotion != next.keyMotion) editor.putString(theme.keyMotionEffect.key, next.keyMotion.name)

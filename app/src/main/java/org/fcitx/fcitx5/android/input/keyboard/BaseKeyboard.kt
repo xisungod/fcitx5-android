@@ -146,8 +146,6 @@ abstract class BaseKeyboard(
             ignitionTimeMs = p.pressIgnitionTime.getValue(),
             keyHoldTimeMs = p.pressKeyHoldTime.getValue(),
             keyRetreatTimeMs = p.pressKeyRetreatTime.getValue(),
-            samKeyHoldTimeMs = p.samKeyHoldTime.getValue(),
-            samKeyRetreatTimeMs = p.samKeyRetreatTime.getValue(),
             keySurfaceEffects = true,
             keyColorStyle = p.keyColorStyle.getValue().ordinal,
             keyCornerRadius = p.keyRadius.getValue() * resources.displayMetrics.density,

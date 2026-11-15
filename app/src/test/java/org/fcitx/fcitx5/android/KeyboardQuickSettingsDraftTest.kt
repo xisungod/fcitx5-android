@@ -86,7 +86,7 @@ class KeyboardQuickSettingsDraftTest {
         val keyboard = AppPrefs(stored).keyboard
         val draft = KeyboardQuickSettingsDraft(theme, keyboard)
         draft.values = draft.values.copy(pressEffect = false, glowBrightness = 35,
-            glowReach = 45, samKeyRetreatTime = 220, candidateGlow = false, idleBreathing = true,
+            glowReach = 45, fadeDuration = 220, candidateGlow = false, idleBreathing = true,
             keyMotion = ThemePrefs.KeyMotionEffect.Bounce, numberRow = false, popup = false,
             hapticMode = InputFeedbackMode.Enabled, hapticStrength = 0,
             motionSettings = KeyMotionSettings(pressAmplitude = 14, pressDuration = 260,
@@ -103,7 +103,7 @@ class KeyboardQuickSettingsDraftTest {
             assertEquals(0, keyboard.hapticStrength.getValue())
             assertEquals(InputFeedbackMode.Enabled, keyboard.hapticOnKeyPress.getValue())
             assertEquals(ThemePrefs.KeyMotionEffect.Bounce, theme.keyMotionEffect.getValue())
-            assertEquals(220, theme.samKeyRetreatTime.getValue())
+            assertEquals(220, theme.pressFadeOutTime.getValue())
             assertTrue(theme.idleBreathing.getValue())
             assertEquals(14, theme.pressMotionAmplitude.getValue())
             assertEquals(260, theme.pressMotionDuration.getValue())
@@ -170,7 +170,7 @@ class KeyboardQuickSettingsDraftTest {
         assertEquals(1, theme.reboundMotionAmplitude.getValue())
         assertEquals(400, theme.reboundMotionDuration.getValue())
 
-        draft.values = draft.values.copy(glowBrightness = 35, samKeyRetreatTime = 250,
+        draft.values = draft.values.copy(glowBrightness = 35, fadeDuration = 250,
             keyMotion = ThemePrefs.KeyMotionEffect.Bounce, popup = false,
             colorMode = ThemePrefs.PressColorMode.Single,
             motionSettings = KeyMotionSettings(12, 240, 5, 1500))
@@ -186,7 +186,7 @@ class KeyboardQuickSettingsDraftTest {
         assertEquals(2, stored.applies)
         assertEquals(KeyMotionSettings(), KeyboardQuickSettingsDraft(theme, keyboard).values.motionSettings)
         assertEquals(35, theme.pressGlowBrightness.getValue())
-        assertEquals(250, theme.samKeyRetreatTime.getValue())
+        assertEquals(250, theme.pressFadeOutTime.getValue())
         assertEquals(ThemePrefs.KeyMotionEffect.Bounce, theme.keyMotionEffect.getValue())
         assertFalse(keyboard.popupOnKeyPress.getValue())
         assertFalse(draft.apply())
@@ -218,30 +218,29 @@ class KeyboardQuickSettingsDraftTest {
         assertArrayEquals(intArrayOf(0xFF18FFC1.toInt(), 0xFFD96EFF.toInt()), PressColorPalette.colorsFor(theme, 0))
     }
 
-    @Test fun samTimingEditsPreserveLegacyPreferencesAndConcurrentChanges() {
+    @Test fun sharedFadeEditsPreserveLegacyPreferencesAndConcurrentChanges() {
         val stored = storage("quick-sam-colour-timing")
         val theme = ThemePrefs(stored)
         val keyboard = AppPrefs(stored).keyboard
         theme.pressKeyHoldTime.setValue(37)
         theme.pressKeyRetreatTime.setValue(1783)
+        theme.samKeyHoldTime.setValue(190)
+        theme.samKeyRetreatTime.setValue(1573)
         val draft = KeyboardQuickSettingsDraft(theme, keyboard)
-        assertEquals(80, draft.values.samKeyHoldTime)
-        assertEquals(800, draft.values.samKeyRetreatTime)
-        draft.values = draft.values.copy(samKeyHoldTime = 160, samKeyRetreatTime = 1400)
-        assertEquals("Staging Sam controls cannot persist before Done", 800, theme.samKeyRetreatTime.getValue())
+        assertEquals(900, draft.values.fadeDuration)
+        draft.values = draft.values.copy(fadeDuration = 1400)
+        assertEquals("Staging fade duration cannot persist before Done", 900, theme.pressFadeOutTime.getValue())
         assertTrue(draft.apply())
-        assertEquals(160, theme.samKeyHoldTime.getValue())
-        assertEquals(1400, theme.samKeyRetreatTime.getValue())
+        assertEquals(1400, theme.pressFadeOutTime.getValue())
+        assertEquals(190, theme.samKeyHoldTime.getValue())
+        assertEquals(1573, theme.samKeyRetreatTime.getValue())
         assertEquals(37, theme.pressKeyHoldTime.getValue())
         assertEquals(1783, theme.pressKeyRetreatTime.getValue())
 
         val reopened = KeyboardQuickSettingsDraft(theme, keyboard)
         reopened.values = reopened.values.copy(glowReach = 55)
-        theme.samKeyHoldTime.setValue(190)
-        theme.samKeyRetreatTime.setValue(1573)
+        theme.pressFadeOutTime.setValue(1820)
         assertTrue(reopened.apply())
-        assertEquals(1783, theme.pressKeyRetreatTime.getValue())
-        assertEquals("Changing reach preserves a concurrent Sam hold edit", 190, theme.samKeyHoldTime.getValue())
-        assertEquals(1573, theme.samKeyRetreatTime.getValue())
+        assertEquals("Changing reach preserves a concurrent fade edit", 1820, theme.pressFadeOutTime.getValue())
     }
 }

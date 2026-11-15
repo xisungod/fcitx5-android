@@ -176,12 +176,10 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         listOf(
             Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
             Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 10),
-            Range(R.string.light_effect_wave_fade, prefs.pressFadeOutTime, 100, 5000, 20),
-            Range(R.string.sam_key_hold_time, prefs.samKeyHoldTime, 0, 1000, 10),
-            Range(R.string.sam_key_retreat_time, prefs.samKeyRetreatTime, 100, 5000, 10)
+            Range(R.string.light_effect_fade_duration, prefs.pressFadeOutTime, 100, 5000, 20)
         ).forEach { range -> addRange(animationCard, range, "ms") }
         advanced.addView(animationCard)
-        advanced.addView(text(context.getString(R.string.sam_key_timing_hint), 12f, subdued),
+        advanced.addView(text(context.getString(R.string.light_effect_fade_hint), 12f, subdued),
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(16) })
         updateTotal()
         addDivider(advanced)

@@ -264,16 +264,11 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val pressKeyRetreatTime = ManagedPreference.PInt(sharedPreferences, "press_key_retreat_time", 100)
         .also { it.register() }
 
-    // Sam leaves an independent colour tail after release.
-    val samKeyHoldTime = int(
-        R.string.sam_key_hold_time, "sam_key_hold_time", 80, 0, 1000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() }
-    )
-
-    val samKeyRetreatTime = int(
-        R.string.sam_key_retreat_time, "sam_key_retreat_time", 800, 100, 5000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() }
-    )
+    // Preserve the previous independent SAM timings when reading or restoring backups.
+    val samKeyHoldTime = ManagedPreference.PInt(sharedPreferences, "sam_key_hold_time", 80)
+        .also { it.register() }
+    val samKeyRetreatTime = ManagedPreference.PInt(sharedPreferences, "sam_key_retreat_time", 800)
+        .also { it.register() }
 
     val pressExpansionTime = int(
         R.string.press_expansion_time, "press_expansion_time", 400, 100, 4000, "ms", 50,
@@ -287,7 +282,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     val pressFadeOutTime = int(
         // Unset timings receive the longer tail; saved 520ms and custom values stay intact.
-        R.string.press_fade_out_time, "press_fade_out_time", 900, 100, 5000, "ms", 50,
+        R.string.light_effect_fade_duration, "press_fade_out_time", 900, 100, 5000, "ms", 20,
         enableUiOn = { pressEffect.getValue() }
     )
 

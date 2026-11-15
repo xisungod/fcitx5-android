@@ -709,15 +709,11 @@ internal class KeyboardQuickSettingsUi(
                 topMargin = context.dp(4); bottomMargin = context.dp(8)
             })
             updatePalettePreview()
-            slider(R.string.sam_key_hold_time, "quick_sam_key_hold", draft.values.samKeyHoldTime,
-                0, 1000, 10, R.string.keyboard_quick_settings_value_ms) {
-                draft.values = draft.values.copy(samKeyHoldTime = it)
+            slider(R.string.light_effect_fade_duration, "quick_glow_fade", draft.values.fadeDuration,
+                100, 5000, 20, R.string.keyboard_quick_settings_value_ms) {
+                draft.values = draft.values.copy(fadeDuration = it)
             }
-            slider(R.string.sam_key_retreat_time, "quick_sam_key_retreat", draft.values.samKeyRetreatTime,
-                100, 5000, 10, R.string.keyboard_quick_settings_value_ms) {
-                draft.values = draft.values.copy(samKeyRetreatTime = it)
-            }
-            note(R.string.sam_key_timing_hint)
+            note(R.string.light_effect_fade_hint)
             slider(R.string.press_glow_brightness, "quick_glow_brightness", draft.values.glowBrightness, 0, 100, 5) {
                 draft.values = draft.values.copy(glowBrightness = it)
             }

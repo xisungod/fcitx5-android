@@ -93,10 +93,8 @@ internal class PressEffect(
     coordinatePalette: Boolean = true,
     private val rippleShape: org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape =
         org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.SoftMist,
-    /** Floating motion keeps colour visible through the rise; Sam also has its own release tail. */
-    private val keyFloatOpacity: ((Int) -> Float)? = null,
-    samKeyHoldTimeMs: Int = 80,
-    samKeyRetreatTimeMs: Int = 800
+    /** Legacy faces can follow the per-key floating motion. */
+    private val keyFloatOpacity: ((Int) -> Float)? = null
 ) {
 
     private val samGlare = rippleShape == org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.Sam
@@ -127,8 +125,6 @@ internal class PressEffect(
     private val waveDuration = fadeStart + fadeDuration
     private val keyHoldDuration = keyHoldTimeMs.coerceIn(20, 1000).toLong()
     private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(20, 5000).toLong()
-    private val samKeyHoldDuration = samKeyHoldTimeMs.coerceIn(0, 1000).toLong()
-    private val samKeyRetreatDuration = samKeyRetreatTimeMs.coerceIn(100, 5000).toLong()
     private val duration = max(waveDuration, keyHoldDuration + keyRetreatDuration)
     private val keyFlashTextures = KEY_FLASH_TEXTURES
     private val underStrength = if (lightLegends) 1f else 0.9f
@@ -137,19 +133,13 @@ internal class PressEffect(
     @Suppress("UNUSED_PARAMETER")
     private val legacyOverKeys = overKeysPercent
 
-    /** returns (alpha, retreat 0..1) of the key face, or null once the face is gone */
+    /** Returns the face alpha and updates its retreat fraction for the legacy renderer. */
     private fun keyEnvelope(r: PressEffectTrail.Ripple, now: Long): Float {
         if (samGlare) {
             envelopeRetreat = 0f
-            if (r.releasedAt < 0L) return 0.92f
-            val released = (now - r.releasedAt).coerceAtLeast(0L).toFloat()
-            val tail = 1f - smoothstep(samKeyHoldDuration.toFloat(),
-                (samKeyHoldDuration + samKeyRetreatDuration).toFloat(), released)
-            val motion = if (holdWhilePressed && r.keyFill)
-                keyFloatOpacity?.invoke(r.keyId)?.coerceIn(0f, 1f) ?: 0f else 0f
-            // Geometry may land first or last depending on the motion settings.
-            // Neither clock can cut off the other; subsequent keys own neither.
-            return 0.92f * max(motion, tail)
+            // The face responds on DOWN; the source halo adds a short, soft ignition.
+            // Neither lifting the finger nor the key's rebound restarts the colour.
+            return 0.92f * samLightFade((now - r.start).toFloat(), waveHoldDuration, fadeDuration)
         }
         if (holdWhilePressed && r.keyFill && keyFloatOpacity != null) {
             // The real KeyView supplies its own per-key elevation/fade state.
@@ -198,7 +188,9 @@ internal class PressEffect(
     private val neonField = if (sharedFieldEnabled) NeonField() else null
     private var fieldPreparedAt = Long.MIN_VALUE
     private val keyFaces = PressEffectTrail(MAX_KEY_FACES)
-    private val heldFaces = android.util.SparseArray<PressEffectTrail.Ripple>()
+    // Sam tracks which pointers are held for the idle light without retaining a
+    // reference to a face that can expire and be recycled before that pointer lifts.
+    private val heldFaces = android.util.SparseArray<PressEffectTrail.Ripple?>()
     private val ownedColorKeys = android.util.SparseBooleanArray()
     private fun clearOwnedColors() {
         for (i in 0 until ownedColorKeys.size()) forgetKeyColor(ownedColorKeys.keyAt(i))
@@ -303,7 +295,7 @@ internal class PressEffect(
         }
     }
 
-    /** Releasing one finger must leave the other pressed keys illuminated. */
+    /** Releasing one finger must not disturb the other pressed keys. */
     fun onRelease(pointerId: Int) {
         val now = clock()
         releasePointer(pointerId, now)
@@ -493,7 +485,7 @@ internal class PressEffect(
             face.x = pressX
             face.y = pressY
         }
-        heldFaces.put(pointerId, face)
+        heldFaces.put(pointerId, if (samGlare) null else face)
         fieldPreparedAt = Long.MIN_VALUE
         displayFrameClock = max(displayFrameClock, now)
         host.postInvalidateOnAnimation()
@@ -516,13 +508,13 @@ internal class PressEffect(
         if (ripples.size > 0 || keyFaces.size > 0) draw(canvas, underStrength)
     }
 
-    /** Mist faces rest while held; a visible liquid rim continues its local flow. */
+    /** Schedule frames while a visible effect is still changing. */
     fun drawOver(canvas: Canvas) {
         if (!canDraw() || !animatorsEnabled()) return
         var changing = glowStrength > 0f && ripples.size > 0
         if (!changing) for (i in 0 until keyFaces.size) {
             val face = keyFaces[i]
-            if ((!holdWhilePressed || face.releasedAt >= 0L || (liquidKeyFaces && face.keyFill)) &&
+            if ((samGlare || !holdWhilePressed || face.releasedAt >= 0L || (liquidKeyFaces && face.keyFill)) &&
                 keyEnvelope(face, frameTime) > 0f) {
                 changing = true
                 break
@@ -680,7 +672,7 @@ internal class PressEffect(
         horizontalInset: Int = 0, verticalInset: Int = 0): Float {
         if (!keySurfaceEffects || !canDraw() || !animatorsEnabled()) return 0f
         if (keyColorStyle == KEY_STYLE_OFF) return 0f
-        val now = clock()
+        val now = if (samGlare) drawClock() else clock()
         val ripple = keyFaces.findKey(keyId) ?: return 0f
         if (!ripple.keyFill) return 0f
         val a = keyEnvelope(ripple, now)

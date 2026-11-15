@@ -290,7 +290,7 @@ internal class SamKeyLightField(
     }
 
     private fun envelope(age: Float): Float = smooth(0f, 32f, age) *
-        (1f - smooth(holdMs.toFloat(), (holdMs + fadeMs).toFloat(), age))
+        samLightFade(age, holdMs, fadeMs)
 
     private fun accumulate(stamp: Stamp, energy: Float, r: Float, g: Float, b: Float) {
         for (i in stamp.pixels.indices) {
