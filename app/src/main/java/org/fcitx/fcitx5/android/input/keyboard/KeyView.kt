@@ -227,7 +227,9 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         }
         // key border
         if (theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam) {
-            appearanceView.background = insetRadiusDrawable(hMargin, vMargin, radius, Color.BLACK)
+            // Caps are dark glass over the light plate: black at rest, and a fifth of the
+            // light below shows through, as on the Samsung keyboard this mode follows.
+            appearanceView.background = insetRadiusDrawable(hMargin, vMargin, radius, SAM_CAP_COLOR)
             appearanceView.padding = 0
             appearanceView.foreground = null
         } else if ((bordered && def.border != Border.Off) || def.border == Border.On) {
@@ -581,3 +583,6 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
         updateMargins(newConfig.orientation)
     }
 }
+
+/** Black at 80% opacity. */
+private val SAM_CAP_COLOR = Color.argb(0xCC, 0, 0, 0)

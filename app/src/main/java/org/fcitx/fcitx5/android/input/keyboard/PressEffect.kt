@@ -127,11 +127,6 @@ internal class PressEffect(
     private val fadeDuration = fadeOutTimeMs.coerceIn(100, 5000).toLong()
     private val fadeStart = ignitionDuration + expansionDuration + waveHoldDuration
     private val waveDuration = fadeStart + fadeDuration
-    // Let the source glow outlast the travelling front's initial expansion.
-    // At the defaults this holds through 120ms and retreats until 670ms, while
-    // the whole field still obeys the user's selected hold/fade lifetime.
-    private val samWakeHold = expansionDuration * 0.30f
-    private val samWakeRetreatEnd = expansionDuration + min(fadeDuration * 0.30f, expansionDuration * 0.75f)
     private val keyHoldDuration = keyHoldTimeMs.coerceIn(20, 1000).toLong()
     private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(20, 5000).toLong()
     private val samKeyHoldDuration = samKeyHoldTimeMs.coerceIn(0, 1000).toLong()
@@ -690,7 +685,6 @@ internal class PressEffect(
     private fun waveProgress(spread: Long): Float {
         val t = (spread.toFloat() / expansionDuration).coerceIn(0f, 1f)
         val remaining = 1f - t
-        if (samGlare) return smoothstep(0f, 1f, t)
         return 1f - remaining * remaining * remaining
     }
 
@@ -1094,48 +1088,57 @@ internal class PressEffect(
             node.blue = if (coordinatedNeon) 0f else Color.blue(color) / 255f
         }
 
+        /**
+         * The Samsung reference is a pool of light, not a ring: it grows quickly from the key
+         * to about six keys' reach, stays lit all the way back to its centre, shifts hue from
+         * the centre outwards, and then the whole pool dims together.
+         */
         private fun prepareSamNode(node: FieldNode, ripple: PressEffectTrail.Ripple, alpha: Float, progress: Float) {
             val pitch = logicalWidth / 10f
             val reach = sqrt(sizeScale * glowReach)
-            val travel = pitch * 5.1f * reach * ripple.size * progress
-            val phase = (frameTime - ripple.start).toFloat() / 820f + ripple.shape * 0.83f
-            node.x = ripple.x + ripple.driftX * progress * 0.18f
-            node.y = ripple.y + ripple.driftY * progress * 0.18f
-            // A broad band advances between black caps and leaves connected
-            // colour behind it. Keep its later travel visible: a narrow, weakening
-            // crest reads as a faint outline instead of the reference's moving wash.
+            val travel = pitch * 6.2f * reach * ripple.size * progress
+            node.x = ripple.x
+            node.y = ripple.y
             node.halfWidth = min(ripple.flashWidth / 2f, pitch / 2f) + travel
-            node.halfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.76f
-            // Fast broad reach belongs to the dim shoulder. The much smaller
-            // bright core remains attached to this particular touch location.
-            node.coreHalfWidth = min(ripple.flashWidth / 2f, pitch / 2f) +
-                pitch * 0.90f * reach * ripple.size * progress
-            node.coreHalfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) +
-                pitch * 0.88f * reach * ripple.size * progress
-            node.candidateCoreHalfWidth = node.coreHalfWidth
-            node.candidateCoreHalfHeight = node.coreHalfHeight
+            node.halfHeight = min(ripple.flashHeight / 2f, pitch * 0.6f) + travel * 0.9f
+            node.coreHalfWidth = node.halfWidth
+            node.coreHalfHeight = node.halfHeight
+            node.candidateCoreHalfWidth = node.halfWidth
+            node.candidateCoreHalfHeight = node.halfHeight
             node.corner = min(node.halfWidth, node.halfHeight)
-            node.feather = 5f * density + travel * 0.18f
-            node.samFrontWidth = pitch * 0.85f + travel * 0.26f
-            node.samFrontStrength = 0.62f * (1f - 0.18f * smoothstep(0.65f, 1f, progress))
-            // A soft afterglow recedes on its own clock instead of hollowing out
-            // the centre as soon as the front reaches full size. It still dims
-            // beneath the outgoing band, without holding a bright static pool.
-            // Key-face colour keeps its independent release clock.
-            val elapsed = (frameTime - ripple.start).coerceAtLeast(0L).toFloat()
-            node.samWakeStrength = 1f - 0.94f * smoothstep(samWakeHold, samWakeRetreatEnd, elapsed)
-            node.bendX = travel * 0.018f
-            node.bendY = travel * 0.014f
-            node.curveX = kotlin.math.sin(phase)
-            node.skewX = cos(phase * 0.73f)
-            node.curveY = cos(phase * 0.81f)
-            node.skewY = kotlin.math.sin(phase * 0.67f)
+            // A wide soft skirt: the pool has no visible rim at any size.
+            node.feather = 4f * density + min(node.halfWidth, node.halfHeight) * 0.45f
+            node.bendX = 0f
+            node.bendY = 0f
+            node.curveX = 0f
+            node.skewX = 0f
+            node.curveY = 0f
+            node.skewY = 0f
             node.fluidMix = 0f
             node.weight = alpha
+            // The outer part of the pool sits further along the palette than its centre, and
+            // the whole pool drifts the same way while it fades.
+            val elapsed = (frameTime - ripple.start).coerceAtLeast(0L).toFloat()
+            val aging = smoothstep(expansionDuration * 0.5f, waveDuration.toFloat(), elapsed)
             val color = colors[ripple.colorIndex]
-            node.red = if (coordinatedNeon) ripple.colorPosition else Color.red(color) / 255f
-            node.green = if (coordinatedNeon) 0f else Color.green(color) / 255f
-            node.blue = if (coordinatedNeon) 0f else Color.blue(color) / 255f
+            if (coordinatedNeon) {
+                val span = if (cyclicNeon) colors.size * SAM_HUE_SPAN
+                    else (colors.size - 1) * SAM_FAMILY_SPAN *
+                        (if (ripple.colorIndex * 2 < colors.size) 1f else -1f)
+                node.red = ripple.colorPosition + span * 0.30f * aging
+                node.green = 0f
+                node.blue = 0f
+                node.hueSpan = span
+            } else {
+                val outer = colors[(ripple.colorIndex + 1) % colors.size]
+                node.red = Color.red(color) / 255f
+                node.green = Color.green(color) / 255f
+                node.blue = Color.blue(color) / 255f
+                node.outerRed = Color.red(outer) / 255f
+                node.outerGreen = Color.green(outer) / 255f
+                node.outerBlue = Color.blue(outer) / 255f
+                node.hueSpan = 0f
+            }
         }
 
         private fun prepareOlder(end: Int): Boolean {
@@ -1296,26 +1299,20 @@ internal class PressEffect(
                 val coverage = 1f - smoothstep(-feather * 0.20f, feather, distance)
                 if (coverage <= 0f) continue
                 val index = y * gridWidth + x
+                var hueShift = 0f
                 val w = if (samGlare) {
-                    val horizontal = (node.dx[x] - node.rowBend[y]) / node.coreHalfWidth
-                    val vertical = (node.dy[y] - node.columnBend[x]) / node.coreHalfHeight
-                    val coreRadius = horizontal * horizontal + vertical * vertical
-                    val coreDenominator = 1f + coreRadius
-                    val core = 0.68f / (coreDenominator * coreDenominator)
-                    val outerX = (node.dx[x] - node.rowBend[y]) / node.halfWidth
-                    val outerY = (node.dy[y] - node.columnBend[x]) / node.halfHeight
-                    val outerRadius = sqrt(outerX * outerX + outerY * outerY)
-                    val shoulder = 0.13f / (1f + 2f * outerRadius * outerRadius)
-                    val distanceFromFront = abs(outerRadius - 0.78f) * min(node.halfWidth, node.halfHeight)
-                    val front = node.samFrontStrength *
-                        (1f - smoothstep(0f, node.samFrontWidth, distanceFromFront))
-                    val wake = (core + shoulder - core * shoulder) * node.samWakeStrength
-                    val exposure = (node.weight / 1.35f) * coverage * (wake + front - wake * front)
-                    // The strongest local source determines exposure; another
-                    // distant shoulder cannot lift the whole scene to its peak.
-                    // max is continuous as sources expand and fade, so their
-                    // boundaries join without a new-wave reset or a hard ring.
-                    exposureBuffer!![index] = max(exposureBuffer[index], exposure)
+                    val outerX = node.dx[x] / node.halfWidth
+                    val outerY = node.dy[y] / node.halfHeight
+                    val square = outerX * outerX + outerY * outerY
+                    // Brightest at the key, still clearly lit at the edge of the pool.
+                    val fall = 1f + 2.2f * square
+                    val body = 0.38f + 0.62f / (fall * fall)
+                    val exposure = ((node.weight / 1.35f) * coverage * body).coerceIn(0f, 1f)
+                    // Lights add up like light: two pools are brighter where they overlap,
+                    // and no number of them can exceed full brightness.
+                    val before = exposureBuffer!![index]
+                    exposureBuffer[index] = before + exposure - before * exposure
+                    hueShift = smoothstep(0.02f, 0.90f, square)
                     // Prefer the actual local colour pool over the numerous
                     // faint far tails. Old sources retain their own colours.
                     exposure * exposure
@@ -1326,9 +1323,17 @@ internal class PressEffect(
                         node.weight * coverage * (compact + (bridge - compact) * node.candidateMix[y])
                     } else node.weight * coverage * node.columnDensity[x] * node.rowDensity[y]
                 wBuffer[index] += w
-                rBuffer[index] += w * node.red
-                gBuffer[index] += w * node.green
-                bBuffer[index] += w * node.blue
+                if (!samGlare) {
+                    rBuffer[index] += w * node.red
+                    gBuffer[index] += w * node.green
+                    bBuffer[index] += w * node.blue
+                } else if (coordinatedNeon) {
+                    rBuffer[index] += w * (node.red + node.hueSpan * hueShift)
+                } else {
+                    rBuffer[index] += w * (node.red + (node.outerRed - node.red) * hueShift)
+                    gBuffer[index] += w * (node.green + (node.outerGreen - node.green) * hueShift)
+                    bBuffer[index] += w * (node.blue + (node.outerBlue - node.blue) * hueShift)
+                }
             }
         }
     }
@@ -1355,9 +1360,11 @@ internal class PressEffect(
         var skewX = 0f
         var skewY = 0f
         var fluidMix = 0f
-        var samFrontWidth = 0f
-        var samFrontStrength = 0f
-        var samWakeStrength = 1f
+        /** Sam: how far along the palette the edge of a pool sits from its centre. */
+        var hueSpan = 0f
+        var outerRed = 0f
+        var outerGreen = 0f
+        var outerBlue = 0f
         var fluidCos2 = 0f
         var fluidSin2 = 0f
         var fluidCos3 = 0f
@@ -1531,6 +1538,10 @@ internal class PressEffect(
         private const val FIELD_OLD_WIDTH = 40
         private const val FIELD_OLD_HEIGHT = 32
         private const val FIELD_OLD_PIXELS = FIELD_OLD_WIDTH * FIELD_OLD_HEIGHT
+        /** Of the full colour wheel: about a quarter turn from the centre of a pool to its edge. */
+        private const val SAM_HUE_SPAN = 0.24f
+        /** Of a bounded colour family: most of the way to its far end. */
+        private const val SAM_FAMILY_SPAN = 0.7f
         private const val FRESH_LIGHT_BUDGET = 1.50f
         private const val OLD_LIGHT_BUDGET = 0.30f
         private const val BRIDGE_LIGHT_BUDGET = 0.40f
