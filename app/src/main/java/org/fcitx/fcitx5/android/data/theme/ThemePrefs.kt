@@ -275,6 +275,11 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         enableUiOn = { pressEffect.getValue() }
     )
 
+    fun pressExpansionTimeFor(shape: RippleShape): Int =
+        if (shape == RippleShape.Sam || sharedPreferences.contains(pressExpansionTime.key))
+            pressExpansionTime.getValue()
+        else 400
+
     val pressWaveHoldTime = int(
         R.string.press_wave_hold_time, "press_wave_hold_time", 40, 0, 2000, "ms", 10,
         enableUiOn = { pressEffect.getValue() }

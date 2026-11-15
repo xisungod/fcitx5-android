@@ -121,13 +121,14 @@ abstract class BaseKeyboard(
 
     /** colourful press effect (Keys Cafe style), drawn under and over the keys */
     private val pressEffectLayer: PressEffect? = ThemeManager.prefs.let { p ->
+        val rippleShape = if (useEffectTheme) ThemePrefs.RippleShape.Sam else ThemePrefs.RippleShape.SoftMist
         if (!p.pressEffect.getValue() && !p.idleBreathing.getValue()) null
         else PressEffect(
             this,
             PressColorPalette.colorsFor(p, theme.accentKeyBackgroundColor),
             theme.isDark,
             p.pressEffectSize.getValue(),
-            p.pressExpansionTime.getValue(),
+            p.pressExpansionTimeFor(rippleShape),
             p.pressFadeOutTime.getValue(),
             p.pressEffectOverKeys.getValue(),
             p.pressEffect.getValue(),
@@ -161,7 +162,7 @@ abstract class BaseKeyboard(
             glowBrightnessPercent = p.pressGlowBrightness.getValue(),
             waveHoldTimeMs = p.pressWaveHoldTime.getValue(),
             coordinatePalette = p.pressColorMode.getValue() == ThemePrefs.PressColorMode.Random,
-            rippleShape = if (useEffectTheme) ThemePrefs.RippleShape.Sam else ThemePrefs.RippleShape.SoftMist,
+            rippleShape = rippleShape,
             keyFloatOpacity = if (keyMotion == ThemePrefs.KeyMotionEffect.Press)
                 { keyId -> floatingKeys.get(keyId)?.floatingFaceOpacity() ?: 0f } else null
         )

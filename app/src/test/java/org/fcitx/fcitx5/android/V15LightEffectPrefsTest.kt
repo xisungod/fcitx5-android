@@ -69,6 +69,8 @@ class V15LightEffectPrefsTest {
         assertEquals(80, prefs.samKeyHoldTime.getValue())
         assertEquals(800, prefs.samKeyRetreatTime.getValue())
         assertEquals(550, prefs.pressExpansionTime.getValue())
+        assertEquals(550, prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.Sam))
+        assertEquals(400, prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.SoftMist))
         assertEquals(40, prefs.pressWaveHoldTime.getValue())
         assertEquals(900, prefs.pressFadeOutTime.getValue())
         assertEquals(1530, prefs.pressIgnitionTime.getValue() + prefs.pressExpansionTime.getValue() +
@@ -164,6 +166,8 @@ class V15LightEffectPrefsTest {
         assertEquals(260, prefs.pressKeyHoldTime.getValue())
         assertEquals(1800, prefs.pressKeyRetreatTime.getValue())
         assertEquals(1400, prefs.pressExpansionTime.getValue())
+        assertEquals(1400, prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.Sam))
+        assertEquals(1400, prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.SoftMist))
         assertEquals(350, prefs.pressWaveHoldTime.getValue())
         assertEquals(900, prefs.pressFadeOutTime.getValue())
         assertEquals(ThemePrefs.PressColorMode.Custom, prefs.pressColorMode.getValue())

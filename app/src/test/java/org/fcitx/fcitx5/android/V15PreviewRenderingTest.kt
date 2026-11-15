@@ -303,7 +303,8 @@ class V15PreviewRenderingTest {
     private fun defaultSoftTiming(): EffectTiming {
         val prefs = ThemeManager.prefs
         val timing = EffectTiming(prefs.pressIgnitionTime.getValue().toLong(),
-            prefs.pressExpansionTime.getValue().toLong(), prefs.pressWaveHoldTime.getValue().toLong(),
+            prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.SoftMist).toLong(),
+            prefs.pressWaveHoldTime.getValue().toLong(),
             prefs.pressFadeOutTime.getValue().toLong(), prefs.pressKeyHoldTime.getValue().toLong(),
             prefs.pressKeyRetreatTime.getValue().toLong())
         assertEquals("Use the APK's current extended default wave tail", 1380L, timing.waveTotal)
