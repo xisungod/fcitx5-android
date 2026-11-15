@@ -10,7 +10,6 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ScheduledThreadPoolExecutor
-import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -309,9 +308,7 @@ internal class LocalOfflineDictationSession(
         // Native construction is bounded separately: cancel/timeout frees the recognition
         // worker, while a late load owns and closes its result. A stuck load rejects retries
         // rather than accumulating threads or parallel native model allocations.
-        val sharedEngineLoader: Executor = ThreadPoolExecutor(
-            0, 1, 15L, TimeUnit.SECONDS, SynchronousQueue()
-        ) { runnable -> Thread(runnable, "axiang-offline-dictation-load").apply { isDaemon = true } }
+        val sharedEngineLoader: Executor = BoundedDictationEngineLoader()
         val loadTimers = ScheduledThreadPoolExecutor(1) { runnable ->
             Thread(runnable, "axiang-dictation-load-timeout").apply { isDaemon = true }
         }.apply {

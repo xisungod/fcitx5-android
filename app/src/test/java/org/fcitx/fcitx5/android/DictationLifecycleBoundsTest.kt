@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 package org.fcitx.fcitx5.android
 
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -11,7 +12,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ScheduledThreadPoolExecutor
-import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -38,7 +38,11 @@ class DictationLifecycleBoundsTest {
     }
 
     private fun waitFor(session: OfflineDictationSession, phase: OfflineDictationPhase) = runBlocking {
-        withTimeout(3_000) { session.state.first { it.phase == phase } }
+        try {
+            withTimeout(3_000) { session.state.first { it.phase == phase } }
+        } catch (timeout: TimeoutCancellationException) {
+            throw AssertionError("Expected $phase; actual=${session.state.value}", timeout)
+        }
     }
 
     @Test fun cancelDuringNativeConstructionFreesTheWorkerAndClosesTheLateResultOnce() {
@@ -80,7 +84,8 @@ class DictationLifecycleBoundsTest {
 
     @Test fun nativeLoadDeadlineStopsAudioAndRejectsOverlappingLoadsUntilTheOldOneReturns() {
         val worker = Executors.newSingleThreadExecutor()
-        val loader = ThreadPoolExecutor(0, 1, 1L, TimeUnit.SECONDS, SynchronousQueue<Runnable>())
+        val loaderWorker = ThreadPoolExecutor(0, 1, 1L, TimeUnit.SECONDS, LinkedBlockingQueue<Runnable>(1))
+        val loader = BoundedDictationEngineLoader(loaderWorker)
         val timers = ScheduledThreadPoolExecutor(1)
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
@@ -112,7 +117,7 @@ class DictationLifecycleBoundsTest {
             assertEquals("", second.state.value.transcript)
         } finally {
             release.countDown(); first.close(); second.close()
-            worker.shutdownNow(); loader.shutdownNow(); timers.shutdownNow()
+            worker.shutdownNow(); loaderWorker.shutdownNow(); timers.shutdownNow()
         }
     }
 
