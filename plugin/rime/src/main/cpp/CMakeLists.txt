@@ -77,6 +77,7 @@ install(FILES
         "${XUANCAI_RIME_DATA}/custom_phrase.txt"
         "${XUANCAI_RIME_DATA}/symbols_v.yaml"
         "${XUANCAI_RIME_DATA}/xuancai_mobile.yaml"
+        "${XUANCAI_RIME_DATA}/axiang_moegirl.yaml"
         "${XUANCAI_RIME_DATA}/zh-hans-t-essay-bgw-compact.gram"
         DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
         COMPONENT prebuilt-assets)

@@ -6,4 +6,15 @@
     <string name="rime_dictionary_import_saved">Saved %1$d entries. Select Rime, then tap Apply and deploy Rime configuration to activate them.</string>
     <string name="rime_dictionary_import_bad_line">Line %1$d has an invalid format. Use phrase [TAB] space-separated pinyin [TAB] optional weight (0–100000). The previous dictionary is unchanged.</string>
     <string name="rime_dictionary_import_failed">Could not finish importing. Check UTF-8 encoding, file size and dictionary format.</string>
+    <string name="rime_moegirl_import">Import Moegirlpedia dictionary</string>
+    <string name="rime_moegirl_import_summary">Optional names from games and animation. The dictionary runs offline after import.</string>
+    <string name="rime_moegirl_source">Get moegirl.dict.yaml from release %1$s. The dictionary comes from Moegirlpedia contributors via outloudvi/mw2fcitx and uses the CC BY-NC-SA licence. Select the downloaded file to install it; the dictionary stays off until you enable it.</string>
+    <string name="rime_moegirl_open_release">Open release page</string>
+    <string name="rime_moegirl_choose_file">Choose file</string>
+    <string name="rime_moegirl_enable">Use Moegirlpedia dictionary</string>
+    <string name="rime_moegirl_enable_summary">Adds optional candidates in Rime full pinyin and T9. Changing this starts a Rime deployment.</string>
+    <string name="rime_moegirl_not_installed">Import the dictionary before enabling it.</string>
+    <string name="rime_moegirl_imported">Moegirlpedia dictionary imported. Turn on its switch to use it.</string>
+    <string name="rime_moegirl_wrong_release">Select the original moegirl.dict.yaml from release %1$s.</string>
+    <string name="rime_moegirl_failed">Could not change the Moegirlpedia dictionary. Try again.</string>
 </resources>

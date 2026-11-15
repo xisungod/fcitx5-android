@@ -6,4 +6,15 @@
     <string name="rime_dictionary_import_saved">已儲存 %1$d 條詞語。請切換至 Rime，再點「套用並重新部署 Rime 設定」啟用。</string>
     <string name="rime_dictionary_import_bad_line">第 %1$d 行格式有誤。請用：詞語 [Tab] 以空格分開的拼音 [Tab] 可選權重（0–100000）。原詞庫未變更。</string>
     <string name="rime_dictionary_import_failed">未完成匯入，請檢查 UTF-8 編碼、檔案大小與詞條格式。</string>
+    <string name="rime_moegirl_import">匯入萌娘百科詞庫</string>
+    <string name="rime_moegirl_import_summary">按需補充動漫、遊戲等專名，匯入後離線使用。</string>
+    <string name="rime_moegirl_source">請下載 %1$s 版的 moegirl.dict.yaml。詞庫來自萌娘百科貢獻者及 outloudvi/mw2fcitx，採用 CC BY-NC-SA 授權。選取下載的檔案即可匯入，詞庫預設關閉。</string>
+    <string name="rime_moegirl_open_release">開啟發行頁</string>
+    <string name="rime_moegirl_choose_file">選擇檔案</string>
+    <string name="rime_moegirl_enable">使用萌娘百科詞庫</string>
+    <string name="rime_moegirl_enable_summary">為霧凇全拼和九鍵提供擴充候選。切換後會重新部署 Rime。</string>
+    <string name="rime_moegirl_not_installed">匯入詞庫後即可開啟。</string>
+    <string name="rime_moegirl_imported">已匯入萌娘百科詞庫。開啟開關後即可使用。</string>
+    <string name="rime_moegirl_wrong_release">請選擇 %1$s 版發行頁的原始 moegirl.dict.yaml 檔案。</string>
+    <string name="rime_moegirl_failed">無法修改萌娘百科詞庫，請再試一次。</string>
 </resources>

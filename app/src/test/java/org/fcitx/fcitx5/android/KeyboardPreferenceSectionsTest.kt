@@ -19,6 +19,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
+import androidx.preference.SwitchPreferenceCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,7 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.rime.RimeFuzzyConfig
+import org.fcitx.fcitx5.android.data.rime.RimeMoegirlDictionary
 import org.fcitx.fcitx5.android.data.rime.RimePersonalDictionary
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.TwinSeekBarPreference
@@ -250,7 +252,10 @@ class KeyboardPreferenceSectionsTest {
         override fun runIfReady(block: suspend FcitxAPI.() -> Unit) { runBlocking { block(api) } }
     }
 
-    private fun withTypingFragment(block: (AppCompatActivity, TypingSettingsFragment, RecordingEngine, File) -> Unit) {
+    private fun withTypingFragment(
+        prepareDirectory: (File) -> Unit = {},
+        block: (AppCompatActivity, TypingSettingsFragment, RecordingEngine, File) -> Unit
+    ) {
         @Suppress("UNCHECKED_CAST")
         val clients = FcitxDaemon::class.java.getDeclaredField("clients").run {
             isAccessible = true
@@ -266,6 +271,7 @@ class KeyboardPreferenceSectionsTest {
         val directory = (application.getExternalFilesDir(null) ?: application.filesDir).resolve("data/rime")
         directory.mkdirs()
         try {
+            prepareDirectory(directory)
             val host = FrameLayout(controller.get()).apply { id = View.generateViewId() }
             controller.get().setContentView(host)
             val fragment = TypingSettingsFragment()
@@ -409,6 +415,64 @@ class KeyboardPreferenceSectionsTest {
             }
             assertEquals(setOf("已有", "阿祥"), RimePersonalDictionary.readStored(dictionary.readText()).map { it.text }.toSet())
             assertEquals(listOf(71), engine.deployments.toList())
+        }
+    }
+
+    @Test fun moegirlPackIsDisabledAndNeverDeploysBeforeImport() {
+        withTypingFragment { activity, fragment, engine, directory ->
+            val optional = fragment.findPreference<SwitchPreferenceCompat>(KeyboardPreferenceSections.MOEGIRL_ENABLE_KEY)!!
+            val installer = fragment.findPreference<Preference>(KeyboardPreferenceSections.MOEGIRL_IMPORT_KEY)!!
+            assertEquals("typing_dictionary", optional.parent!!.key)
+            assertFalse(optional.isChecked)
+            assertFalse(optional.isEnabled)
+            assertTrue(installer.isEnabled)
+            installer.performClick()
+            val dialog = ShadowDialog.getLatestDialog() as AlertDialog
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            // AlertDialog dispatches the button callback through the paused UI loop.
+            shadowOf(Looper.getMainLooper()).idle()
+            val request = shadowOf(activity).nextStartedActivityForResult
+            assertNotNull("Choosing the local dictionary must launch the system picker", request)
+            assertEquals(Intent.ACTION_OPEN_DOCUMENT, request.intent.action)
+            val uri = Uri.parse("content://axiang-test/wrong-dictionary.yaml")
+            shadowOf(activity.contentResolver).registerInputStream(uri, ByteArrayInputStream("invalid".toByteArray()))
+            shadowOf(activity).receiveResult(request.intent, Activity.RESULT_OK, Intent().setData(uri))
+            awaitUi("The invalid import must return to the settings screen") { installer.isEnabled }
+            assertFalse(optional.isEnabled)
+            assertFalse(directory.resolve(RimeMoegirlDictionary.DICTIONARY_FILE).exists())
+            assertFalse(directory.resolve(RimeMoegirlDictionary.CONFIG_FILE).exists())
+            assertTrue(engine.deployments.isEmpty())
+        }
+    }
+
+    @Test fun moegirlSwitchOnlyChangesItsOwnPatchAndDeploysBothWays() {
+        withTypingFragment(prepareDirectory = { directory ->
+            val id = RimeMoegirlDictionary.ID
+            listOf(RimeMoegirlDictionary.DICTIONARY_FILE, "$id.schema.yaml", "${id}_t9.schema.yaml")
+                .forEach { directory.resolve(it).writeText("Previously installed source") }
+            directory.resolve(RimePersonalDictionary.FILE_NAME).writeText("Personal words")
+            directory.resolve("rime_ice.custom.yaml").writeText("My Rime customisation")
+            directory.resolve("xuancai_mobile.yaml").writeText(RimeFuzzyConfig.render(true, false, false))
+        }) { _, fragment, engine, directory ->
+            val optional = fragment.findPreference<SwitchPreferenceCompat>(KeyboardPreferenceSections.MOEGIRL_ENABLE_KEY)!!
+            val patch = directory.resolve(RimeMoegirlDictionary.CONFIG_FILE)
+            assertTrue(optional.isEnabled)
+            assertFalse(optional.isChecked)
+            assertFalse(patch.exists())
+            optional.performClick()
+            awaitUi("Enabling must apply the QWERTY and T9 patch and deploy") {
+                engine.deployments.size == 1 && optional.isEnabled && optional.isChecked
+            }
+            assertTrue(patch.readText().contains("schema/dependencies/+: [axiang_moegirl_t9]"))
+            assertTrue(patch.readText().contains("engine/translators/+: [script_translator@axiang_moegirl]"))
+            optional.performClick()
+            awaitUi("Disabling must remove both translators and deploy") {
+                engine.deployments.size == 2 && optional.isEnabled && !optional.isChecked
+            }
+            assertEquals("qwerty: {}\nt9: {}\n", patch.readText())
+            assertEquals("Personal words", directory.resolve(RimePersonalDictionary.FILE_NAME).readText())
+            assertEquals("My Rime customisation", directory.resolve("rime_ice.custom.yaml").readText())
+            assertEquals(RimeFuzzyConfig.render(true, false, false), directory.resolve("xuancai_mobile.yaml").readText())
         }
     }
 }

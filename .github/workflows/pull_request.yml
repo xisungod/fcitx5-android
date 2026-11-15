@@ -54,16 +54,20 @@ jobs:
           python3 scripts/prepare-axiang-touch9-build.py prepare \
             --work "$RUNNER_TEMP/axiang-touch9" --label "$APP_LABEL"
 
-      - name: Install Lua for the Rime correction test
+      - name: Install host tools for Rime schema compilation
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y liblua5.4-0
+          sudo apt-get install -y cmake ninja-build pkg-config libboost-regex-dev libyaml-cpp-dev libmarisa-dev libopencc-dev libleveldb-dev liblua5.4-dev libgoogle-glog-dev
 
       - name: Apply and verify the bounded Pinyin corrections
         run: |
           python3 scripts/prepare-touch-rime-corrections.py --work "$RUNNER_TEMP/axiang-touch9"
           python3 scripts/test-axiang-single-edit-corrections.py \
             --stage "$RUNNER_TEMP/axiang-touch9/prebuilt/assets/usr/share/rime-data"
+
+      - name: Precompile the default-off Rime encyclopedia hooks
+        run: |
+          python3 scripts/prepare-touch-rime-moegirl-hooks.py --work "$RUNNER_TEMP/axiang-touch9"
 
       # Later builds of the same pull request keep one debug certificate, so a newer
       # test package installs over the previous one.
@@ -111,7 +115,7 @@ jobs:
           "$sdk_tools/aapt" dump badging "$apk" | head -n 3
           python3 scripts/prepare-axiang-touch9-build.py verify \
             --work "$RUNNER_TEMP/axiang-touch9" --apk "$apk" \
-            --rime-overlay single-edit-corrections-v1
+            --rime-overlay single-edit-corrections-v1 --rime-overlay moegirl-hooks-v1
           cd "$RUNNER_TEMP/axiang-pr"
           sha256sum "AXiang-$BUILD_VERSION_NAME-arm64.apk" > SHA256SUMS.txt
 
@@ -179,5 +183,6 @@ jobs:
             ${{ runner.temp }}/axiang-touch9/test.log
             ${{ runner.temp }}/axiang-touch9/prebuilt-manifest.json
             ${{ runner.temp }}/axiang-touch9/staged-inputs-manifest.json
+            ${{ runner.temp }}/axiang-touch9/rime-moegirl-hooks.json
           if-no-files-found: warn
           retention-days: 14
