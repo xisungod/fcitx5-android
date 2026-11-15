@@ -44,7 +44,14 @@ class OfflineDictationUiTest {
     private var previousAnimationPreference = false
 
     @Before fun enableAnimations() {
-        AppPrefs.init(RuntimeEnvironment.getApplication().getSharedPreferences("dictation-ui", Context.MODE_PRIVATE))
+        // Initialize the application context here, rather than relying on another test
+        // having set this singleton before the dictation tests are run in isolation.
+        val application = RuntimeEnvironment.getApplication()
+        val ui = FcitxApplication()
+        ReflectionHelpers.callInstanceMethod<Void>(ui, "attachBaseContext",
+            ReflectionHelpers.ClassParameter.from(Context::class.java, application))
+        FcitxApplication::class.java.getDeclaredField("instance").apply { isAccessible = true; set(null, ui) }
+        AppPrefs.init(application.getSharedPreferences("dictation-ui", Context.MODE_PRIVATE))
         previousAnimationPreference = AppPrefs.getInstance().advanced.disableAnimation.getValue()
         AppPrefs.getInstance().advanced.disableAnimation.setValue(false)
         systemAnimationScale(1f)
