@@ -50,18 +50,18 @@ class V15LightEffectPrefsTest {
         .getSharedPreferences(name, Context.MODE_PRIVATE).also { it.edit().clear().commit() }
 
     @Test
-    fun newInstallationUsesSamWithACoolPaletteAndIndependentKeyMotion() {
+    fun newInstallationUsesSamWithMixedNeonAndIndependentKeyMotion() {
         val stored = storage("v15-neon-defaults")
         val prefs = ThemePrefs(stored)
         assertEquals(ThemePrefs.PressColorMode.Random, prefs.pressColorMode.getValue())
         assertEquals(ThemePrefs.RippleShape.Sam, prefs.rippleShape.getValue())
-        assertEquals(ThemePrefs.PressEffectPalette.SamsungCool, prefs.pressEffectPalette.getValue())
+        assertEquals(ThemePrefs.PressEffectPalette.NeonDistrict, prefs.pressEffectPalette.getValue())
         val colors = PressColorPalette.colorsFor(prefs, 0)
-        assertArrayEquals(PressColorPalette.CYAN_BLUE_PURPLE, colors)
-        assertTrue("The default starts with green before moving through cyan and blue",
-            (colors.first() ushr 8 and 255) > (colors.first() and 255))
-        assertTrue("The default path must not introduce red, orange or yellow",
-            colors.all { color -> (color ushr 16 and 255) < maxOf(color ushr 8 and 255, color and 255) })
+        assertArrayEquals(PressColorPalette.NEON_DISTRICT, colors)
+        assertTrue("The default includes warm orange-red alongside cool accents",
+            colors.any { color -> (color ushr 16 and 255) == 255 && (color and 255) < 64 })
+        assertTrue("The default also includes electric green and mint",
+            colors.any { color -> (color ushr 8 and 255) == 255 && (color ushr 16 and 255) < 128 })
         assertEquals(40, prefs.pressIgnitionTime.getValue())
         assertEquals(50, prefs.pressKeyHoldTime.getValue())
         assertEquals(ThemePrefs.KeyMotionEffect.Press, prefs.keyMotionEffect.getValue())
@@ -78,27 +78,25 @@ class V15LightEffectPrefsTest {
     }
 
     @Test
-    fun upgradeAdoptsCoolDefaultOnlyWhenNoPaletteWasSaved() {
-        val stored = storage("sam-cool-unsaved-upgrade")
+    fun upgradeAdoptsMixedNeonOnlyWhenNoPaletteWasSaved() {
+        val stored = storage("sam-neon-unsaved-upgrade")
         stored.edit().putBoolean("sam_mode_default_applied", true)
             .putString("ripple_shape", "Sam").putInt("press_motion_amplitude", 13).commit()
         val before = stored.all.toMap()
         val prefs = ThemePrefs(stored)
-        prefs.applySamDefaultOnce()
-        assertEquals(ThemePrefs.PressEffectPalette.SamsungCool, prefs.pressEffectPalette.getValue())
+        assertEquals(ThemePrefs.PressEffectPalette.NeonDistrict, prefs.pressEffectPalette.getValue())
         assertEquals(13, prefs.pressMotionAmplitude.getValue())
         assertEquals("An unsaved palette reads the default without rewriting user settings", before, stored.all)
     }
 
     @Test
-    fun coolDefaultDoesNotOverwriteSavedPalettesSingleOrCustomColours() {
-        val stored = storage("sam-cool-explicit-upgrade")
+    fun mixedNeonDefaultDoesNotOverwriteSavedPalettesSingleOrCustomColours() {
+        val stored = storage("sam-neon-explicit-upgrade")
         for (palette in ThemePrefs.PressEffectPalette.entries) {
             stored.edit().clear().putBoolean("sam_mode_default_applied", true)
                 .putString("ripple_shape", "Sam").putString("press_effect_palette", palette.name).commit()
             val before = stored.all.toMap()
             val prefs = ThemePrefs(stored)
-            prefs.applySamDefaultOnce()
             assertEquals("Explicit ${palette.name} remains selected", palette, prefs.pressEffectPalette.getValue())
             assertEquals(before, stored.all)
         }
@@ -200,9 +198,6 @@ class V15LightEffectPrefsTest {
     fun capTimingControlsAllowShortFlashesWhileKeepingLongCustomExits() {
         val prefs = ThemePrefs(storage("v15-neon-ranges"))
         val expected = mapOf(
-            "press_ignition_time" to (30 to 300),
-            "press_key_hold_time" to (20 to 1000),
-            "press_key_retreat_time" to (20 to 5000),
             "sam_key_hold_time" to (0 to 1000),
             "sam_key_retreat_time" to (100 to 5000),
             "press_expansion_time" to (100 to 4000),

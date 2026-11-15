@@ -112,7 +112,7 @@
     <string name="theme">主題</string>
     <string name="key_ripple_effect">啟用按鍵水波紋特效</string>
     <string name="press_effect">炫彩按鍵特效</string>
-    <string name="press_effect_summary">每次按鍵隨機顏色的水波漣漪，在按鍵下方和上方擴散</string>
+    <string name="press_effect_summary">按鍵亮起時，同色的光會沿鍵縫擴散</string>
     <string name="press_effect_palette">特效配色</string>
     <string name="press_effect_palette_cyberpunk">霓虹賽博（20 色）</string>
     <string name="press_effect_palette_cool">冷色系</string>

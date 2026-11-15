@@ -157,6 +157,14 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             if (!boundsValid) updateBounds()
         }
 
+    /** Resting key face in row coordinates, independent of press animations. */
+    internal fun restingCapBounds(): Rect = Rect(
+        left + appearanceView.left + hMargin,
+        top + appearanceView.top + vMargin,
+        left + appearanceView.right - hMargin,
+        top + appearanceView.bottom - vMargin
+    )
+
     /**
      * KeyView content left margin, in percentage of parent width
      */

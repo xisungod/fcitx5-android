@@ -14,29 +14,26 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class)
 class SamModeDefaultsTest {
-    @Test fun upgradeSelectsSamOnceAndLaterExplicitChoicesSurvive() {
+    @Test fun legacyShapeIsStillReadableInBackupsButIsNotAUserControl() {
         val storage = RuntimeEnvironment.getApplication().getSharedPreferences("sam-upgrade", Context.MODE_PRIVATE)
         storage.edit().clear().putString("ripple_shape", "IrregularFluid")
             .putInt("press_motion_amplitude", 13).putString("press_user_colors", "#0099FF,#FF0099").commit()
+        val before = storage.all.toMap()
         val prefs = ThemePrefs(storage)
-        prefs.applySamDefaultOnce()
-        assertEquals(ThemePrefs.RippleShape.Sam, prefs.rippleShape.getValue())
+        assertEquals(ThemePrefs.RippleShape.IrregularFluid, prefs.rippleShape.getValue())
         assertEquals(13, prefs.pressMotionAmplitude.getValue())
         assertEquals("#0099FF,#FF0099", prefs.pressUserColors.getValue())
-        for (mode in ThemePrefs.RippleShape.entries) {
-            prefs.rippleShape.setValue(mode)
-            val restarted = ThemePrefs(storage)
-            restarted.applySamDefaultOnce()
-            assertEquals("An explicit mode choice is never overwritten after migration", mode, restarted.rippleShape.getValue())
-        }
+        assertFalse(prefs.managedPreferencesUi.any { it.key == "ripple_shape" })
+        assertEquals(before, storage.all)
     }
 
-    @Test fun newInstallUsesSamWithoutChangingTheTwoLegacyChoices() {
+    @Test fun newInstallLeavesTheIdlePanelDark() {
         val storage = RuntimeEnvironment.getApplication().getSharedPreferences("sam-fresh", Context.MODE_PRIVATE)
         storage.edit().clear().commit()
         val prefs = ThemePrefs(storage)
         assertEquals(ThemePrefs.RippleShape.Sam, prefs.rippleShape.getValue())
-        assertEquals(listOf("SoftMist", "IrregularFluid", "Sam"), ThemePrefs.RippleShape.entries.map { it.name })
+        assertTrue(prefs.pressEffect.getValue())
+        assertFalse(prefs.idleBreathing.getValue())
         assertTrue("Reading default preferences must be side-effect free", storage.all.isEmpty())
     }
 }

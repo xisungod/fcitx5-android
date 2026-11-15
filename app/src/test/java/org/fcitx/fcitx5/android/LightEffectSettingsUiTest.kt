@@ -21,7 +21,6 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.PopupMenu
 import android.widget.Switch
 import android.widget.TextView
@@ -180,7 +179,8 @@ class LightEffectSettingsUiTest {
             assertEquals(ContextCompat.getColor(ui.context, R.color.ax_settings_surface),
                 (ui.root.findViewWithTag<View>("effect-basics").background as GradientDrawable).color!!.defaultColor)
             assertTrue(ui.root.findViewWithTag<View>(prefs.pressEffect.key).isShown)
-            assertTrue(ui.root.findViewWithTag<View>("effect-ripple-shape").isShown)
+            assertNull(ui.root.findViewWithTag<View>("effect-ripple-shape"))
+            assertTrue(ui.root.findViewWithTag<View>(prefs.idleBreathing.key).isShown)
             assertTrue(ui.modeButtons.getValue(ThemePrefs.PressColorMode.Random).isShown)
             val toggle = ui.root.findViewWithTag<View>("effect-advanced-toggle")
             val timing = ui.durationControls.getValue(prefs.samKeyRetreatTime.key)
@@ -288,9 +288,6 @@ class LightEffectSettingsUiTest {
         val rowPref = ThemeManager.prefs.portraitNumberRow
         val hadRow = rowPref.sharedPreferences.contains(rowPref.key)
         val oldRow = rowPref.getValue()
-        val shapePref = ThemeManager.prefs.rippleShape
-        val hadShape = shapePref.sharedPreferences.contains(shapePref.key)
-        val oldShape = shapePref.getValue()
         val breathingPref = ThemeManager.prefs.idleBreathing
         val hadBreathing = breathingPref.sharedPreferences.contains(breathingPref.key)
         val oldBreathing = breathingPref.getValue()
@@ -377,13 +374,13 @@ class LightEffectSettingsUiTest {
             assertTrue("Done returns to the keyboard before preference callbacks", windows.isAttached(keyboard))
             assertEquals(!oldRow, rowPref.getValue())
 
-            fun openDirectTool(type: StatusAreaEntry.Android.Type): StatusAreaWindow {
+            fun openDirectTool(type: StatusAreaEntry.Android.Type) {
                 assertTrue(entry.performClick())
                 val menu = ReflectionHelpers.getField<InputWindow>(windows, "currentWindow") as StatusAreaWindow
                 broadcaster.onStatusAreaUpdate(emptyArray())
                 layout(shell, 600, 465)
                 val adapter = menu.view.adapter as StatusAreaAdapter
-                assertEquals("The common tools have six concise entries", 6, adapter.entries.size)
+                assertEquals("The common tools have five concise entries", 5, adapter.entries.size)
                 assertFalse(adapter.entries.any { it is StatusAreaEntry.Android && it.type in setOf(
                     StatusAreaEntry.Android.Type.ReloadConfig, StatusAreaEntry.Android.Type.Keyboard,
                     StatusAreaEntry.Android.Type.InputMethod, StatusAreaEntry.Android.Type.ThemeList) })
@@ -392,16 +389,7 @@ class LightEffectSettingsUiTest {
                 val holder = menu.view.findViewHolderForAdapterPosition(position)
                 assertNotNull(holder)
                 holder!!.itemView.performClick()
-                return menu
             }
-            val shapeMenu = openDirectTool(StatusAreaEntry.Android.Type.RippleShape)
-            val picker = shapeMenu.popupMenu!!
-            val newShape = if (oldShape == ThemePrefs.RippleShape.SoftMist)
-                ThemePrefs.RippleShape.IrregularFluid else ThemePrefs.RippleShape.SoftMist
-            assertEquals(ThemePrefs.RippleShape.entries.size, picker.menu.size())
-            assertTrue(picker.menu.performIdentifierAction(newShape.ordinal + 1, 0))
-            assertTrue("Choosing a shape returns to the keyboard for immediate feedback", windows.isAttached(keyboard))
-            assertEquals(newShape, shapePref.getValue())
             openDirectTool(StatusAreaEntry.Android.Type.IdleBreathing)
             assertTrue(windows.isAttached(keyboard))
             assertEquals("The breathing tile applies with one tap", !oldBreathing, breathingPref.getValue())
@@ -409,7 +397,6 @@ class LightEffectSettingsUiTest {
                 shadowOf(activity).nextStartedActivity)
         } finally {
             if (hadRow) rowPref.setValue(oldRow) else rowPref.sharedPreferences.edit().remove(rowPref.key).apply()
-            if (hadShape) shapePref.setValue(oldShape) else shapePref.sharedPreferences.edit().remove(shapePref.key).apply()
             if (hadBreathing) breathingPref.setValue(oldBreathing) else breathingPref.sharedPreferences.edit().remove(breathingPref.key).apply()
             animationPref.setValue(oldAnimation)
             controller.pause().stop().destroy()
@@ -479,33 +466,10 @@ class LightEffectSettingsUiTest {
         assertEquals(350, prefs.pressWaveHoldTime.getValue())
     }
 
-    @Test fun quickerDefaultIgnitionIsAdjustableWithoutOverwritingASavedTiming() {
-        val prefs = ThemeManager.prefs
-        prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
-        assertTrue(prefs.pressIgnitionTime.sharedPreferences.edit().remove(prefs.pressIgnitionTime.key).commit())
-        assertEquals(40, prefs.pressIgnitionTime.getValue())
-        val ui = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
-        val control = ui.durationControls.getValue(prefs.pressIgnitionTime.key)
-        assertEquals(1, control.slider.progress) // 30 + 1 * 10 = 40ms.
-        assertEquals(ui.context.getString(R.string.light_effect_total, 2690),
-            ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
-        control.slider.progress = 7
-        assertEquals("Dragging does not save before release", 40, prefs.pressIgnitionTime.getValue())
-        control.commit()
-        assertEquals(100, prefs.pressIgnitionTime.getValue())
-        assertEquals(ui.context.getString(R.string.light_effect_total, 2750),
-            ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
-        assertEquals(ui.context.getString(R.string.light_effect_total_detail, 100),
-            ui.root.findViewWithTag<TextView>("effect-total-detail").text.toString())
-        val reopened = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
-        assertEquals("Opening the new page preserves the user's saved 100ms", 100, prefs.pressIgnitionTime.getValue())
-        assertEquals(7, reopened.durationControls.getValue(prefs.pressIgnitionTime.key).slider.progress)
-    }
-
-    @Test fun samTimingControlsUseIndependentColoursAndImmediateWaveTimingAcrossModeChanges() {
+    @Test fun samTimingControlsExcludeLegacyTimingsAndPreserveSavedValues() {
         val controller = activity()
         val prefs = ThemeManager.prefs
-        prefs.rippleShape.setValue(ThemePrefs.RippleShape.Sam)
+        prefs.rippleShape.setValue(ThemePrefs.RippleShape.IrregularFluid)
         prefs.samKeyHoldTime.setValue(80)
         prefs.samKeyRetreatTime.setValue(800)
         prefs.pressKeyHoldTime.setValue(37)
@@ -521,9 +485,9 @@ class LightEffectSettingsUiTest {
                 ui.durationControls.getValue(pref.key).root.visibility == View.VISIBLE
             assertTrue(visible(prefs.samKeyHoldTime))
             assertTrue(visible(prefs.samKeyRetreatTime))
-            assertFalse(visible(prefs.pressKeyHoldTime))
-            assertFalse(visible(prefs.pressKeyRetreatTime))
-            assertFalse(visible(prefs.pressIgnitionTime))
+            assertFalse(ui.durationControls.containsKey(prefs.pressKeyHoldTime.key))
+            assertFalse(ui.durationControls.containsKey(prefs.pressKeyRetreatTime.key))
+            assertFalse(ui.durationControls.containsKey(prefs.pressIgnitionTime.key))
             assertEquals(ui.context.getString(R.string.light_effect_total, 2650),
                 ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
             assertEquals(ui.context.getString(R.string.sam_wave_total_detail),
@@ -540,25 +504,7 @@ class LightEffectSettingsUiTest {
             assertEquals(1400, prefs.samKeyRetreatTime.getValue())
             assertEquals(37, prefs.pressKeyHoldTime.getValue())
             assertEquals(1783, prefs.pressKeyRetreatTime.getValue())
-            val selector = ui.root.findViewWithTag<Spinner>("effect-ripple-shape")
-            selector.setSelection(ThemePrefs.RippleShape.IrregularFluid.ordinal)
-            shadowOf(Looper.getMainLooper()).idle()
-            assertTrue(visible(prefs.pressKeyHoldTime))
-            assertTrue(visible(prefs.pressKeyRetreatTime))
-            assertTrue(visible(prefs.pressIgnitionTime))
-            assertFalse(visible(prefs.samKeyHoldTime))
-            assertFalse(visible(prefs.samKeyRetreatTime))
-            assertEquals(ui.context.getString(R.string.light_effect_total, 2750),
-                ui.root.findViewWithTag<TextView>("effect-total-time").text.toString())
-            val legacy = ui.durationControls.getValue(prefs.pressKeyRetreatTime.key)
-            legacy.slider.progress = 21
-            legacy.commit()
-            assertEquals(230, prefs.pressKeyRetreatTime.getValue())
-            assertEquals(1400, prefs.samKeyRetreatTime.getValue())
-            selector.setSelection(ThemePrefs.RippleShape.Sam.ordinal)
-            shadowOf(Looper.getMainLooper()).idle()
-            assertTrue(visible(prefs.samKeyRetreatTime))
-            assertEquals(130, fade.slider.progress)
+            assertNull(ui.root.findViewWithTag<View>("effect-ripple-shape"))
         } finally {
             ui.dismissDialogs()
             controller.pause().stop().destroy()
@@ -592,37 +538,6 @@ class LightEffectSettingsUiTest {
             }
             assertEquals(before, stored.all)
             assertEquals(palette, prefs.pressEffectPalette.getValue())
-        }
-    }
-
-    @Test fun shapeSelectorPersistsIndependentlyOfTheUsersColorMode() {
-        val controller = activity()
-        val prefs = ThemeManager.prefs
-        val beforeShape = prefs.rippleShape.getValue()
-        val beforeMode = prefs.pressColorMode.getValue()
-        val beforeColors = prefs.pressUserColors.getValue()
-        try {
-            prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
-            prefs.pressColorMode.setValue(ThemePrefs.PressColorMode.Custom)
-            prefs.pressUserColors.setValue("#18FFC1,#D96EFF")
-            val ui = LightEffectSettingsUi(controller.get())
-            controller.get().setContentView(ui.root)
-            shadowOf(Looper.getMainLooper()).idle()
-            val selector = ui.root.findViewWithTag<Spinner>("effect-ripple-shape")
-            assertEquals(ThemePrefs.RippleShape.SoftMist.ordinal, selector.selectedItemPosition)
-            selector.setSelection(ThemePrefs.RippleShape.IrregularFluid.ordinal)
-            shadowOf(Looper.getMainLooper()).idle()
-            assertEquals(ThemePrefs.RippleShape.IrregularFluid, prefs.rippleShape.getValue())
-            assertEquals(ThemePrefs.PressColorMode.Custom, prefs.pressColorMode.getValue())
-            assertEquals("#18FFC1,#D96EFF", prefs.pressUserColors.getValue())
-            val reopened = LightEffectSettingsUi(controller.get())
-            assertEquals(ThemePrefs.RippleShape.IrregularFluid.ordinal,
-                reopened.root.findViewWithTag<Spinner>("effect-ripple-shape").selectedItemPosition)
-        } finally {
-            prefs.rippleShape.setValue(beforeShape)
-            prefs.pressColorMode.setValue(beforeMode)
-            prefs.pressUserColors.setValue(beforeColors)
-            controller.pause().stop().destroy()
         }
     }
 
@@ -743,14 +658,14 @@ class LightEffectSettingsUiTest {
         ui.root.invalidate()
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue("Scroll must finish before capturing the timing screen", ui.root.scrollY > 0)
-        listOf(prefs.pressFadeOutTime, prefs.pressKeyHoldTime, prefs.pressKeyRetreatTime).forEach { pref ->
+        listOf(prefs.pressFadeOutTime, prefs.samKeyHoldTime, prefs.samKeyRetreatTime).forEach { pref ->
             val control = ui.durationControls.getValue(pref.key).root
             val visible = Rect()
             assertTrue("${pref.key} must be visible in the timing screenshot", control.getGlobalVisibleRect(visible))
             assertTrue("${pref.key} must show its label and slider", visible.height() >= control.height)
         }
         val timing = captureScrollViewport(ui.root)
-        listOf(prefs.pressFadeOutTime, prefs.pressKeyHoldTime, prefs.pressKeyRetreatTime).forEach { pref ->
+        listOf(prefs.pressFadeOutTime, prefs.samKeyHoldTime, prefs.samKeyRetreatTime).forEach { pref ->
             assertSliderPixelsAreVisible(timing, ui.root, ui.durationControls.getValue(pref.key).slider)
         }
         save(timing, "light-settings-timing")

@@ -72,8 +72,7 @@ class V14TouchRoutingTest {
         init {
             val p = ThemeManager.prefs
             setting(p.pressEffect, true)
-            // Held face colour is the Soft Mist contract; SAM lights the plate below it.
-            setting(p.rippleShape, ThemePrefs.RippleShape.SoftMist)
+            // Use the theme preview to isolate held-face routing from the SAM field.
             setting(p.idleBreathing, false)
             setting(p.pressColorMode, ThemePrefs.PressColorMode.Random)
             setting(p.pressEffectPalette, ThemePrefs.PressEffectPalette.Custom)
@@ -93,7 +92,7 @@ class V14TouchRoutingTest {
             setting(AppPrefs.getInstance().advanced.disableAnimation, false)
             setting(AppPrefs.getInstance().keyboard.pinyinTouchCorrection, false)
             activity.setTheme(R.style.Theme_InputViewTheme)
-            keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
+            keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
             activity.setContentView(keyboard)
             controller.visible()
             keyboard.measure(

@@ -13,31 +13,40 @@ import org.fcitx.fcitx5.android.data.theme.PressColorPalette
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.input.keyboard.IdleBreathing
 import org.fcitx.fcitx5.android.input.keyboard.PressEffect
+import org.fcitx.fcitx5.android.input.keyboard.SamKeyLightField
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.LooperMode
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
-import kotlin.math.abs
 import kotlin.random.Random
 
-/** Native pixels from the production field; no redrawn mock keyboard or copied effect formula. */
+/** Actual production pixels over a real rectangular-key topology, not a radial mock. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
 class SamWavePropagationTest {
-    private class Field(
-        expansion: Int = 400, fade: Int = 900, hold: Int = 40,
-        val width: Int = 600, val height: Int = 300,
+    companion object {
+        private fun intensity(pixel: Int) = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+        private const val SOURCE = 23 // column 2, row 2
+        private fun grid(): List<SamKeyLightField.KeyGeometry> = (0 until 5).flatMap { row ->
+            (0 until 10).map { col ->
+                val touch = Rect(col * 60, row * 72, (col + 1) * 60, (row + 1) * 72)
+                SamKeyLightField.KeyGeometry(row * 10 + col + 1,
+                    Rect(touch.left + 6, touch.top + 6, touch.right - 6, touch.bottom - 6), touch)
+            }
+        }
+    }
+
+    private class Field(val geometry: List<SamKeyLightField.KeyGeometry> = grid(),
         palette: IntArray = intArrayOf(Color.CYAN), autoPress: Boolean = true,
-        coordinatePalette: Boolean = true
-    ) : AutoCloseable {
+        expansion: Int = 400, fade: Int = 900, hold: Int = 40, reach: Int = 100) : AutoCloseable {
         private val controller = Robolectric.buildActivity(Activity::class.java).setup()
         private val activity = controller.get()
         private val host = View(activity)
@@ -47,330 +56,203 @@ class SamWavePropagationTest {
         val effect = PressEffect(host, palette, true, 100, expansion, fade, 0,
             true, false, IdleBreathing(), intArrayOf(Color.CYAN), clock = { now },
             keySurfaceEffects = true, holdWhilePressed = true, exactKeyShape = true,
-            keyCornerRadius = 5f, glowOnCandidates = false, animationsAllowed = { true },
-            waveHoldTimeMs = hold, coordinatePalette = coordinatePalette,
-            rippleShape = ThemePrefs.RippleShape.Sam)
+            keyCornerRadius = 7f, glowOnCandidates = false, animationsAllowed = { true },
+            waveHoldTimeMs = hold, glowReachPercent = reach, rippleShape = ThemePrefs.RippleShape.Sam)
 
         init {
             activity.setContentView(FrameLayout(activity).apply {
-                addView(host, FrameLayout.LayoutParams(width, height))
+                addView(host, FrameLayout.LayoutParams(600, 360))
             })
             controller.visible()
-            host.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
-            host.layout(0, 0, width, height)
+            host.measure(View.MeasureSpec.makeMeasureSpec(600, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY))
+            host.layout(0, 0, 600, 360)
             assertTrue(host.isAttachedToWindow && host.isShown)
             ReflectionHelpers.setField(effect, "random", Random(1401))
+            effect.setSamKeyGeometry(geometry)
             effect.setActive(true)
             if (autoPress) { press(0); release(50) }
         }
 
-        fun press(time: Long, x: Float = 120f, y: Float = 150f,
-            pitch: Float = 60f, keyId: Int = 41, pointerId: Int = 0) {
+        fun press(time: Long, id: Int = SOURCE) {
             now = time
-            // Hold the visible cap dimensions fixed: pitch represents the real
-            // surrounding touch cell and can differ after width/layout editing.
-            effect.onPress(x, y, Rect((x - 30).toInt(), (y - 35).toInt(),
-                (x + 30).toInt(), (y + 35).toInt()), true, keyId, pointerId, pitch)
-            sourceColour = requireNotNull(PressEffect.colorForKey(keyId))
+            val key = geometry.first { it.id == id }
+            effect.onPress(key.capBounds.exactCenterX(), key.capBounds.exactCenterY(), key.capBounds,
+                true, id, 0, minOf(key.touchBounds.width(), key.touchBounds.height()).toFloat())
+            sourceColour = requireNotNull(PressEffect.colorForKey(id))
         }
-
-        fun release(time: Long, pointerId: Int = 0) {
+        fun release(time: Long) { now = time; effect.onRelease(0) }
+        fun frame(time: Long): Bitmap {
             now = time
-            effect.onRelease(pointerId)
-        }
-
-        fun render(time: Long): Bitmap {
-            now = time
-            return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+            return Bitmap.createBitmap(600, 360, Bitmap.Config.ARGB_8888).also {
                 Canvas(it).apply { drawColor(Color.BLACK); effect.drawUnder(this) }
             }
         }
-
-        override fun close() {
-            effect.setActive(false)
-            controller.pause().stop().destroy()
+        fun light(frame: Bitmap, id: Int): Int {
+            val key = geometry.first { it.id == id }.capBounds
+            var sum = 0
+            for (y in key.centerY() - 2..key.centerY() + 2)
+                for (x in key.centerX() - 2..key.centerX() + 2) sum += intensity(frame.getPixel(x, y))
+            return sum / 25
         }
+        fun samplesVisited(): Int = ReflectionHelpers.getField<Int>(
+            ReflectionHelpers.getField<Any>(effect, "neonField"), "visitedSamples")
+        override fun close() { effect.setActive(false); controller.pause().stop().destroy() }
     }
 
-    private fun intensity(pixel: Int) = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
 
-    private fun light(image: Bitmap, x: Int, y: Int = 150): Int {
-        var sum = 0
-        for (row in y - 2..y + 2) for (column in x - 2..x + 2) sum += intensity(image.getPixel(column, row))
-        return sum / 25
-    }
-
-    private fun save(image: Bitmap, name: String) {
+    private fun save(frame: Bitmap, name: String) {
         val file = File("build/outputs/effect-checks/sam-propagation/$name.png")
         file.parentFile.mkdirs()
-        file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        file.outputStream().use { frame.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+    private fun firstArrival(field: Field, id: Int, end: Long = 800): Long = (0L..end step 10).first { time ->
+        val frame = field.frame(time)
+        try { field.light(frame, id) >= 20 } finally { frame.recycle() }
     }
 
-    private fun arrival(samples: List<Pair<Long, Int>>): Long {
-        val most = samples.maxOf { it.second }
-        assertTrue("Arrival must refer to visible light", most >= 20)
-        return samples.first { it.second * 2 >= most }.first
-    }
-
-    @Test
-    fun lightArrivesOutwardsAndLeavesABroadConnectedTail() {
+    @Test fun neighbourKeysLightInOrderAndTheFourthHopIsTheMaximumReach() {
         Field().use { field ->
-            val samples = (40L..400L step 10).map { time ->
-                val frame = field.render(time)
-                try {
-                    if (time in listOf(80L, 160L, 240L, 320L, 400L)) save(frame, "travel-$time")
-                    listOf(time.toInt(), light(frame, 180), light(frame, 230), light(frame, 280))
-                } finally { frame.recycle() }
-            }
-            val near = samples.map { it[0].toLong() to it[1] }
-            val middle = samples.map { it[0].toLong() to it[2] }
-            val far = samples.map { it[0].toLong() to it[3] }
-            assertTrue("Far light cannot appear with the initial press: $samples", far.first().second < 5)
-            assertTrue("Light reaches successive physical key positions later: $samples",
-                arrival(near) < arrival(middle) && arrival(middle) + 30 <= arrival(far))
-            val broad = field.render(320)
+            val one = firstArrival(field, SOURCE + 1)
+            val two = firstArrival(field, SOURCE + 2)
+            val three = firstArrival(field, SOURCE + 3)
+            assertTrue("Weighted neighbouring edges arrive successively: $one/$two/$three", one + 50 <= two && two + 50 <= three)
+            val frame = field.frame(440)
             try {
-                // A connected region at least two key pitches wide distinguishes
-                // this from a thin bright ring with an immediately black wake.
-                assertTrue("The advancing light retains a broad connected wake",
-                    (170..290 step 5).count { light(broad, it) >= 35 } >= 20)
-                assertTrue("A single press must leave a distant dark region", light(broad, 480) < 5)
-            } finally { broad.recycle() }
-            File("build/outputs/effect-checks/sam-propagation/arrival.csv").writeText(
-                "time_ms,near_light,middle_light,far_light\n" + samples.joinToString("\n") { it.joinToString(",") } + "\n")
+                assertTrue(field.light(frame, SOURCE + 3) >= 25)
+                assertEquals("Five hops must remain outside a three/four-hop wave", 0, field.light(frame, SOURCE + 5))
+                val coloured = (0 until frame.width).filter { intensity(frame.getPixel(it, 180)) >= 25 }
+                assertTrue("One press still reaches across half the panel", coloured.last() - coloured.first() >= 300)
+                save(frame, "graph-half-panel")
+            } finally { frame.recycle() }
         }
     }
 
-    @Test
-    fun centreDimsBeforeTheOutsideWithoutCuttingOffTheTravellingTail() {
-        Field().use { field ->
-            val samples = listOf(80L, 240L, 440L, 650L, 900L, 1100L, 1340L).map { time ->
-                val frame = field.render(time)
-                try {
-                    save(frame, "local-fade-$time")
-                    Triple(time, light(frame, 120), light(frame, 340))
-                } finally { frame.recycle() }
-            }
-            val early = samples.first()
-            val late = samples.first { it.first == 900L }
-            assertTrue("Initially the source is brighter than the unreached outside: $early", early.second > early.third + 50)
-            assertTrue("The source can finish fading while the outside retains light: $late",
-                late.second < 12 && late.third > late.second + 15)
-            assertTrue("The outside falls later, rather than keeping a fixed ratio to the centre: $samples",
-                samples.first { it.first == 650L }.third > samples.first { it.first == 650L }.second)
-            assertEquals("The original configured total lifetime still ends in black", Triple(1340L, 0, 0), samples.last())
-            File("build/outputs/effect-checks/sam-propagation/fade.csv").writeText(
-                "time_ms,source_light,outer_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
-        }
-    }
-
-    @Test
-    fun explicitSingleColourKeepsItsSelectedColourAtEveryDistanceAndAge() {
-        Field(palette = intArrayOf(0xFF20FFB1.toInt()), coordinatePalette = false).use { field ->
-            val expected = field.sourceColour
-            fun normalized(pixel: Int) = listOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
-                .map { it.toFloat() / intensity(pixel).coerceAtLeast(1) }
-            val wanted = normalized(expected)
-            for ((time, x) in listOf(80L to 130, 240L to 210, 400L to 280, 900L to 360)) {
-                val frame = field.render(time)
-                try {
-                    val actual = frame.getPixel(x, 150)
-                    assertTrue("Colour must be measured where the wave remains visible: $time/$x", intensity(actual) >= 20)
-                    normalized(actual).zip(wanted).forEach { (a, b) ->
-                        assertEquals("Single colour must not acquire a preset's colour migration: $time/$x", b, a, 0.09f)
-                    }
-                    save(frame, "single-colour-$time")
-                } finally { frame.recycle() }
-            }
-        }
-    }
-
-    @Test
-    fun defaultCoolWaveMovesFromGreenCyanThroughBlueToVioletInTimeAndDistance() {
-        Field(palette = PressEffect.SAMSUNG_COOL).use { field ->
-            fun hueAt(time: Long, x: Int, name: String): Float {
-                val frame = field.render(time)
-                try {
-                    val pixel = frame.getPixel(x, 150)
-                    assertTrue("Measure hue while the actual wave remains visible: $time/$x", intensity(pixel) >= 20)
-                    val hsv = FloatArray(3)
-                    Color.colorToHSV(pixel, hsv)
-                    assertTrue("The default wave retains saturated cold light", hsv[1] >= 0.65f)
-                    save(frame, name)
-                    return hsv[0]
-                } finally { frame.recycle() }
-            }
-            val start = hueAt(80, 130, "cool-time-80")
-            val middle = hueAt(480, 130, "cool-time-480")
-            val end = hueAt(740, 130, "cool-time-740")
-            assertTrue("An isolated wave starts green/cyan, not random red/orange or already purple: $start", start in 135f..205f)
-            assertTrue("The same location becomes blue: $middle", middle in 205f..250f)
-            assertTrue("The same location then becomes violet: $end", end in 250f..295f)
-            assertTrue("The time path has a substantial green/cyan-to-blue-to-violet progression", middle > start + 20f && end > middle + 20f)
-            val inner = hueAt(240, 130, "cool-distance-inner")
-            val outer = hueAt(240, 340, "cool-distance-outer")
-            assertTrue("At the same instant the travelling outside is farther along the cold path: $inner/$outer", outer > inner + 25f && outer in 215f..295f)
-        }
-    }
-
-    @Test
-    fun selectedWarmPresetEvolvesWithinItsOwnFamily() {
-        Field(palette = PressColorPalette.RED_ORANGE_YELLOW).use { field ->
-            val greenFractions = listOf(80L, 400L, 700L).map { time ->
-                val frame = field.render(time)
-                try {
-                    val pixel = frame.getPixel(130, 150)
-                    val red = Color.red(pixel).coerceAtLeast(1)
-                    assertTrue("The warm preset stays visible", intensity(pixel) >= 20)
-                    assertTrue("A warm preset must not be forced towards cyan/blue/violet", Color.red(pixel) > Color.blue(pixel) * 3)
-                    save(frame, "warm-time-$time")
-                    Color.green(pixel).toFloat() / red
-                } finally { frame.recycle() }
-            }
-            assertTrue("The warm path advances from red/orange towards yellow: $greenFractions",
-                greenFractions.last() > greenFractions.first() + 0.35f)
-        }
-    }
-
-    @Test
-    fun onePressReachesAcrossHalfThePanelWhileTheUnreachedSideStaysBlack() {
-        Field().use { field ->
-            val early = field.render(80)
-            val expanded = field.render(400)
+    @Test fun anEmptyColumnBreaksPropagationEvenWhenTheOtherBankIsGeometricallyNear() {
+        val disconnected = grid().filter { (it.id - 1) % 10 != 4 }
+        Field(disconnected).use { field ->
+            val frame = field.frame(440)
             try {
-                assertTrue("The remote region is dark before the front arrives", light(early, 360) < 5)
-                assertTrue("A single wave reaches well beyond a few neighbouring keys", light(expanded, 360) >= 25)
-                var left = expanded.width
-                var right = 0
-                for (x in 0 until expanded.width) if (intensity(expanded.getPixel(x, 150)) >= 25) {
-                    left = minOf(left, x); right = maxOf(right, x)
-                }
-                assertTrue("The visible span covers at least half the actual panel", right - left >= expanded.width / 2)
-                assertTrue("A broad wave is not a uniformly lit whole panel", light(expanded, 560) < 5)
-                save(expanded, "half-panel-reach")
-            } finally { early.recycle(); expanded.recycle() }
+                assertTrue("The source bank is lit", field.light(frame, SOURCE + 1) >= 25)
+                assertEquals("A pixel-distance ripple would cross this gap; the actual graph must not", 0,
+                    field.light(frame, SOURCE + 3))
+                save(frame, "graph-disconnected")
+            } finally { frame.recycle() }
         }
     }
 
-    @Test
-    fun aDistantSecondPressDoesNotRecolourOrRestartTheOlderWave() {
-        Field(width = 1000, palette = PressEffect.SAMSUNG_COOL).use { control ->
-            Field(width = 1000, palette = PressEffect.SAMSUNG_COOL).use { multiple ->
-                multiple.press(200, 820f, 150f, keyId = 42)
-                multiple.release(250)
-                for (time in listOf(300L, 600L, 900L)) {
-                    val expected = control.render(time)
-                    val actual = multiple.render(time)
-                    try {
-                        for (y in 140..160) for (x in 100..180) {
-                            assertEquals("A distant press cannot alter the old source at $time/$x/$y",
-                                expected.getPixel(x, y), actual.getPixel(x, y))
-                        }
-                        save(actual, "two-sources-$time")
-                    } finally { expected.recycle(); actual.recycle() }
-                }
-            }
-        }
-    }
-
-    @Test
-    fun overlappingWeakTailsStayDimInsteadOfRapidlySaturating() {
-        Field().use { single ->
-            Field().use { pair ->
-                pair.press(0, keyId = 42)
-                pair.release(50)
-                val one = single.render(650)
-                val two = pair.render(650)
-                try {
-                    // Sample the background field at the common centre: each
-                    // source has the same age, irrespective of its random reach.
-                    val isolated = light(one, 120)
-                    val combined = light(two, 120)
-                    assertTrue("Both sampled tails are visibly weak", isolated in 30..90)
-                    assertTrue("Two weak tails add light without nearly doubling it: $isolated/$combined",
-                        combined > isolated * 1.15f && combined < isolated * 1.40f)
-                    assertTrue("Weak overlap must not approach a saturated plate", combined < 120)
-                    save(two, "weak-tail-overlap")
-                } finally { one.recycle(); two.recycle() }
-            }
-        }
-    }
-
-    @Test
-    fun longHoldAndReleaseDoNotRestartAnExpiredBackgroundWave() {
+    @Test fun sourceFinishesBeforeLaterKeysAndLongHoldDoesNotRestartTheWave() {
         Field(autoPress = false).use { field ->
             field.press(0)
-            val ended = field.render(1500)
-            field.release(1500)
-            val released = field.render(1516)
+            val tail = field.frame(900)
             try {
-                assertEquals(0, light(ended, 120))
-                assertEquals(0, light(ended, 280))
-                assertTrue("UP only releases the independent key face; it must not flash a new background wave", ended.sameAs(released))
+                assertTrue("Source already faded", field.light(tail, SOURCE) < 12)
+                assertTrue("Later keys retain their independent tail", field.light(tail, SOURCE + 3) > 20)
+                save(tail, "graph-local-tail")
+            } finally { tail.recycle() }
+            val ended = field.frame(1500)
+            field.release(1500)
+            val released = field.frame(1516)
+            try {
+                assertEquals(0, field.light(ended, SOURCE + 3))
+                assertTrue("UP cannot relight an expired background wave", ended.sameAs(released))
             } finally { ended.recycle(); released.recycle() }
         }
     }
 
-    @Test
-    fun measuredKeyPitchControlsBothAxesInsteadOfAssumingTenColumns() {
-        fun boundsForPitch(pitch: Float): Rect = Field(width = 1600, height = 1400, autoPress = false).use { field ->
-            field.press(0, 800f, 700f, pitch)
-            field.release(50)
-            val frame = field.render(400)
-            try {
-                val bounds = Rect(frame.width, frame.height, 0, 0)
-                for (y in 0 until frame.height) for (x in 0 until frame.width) if (intensity(frame.getPixel(x, y)) >= 25) {
-                    bounds.left = minOf(bounds.left, x); bounds.right = maxOf(bounds.right, x)
-                    bounds.top = minOf(bounds.top, y); bounds.bottom = maxOf(bounds.bottom, y)
+    @Test fun everyPresetWaveKeepsItsSelectedColourAtAllReachedKeysAndAges() {
+        for ((name, palette) in listOf("cool" to PressEffect.SAMSUNG_COOL,
+            "warm" to PressColorPalette.RED_ORANGE_YELLOW, "full" to PressEffect.CYBERPUNK)) {
+            Field(palette = palette).use { field ->
+                val expected = field.sourceColour
+                val peak = intensity(expected).toFloat()
+                for (time in listOf(80L, 240L, 480L, 740L, 900L)) {
+                    val frame = field.frame(time)
+                    try {
+                        var measured = 0
+                        for (key in field.geometry) {
+                            val pixel = frame.getPixel(key.capBounds.centerX(), key.capBounds.centerY())
+                            val brightness = intensity(pixel).toFloat()
+                            if (brightness < 20) continue
+                            measured++
+                            assertEquals(Color.red(expected) / peak, Color.red(pixel) / brightness, 0.09f)
+                            assertEquals(Color.green(expected) / peak, Color.green(pixel) / brightness, 0.09f)
+                            assertEquals(Color.blue(expected) / peak, Color.blue(pixel) / brightness, 0.09f)
+                        }
+                        assertTrue("Visible fixed-colour light at $name/$time", measured > 0)
+                        save(frame, "fixed-$name-$time")
+                    } finally { frame.recycle() }
                 }
-                save(frame, "pitch-${pitch.toInt()}")
-                bounds
-            } finally { frame.recycle() }
-        }
-        val small = boundsForPitch(50f)
-        val large = boundsForPitch(100f)
-        assertTrue("A larger nine-key touch cell must produce a proportionate horizontal reach", large.width().toFloat() / small.width() in 1.7f..2.3f)
-        assertTrue("Vertical reach must use the same physical metric", large.height().toFloat() / small.height() in 1.7f..2.3f)
-        assertEquals("Changing layout must not flatten or stretch the light", small.width().toFloat() / small.height(), large.width().toFloat() / large.height(), 0.06f)
-    }
-
-    @Test
-    fun droppedDisplayFramesDoNotChangeTheWaveState() {
-        Field().use { sparse ->
-            Field().use { dense ->
-                for (time in 60L..660L step 10) dense.render(time).recycle()
-                val a = sparse.render(700)
-                val b = dense.render(700)
-                try { assertTrue("Wave state depends on elapsed time, not the number of frames drawn", a.sameAs(b)) }
-                finally { a.recycle(); b.recycle() }
             }
         }
     }
 
-    @Test
-    fun configuredExpansionTimeChangesTheObservedTravelTime() {
-        fun arrivalTime(expansion: Int): Long = Field(expansion = expansion).use { field ->
-            arrival((40L..expansion.toLong() step 10).map { time ->
-                val frame = field.render(time)
-                try { time to light(frame, 280) } finally { frame.recycle() }
-            })
+    @Test fun overlappingColoursUseWeightedLocalEnergyAndStayBounded() {
+        Field(palette = intArrayOf(Color.RED, Color.GREEN), autoPress = false).use { field ->
+            field.press(0, SOURCE); field.release(50)
+            field.press(0, SOURCE + 2); field.release(50)
+            val frame = field.frame(350)
+            try {
+                val between = field.geometry.first { it.id == SOURCE + 1 }.capBounds
+                val pixel = frame.getPixel(between.centerX(), between.centerY())
+                assertTrue("Both wave colours contribute at their shared neighbour", Color.red(pixel) >= 40 && Color.green(pixel) >= 40)
+                assertEquals("No unrelated blue is introduced", 0, Color.blue(pixel))
+                assertTrue("The later two source keys stay visibly lit", field.light(frame, SOURCE) >= 40 && field.light(frame, SOURCE + 2) >= 40)
+                save(frame, "graph-weighted-overlap")
+            } finally { frame.recycle() }
         }
-        val fast = arrivalTime(400)
-        val slow = arrivalTime(800)
-        assertTrue("Doubling the expansion setting delays arrival at a fixed physical location", slow > fast * 1.7f)
-        assertTrue("Propagation still scales with the selected duration", abs(slow - fast * 2) <= 50)
     }
 
-    @Test
-    fun selectedFadeAndHoldRemainVisibleWithoutExtendingTheConfiguredLifetime() {
-        fun sample(fade: Int, hold: Int, time: Long): Int = Field(fade = fade, hold = hold).use { field ->
-            val frame = field.render(time)
-            try { light(frame, 280) } finally { frame.recycle() }
+    @Test fun weakOverlapUsesL3AndRasterWorkDoesNotMultiplyByTheWaveCount() {
+        Field().use { single -> Field(autoPress = false).use { many ->
+            repeat(12) { many.press(0); many.release(50) }
+            val one = single.frame(650)
+            val several = many.frame(650)
+            try {
+                val baseline = single.light(one, SOURCE)
+                val combined = many.light(several, SOURCE)
+                assertTrue("Twelve weak tails remain well below full brightness", combined < 180)
+                assertTrue("The overlap is brighter than a single tail", combined > baseline * 1.5f)
+                assertTrue("Cached key halos are rasterized once, not twelve times", many.samplesVisited() < single.samplesVisited() * 2)
+                save(several, "graph-burst-tail")
+            } finally { one.recycle(); several.recycle() }
+        } }
+    }
+
+    @Test fun reachSettingChangesTheHopBudgetWithoutChangingTheSource() {
+        Field(reach = 20).use { small -> Field(reach = 100).use { full ->
+            val a = small.frame(440); val b = full.frame(440)
+            try {
+                assertEquals("The source retains its own brightness", small.light(a, SOURCE), full.light(b, SOURCE))
+                assertEquals(0, small.light(a, SOURCE + 3))
+                assertTrue(full.light(b, SOURCE + 3) >= 25)
+            } finally { a.recycle(); b.recycle() }
+        } }
+    }
+
+    @Test fun elapsedTimeAndExpansionSettingControlArrivalWithoutFrameCountDependence() {
+        Field(expansion = 400).use { fast -> Field(expansion = 800).use { slow ->
+            val a = firstArrival(fast, SOURCE + 2)
+            val b = firstArrival(slow, SOURCE + 2)
+            assertTrue("A doubled expansion setting delays the same graph route", b > a * 1.7f)
+        } }
+        Field().use { sparse -> Field().use { dense ->
+            for (time in 60L..660L step 10) dense.frame(time).recycle()
+            val a = sparse.frame(700); val b = dense.frame(700)
+            try { assertTrue("Deterministic geometry/edge jitter cannot flicker with dropped frames", a.sameAs(b)) }
+            finally { a.recycle(); b.recycle() }
+        } }
+    }
+
+    @Test fun samCyclesTheSelectedPaletteAndSingleColourRemainsSingle() {
+        Field(palette = PressEffect.CYBERPUNK, autoPress = false).use { field ->
+            repeat(45) { index ->
+                field.press(index * 1400L); field.release(index * 1400L + 50)
+                assertEquals(PressEffect.CYBERPUNK[index % PressEffect.CYBERPUNK.size], field.sourceColour)
+            }
         }
-        assertEquals("Short selected fade has ended", 0, sample(100, 40, 700))
-        assertTrue("A long fade retains the later outer tail", sample(900, 40, 900) >= 15)
-        assertTrue("A selected hold delays local fade", sample(100, 500, 600) >= 30)
-        assertEquals("No source outlives expansion + hold + fade", 0, sample(900, 40, 1340))
+        Field(palette = intArrayOf(Color.MAGENTA), autoPress = false).use { field ->
+            repeat(3) { field.press(it * 1400L); assertEquals(Color.MAGENTA, field.sourceColour) }
+        }
     }
 }

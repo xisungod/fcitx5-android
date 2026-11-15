@@ -120,8 +120,8 @@ class SamKeyboardRenderingTest {
         init {
             val prefs = ThemeManager.prefs
             prefs.rippleShape.setValue(shape)
-            // Deliberately ON: Sam must remain black even after upgrading a saved breathing setting.
-            prefs.idleBreathing.setValue(true)
+            // Isolate the touch light from the optional idle breathing layer.
+            prefs.idleBreathing.setValue(false)
             prefs.pressColorMode.setValue(when {
                 customColours != null -> ThemePrefs.PressColorMode.Custom
                 randomColours -> ThemePrefs.PressColorMode.Random
@@ -538,8 +538,8 @@ class SamKeyboardRenderingTest {
                 "source=actual Android TextKeyboard and PressEffect\ngraphics=Robolectric NATIVE\n" +
                     "portrait_width_dp=360\nheight_px=${board.pixelHeight}\ndensity=${board.root.resources.displayMetrics.density}\nbase_height_dp=288\nfps=60\nframes=145\n" +
                     "input=${input.joinToString("")}\npress_times_ms=${presses.joinToString(",")}\nrelease_after_ms=50\n" +
-                    "portrait_number_row=false\npalette=production SamsungCool random\nseed=1401\nripple_shape=Sam\n" +
-                    "idle_breathing_preference=true (Sam suppresses it)\npopup=false\n" +
+                    "portrait_number_row=false\npalette=production NeonDistrict random\nseed=1401\nripple_shape=Sam\n" +
+                    "idle_breathing=false\npopup=false\n" +
                     "gap_metrics=fixed physical gaps outside all resting cap interiors; no glyphs or deliberately hidden cap drawings\n" +
                     "direct_native_frames=true\ninterpolation=false\nphysical_device_capture=false\n")
         }
@@ -600,22 +600,24 @@ class SamKeyboardRenderingTest {
     }
 
     @Test
-    fun oldModesRemainVisuallyDistinctAndDisabledOrDetachedSamStopsDrawing() {
-        val frames = ThemePrefs.RippleShape.entries.associateWith { shape ->
+    fun restoringOldModesStillDrawsSamAndDisabledOrDetachedSamStopsDrawing() {
+        for (shape in ThemePrefs.RippleShape.entries) {
             Keyboard(shape).use { board ->
+                assertEquals("Restoring $shape must still select the SAM renderer", ThemePrefs.RippleShape.Sam,
+                    ReflectionHelpers.getField<ThemePrefs.RippleShape>(board.effect, "rippleShape"))
                 board.touch("f", MotionEvent.ACTION_DOWN)
                 board.go(50)
                 board.touch("f", MotionEvent.ACTION_UP, 0)
                 board.go(250)
-                board.frame().also { save(it, "mode-${shape.name}-250ms") }
+                val frame = board.frame()
+                try {
+                    assertTrue("Restoring $shape must still render colour",
+                        (0 until frame.height).any { y ->
+                            (0 until frame.width).any { x -> coloured(frame.getPixel(x, y)) }
+                        })
+                } finally { frame.recycle() }
             }
         }
-        try {
-            frames.values.toList().let { images ->
-                for (i in images.indices) for (j in i + 1 until images.size)
-                    assertFalse("Each mode must produce visibly different actual keyboard pixels", images[i].sameAs(images[j]))
-            }
-        } finally { frames.values.forEach(Bitmap::recycle) }
         Keyboard(ThemePrefs.RippleShape.Sam).use { board ->
             board.touch("f", MotionEvent.ACTION_DOWN)
             board.go(50)

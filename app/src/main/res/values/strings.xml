@@ -112,7 +112,7 @@
     <string name="theme">Theme</string>
     <string name="key_ripple_effect">Enable key ripple effect</string>
     <string name="press_effect">Colourful press effect</string>
-    <string name="press_effect_summary">Random-colour water ripples that spread under and over the keys</string>
+    <string name="press_effect_summary">Spread the pressed key colour through the gaps between keys</string>
     <string name="press_effect_palette">Press effect colours</string>
     <string name="press_effect_palette_cyberpunk">Cyberpunk neon (20 colours)</string>
     <string name="press_effect_palette_cool">Cool blues</string>

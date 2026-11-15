@@ -173,7 +173,7 @@ class LightEffectProbeTest {
 
     /** [presses] are letter to DOWN time; release time is controlled independently. */
     private fun record(name: String, presses: List<Pair<String, Long>>, moments: List<Long>, columns: Int,
-        holdMillis: Long = 70L): List<Int> {
+        holdMillis: Long = 70L, observe: (Long, Bitmap) -> Unit = { _, _ -> }): List<Int> {
         val events = presses.flatMap { (letter, at) ->
             listOf(Triple(at, letter, MotionEvent.ACTION_DOWN), Triple(at + holdMillis, letter, MotionEvent.ACTION_UP))
         }.sortedBy { it.first }
@@ -196,6 +196,7 @@ class LightEffectProbeTest {
                 board.go(moment)
                 val image = board.frame()
                 coverage += lit(image)
+                observe(moment, image)
                 val left = (index % columns) * tileWidth
                 val top = (index / columns) * (tileHeight + 14)
                 canvas.drawBitmap(image, null, Rect(left, top + 14, left + tileWidth, top + 14 + tileHeight), smooth)
@@ -212,7 +213,7 @@ class LightEffectProbeTest {
 
     @Test
     fun onePressSpreadsLightAndReturnsToBlack() {
-        val moments = listOf(0L, 16, 33, 50, 66, 100, 133, 166, 200, 250, 300, 400, 500, 650, 800, 1000, 1300, 1600, 2000, 2600, 3200)
+        val moments = listOf(0L, 16, 33, 50, 66, 100, 133, 166, 200, 250, 300, 400, 500, 650, 800, 1000, 1300, 1500, 2000, 2600, 3200)
         val coverage = record("one-press", listOf("g" to 0L), moments, columns = 7)
         assertTrue("Light must appear after a press: $coverage", coverage.max() > 400)
         assertTrue("And be gone in the end: $coverage", coverage.last() < coverage.max() / 20)
@@ -230,8 +231,29 @@ class LightEffectProbeTest {
     fun fastTypingKeepsBrightAndDimPlaces() {
         val presses = "zheshiyigeceshi".mapIndexed { index, letter -> letter.toString() to index * 120L }
         val moments = (0L..2400L step 120).map { it + 60 }
-        val coverage = record("fast-typing", presses, moments, columns = 7)
+        val hueSamples = IntArray(12)
+        val hsv = FloatArray(3)
+        var framesWithBoth = 0
+        val coverage = record("fast-typing", presses, moments, columns = 7) { time, bitmap ->
+            if (time !in 300L..1600L) return@record
+            var bright = 0
+            var dark = 0
+            var total = 0
+            for (y in 0 until bitmap.height step 3) for (x in 0 until bitmap.width step 3) {
+                total++
+                Color.colorToHSV(bitmap.getPixel(x, y), hsv)
+                if (hsv[2] < 0.10f) dark++
+                if (hsv[1] >= 0.48f && hsv[2] >= 0.22f) {
+                    hueSamples[(hsv[0] / 30f).toInt().coerceIn(0, 11)]++
+                    bright++
+                }
+            }
+            if (dark > total / 4 && bright > total / 100) framesWithBoth++
+        }
         assertTrue("Light must appear while typing: $coverage", coverage.max() > 400)
+        assertTrue("Fast typing preserves dark areas alongside visible neon", framesWithBoth >= 4)
+        assertTrue("Rapid overlapping waves retain several distinguishable hues: ${hueSamples.toList()}",
+            hueSamples.count { it > 100 } >= 4)
     }
 
     @Test

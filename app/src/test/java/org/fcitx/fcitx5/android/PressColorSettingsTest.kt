@@ -101,8 +101,6 @@ class PressColorSettingsTest {
 
         init {
             setting(prefs.pressEffect, true)
-            // These assertions cover a filled key face and its matching popup.
-            setting(prefs.rippleShape, ThemePrefs.RippleShape.SoftMist)
             setting(prefs.idleBreathing, false)
             setting(prefs.effectsFollowSystemAnimation, false)
             setting(prefs.pressGlowBrightness, 0)
@@ -138,7 +136,7 @@ class PressColorSettingsTest {
 
         fun rebuild() {
             keyboard?.let { it.onDetach(); root.removeView(it) }
-            val next = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
+            val next = TextKeyboard(activity, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
             keyboard = next
             root.addView(next, 0, FrameLayout.LayoutParams(360, 260))
             next.measure(View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),

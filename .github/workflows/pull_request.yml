@@ -27,8 +27,8 @@ jobs:
     timeout-minutes: 45
     env:
       BUILD_ABI: arm64-v8a
-      BUILD_VERSION_CODE: "16"
-      BUILD_VERSION_NAME: 1.2-touch.10.1
+      BUILD_VERSION_CODE: "17"
+      BUILD_VERSION_NAME: 1.2-touch.10.2
       BUILD_COMMIT_HASH: ${{ github.sha }}
       XUANCAI_APP_SUFFIX: .axiang.touch10
       APP_LABEL: 阿翔 触点测试10
@@ -116,14 +116,16 @@ jobs:
       # Frames of the real keyboard's light effect, printed into the log as text so they
       # can be read back and compared with a reference recording without a phone.
       - name: Render the light effect probe
-        continue-on-error: true
         run: |
           ./gradlew --no-daemon --max-workers=2 \
             -I "$RUNNER_TEMP/axiang-touch9/touch9.init.gradle" \
             :app:testDebugUnitTest --tests '*LightEffectProbeTest*' \
             -x :app:generateDataDescriptor \
             -x :app:installFcitxComponent \
-            -x :app:deleteFcitxComponentExcludeFiles || true
+            -x :app:deleteFcitxComponentExcludeFiles
+          for probe in one-press typing fast-typing; do
+            test -s "app/build/outputs/effect-checks/probe/$probe.jpg"
+          done
           for image in app/build/outputs/effect-checks/probe/*.jpg; do
             [ -f "$image" ] || continue
             echo "PROBE-BEGIN $(basename "$image")"

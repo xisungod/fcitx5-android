@@ -85,9 +85,9 @@ object ThemeManager {
 
     val prefs = AppPrefs.getInstance().registerProvider(::ThemePrefs)
 
-    /** A rendering override only: selecting another effect restores the saved theme. */
+    /** The SAM rendering theme never replaces the user's saved theme preference. */
     fun keyboardTheme(selected: Theme): Theme =
-        if (prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam) ThemePreset.Sam else selected
+        if (prefs.pressEffect.getValue()) ThemePreset.Sam else selected
 
     fun saveTheme(theme: Theme.Custom) {
         ThemeFilesManager.saveThemeFiles(theme)
@@ -136,7 +136,6 @@ object ThemeManager {
     }
 
     fun init(configuration: Configuration) {
-        prefs.applySamDefaultOnce()
         isDarkMode = configuration.isDarkMode()
         // fire all `OnThemeChangedListener`s on theme preferences change
         prefs.registerOnChangeListener(onThemePrefsChange)

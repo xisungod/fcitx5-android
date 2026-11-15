@@ -69,7 +69,7 @@ abstract class BaseKeyboard(
 ) : ConstraintLayout(context) {
 
     protected val theme = if (useEffectTheme) ThemeManager.keyboardTheme(sourceTheme) else sourceTheme
-    private val samMode = useEffectTheme && ThemeManager.prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
+    private val samMode = useEffectTheme && ThemeManager.prefs.pressEffect.getValue()
 
     var keyActionListener: KeyActionListener? = null
     internal var effectInvalidator: (() -> Unit)? = null
@@ -120,7 +120,7 @@ abstract class BaseKeyboard(
 
     /** colourful press effect (Keys Cafe style), drawn under and over the keys */
     private val pressEffectLayer: PressEffect? = ThemeManager.prefs.let { p ->
-        if (!p.pressEffect.getValue() && (!p.idleBreathing.getValue() || samMode)) null
+        if (!p.pressEffect.getValue() && !p.idleBreathing.getValue()) null
         else PressEffect(
             this,
             PressColorPalette.colorsFor(p, theme.accentKeyBackgroundColor),
@@ -130,7 +130,7 @@ abstract class BaseKeyboard(
             p.pressFadeOutTime.getValue(),
             p.pressEffectOverKeys.getValue(),
             p.pressEffect.getValue(),
-            p.idleBreathing.getValue() && !samMode,
+            p.idleBreathing.getValue(),
             IdleBreathing(
                 p.idleDelay.getValue().toLong(),
                 p.idleCycle.getValue().toLong(),
@@ -162,7 +162,7 @@ abstract class BaseKeyboard(
             glowBrightnessPercent = p.pressGlowBrightness.getValue(),
             waveHoldTimeMs = p.pressWaveHoldTime.getValue(),
             coordinatePalette = p.pressColorMode.getValue() == ThemePrefs.PressColorMode.Random,
-            rippleShape = if (useEffectTheme) p.rippleShape.getValue() else ThemePrefs.RippleShape.SoftMist,
+            rippleShape = if (useEffectTheme) ThemePrefs.RippleShape.Sam else ThemePrefs.RippleShape.SoftMist,
             keyFloatOpacity = if (keyMotion == ThemePrefs.KeyMotionEffect.Press)
                 { keyId -> floatingKeys.get(keyId)?.floatingFaceOpacity() ?: 0f } else null
         )
@@ -290,6 +290,25 @@ abstract class BaseKeyboard(
             for (i in surfaceKeys.indices) surfaceKeys[i].invalidateKeySurface()
         }
         motionLifecycleReady = true
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        if (!samMode) return
+        val effect = pressEffectLayer ?: return
+        val geometry = buildList {
+            for (row in keyRows) if (row.visibility == View.VISIBLE) {
+                for (key in row.children.filterIsInstance<KeyView>()) {
+                    if (key.visibility != View.VISIBLE || key.width <= 0 || key.height <= 0) continue
+                    val cell = Rect(key.left, key.top, key.right, key.bottom)
+                    val cap = key.restingCapBounds()
+                    cell.offset(row.left, row.top)
+                    cap.offset(row.left, row.top)
+                    if (!cap.isEmpty) add(SamKeyLightField.KeyGeometry(key.id, cap, cell))
+                }
+            }
+        }
+        effect.setSamKeyGeometry(geometry)
     }
 
     private fun createKeyView(def: KeyDef): KeyView {

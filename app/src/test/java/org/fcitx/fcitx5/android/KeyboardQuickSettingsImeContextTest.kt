@@ -483,7 +483,7 @@ class KeyboardQuickSettingsImeContextTest {
         }
     }
 
-    @Test fun quickSamColourSlidersStageTheirOwnValuesAndRetainEditsWhenSwitchingModes() {
+    @Test fun quickSamColourSlidersStageTheirValuesWithoutOfferingLegacyControls() {
         Host().use { host ->
             val storage = host.service.getSharedPreferences("ime-sam-colour-draft", Context.MODE_PRIVATE)
             storage.edit().clear().putInt("press_key_retreat_time", 1783).commit()
@@ -497,14 +497,13 @@ class KeyboardQuickSettingsImeContextTest {
                 host.settle()
                 ui.root.findViewWithTag<View>("quick_open_effects").performClick()
                 host.settle()
-                val shape = ui.root.findViewWithTag<Spinner>("quick_ripple_shape")
+                assertNull(ui.root.findViewWithTag<View>("quick_ripple_shape"))
                 val hold = ui.root.findViewWithTag<SeekBar>("quick_sam_key_hold")
                 val fade = ui.root.findViewWithTag<SeekBar>("quick_sam_key_retreat")
-                val legacy = ui.root.findViewWithTag<SeekBar>("quick_key_retreat")
+                assertNull(ui.root.findViewWithTag<View>("quick_key_retreat"))
                 fun shown(bar: SeekBar) = (bar.parent as View).visibility == View.VISIBLE
                 assertTrue(shown(hold))
                 assertTrue(shown(fade))
-                assertFalse(shown(legacy))
                 assertEquals(8, hold.progress)
                 assertEquals(70, fade.progress)
                 fun choose(bar: SeekBar, progress: Int) {
@@ -519,22 +518,11 @@ class KeyboardQuickSettingsImeContextTest {
                 assertEquals(160, draft.values.samKeyHoldTime)
                 assertEquals(1400, draft.values.samKeyRetreatTime)
                 assertEquals(800, theme.samKeyRetreatTime.getValue())
-                shape.setSelection(ThemePrefs.RippleShape.SoftMist.ordinal)
-                host.settle()
-                assertTrue(shown(legacy))
-                assertFalse(shown(fade))
-                choose(legacy, 21)
-                assertEquals(230, draft.values.keyRetreatTime)
-                assertEquals(1400, draft.values.samKeyRetreatTime)
-                shape.setSelection(ThemePrefs.RippleShape.Sam.ordinal)
-                host.settle()
-                assertTrue(shown(fade))
-                assertFalse(shown(legacy))
                 assertEquals(130, fade.progress)
                 assertTrue(ui.extension.findViewWithTag<View>("quick_done").performClick())
                 assertEquals(160, theme.samKeyHoldTime.getValue())
                 assertEquals(1400, theme.samKeyRetreatTime.getValue())
-                assertEquals(230, theme.pressKeyRetreatTime.getValue())
+                assertEquals(1783, theme.pressKeyRetreatTime.getValue())
                 host.assertVisible()
             } finally {
                 ui.dispose()

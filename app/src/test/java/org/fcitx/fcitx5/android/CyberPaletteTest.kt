@@ -9,11 +9,11 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 class CyberPaletteTest {
-    @Test fun sixDifferentPresetsRemainOpaqueBrightAndSaturated() {
+    @Test fun neonPresetsRemainDistinctOpaqueBrightAndSaturated() {
         val presets = PressColorPalette.recommendedPresets
-        assertEquals(6, presets.size)
-        assertEquals(ThemePrefs.PressEffectPalette.SamsungCool, presets.keys.first())
-        assertEquals(6, presets.values.map { it.toList() }.toSet().size)
+        assertEquals(8, presets.size)
+        assertEquals(ThemePrefs.PressEffectPalette.NeonDistrict, presets.keys.first())
+        assertEquals(presets.size, presets.values.map { it.toList() }.toSet().size)
         presets.forEach { (preset, palette) ->
             assertTrue(preset.name, PressColorPalette.isCoordinated(palette))
             assertEquals(preset.name, palette.size, palette.toSet().size)
@@ -23,7 +23,11 @@ class CyberPaletteTest {
                 assertEquals(preset.name, 255, rgb.max())
                 // The existing full wheel keeps its tested 75% floor and exact RGB values.
                 // Newly introduced narrow neon families use the stronger 80% floor.
-                val saturationFloor = if (preset == ThemePrefs.PressEffectPalette.Cyberpunk) 0.75f else 0.8f
+                val saturationFloor = when (preset) {
+                    ThemePrefs.PressEffectPalette.NeonDistrict -> 0.63f // specified violet #8B5CFF
+                    ThemePrefs.PressEffectPalette.Cyberpunk -> 0.75f
+                    else -> 0.8f
+                }
                 assertTrue("${preset.name}: ${PressColorPalette.formatColor(color)} saturation",
                     (rgb.max() - rgb.min()).toFloat() / 255f >= saturationFloor)
             }
@@ -32,7 +36,9 @@ class CyberPaletteTest {
     }
 
     @Test fun restrictedFamiliesWalkAdjacentTonesWithoutWrappingBetweenTheEndpoints() {
-        PressColorPalette.recommendedPresets.filterKeys { it != ThemePrefs.PressEffectPalette.Cyberpunk }
+        PressColorPalette.recommendedPresets.filterKeys {
+            it != ThemePrefs.PressEffectPalette.Cyberpunk && it != ThemePrefs.PressEffectPalette.NeonDistrict
+        }
             .forEach { (preset, colors) ->
                 val random = Random(1107)
                 var previous = -1
