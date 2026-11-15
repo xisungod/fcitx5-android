@@ -59,10 +59,11 @@ jobs:
       # Later builds of the same pull request keep one debug certificate, so a newer
       # test package installs over the previous one.
       - name: Reuse this pull request's debug certificate
-        uses: actions/cache@v5
+        id: debug_certificate
+        uses: actions/cache/restore@v5
         with:
           path: ~/.android/debug.keystore
-          key: axiang-touch10-debug-certificate-v1
+          key: axiang-touch10-debug-certificate-v2
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -77,6 +78,15 @@ jobs:
             -x :app:installFcitxComponent \
             -x :app:deleteFcitxComponentExcludeFiles \
             2>&1 | tee "$RUNNER_TEMP/axiang-touch9/build.log"
+
+      # Saved here, not at the end of the job: a failing later check must not throw the
+      # certificate away, or the next package could not be installed over this one.
+      - name: Keep the debug certificate for later builds
+        if: steps.debug_certificate.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.android/debug.keystore
+          key: axiang-touch10-debug-certificate-v2
 
       - name: Verify the signature, alignment and the 380 reused assets and libraries
         run: |
