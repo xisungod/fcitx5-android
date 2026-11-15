@@ -13,4 +13,6 @@
     <string name="offline_dictation_backend_engine">The local speech engine or model cannot run on this device. Dictation has stopped; no audio was uploaded.</string>
     <string name="offline_dictation_backend_editor">The input field changed. This result will not be inserted. Start again in the intended field.</string>
     <string name="offline_dictation_backend_preedit">Finish choosing the current input candidate before starting dictation.</string>
+    <string name="offline_dictation_backend_load_timeout">The local speech model took too long to load. Recording has stopped. Try again shortly.</string>
+    <string name="offline_dictation_backend_load_busy">The local speech engine is still finishing an earlier load. Recording has stopped. Try again shortly.</string>
 </resources>

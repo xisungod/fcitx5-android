@@ -72,6 +72,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
+import org.fcitx.fcitx5.android.input.voice.DictationSilencePolicy
 import org.fcitx.fcitx5.android.input.voice.InlineDictationBar
 import org.fcitx.fcitx5.android.input.voice.OfflineDictationPhase
 import org.fcitx.fcitx5.android.input.voice.OfflineDictationSession
@@ -485,13 +486,16 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         inlineDictationJob?.cancel()
         inlineDictationJob = service.lifecycleScope.launch {
             launch { session.level.collect { idleUi.dictationBar.setLevel(it) } }
-            // Follows speech, not the clock: any new word restarts the wait.
-            var heardAt = SystemClock.uptimeMillis()
+            val inactivity = DictationSilencePolicy(SystemClock.uptimeMillis(), INLINE_DICTATION_SILENCE_MS)
+            launch {
+                session.audioActivity.collect {
+                    inactivity.onAudioActivity(it, SystemClock.uptimeMillis())
+                }
+            }
             launch {
                 while (true) {
                     delay(1_000L)
-                    if (session.state.value.phase == OfflineDictationPhase.Recording &&
-                        SystemClock.uptimeMillis() - heardAt > INLINE_DICTATION_SILENCE_MS) {
+                    if (inactivity.shouldStop(session.state.value, SystemClock.uptimeMillis())) {
                         session.stop()
                     }
                 }
@@ -499,7 +503,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             var notice: Job? = null
             session.state.collect { state ->
                 if (inlineDictation !== session) return@collect
-                heardAt = SystemClock.uptimeMillis()
+                inactivity.onState(state, SystemClock.uptimeMillis())
                 renderInlineDictation(state)
                 when (state.phase) {
                     OfflineDictationPhase.Finished -> service.endOfflineDictation(session)
@@ -526,7 +530,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 context.getString(R.string.offline_dictation_ui_preparing), done)
             OfflineDictationPhase.Recording -> bar.render(
                 InlineDictationBar.Mode.Listening,
-                context.getString(R.string.offline_dictation_ui_recording), done)
+                context.getString(if (state.loadingModel) R.string.offline_dictation_ui_loading_recording
+                    else R.string.offline_dictation_ui_recording), done)
             OfflineDictationPhase.Finishing, OfflineDictationPhase.Finished -> bar.render(
                 InlineDictationBar.Mode.Finishing,
                 context.getString(R.string.offline_dictation_ui_finishing), done)

@@ -13,4 +13,6 @@
     <string name="offline_dictation_backend_engine">本機語音引擎或模型無法在此裝置執行。聽寫已停止，聲音沒有上傳。</string>
     <string name="offline_dictation_backend_editor">輸入框已切換，不會插入這次結果。請在目標輸入框重新開始聽寫。</string>
     <string name="offline_dictation_backend_preedit">請先完成目前拼音選詞，再開始聽寫。</string>
+    <string name="offline_dictation_backend_load_timeout">本機語音模型載入逾時，錄音已停止。請稍後重試。</string>
+    <string name="offline_dictation_backend_load_busy">本機語音引擎仍在結束上次載入，錄音已停止。請稍後重試。</string>
 </resources>

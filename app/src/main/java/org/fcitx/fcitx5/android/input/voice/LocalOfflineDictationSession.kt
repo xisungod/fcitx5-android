@@ -5,7 +5,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.FutureTask
+import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -28,7 +33,10 @@ internal class LocalOfflineDictationSession(
      * they are, so a cold engine does not swallow the first words. Off by default: the
      * original order never records while a slow load can still be cancelled.
      */
-    private val captureWhileLoading: Boolean = false
+    private val captureWhileLoading: Boolean = false,
+    private val engineLoader: Executor = sharedEngineLoader,
+    private val timers: ScheduledExecutorService = loadTimers,
+    private val loadTimeoutMillis: Long = 20_000L
 ) : OfflineDictationSession {
     private val lock = Any()
     private val mutableState = MutableStateFlow(
@@ -38,6 +46,8 @@ internal class LocalOfflineDictationSession(
     override val state: StateFlow<OfflineDictationState> = mutableState.asStateFlow()
     private val mutableLevel = MutableStateFlow(0f)
     override val level: StateFlow<Float> = mutableLevel.asStateFlow()
+    private val mutableAudioActivity = MutableStateFlow(0L)
+    override val audioActivity: StateFlow<Long> = mutableAudioActivity.asStateFlow()
     private var generation = 0L
     private var closed = false
     private var stopRequested = false
@@ -70,74 +80,78 @@ internal class LocalOfflineDictationSession(
         for (sample in samples) energy += sample.toDouble() * sample
         val decibels = 20.0 * log10(sqrt(energy / samples.size) + 1e-7)
         mutableLevel.value = ((decibels + 50.0) / 38.0).coerceIn(0.0, 1.0).toFloat()
+        // An activity counter also changes for steady speech with unchanged loudness/text.
+        // This is an energy gate, not a linguistic VAD: it never retains microphone samples.
+        if (decibels >= -42.0) mutableAudioActivity.value++
     }
 
-    private fun recognizeCapturingFirst(token: Long) {
+    private fun recognize(token: Long) {
         var engine: DictationSpeechEngine? = null
         var audio: DictationAudioSource? = null
-        var failure = DictationFailure.Audio
-        val loading = FutureTask { engineFactory() }
-        var loaderStarted = false
+        var loading: PendingDictationEngine? = null
+        var timeout: ScheduledFuture<*>? = null
+        var failure = DictationFailure.Engine
         try {
             synchronized(lock) { if (!valid(token) || stopRequested) return }
-            audio = audioFactory()
-            synchronized(lock) {
-                if (!valid(token) || stopRequested) return
-                source = audio
+            if (captureWhileLoading) {
+                failure = DictationFailure.Audio
+                audio = openAudio(token, loadingModel = true) ?: return
             }
-            audio.start()
-            synchronized(lock) {
-                if (!valid(token) || stopRequested) return
-                mutableState.value = OfflineDictationState(OfflineDictationPhase.Recording)
+            failure = DictationFailure.Engine
+            val pending = PendingDictationEngine(engineFactory).also { loading = it }
+            try {
+                engineLoader.execute(pending)
+            } catch (_: RejectedExecutionException) {
+                reportFailure(token, DictationFailure.LoadBusy)
+                return
             }
-            loaderStarted = true
-            Thread(loading, "axiang-offline-dictation-load").apply { isDaemon = true }.start()
-            // Keep what is said while the models load. The bound only protects memory if
-            // loading hangs; a warm engine is ready before the first chunk arrives.
+            timeout = timers.schedule({
+                // Also unblocks a microphone read when the native load makes no progress.
+                if (!pending.isDone) reportFailure(token, DictationFailure.LoadTimeout)
+            }, loadTimeoutMillis, TimeUnit.MILLISECONDS)
             val backlog = ArrayDeque<FloatArray>()
             var captured = 0
-            while (!loading.isDone && synchronized(lock) { valid(token) && !stopRequested }) {
-                val samples = audio.read() ?: break
-                publishLevel(samples)
-                backlog.addLast(samples)
-                captured += samples.size
-                while (captured > MAX_BACKLOG_SAMPLES && backlog.size > 1) captured -= backlog.removeFirst().size
+            if (captureWhileLoading) {
+                while (!pending.isDone && synchronized(lock) { valid(token) && !stopRequested }) {
+                    failure = DictationFailure.Audio
+                    val samples = audio!!.read() ?: break
+                    synchronized(lock) { if (!valid(token)) return }
+                    publishLevel(samples)
+                    backlog.addLast(samples)
+                    captured += samples.size
+                    while (captured > MAX_BACKLOG_SAMPLES && backlog.size > 1)
+                        captured -= backlog.removeFirst().size
+                }
             }
-            synchronized(lock) { if (!valid(token)) return }
             failure = DictationFailure.Engine
-            engine = loading.get()
-            synchronized(lock) { if (!valid(token)) return }
+            engine = pending.await { synchronized(lock) { valid(token) } } ?: return
+            timeout.cancel(false)
+            synchronized(lock) {
+                if (!valid(token) || (!captureWhileLoading && stopRequested)) return
+                mutableState.value = mutableState.value.copy(loadingModel = false)
+            }
+            if (!captureWhileLoading) {
+                failure = DictationFailure.Audio
+                audio = openAudio(token) ?: return
+            }
+            failure = DictationFailure.Engine
             var decodedBacklog = false
             while (backlog.isNotEmpty()) {
                 engine.accept(backlog.removeFirst())
                 decodedBacklog = true
                 synchronized(lock) { if (!valid(token)) return }
             }
-            if (decodedBacklog) {
-                val transcript = engine.text()
-                synchronized(lock) {
-                    if (!valid(token)) return
-                    if (!stopRequested) mutableState.value = OfflineDictationState(
-                        OfflineDictationPhase.Recording, transcript.text)
-                }
-                deliverTranscript(token, transcript, finished = false)
-            }
+            if (decodedBacklog) publishTranscript(token, engine.text())
             while (synchronized(lock) { valid(token) && !stopRequested }) {
                 failure = DictationFailure.Audio
-                val samples = audio.read() ?: break
+                val samples = audio!!.read() ?: break
                 synchronized(lock) { if (!valid(token)) return }
                 publishLevel(samples)
                 failure = DictationFailure.Engine
                 engine.accept(samples)
-                val transcript = engine.text()
-                synchronized(lock) {
-                    if (!valid(token)) return
-                    if (!stopRequested) mutableState.value = OfflineDictationState(
-                        OfflineDictationPhase.Recording, transcript.text)
-                }
-                deliverTranscript(token, transcript, finished = false)
+                publishTranscript(token, engine.text())
             }
-            audio.stop()
+            audio?.stop()
             synchronized(lock) {
                 if (!valid(token)) return
                 mutableState.value = OfflineDictationState(OfflineDictationPhase.Finishing,
@@ -152,82 +166,59 @@ internal class LocalOfflineDictationSession(
         } catch (_: OutOfMemoryError) {
             reportFailure(token, DictationFailure.Engine)
         } finally {
-            releaseRun(token, audio, engine, if (loaderStarted) loading else null)
+            releaseRun(token, audio, engine, loading, timeout)
         }
     }
 
-    /**
-     * Cleanup lives in its own function on purpose. This file leaves its try blocks with
-     * `return` inside `synchronized { }`; error handling written directly in such a
-     * `finally` did not catch on that path (seen with Kotlin 2.0), and an exception that
-     * escapes the worker thread would end the whole input method process.
-     */
-    private fun releaseRun(
-        token: Long, audio: DictationAudioSource?, engine: DictationSpeechEngine?,
-        pendingEngine: FutureTask<DictationSpeechEngine>? = null
-    ) {
-        mutableLevel.value = 0f
-        try { audio?.close() } catch (_: Throwable) {}
-        // A load that is still running cannot be interrupted; wait for it so the engine
-        // it produces is always released.
-        val created = engine ?: try { pendingEngine?.get() } catch (_: Throwable) { null }
-        try { created?.close() } catch (_: Throwable) {}
-        synchronized(lock) { if (valid(token)) source = null }
-    }
-
-    private fun recognize(token: Long) {
-        if (captureWhileLoading) return recognizeCapturingFirst(token)
-        var engine: DictationSpeechEngine? = null
-        var audio: DictationAudioSource? = null
-        var failure = DictationFailure.Engine
-        try {
-            synchronized(lock) { if (!valid(token) || stopRequested) return }
-            engine = engineFactory()
-            synchronized(lock) { if (!valid(token) || stopRequested) return }
-            failure = DictationFailure.Audio
-            audio = audioFactory()
-            synchronized(lock) {
-                if (!valid(token) || stopRequested) return
-                source = audio
+    private fun openAudio(token: Long, loadingModel: Boolean = false): DictationAudioSource? {
+        val audio = audioFactory()
+        synchronized(lock) {
+            if (!valid(token) || stopRequested) {
+                closeAudio(audio)
+                return null
             }
-            // Source.stop() also prevents a subsequent start(), closing the cancellation race.
+            source = audio
+        }
+        try {
             audio.start()
             synchronized(lock) {
-                if (!valid(token) || stopRequested) return
-                mutableState.value = OfflineDictationState(OfflineDictationPhase.Recording)
-            }
-            while (synchronized(lock) { valid(token) && !stopRequested }) {
-                failure = DictationFailure.Audio
-                val samples = audio.read() ?: break
-                synchronized(lock) { if (!valid(token)) return }
-                publishLevel(samples)
-                failure = DictationFailure.Engine
-                engine.accept(samples)
-                val transcript = engine.text()
-                synchronized(lock) {
-                    if (!valid(token)) return
-                    if (!stopRequested) mutableState.value = OfflineDictationState(
-                        OfflineDictationPhase.Recording, transcript.text)
+                if (!valid(token) || stopRequested) {
+                    closeAudio(audio)
+                    return null
                 }
-                deliverTranscript(token, transcript, finished = false)
+                mutableState.value = OfflineDictationState(OfflineDictationPhase.Recording, loadingModel = loadingModel)
             }
-            audio.stop()
-            synchronized(lock) {
-                if (!valid(token)) return
-                mutableState.value = OfflineDictationState(OfflineDictationPhase.Finishing,
-                    mutableState.value.transcript)
-            }
-            failure = DictationFailure.Engine
-            deliverTranscript(token, engine.finish(), finished = true)
-        } catch (_: Exception) {
-            reportFailure(token, failure)
-        } catch (_: LinkageError) {
-            reportFailure(token, DictationFailure.Engine)
-        } catch (_: OutOfMemoryError) {
-            reportFailure(token, DictationFailure.Engine)
-        } finally {
-            releaseRun(token, audio, engine)
+            return audio
+        } catch (error: Throwable) {
+            closeAudio(audio)
+            throw error
         }
+    }
+
+    private fun closeAudio(audio: DictationAudioSource?) {
+        try { audio?.close() } catch (_: Throwable) {}
+        synchronized(lock) { if (source === audio) source = null }
+    }
+
+    private fun publishTranscript(token: Long, transcript: DictationTranscript) {
+        synchronized(lock) {
+            if (!valid(token)) return
+            if (!stopRequested) mutableState.value = OfflineDictationState(
+                OfflineDictationPhase.Recording, transcript.text)
+        }
+        deliverTranscript(token, transcript, finished = false)
+    }
+
+    /** Keep exception handling outside inlined synchronized returns, and never await a late load. */
+    private fun releaseRun(
+        token: Long, audio: DictationAudioSource?, engine: DictationSpeechEngine?,
+        pendingEngine: PendingDictationEngine?, timeout: ScheduledFuture<*>?
+    ) {
+        timeout?.cancel(false)
+        synchronized(lock) { if (valid(token)) mutableLevel.value = 0f }
+        closeAudio(audio)
+        try { engine?.close() } catch (_: Throwable) {}
+        pendingEngine?.abandon()
     }
 
     private fun deliverTranscript(token: Long, transcript: DictationTranscript, finished: Boolean) {
@@ -253,6 +244,7 @@ internal class LocalOfflineDictationSession(
         if (valid(token)) {
             generation++
             stopRequested = true
+            mutableLevel.value = 0f
             runCatching { source?.stop() }
             source = null
             mutableState.value = OfflineDictationState(
@@ -288,6 +280,7 @@ internal class LocalOfflineDictationSession(
             if (closed) return
             generation++
             stopRequested = true
+            mutableLevel.value = 0f
             mutableState.value = OfflineDictationState()
             source.also { source = null }
         }
@@ -299,6 +292,7 @@ internal class LocalOfflineDictationSession(
         val audio = synchronized(lock) {
             if (closed) return
             closed = true
+            mutableLevel.value = 0f
             generation++
             stopRequested = true
             mutableState.value = OfflineDictationState(OfflineDictationPhase.Unavailable,
@@ -312,8 +306,20 @@ internal class LocalOfflineDictationSession(
     private companion object {
         // Thirty seconds at 16 kHz.
         const val MAX_BACKLOG_SAMPLES = 480_000
-        // Native model creation cannot be interrupted. Serialize sessions to prevent overlapping
-        // model allocations when the user closes/reopens the panel; idle threads expire promptly.
+        // Native construction is bounded separately: cancel/timeout frees the recognition
+        // worker, while a late load owns and closes its result. A stuck load rejects retries
+        // rather than accumulating threads or parallel native model allocations.
+        val sharedEngineLoader: Executor = ThreadPoolExecutor(
+            0, 1, 15L, TimeUnit.SECONDS, SynchronousQueue()
+        ) { runnable -> Thread(runnable, "axiang-offline-dictation-load").apply { isDaemon = true } }
+        val loadTimers = ScheduledThreadPoolExecutor(1) { runnable ->
+            Thread(runnable, "axiang-dictation-load-timeout").apply { isDaemon = true }
+        }.apply {
+            removeOnCancelPolicy = true
+            setKeepAliveTime(15L, TimeUnit.SECONDS)
+            allowCoreThreadTimeOut(true)
+        }
+        // Decoding still runs on one worker and releases it promptly after cancellation.
         val sharedWorker: ExecutorService = ThreadPoolExecutor(
             0, 1, 15L, TimeUnit.SECONDS, LinkedBlockingQueue()
         ) { runnable -> Thread(runnable, "axiang-offline-dictation").apply { isDaemon = true } }

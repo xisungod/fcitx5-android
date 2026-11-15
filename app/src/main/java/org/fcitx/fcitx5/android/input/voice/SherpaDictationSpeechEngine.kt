@@ -2,6 +2,8 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.content.res.AssetManager
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
@@ -14,15 +16,21 @@ import com.k2fsa.sherpa.onnx.OfflinePunctuationModelConfig
 /**
  * The recognizer and punctuation models stay loaded for a while after a dictation ends, so the
  * next tap on the microphone starts listening at once instead of reloading about 100 MB.
- * Each dictation owns only its stream. Memory is given back after [IDLE_KEEP_MS] without use.
+ * Each dictation owns only its stream. Memory is given back after two minutes without use, or earlier on memory pressure.
  */
 internal object SherpaModels {
     class Loaded(val recognizer: OnlineRecognizer, val punctuation: OfflinePunctuation)
 
-    private val lock = Any()
-    private var loaded: Loaded? = null
-    private var users = 0
-    private var idleToken = 0L
+    private val scheduler = ScheduledThreadPoolExecutor(1) { runnable ->
+        Thread(runnable, "axiang-dictation-model-cache").apply { isDaemon = true }
+    }.apply {
+        removeOnCancelPolicy = true
+        setKeepAliveTime(15L, TimeUnit.SECONDS)
+        allowCoreThreadTimeOut(true)
+    }
+    // Application assets are immutable for this process. Initialization does not load models.
+    private var cache: IdleDictationModelCache<Loaded>? = null
+    private val cacheLock = Any()
 
     /** "OnlineRecognizer" is Sherpa's streaming API; provider=cpu never uses a network. */
     private fun load(assets: AssetManager): Loaded {
@@ -53,38 +61,25 @@ internal object SherpaModels {
         return Loaded(recognizer, punctuation)
     }
 
-    /** Blocks while a cold model loads. Every successful call needs one [release]. */
-    fun acquire(assets: AssetManager): Loaded = synchronized(lock) {
-        idleToken++ // a pending idle unload no longer applies
-        val current = loaded ?: load(assets).also { loaded = it }
-        users++
-        current
-    }
-
-    fun release() {
-        val token = synchronized(lock) {
-            if (users > 0) users--
-            if (users != 0 || loaded == null) return
-            ++idleToken
+    /** Blocks only the dedicated native loader, never the UI or cancellation worker. */
+    fun acquire(assets: AssetManager): Loaded {
+        val current = synchronized(cacheLock) {
+            cache ?: IdleDictationModelCache(
+                create = { load(assets) },
+                destroy = { idle ->
+                    try { idle.recognizer.release() } finally { idle.punctuation.release() }
+                },
+                scheduler = scheduler
+            ).also { cache = it }
         }
-        Thread({
-            try { Thread.sleep(IDLE_KEEP_MS) } catch (_: InterruptedException) { return@Thread }
-            unload(token)
-        }, "axiang-dictation-idle").apply { isDaemon = true }.start()
+        return current.acquire()
     }
 
-    /** Frees the models now if no dictation uses them, for example when memory runs low. */
-    fun trim() = unload(null)
+    fun release() = synchronized(cacheLock) { cache }?.release() ?: Unit
 
-    private fun unload(token: Long?) {
-        val idle = synchronized(lock) {
-            if (users != 0 || (token != null && token != idleToken)) return
-            loaded.also { loaded = null }
-        } ?: return
-        try { idle.recognizer.release() } finally { idle.punctuation.release() }
-    }
+    /** Active streams keep ownership; low memory releases models as soon as they become idle. */
+    fun trim() = synchronized(cacheLock) { cache }?.trim() ?: Unit
 
-    private const val IDLE_KEEP_MS = 120_000L
 }
 
 internal class SherpaDictationSpeechEngine(assets: AssetManager) : DictationSpeechEngine {
