@@ -21,5 +21,7 @@ data class PinyinTapEvidence(
     val dispatchTime: Long? = null,
     val physicalUpTime: Long? = null,
     val physicalUpX: Float? = null,
-    val physicalUpY: Float? = null
+    val physicalUpY: Float? = null,
+    /** Already selected by the learned DOWN boundary; do not learn from our own decision. */
+    val personalizedBoundary: Boolean = false
 )

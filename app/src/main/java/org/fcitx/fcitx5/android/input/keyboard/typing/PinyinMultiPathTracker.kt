@@ -214,6 +214,7 @@ class PinyinMultiPathTracker internal constructor(
     private fun spatialChoices(evidence: PinyinTapEvidence, offsets: Map<Char, CenterOffset>): List<PinyinPathChoice> {
         val tap = evidence.tap
         fun originalOnly() = listOf(PinyinPathChoice(tap.original, 0.0))
+        if (evidence.personalizedBoundary) return originalOnly()
         if (!tap.downX.isFinite() || !tap.downY.isFinite() || !tap.density.isFinite() || tap.density <= 0f)
             return originalOnly()
         if (evidence.cells.any { !it.isValid() } ||

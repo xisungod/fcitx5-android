@@ -68,6 +68,8 @@ import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapRuntime
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapEvidence
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinSpatialKeyDecider
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchModelRepository
+import org.fcitx.fcitx5.android.input.keyboard.typing.CenterOffset
+import org.fcitx.fcitx5.android.input.keyboard.typing.KeyCell
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinMultiPathSearch
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinMultiPathTracker
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateRuntime
@@ -196,6 +198,10 @@ class CommonKeyActionListener :
 
     private fun touchFeaturesEnabled() = kbdPrefs.pinyinTouchCorrection.getValue() ||
         kbdPrefs.pinyinTouchAlternatives.getValue()
+
+    /** Read the calibration snapshot already loaded by the IME; never open storage on DOWN. */
+    internal fun personalizedHitOffsets(cells: List<KeyCell>, density: Float): Map<Char, CenterOffset> =
+        pinyinTouchModels.profileStore?.hitOffsets(cells, density).orEmpty()
 
     /**
      * The service calls this on the main thread, in event order, when the editor accepted
@@ -619,12 +625,14 @@ class CommonKeyActionListener :
         val prefix = currentPinyinSpelling()
         val model = pinyinTouchModels.decider
         val supported = source == KeyActionListener.Source.Keyboard && evidence != null &&
+            !evidence.personalizedBoundary &&
             action.act.length == 1 && action.act[0] in 'a'..'z' &&
             action.act[0] == evidence.tap.original && action.states == KeyStates.Virtual &&
             allowsPinyinTap(editor, epoch) && prefix != null && model != null
         if (!supported) {
             sendMeasuredLetter(action.act, action.states.states, action.code, observation)
             recordPinyinDecision(evidence, action.act, bypass = when {
+                evidence?.personalizedBoundary == true -> "PersonalizedBoundary"
                 !kbdPrefs.pinyinTouchCorrection.getValue() -> "Disabled"
                 !allowsPinyinTap(editor, epoch) -> "UnsupportedContext"
                 prefix == null -> "ProtectedPreedit"

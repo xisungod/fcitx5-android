@@ -42,6 +42,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.OnGestureListen
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.keyboard.typing.KeyCell
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinProfileHitTarget
 import org.fcitx.fcitx5.android.input.keyboard.typing.TapEvidence
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTapEvidence
 import splitties.dimensions.dp
@@ -531,8 +532,16 @@ abstract class BaseKeyboard(
         }
     }
 
-    private class TouchTarget(val view: KeyView, val hitRect: Rect)
+    private class TouchTarget(
+        val view: KeyView,
+        val hitRect: Rect,
+        val personalizedBoundary: Boolean = false
+    ) {
+        var tapCells: List<KeyCell>? = null
+    }
     private data class TouchSample(val x: Float, val y: Float, val time: Long)
+    private var initialRoutingEvent: MotionEvent? = null
+    private var initialRoutingTarget: TouchTarget? = null
 
     private class TouchContact(
         var target: TouchTarget,
@@ -556,7 +565,7 @@ abstract class BaseKeyboard(
     private fun beginTouch(event: MotionEvent, index: Int, target: TouchTarget): TouchContact =
         TouchContact(target, event.getX(index), event.getY(index), event.eventTime,
             maxOf(slideTouchSlop * 1.5f, minOf(target.hitRect.width(), target.hitRect.height()) * 0.45f),
-            tapCells = if (this is TextKeyboard && (prefs.keyboard.pinyinTouchCorrection.getValue() ||
+            tapCells = target.tapCells ?: if (this is TextKeyboard && (prefs.keyboard.pinyinTouchCorrection.getValue() ||
                 prefs.keyboard.pinyinTouchAlternatives.getValue() || typingTestEditorEligible()))
                 alphabetCells() else emptyList(),
             contactId = contactIds.incrementAndGet(), downSequence = touchDownSequence++,
@@ -680,6 +689,41 @@ abstract class BaseKeyboard(
             key.right + row.left, key.bottom + row.top))
     }
 
+    /** One DOWN decision shared by the key animation and the actual input route. */
+    private fun findInitialTouchTarget(event: MotionEvent, index: Int): TouchTarget? {
+        if (event === initialRoutingEvent) return initialRoutingTarget
+        val literal = findTouchTarget(event, index) ?: return null
+        val text = this as? TextKeyboard ?: return literal
+        val offsets = text.pinyinHitOffsets ?: return literal
+        if (event.getToolType(index) != MotionEvent.TOOL_TYPE_FINGER) return literal
+        val original = (literal.view.def as? KeyDef.Appearance.Text)?.displayText
+            ?.singleOrNull()?.lowercaseChar() ?: return literal
+        if (!text.acceptsPersonalizedHits || !literal.view.isEnabled || literal.view.id !in alphabetKeyIds ||
+            !prefs.keyboard.pinyinTouchPersonalization.getValue() ||
+            (!prefs.keyboard.pinyinTouchCorrection.getValue() && !prefs.keyboard.pinyinTouchAlternatives.getValue()) ||
+            !TouchDiagnosticPolicy.allows(downOrderEditorInfo())) return literal
+
+        val cells = alphabetCells()
+        literal.tapCells = cells
+        val selected = PinyinProfileHitTarget.choose(original, event.getX(index), event.getY(index),
+            cells, offsets(cells, resources.displayMetrics.density))
+        if (selected == original) return literal
+        for (row in keyRows) {
+            if (row.visibility != View.VISIBLE) continue
+            for (child in row.children) {
+                val key = child as? KeyView ?: continue
+                if (!key.isEnabled || key.visibility != View.VISIBLE || key.id !in alphabetKeyIds ||
+                    touchTargets.values.any { it.target.view === key }) continue
+                val label = (key.def as? KeyDef.Appearance.Text)?.displayText?.singleOrNull()?.lowercaseChar()
+                if (label == selected) return TouchTarget(key, Rect(key.left + row.left, key.top + row.top,
+                    key.right + row.left, key.bottom + row.top), personalizedBoundary = true).apply {
+                    tapCells = cells
+                }
+            }
+        }
+        return literal
+    }
+
     private fun dispatchMotionEventToTarget(
         event: MotionEvent,
         action: Int,
@@ -713,7 +757,8 @@ abstract class BaseKeyboard(
                 dispatchSequence = touchDispatchSequence++, dispatchTime = SystemClock.uptimeMillis(),
                 physicalUpTime = event.eventTime.takeIf { physicalUp },
                 physicalUpX = event.getX(pointerIndex).takeIf { physicalUp },
-                physicalUpY = event.getY(pointerIndex).takeIf { physicalUp })
+                physicalUpY = event.getY(pointerIndex).takeIf { physicalUp },
+                personalizedBoundary = target.personalizedBoundary)
         } else null
         try {
             touchTrace.dispatch(event.getPointerId(pointerIndex), target.view.id, currentPinyinTapEvidence) {
@@ -1031,15 +1076,21 @@ abstract class BaseKeyboard(
         touchTrace.beforeEvent(ev, boundarySettlingForGesture, ::diagnosticLayout) { x, y ->
             findTouchTarget(x, y)?.view?.id
         }
-        if (!downOrderGestureCancelled && (pressEffectLayer != null || keyMotion != ThemePrefs.KeyMotionEffect.Off)) {
-            val action = ev.actionMasked
-            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
-                val i = ev.actionIndex
-                val target = findTouchTarget(ev, i)
-                illuminateKey(ev, i, target)
+        val handled = if (!downOrderGestureCancelled &&
+            (ev.actionMasked == MotionEvent.ACTION_DOWN || ev.actionMasked == MotionEvent.ACTION_POINTER_DOWN)) {
+            val index = ev.actionIndex
+            val target = findInitialTouchTarget(ev, index)
+            initialRoutingEvent = ev
+            initialRoutingTarget = target
+            try {
+                if (pressEffectLayer != null || keyMotion != ThemePrefs.KeyMotionEffect.Off)
+                    illuminateKey(ev, index, target)
+                super.dispatchTouchEvent(ev)
+            } finally {
+                initialRoutingEvent = null
+                initialRoutingTarget = null
             }
-        }
-        val handled = super.dispatchTouchEvent(ev)
+        } else super.dispatchTouchEvent(ev)
         // Final-UP retargeting can illuminate a new key inside onTouchEvent.
         // Release afterwards so it cannot leave idle breathing in the held state.
         if (ev.actionMasked == MotionEvent.ACTION_CANCEL) {
@@ -1081,7 +1132,7 @@ abstract class BaseKeyboard(
                 MotionEvent.ACTION_DOWN -> {
                     releaseAllTouchTargets()
                     val pid = event.getPointerId(0)
-                    val target = findTouchTarget(event, 0) ?: return false
+                    val target = findInitialTouchTarget(event, 0) ?: return false
                     touchTargets[pid] = beginTouch(event, 0, target)
                     dispatchMotionEventToTarget(event, MotionEvent.ACTION_DOWN, 0, target)
                     return true
@@ -1089,7 +1140,7 @@ abstract class BaseKeyboard(
                 MotionEvent.ACTION_POINTER_DOWN -> {
                     val i = event.actionIndex
                     val pid = event.getPointerId(i)
-                    val target = findTouchTarget(event, i) ?: return true
+                    val target = findInitialTouchTarget(event, i) ?: return true
                     // Return has one long-press state. An extra finger must not reset it
                     // and turn the final release into a Send/Search/Done action.
                     if (target.view.id == R.id.button_return &&

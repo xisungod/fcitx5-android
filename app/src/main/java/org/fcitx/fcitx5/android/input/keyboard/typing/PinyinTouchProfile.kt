@@ -43,7 +43,17 @@ class PinyinTouchProfile {
         if (layouts.isEmpty()) return emptyMap()
         val key = layoutSignature(cells, density) ?: return emptyMap()
         val statistics = layouts[key] ?: return emptyMap()
-        return statistics.mapNotNull { (letter, sample) ->
+        return offsetsFor(statistics)
+    }
+
+    /** Published snapshots contain only eligible, bounded per-letter offsets. */
+    internal fun offsetSnapshot(): Map<String, Map<Char, CenterOffset>> = layouts.mapNotNull { (layout, statistics) ->
+        val offsets = offsetsFor(statistics)
+        if (offsets.isEmpty()) null else layout to offsets
+    }.toMap()
+
+    private fun offsetsFor(statistics: Map<Char, Statistics>): Map<Char, CenterOffset> =
+        statistics.mapNotNull { (letter, sample) ->
             if (sample.weight < MINIMUM_CONFIRMED_COUNT) null else {
                 val shrinkage = sample.weight / (sample.weight + PRIOR_COUNT)
                 letter to CenterOffset(
@@ -52,7 +62,6 @@ class PinyinTouchProfile {
                 )
             }
         }.toMap()
-    }
 
     fun confirmedSampleCount(cells: List<KeyCell>, density: Float, letter: Char): Int =
         layoutSignature(cells, density)?.let { layouts[it]?.get(letter)?.count } ?: 0
@@ -61,6 +70,7 @@ class PinyinTouchProfile {
         observe(cells, tap, intended, 1.0)
 
     internal fun observeHabit(sample: PinyinTouchHabitJournal.Sample): Boolean {
+        if (sample.evidence.personalizedBoundary) return false
         val confirmed = sample.confirmation == PinyinTouchHabitJournal.Confirmation.SelectedRepair
         // Only an explicit repair can tell us that another key was intended.
         if (!confirmed && sample.intended != sample.evidence.tap.original) return false
@@ -129,7 +139,7 @@ class PinyinTouchProfile {
         private const val UNCHANGED_COMMIT_WEIGHT = 0.125
         private const val MAXIMUM_COUNT = 4096
         private const val MAX_SAMPLE_OFFSET = 0.65
-        private const val MAX_OFFSET = 0.12
+        internal const val MAX_OFFSET = 0.12
 
         /** Geometry itself separates portrait, landscape, dimensions and custom key widths. */
         fun layoutSignature(cells: List<KeyCell>, density: Float): String? {
@@ -148,7 +158,7 @@ class PinyinTouchProfile {
                 }
             }
             return MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.US_ASCII))
-                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                .toHexString()
         }
     }
 }

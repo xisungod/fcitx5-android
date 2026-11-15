@@ -99,6 +99,8 @@ class PinyinTouchProfileTest {
     @Test fun `unchanged commits need more evidence and cannot relabel a neighbouring key`() {
         val profile = PinyinTouchProfile()
         val ordinary = PinyinTouchHabitJournal.Sample(PinyinTapEvidence(tap, cells), 'n')
+        assertFalse("An applied boundary decision cannot supply its own training label",
+            profile.observeHabit(ordinary.copy(evidence = ordinary.evidence.copy(personalizedBoundary = true))))
         repeat(63) { assertTrue(profile.observeHabit(ordinary)) }
         assertTrue("Unconfirmed typing must not meet the eight-confirmation threshold", profile.offsets(cells, 1f).isEmpty())
         assertTrue(profile.observeHabit(ordinary))
