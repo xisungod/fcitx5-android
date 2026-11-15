@@ -166,7 +166,11 @@ class FcitxApplication : Application() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) SherpaModels.trim()
+        // Hiding the settings Activity is not memory pressure: the IME may still be in
+        // active use, and its two-minute warm cache should survive UI_HIDDEN (20).
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) SherpaModels.trim()
     }
 
     override fun onLowMemory() {
