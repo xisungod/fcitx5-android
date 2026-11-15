@@ -174,7 +174,7 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         animationCard.addView(totalDetailLabel,
             LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
         listOf(
-            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
+            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 10),
             Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 10),
             Range(R.string.light_effect_fade_duration, prefs.pressFadeOutTime, 100, 5000, 20)
         ).forEach { range -> addRange(animationCard, range, "ms") }
@@ -187,7 +187,7 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
             setTypeface(typeface, Typeface.BOLD)
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16); bottomMargin = dp(12) })
         val lightCard = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 100, 5), "%")
+        addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 150, 5), "%")
         addRange(lightCard, Range(R.string.light_effect_brightness, prefs.pressGlowBrightness, 0, 100, 5), "%")
         advanced.addView(lightCard)
         addSwitch(advanced, R.string.light_effect_glow_candidates, prefs.pressGlowOnCandidates)

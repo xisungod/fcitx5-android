@@ -238,9 +238,10 @@ class KeyboardQuickSettingsDraftTest {
         assertEquals(1783, theme.pressKeyRetreatTime.getValue())
 
         val reopened = KeyboardQuickSettingsDraft(theme, keyboard)
-        reopened.values = reopened.values.copy(glowReach = 55)
+        reopened.values = reopened.values.copy(glowReach = 150)
         theme.pressFadeOutTime.setValue(1820)
         assertTrue(reopened.apply())
+        assertEquals("Quick settings saves the full SAM reach", 150, theme.pressGlowReach.getValue())
         assertEquals("Changing reach preserves a concurrent fade edit", 1820, theme.pressFadeOutTime.getValue())
     }
 }

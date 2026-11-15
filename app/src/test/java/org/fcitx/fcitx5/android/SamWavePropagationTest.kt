@@ -24,6 +24,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.LooperMode
 import org.robolectric.util.ReflectionHelpers
 import java.io.File
+import kotlin.math.abs
 import kotlin.random.Random
 
 /** Actual production pixels over a real rectangular-key topology, not a radial mock. */
@@ -46,7 +47,7 @@ class SamWavePropagationTest {
 
     private class Field(val geometry: List<SamKeyLightField.KeyGeometry> = grid(),
         palette: IntArray = intArrayOf(Color.CYAN), autoPress: Boolean = true,
-        expansion: Int = 400, fade: Int = 900, hold: Int = 40, reach: Int = 100) : AutoCloseable {
+        expansion: Int = 550, fade: Int = 900, hold: Int = 40, reach: Int = 100) : AutoCloseable {
         private val controller = Robolectric.buildActivity(Activity::class.java).setup()
         private val activity = controller.get()
         private val host = View(activity)
@@ -111,20 +112,62 @@ class SamWavePropagationTest {
         try { field.light(frame, id) >= 20 } finally { frame.recycle() }
     }
 
-    @Test fun neighbourKeysLightInOrderAndTheFourthHopIsTheMaximumReach() {
+    @Test fun neighbourKeysLightInOrderAndTheWaveReachesSixHopsAtDefaultRange() {
         Field().use { field ->
             val one = firstArrival(field, SOURCE + 1)
             val two = firstArrival(field, SOURCE + 2)
             val three = firstArrival(field, SOURCE + 3)
-            assertTrue("Weighted neighbouring edges arrive successively: $one/$two/$three", one + 50 <= two && two + 50 <= three)
-            val frame = field.frame(440)
+            assertTrue("Weighted neighbouring edges arrive successively: $one/$two/$three", one < two && two < three)
+            val frame = field.frame(650)
             try {
                 assertTrue(field.light(frame, SOURCE + 3) >= 25)
-                assertEquals("Five hops must remain outside a three/four-hop wave", 0, field.light(frame, SOURCE + 5))
+                assertTrue("Sixth hop remains visible: " + field.light(frame, SOURCE + 6),
+                    field.light(frame, SOURCE + 6) >= 15)
+                assertEquals("Seven hops remain outside default range", 0, field.light(frame, SOURCE + 7))
                 val coloured = (0 until frame.width).filter { intensity(frame.getPixel(it, 180)) >= 25 }
                 assertTrue("One press still reaches across half the panel", coloured.last() - coloured.first() >= 300)
                 save(frame, "graph-half-panel")
             } finally { frame.recycle() }
+        }
+    }
+
+    @Test fun oneFrameNeverSwitchesOnAnEntireRing() {
+        Field().use { field ->
+            val rings = field.geometry.groupBy { key ->
+                abs((key.id - 1) / 10 - (SOURCE - 1) / 10) + abs((key.id - 1) % 10 - (SOURCE - 1) % 10)
+            }.filterKeys { it in 1..6 }
+            val samples = (0L..704L step 16).map { time ->
+                val frame = field.frame(time)
+                try { field.geometry.associate { it.id to field.light(frame, it.id) } }
+                finally { frame.recycle() }
+            }
+            for ((hop, keys) in rings) {
+                val ring = samples.map { frame -> keys.sumOf { frame.getValue(it.id) } }
+                val peak = ring.max()
+                assertTrue("Hop $hop must receive visible light: $ring", peak >= 15)
+                for ((earlier, later) in ring.zipWithNext()) {
+                    assertFalse("Hop $hop switched on in one 16 ms frame: $earlier/$later/$peak",
+                        earlier == 0 && later > peak * 0.5f)
+                }
+            }
+        }
+    }
+
+    @Test fun glowEntersTheNearEdgeOfAKeyFirst() {
+        Field().use { field ->
+            val target = field.geometry.first { it.id == SOURCE + 1 }.capBounds
+            // Both samples are inside the cap and outside the neighbouring
+            // stamps, so their difference comes from this key's sweep.
+            val nearX = target.centerX() - 7
+            val farX = target.centerX() + 7
+            val samples = (32L..144L step 8).map { time ->
+                val frame = field.frame(time)
+                try { intensity(frame.getPixel(nearX, target.centerY())) to intensity(frame.getPixel(farX, target.centerY())) }
+                finally { frame.recycle() }
+            }
+            assertTrue("The near edge brightens before the far edge: $samples", samples.any { (near, far) ->
+                near >= 18 && near >= far + 12
+            })
         }
     }
 
@@ -141,10 +184,10 @@ class SamWavePropagationTest {
         }
     }
 
-    @Test fun aSingleKeyFeathersLightPastTheNarrowRimBeforeNeighboursArrive() {
-        Field().use { field ->
+    @Test fun aSingleKeyFeathersLightPastTheNarrowRim() {
+        Field(geometry = grid().filter { it.id == SOURCE }).use { field ->
             val cap = field.geometry.first { it.id == SOURCE }.capBounds
-            val frame = field.frame(60)
+            val frame = field.frame(144)
             try {
                 val peak = field.light(frame, SOURCE)
                 val inner = intensity(frame.getPixel(cap.right + 10, cap.centerY()))
@@ -166,9 +209,9 @@ class SamWavePropagationTest {
             val tail = field.frame(900)
             try {
                 val source = field.light(tail, SOURCE)
-                val later = field.light(tail, SOURCE + 3)
+                val later = field.light(tail, SOURCE + 6)
                 assertTrue("Source already faded: $source", source < 4)
-                assertTrue("Even the dim third hop retains a visible independent tail: $source/$later", later >= source + 9)
+                assertTrue("A distant hop retains a visible independent tail: $source/$later", later >= source + 9)
                 save(tail, "graph-local-tail")
             } finally { tail.recycle() }
             val ended = field.frame(1500)
@@ -257,7 +300,8 @@ class SamWavePropagationTest {
     }
 
     @Test fun weakOverlapUsesL3AndRasterWorkDoesNotMultiplyByTheWaveCount() {
-        Field().use { single -> Field(autoPress = false).use { many ->
+        // A narrow wave makes the weak-tail blend visible below the exposure limit.
+        Field(reach = 20).use { single -> Field(autoPress = false, reach = 20).use { many ->
             repeat(12) { many.press(0); many.release(50) }
             val one = single.frame(650)
             val several = many.frame(650)
@@ -293,14 +337,27 @@ class SamWavePropagationTest {
     }
 
     @Test fun reachSettingChangesTheHopBudgetWithoutChangingTheSource() {
-        Field(reach = 20).use { small -> Field(reach = 100).use { full ->
-            val a = small.frame(440); val b = full.frame(440)
+        Field(reach = 20).use { small -> Field().use { full ->
+            val a = small.frame(24); val b = full.frame(24)
             try {
                 assertEquals("The source retains its own brightness", small.light(a, SOURCE), full.light(b, SOURCE))
-                assertEquals(0, small.light(a, SOURCE + 3))
-                assertTrue(full.light(b, SOURCE + 3) >= 25)
             } finally { a.recycle(); b.recycle() }
+            val narrow = small.frame(620); val normal = full.frame(620)
+            try {
+                assertEquals(0, small.light(narrow, SOURCE + 3))
+                assertTrue(full.light(normal, SOURCE + 3) >= 25)
+            } finally { narrow.recycle(); normal.recycle() }
         } }
+        Field(autoPress = false, reach = 150).use { field ->
+            val left = 21
+            field.press(0, left)
+            field.release(70)
+            val expanded = field.frame(680)
+            try {
+                assertTrue("Eight hops remain visible at 150%", field.light(expanded, left + 8) >= 10)
+                assertEquals("The ninth hop stays dark", 0, field.light(expanded, left + 9))
+            } finally { expanded.recycle() }
+        }
     }
 
     @Test fun elapsedTimeAndExpansionSettingControlArrivalWithoutFrameCountDependence() {

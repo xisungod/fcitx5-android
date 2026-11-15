@@ -34,4 +34,10 @@
     <string name="touch_probe_policy_blocked">The engine lifecycle guard blocked this check. Check the deployment and synchronization shortcuts.</string>
     <string name="touch_probe_check_failed">The check did not complete. The displayed snapshot remains the last completed query.</string>
     <string name="touch_probe_readonly_note">The check uses the fixed public spelling “nihao” in a read-only query. It does not commit text or learn from your input. Opening this screen only reads cached status.</string>
+    <string name="sam_frame_timing_title">SAM light effect timing</string>
+    <string name="sam_frame_timing_empty">Waiting for consecutive animation frames</string>
+    <string name="sam_frame_timing_summary">Average frame interval %1$.2f ms · %2$d of %3$d over 20 ms</string>
+    <string name="sam_render_timing_summary">Light field average %1$.2f ms · max %2$.2f ms\n%3$d of %4$d renders over 4 ms</string>
+    <string name="sam_frame_timing_input">Tap or type here to measure</string>
+    <string name="sam_frame_timing_reset">Reset timing</string>
 </resources>

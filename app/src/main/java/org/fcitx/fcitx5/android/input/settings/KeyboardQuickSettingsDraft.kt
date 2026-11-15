@@ -84,7 +84,7 @@ internal class KeyboardQuickSettingsDraft(
         if (original.colorMode != next.colorMode) editor.putString(theme.pressColorMode.key, next.colorMode.name)
         if (original.palette != next.palette) editor.putString(theme.pressEffectPalette.key, next.palette.name)
         int(theme.pressGlowBrightness, original.glowBrightness, next.glowBrightness, 0..100)
-        int(theme.pressGlowReach, original.glowReach, next.glowReach, 20..100)
+        int(theme.pressGlowReach, original.glowReach, next.glowReach, 20..150)
         int(theme.pressFadeOutTime, original.fadeDuration, next.fadeDuration, 100..5000)
         bool(theme.pressGlowOnCandidates, original.candidateGlow, next.candidateGlow)
         bool(theme.idleBreathing, original.idleBreathing, next.idleBreathing)

@@ -189,6 +189,18 @@ class LightEffectProbeTest {
         }
     }
 
+    private fun totalColour(image: Bitmap): Long {
+        val pixels = IntArray(image.width * image.height)
+        image.getPixels(pixels, 0, image.width, 0, 0, image.width, image.height)
+        // For one hue, chroma tracks the coloured brightness and removes the
+        // permanent white legends and neutral key backgrounds.
+        return pixels.sumOf { pixel ->
+            val high = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+            val low = minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+            (high - low).toLong()
+        }
+    }
+
     /** [presses] are letter to DOWN time; release time is controlled independently. */
     private fun record(name: String, presses: List<Pair<String, Long>>, moments: List<Long>, columns: Int,
         holdMillis: Long = 70L, momentLabel: (Long) -> String = { "$it ms" },
@@ -231,10 +243,20 @@ class LightEffectProbeTest {
     }
 
     @Test
-    fun onePressSpreadsLightAndReturnsToBlack() {
-        val moments = listOf(0L, 16, 33, 50, 66, 100, 133, 166, 200, 250, 300, 400, 500, 650, 800, 1000, 1300, 1500, 2000, 2600, 3200)
-        val coverage = record("one-press", listOf("g" to 0L), moments, columns = 7)
+    fun onePressSpreadsLightSmoothlyAndReturnsToBlack() {
+        val moments = (0L..600L step 16).toList() + listOf(600L, 800, 1000, 1300, 1500, 2000)
+        val totals = mutableListOf<Long>()
+        val coverage = record("one-press", listOf("g" to 0L), moments, columns = 7) { time, frame ->
+            if (time <= 600) totals.add(totalColour(frame))
+        }
         assertTrue("Light must appear after a press: $coverage", coverage.max() > 400)
+        val peak = totals.max()
+        val maxStep = totals.zipWithNext { a, b -> abs(b - a) }.max()
+        // The peak is the reference for the whole sequence, including the
+        // initial near-dark frame where a relative-to-previous ratio is undefined.
+        val change = 100.0 * maxStep / peak
+        println("SAM one-press maximum frame-to-frame change: $change% of peak brightness")
+        assertTrue("Worst change: $change% of peak brightness ($totals)", change <= 12.0)
         assertTrue("And be gone in the end: $coverage", coverage.last() < coverage.max() / 20)
     }
 

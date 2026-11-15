@@ -68,10 +68,10 @@ class V15LightEffectPrefsTest {
         assertEquals(100, prefs.pressKeyRetreatTime.getValue())
         assertEquals(80, prefs.samKeyHoldTime.getValue())
         assertEquals(800, prefs.samKeyRetreatTime.getValue())
-        assertEquals(400, prefs.pressExpansionTime.getValue())
+        assertEquals(550, prefs.pressExpansionTime.getValue())
         assertEquals(40, prefs.pressWaveHoldTime.getValue())
         assertEquals(900, prefs.pressFadeOutTime.getValue())
-        assertEquals(1380, prefs.pressIgnitionTime.getValue() + prefs.pressExpansionTime.getValue() +
+        assertEquals(1530, prefs.pressIgnitionTime.getValue() + prefs.pressExpansionTime.getValue() +
             prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
         assertTrue("Defaults must not turn into an implicit settings migration", stored.all.isEmpty())
         assertTrue(prefs.previewSameColor.getValue())

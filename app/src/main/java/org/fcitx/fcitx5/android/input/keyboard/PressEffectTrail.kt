@@ -27,6 +27,8 @@ internal class PressEffectTrail(capacity: Int) {
         var driftX = 0f
         var driftY = 0f
         var start = 0L
+        var sequence = 0L
+            internal set
         var releasedAt = -1L
         /** Measured touch-cell pitch; keeps effects proportional on every layout. */
         var pitch = 0f
@@ -52,6 +54,7 @@ internal class PressEffectTrail(capacity: Int) {
 
     init { require(capacity > 0) }
     private val slots = Array(capacity) { Ripple() }
+    private var sequence = 0L
     var size = 0
         private set
 
@@ -68,7 +71,10 @@ internal class PressEffectTrail(capacity: Int) {
 
     fun obtain(now: Long): Ripple {
         if (size == slots.size) removeAt(0)
-        return slots[size++].also { it.start = now }
+        return slots[size++].also {
+            it.start = now
+            it.sequence = ++sequence
+        }
     }
 
     fun removeAt(index: Int) {

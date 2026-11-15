@@ -10,6 +10,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.fcitx.fcitx5.android.core.RimeTouchProbe
 import org.fcitx.fcitx5.android.core.RimeTouchProbeStatus
+import org.fcitx.fcitx5.android.input.keyboard.SamFrameTiming
 import org.fcitx.fcitx5.android.ui.main.settings.behavior.TouchProbeSelfCheckUi
 import org.junit.Assert.*
 import org.junit.Test
@@ -36,6 +37,23 @@ class TouchProbeSelfCheckUiTest {
 
     private fun field(ui: TouchProbeSelfCheckUi, tag: String) =
         ui.root.findViewWithTag<TextView>(tag).text.toString()
+
+    @Test fun samTimingSeparatesSlowFramesFromSlowRendersAndCanBeReset() = fixture { ui ->
+        SamFrameTiming.reset()
+        try {
+            listOf(16L, 20L, 24L).forEach { SamFrameTiming.recordFrame(it * 1_000_000) }
+            listOf(3L, 4L, 5L).forEach { SamFrameTiming.recordRender(it * 1_000_000) }
+            ui.renderSamTiming(SamFrameTiming.snapshot())
+            assertTrue(field(ui, "sam-frame-timing").contains("20.00 ms"))
+            assertTrue(field(ui, "sam-frame-timing").contains("3 帧中 1 帧超过 20 ms"))
+            assertTrue(field(ui, "sam-render-timing").contains("5.00 ms"))
+            assertTrue(field(ui, "sam-render-timing").contains("3 次渲染中 1 次超过 4 ms"))
+            ui.root.findViewWithTag<View>("sam-frame-timing-reset").performClick()
+            assertEquals(0L, SamFrameTiming.snapshot().frameIntervals)
+            assertEquals(0L, SamFrameTiming.snapshot().renders)
+            assertEquals("等待连续的灯效动画帧", field(ui, "sam-frame-timing"))
+        } finally { SamFrameTiming.reset() }
+    }
 
     @Test fun unknownAndLoadedInterfacesNeverPretendAQuerySucceeded() = fixture { ui ->
         assertEquals("尚未查询", field(ui, "touch-probe-query-outcome"))

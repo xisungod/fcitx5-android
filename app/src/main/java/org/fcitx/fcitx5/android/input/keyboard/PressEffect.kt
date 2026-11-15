@@ -67,7 +67,7 @@ internal class PressEffect(
     /** 0 = colour fills the key, 1 = glowing border, 2 = no key colour (only the spreading light) */
     private val keyColorStyle: Int = 0,
     private val keyCornerRadius: Float = 0f,
-    /** 100 = the V09 reach; the Samsung reference keeps the coloured light around neighbouring keys */
+    /** SAM extends its key graph beyond 100%. The other renderers keep their original range. */
     glowReachPercent: Int = 100,
     private val glowOnCandidates: Boolean = true,
     /** V13: key colour follows the finger (full while held, tail starts on release) */
@@ -210,7 +210,7 @@ internal class PressEffect(
     private val freshAttention = FloatArray(MAX_RIPPLES)
     private val samKeyField = if (samGlare) SamKeyLightField(SAM_FIELD_WIDTH, SAM_FIELD_HEIGHT, density,
         keyCornerRadius, expansionDuration, waveHoldDuration, fadeDuration,
-        sqrt(sizeScale) * glowReach) else null
+        glowReachPercent.coerceIn(10, 150) / 100f, sqrt(sizeScale)) else null
     private val neonField = if (sharedFieldEnabled) NeonField() else null
     private var fieldPreparedAt = Long.MIN_VALUE
     private val keyFaces = PressEffectTrail(MAX_KEY_FACES)
@@ -229,6 +229,7 @@ internal class PressEffect(
     private var frameTime = 0L
     private val choreographer = Choreographer.getInstance()
     private var callbackFrameId = Long.MIN_VALUE
+    private var lastSamFrame = Long.MIN_VALUE
     private var callbackFrameClock = 0L
     private var displayFrameId = Long.MIN_VALUE
     private var displayFrameClock = 0L
@@ -292,9 +293,10 @@ internal class PressEffect(
         host.removeCallbacks(endDisplayFrame)
         callbackFrameId = Long.MIN_VALUE
         displayFrameId = Long.MIN_VALUE
+        lastSamFrame = Long.MIN_VALUE
         if (!canDraw() || !animatorsEnabled()) {
             ripples.clear()
-        samKeyField?.clear()
+            samKeyField?.clear()
             clearOwnedColors()
             keyFaces.clear()
             heldFaces.clear()
@@ -488,8 +490,8 @@ internal class PressEffect(
             bridgeGain = 1f
             keyFill = highlightKey && keyBounds != null
             this.keyId = keyId
-            x = keyBounds?.exactCenterX() ?: pressX
-            y = keyBounds?.exactCenterY() ?: pressY
+            x = if (samGlare) pressX else keyBounds?.exactCenterX() ?: pressX
+            y = if (samGlare) pressY else keyBounds?.exactCenterY() ?: pressY
             flashWidth = if (keyBounds != null) max(density, keyBounds.width().toFloat()) else flashRadius * 2f
             flashHeight = if (keyBounds != null) max(density, keyBounds.height().toFloat()) else flashRadius * 2f
             pitch = if (keyPitch > 0f) keyPitch else min(flashWidth, flashHeight)
@@ -552,6 +554,13 @@ internal class PressEffect(
                 break
             }
         }
+        if (samGlare) {
+            if (!changing) lastSamFrame = Long.MIN_VALUE
+            else if (callbackFrameId != Long.MIN_VALUE && callbackFrameId != lastSamFrame) {
+                if (lastSamFrame != Long.MIN_VALUE) SamFrameTiming.recordFrame(callbackFrameId - lastSamFrame)
+                lastSamFrame = callbackFrameId
+            }
+        }
         if (changing) scheduleFrame(0L)
         else {
             choreographer.removeFrameCallback(frameCallback)
@@ -570,6 +579,7 @@ internal class PressEffect(
         fieldPreparedAt = Long.MIN_VALUE
         displayFrameId = Long.MIN_VALUE
         callbackFrameId = Long.MIN_VALUE
+        lastSamFrame = Long.MIN_VALUE
         breathing.stop()
     }
 
@@ -943,7 +953,9 @@ internal class PressEffect(
             bounds.set(0f, -logicalHeight * 0.25f, logicalWidth.toFloat(), logicalHeight.toFloat())
             if (samGlare) {
                 val field = requireNotNull(samKeyField)
+                val start = System.nanoTime()
                 field.render(ripples, colors, frameTime, logicalWidth, logicalHeight, glowOnCandidates, pixels)
+                if (ripples.size > 0) SamFrameTiming.recordRender(System.nanoTime() - start)
                 sourceCount = field.sourceCount
                 visitedSamples = field.visitedSamples
                 mergedSamples = 0

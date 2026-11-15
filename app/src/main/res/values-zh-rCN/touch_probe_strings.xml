@@ -34,4 +34,10 @@
     <string name="touch_probe_policy_blocked">输入引擎保护阻止了自检，请检查部署和同步快捷键设置。</string>
     <string name="touch_probe_check_failed">自检未完成，页面仍显示最近一次已完成查询的状态。</string>
     <string name="touch_probe_readonly_note">自检仅用固定拼写 nihao 做只读查询，不上屏、不学习你的输入。打开本页只读取缓存状态。</string>
+    <string name="sam_frame_timing_title">SAM 灯效帧耗时</string>
+    <string name="sam_frame_timing_empty">等待连续的灯效动画帧</string>
+    <string name="sam_frame_timing_summary">平均帧间隔 %1$.2f ms · %3$d 帧中 %2$d 帧超过 20 ms</string>
+    <string name="sam_render_timing_summary">光场渲染平均 %1$.2f ms · 最慢 %2$.2f ms\n%4$d 次渲染中 %3$d 次超过 4 ms</string>
+    <string name="sam_frame_timing_input">在此单按或连打测试</string>
+    <string name="sam_frame_timing_reset">清空统计</string>
 </resources>

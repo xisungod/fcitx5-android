@@ -717,7 +717,7 @@ internal class KeyboardQuickSettingsUi(
             slider(R.string.press_glow_brightness, "quick_glow_brightness", draft.values.glowBrightness, 0, 100, 5) {
                 draft.values = draft.values.copy(glowBrightness = it)
             }
-            slider(R.string.press_glow_reach, "quick_glow_reach", draft.values.glowReach, 20, 100, 5) {
+            slider(R.string.press_glow_reach, "quick_glow_reach", draft.values.glowReach, 20, 150, 5) {
                 draft.values = draft.values.copy(glowReach = it)
             }
             toggle(R.string.press_glow_on_candidates, "quick_candidate_glow", draft.values.candidateGlow) {

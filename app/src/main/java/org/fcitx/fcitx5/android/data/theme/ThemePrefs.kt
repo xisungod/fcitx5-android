@@ -235,7 +235,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     )
 
     val pressGlowReach = int(
-        R.string.press_glow_reach, "press_glow_reach", 100, 20, 100, "%", 5,
+        R.string.press_glow_reach, "press_glow_reach", 100, 20, 150, "%", 5,
         enableUiOn = { pressEffect.getValue() }
     )
     val pressGlowOnCandidates = switch(
@@ -271,7 +271,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         .also { it.register() }
 
     val pressExpansionTime = int(
-        R.string.press_expansion_time, "press_expansion_time", 400, 100, 4000, "ms", 50,
+        R.string.press_expansion_time, "press_expansion_time", 550, 100, 4000, "ms", 50,
         enableUiOn = { pressEffect.getValue() }
     )
 

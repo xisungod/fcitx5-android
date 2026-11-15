@@ -459,11 +459,20 @@ class LightEffectSettingsUiTest {
         assertEquals(1410, prefs.pressExpansionTime.getValue())
         assertEquals(450, prefs.pressFadeOutTime.getValue())
         val control = ui.durationControls.getValue(prefs.pressExpansionTime.key)
-        control.slider.progress = 95 // 100 + 95*20 = 2000 ms.
+        control.slider.progress = 190 // 100 + 190*10 = 2000 ms.
         assertEquals(1410, prefs.pressExpansionTime.getValue())
         control.commit()
         assertEquals(2000, prefs.pressExpansionTime.getValue())
         assertEquals(350, prefs.pressWaveHoldTime.getValue())
+    }
+
+    @Test fun theReachSliderPersistsOneHundredAndFiftyPercent() {
+        val prefs = ThemeManager.prefs
+        val ui = LightEffectSettingsUi(RuntimeEnvironment.getApplication())
+        val reach = ui.durationControls.getValue(prefs.pressGlowReach.key)
+        reach.slider.progress = reach.slider.max
+        reach.commit()
+        assertEquals(150, prefs.pressGlowReach.getValue())
     }
 
     @Test fun samTimingControlsUseOneSharedFadeAndPreserveLegacyValues() {

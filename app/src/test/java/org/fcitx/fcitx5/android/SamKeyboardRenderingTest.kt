@@ -332,7 +332,8 @@ class SamKeyboardRenderingTest {
                     previousTime = time
                 } finally { observed.image.recycle() }
             }
-            board.assertBlackSurface("Single tap completes its physical landing")
+            board.go(1600)
+            board.assertBlackSurface("Single tap completes its physical landing and the extended wave fades")
             val restored = board.motionFrame(key)
             try {
                 assertEquals(1f, restored.scale, 0f)
@@ -585,7 +586,7 @@ class SamKeyboardRenderingTest {
         for (fade in listOf(240L, 900L)) {
             Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
                 it.keyMotionEffect.setValue(ThemePrefs.KeyMotionEffect.Off)
-                it.pressWaveHoldTime.setValue(80)
+                it.pressWaveHoldTime.setValue(180)
                 it.pressFadeOutTime.setValue(fade.toInt())
             }).use { board ->
                 val key = board.letters.getValue("f")
@@ -605,16 +606,17 @@ class SamKeyboardRenderingTest {
                 assertTrue("The face gives feedback on the very first frame", brightness().first >= 30)
                 board.go(50)
                 board.touch("f", MotionEvent.ACTION_UP, 0)
-                board.go(80)
+                // Observe the common fade after the longer halo ignition has finished.
+                board.go(180)
                 val (capStart, haloStart) = brightness()
                 assertTrue("The source and cap both light up", capStart >= 30 && haloStart >= 30)
-                board.go(80 + fade / 2)
+                board.go(180 + fade / 2)
                 val (capMid, haloMid) = brightness()
                 val capFraction = capMid.toFloat() / capStart
                 val haloFraction = haloMid.toFloat() / haloStart
                 assertEquals("The key cap is halfway through its ${fade}ms fade", 0.5f, capFraction, 0.12f)
                 assertEquals("The source halo tracks the cap through its ${fade}ms fade", capFraction, haloFraction, 0.12f)
-                board.go(80 + fade)
+                board.go(180 + fade)
                 assertEquals("Cap and source both finish at the configured cutoff", 0 to 0, brightness())
             }
         }
