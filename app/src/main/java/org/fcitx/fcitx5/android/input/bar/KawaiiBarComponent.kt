@@ -532,7 +532,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 context.getString(R.string.offline_dictation_ui_finishing), done)
             OfflineDictationPhase.Error, OfflineDictationPhase.Unavailable -> bar.render(
                 InlineDictationBar.Mode.Notice,
-                state.message.ifBlank { context.getString(R.string.offline_dictation_ui_unavailable) },
+                state.message?.takeIf { it.isNotBlank() }
+                    ?: context.getString(R.string.offline_dictation_ui_unavailable),
                 context.getString(R.string.offline_dictation_inline_dismiss))
         }
     }
