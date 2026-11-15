@@ -109,77 +109,146 @@ class SamWavePropagationTest {
         return samples.first { it.second * 2 >= most }.first
     }
 
+    // The key is at x = 120 and its touch cell is 60 wide; a pool reaches four to five cells.
     @Test
-    fun lightArrivesOutwardsAndLeavesABroadConnectedTail() {
+    fun lightReachesNearKeysBeforeFarOnesAndStaysLitBehindItsEdge() {
         Field().use { field ->
-            val samples = (40L..400L step 10).map { time ->
+            val samples = (50L..700L step 10).map { time ->
                 val frame = field.render(time)
                 try {
-                    if (time in listOf(80L, 160L, 240L, 320L, 400L)) save(frame, "travel-$time")
-                    listOf(time.toInt(), light(frame, 180), light(frame, 230), light(frame, 280))
+                    if (time in listOf(80L, 160L, 240L, 320L, 400L)) save(frame, "pool-$time")
+                    listOf(time.toInt(), light(frame, 210), light(frame, 270), light(frame, 315))
                 } finally { frame.recycle() }
             }
             val near = samples.map { it[0].toLong() to it[1] }
             val middle = samples.map { it[0].toLong() to it[2] }
             val far = samples.map { it[0].toLong() to it[3] }
-            assertTrue("Far light cannot appear with the initial press: $samples", far.first().second < 5)
-            assertTrue("Light reaches successive physical key positions later: $samples",
-                arrival(near) < arrival(middle) && arrival(middle) + 30 <= arrival(far))
-            val broad = field.render(320)
-            try {
-                // A connected region at least two key pitches wide distinguishes
-                // this from a thin bright ring with an immediately black wake.
-                assertTrue("The advancing light retains a broad connected wake",
-                    (170..290 step 5).count { light(broad, it) >= 35 } >= 20)
-                assertTrue("A single press must leave a distant dark region", light(broad, 480) < 5)
-            } finally { broad.recycle() }
+            assertTrue("The pool is visible at every sampled distance and dimmer further out: $samples",
+                near.maxOf { it.second } >= 100 && middle.maxOf { it.second } >= 45 && far.maxOf { it.second } >= 8 &&
+                    near.maxOf { it.second } > middle.maxOf { it.second } && middle.maxOf { it.second } > far.maxOf { it.second })
+            assertTrue("It grows outwards: ${arrival(near)} / ${arrival(middle)} / ${arrival(far)}",
+                arrival(middle) >= arrival(near) + 20 && arrival(far) >= arrival(middle) + 60)
+            assertTrue("The area behind the edge stays lit until the fade begins: $near",
+                near.first { it.first == 440L }.second >= near.maxOf { it.second } * 0.9f)
+            for ((previous, next) in middle.filter { it.first <= 440L }.zipWithNext()) {
+                assertTrue("No flicker while the pool grows: $previous / $next", next.second >= previous.second - 3)
+            }
             File("build/outputs/effect-checks/sam-propagation/arrival.csv").writeText(
                 "time_ms,near_light,middle_light,far_light\n" + samples.joinToString("\n") { it.joinToString(",") } + "\n")
         }
     }
 
     @Test
-    fun centreDimsBeforeTheOutsideWithoutCuttingOffTheTravellingTail() {
+    fun aPoolIsBrightestAtItsKeyAndFadesSmoothlyToNothingAtItsReach() {
         Field().use { field ->
-            val samples = listOf(80L, 240L, 440L, 650L, 900L, 1100L, 1340L).map { time ->
+            for (time in listOf(240L, 400L)) {
                 val frame = field.render(time)
                 try {
-                    save(frame, "local-fade-$time")
-                    Triple(time, light(frame, 120), light(frame, 280))
+                    val profile = (120..580 step 4).map { x -> x to light(frame, x) }
+                    val peak = profile.maxOf { it.second }
+                    assertTrue("The pool is bright at $time ms: $peak", peak >= 120)
+                    assertEquals("Its brightest point is the pressed key at $time ms", peak, profile.first().second)
+                    for ((inner, outer) in profile.zipWithNext()) {
+                        assertTrue("Light only falls with distance at $time ms, so there is no ring: $inner / $outer",
+                            outer.second <= inner.second + 3)
+                    }
+                    val broad = profile.count { it.second >= peak * 0.4f } * 4
+                    assertTrue("It is a pool rather than a spot at $time ms: $broad px", broad >= 90)
+                    val skirt = profile.count { it.second >= 1 && it.second <= peak * 0.2f } * 4
+                    assertTrue("Its edge is soft at $time ms: $skirt px of faint light", skirt >= 24)
+                    assertEquals("It does not flood the keyboard: no light eight cells away", 0, profile.last().second)
+                    save(frame, "pool-profile-$time")
                 } finally { frame.recycle() }
             }
-            val early = samples.first()
-            val late = samples.first { it.first == 900L }
-            assertTrue("Initially the source is brighter than the unreached outside: $early", early.second > early.third + 50)
-            assertTrue("The source can finish fading while the outside retains light: $late",
-                late.second < 12 && late.third > late.second + 15)
-            assertTrue("The outside falls later, rather than keeping a fixed ratio to the centre: $samples",
-                samples.first { it.first == 650L }.third > samples.first { it.first == 650L }.second)
-            assertEquals("The original configured total lifetime still ends in black", Triple(1340L, 0, 0), samples.last())
-            File("build/outputs/effect-checks/sam-propagation/fade.csv").writeText(
-                "time_ms,source_light,outer_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
         }
     }
 
     @Test
-    fun onePressKeepsItsSelectedColourAtEveryDistanceAndAge() {
-        Field(palette = PressEffect.CYBERPUNK).use { field ->
-            val expected = field.sourceColour
-            fun normalized(pixel: Int) = listOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
-                .map { it.toFloat() / intensity(pixel).coerceAtLeast(1) }
-            val wanted = normalized(expected)
-            for ((time, x) in listOf(80L to 130, 240L to 210, 400L to 280, 900L to 280)) {
+    fun thePoolDimsAsAWholeAndEndsInBlack() {
+        Field().use { field ->
+            val samples = listOf(440L, 500L, 650L, 900L, 1100L, 1340L).map { time ->
                 val frame = field.render(time)
                 try {
-                    val actual = frame.getPixel(x, 150)
-                    assertTrue("Colour must be measured where the wave remains visible: $time/$x", intensity(actual) >= 20)
-                    normalized(actual).zip(wanted).forEach { (a, b) ->
-                        assertEquals("A single source must not acquire a different rim or aging colour: $time/$x", b, a, 0.09f)
-                    }
-                    save(frame, "single-colour-$time")
+                    save(frame, "fade-$time")
+                    Triple(time, light(frame, 120), light(frame, 240))
                 } finally { frame.recycle() }
             }
+            val full = samples.first()
+            assertTrue("When the fade begins, the key and a place two cells away are both lit: $full",
+                full.second >= 120 && full.third >= 40)
+            for ((previous, next) in samples.zipWithNext()) {
+                assertTrue("Both places only dim once the fade has begun: $previous / $next",
+                    next.second <= previous.second + 2 && next.third <= previous.third + 2)
+            }
+            val shape = full.third.toFloat() / full.second
+            for (sample in samples.filter { it.first in listOf(500L, 650L, 900L) }) {
+                assertTrue("The pool keeps its shape while it dims, it does not retreat to a ring or a spot: $full / $sample",
+                    abs(sample.third.toFloat() / sample.second - shape) <= 0.08f)
+            }
+            assertTrue("Halfway through the fade it is clearly dimmer but still there: $samples",
+                samples.first { it.first == 900L }.second in (full.second * 0.3f).toInt()..(full.second * 0.7f).toInt())
+            assertEquals("The whole pool obeys the selected lifetime", Triple(1340L, 0, 0), samples.last())
+            File("build/outputs/effect-checks/sam-propagation/fade.csv").writeText(
+                "time_ms,key_light,near_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
         }
+    }
+
+    /** The reference keyboard lights green first, then blue, then violet; it never shows warm colours. */
+    @Test
+    fun withTheDefaultPaletteLightAgesFromGreenThroughBlueToVioletWithoutWarmColours() {
+        Field(palette = PressEffect.CYBERPUNK).use { field ->
+            fun hue(pixel: Int): Float {
+                val hsv = FloatArray(3)
+                Color.colorToHSV(pixel, hsv)
+                return hsv[0]
+            }
+            val young = field.render(160)
+            val old = field.render(900)
+            try {
+                save(young, "aurora-160"); save(old, "aurora-900")
+                val edge = young.getPixel(200, 150)
+                assertTrue("Freshly reached light is visible: ${Integer.toHexString(edge)}", intensity(edge) >= 40)
+                assertTrue("Freshly reached light is green to teal: ${hue(edge)}", hue(edge) in 120f..195f)
+                val aged = old.getPixel(124, 150)
+                assertTrue("Aged light is visible: ${Integer.toHexString(aged)}", intensity(aged) >= 30)
+                assertTrue("Aged light is blue to violet: ${hue(aged)}", hue(aged) in 215f..300f)
+                for (frame in listOf(young, old)) for (x in 100..400 step 6) {
+                    val pixel = frame.getPixel(x, 150)
+                    if (intensity(pixel) < 20) continue
+                    assertTrue("No red, orange or yellow light at $x: ${hue(pixel)}", hue(pixel) in 110f..320f)
+                }
+            } finally { young.recycle(); old.recycle() }
+        }
+    }
+
+    @Test
+    fun configuredExpansionTimeChangesTheObservedTravelTime() {
+        fun arrivalTime(expansion: Int): Long = Field(expansion = expansion).use { field ->
+            arrival((50L..expansion.toLong() step 10).map { time ->
+                val frame = field.render(time)
+                try { time to light(frame, 270) } finally { frame.recycle() }
+            })
+        }
+        val fast = arrivalTime(400)
+        val slow = arrivalTime(800)
+        assertTrue("Doubling the expansion setting must delay when further keys light up: $fast / $slow", slow > fast * 1.7f)
+        assertTrue("The propagation scales with the selected duration: $fast / $slow", abs(slow - fast * 2) <= 50)
+    }
+
+    @Test
+    fun selectedWaveFadeAndHoldAreVisibleAndEndAtTheirConfiguredTimes() {
+        fun sample(fade: Int, hold: Int, time: Long): Int = Field(fade = fade, hold = hold).use { field ->
+            val frame = field.render(time)
+            // Observe the pool away from the pressed key.
+            try { light(frame, 240) } finally { frame.recycle() }
+        }
+        assertEquals("Short selected fade has ended", 0, sample(100, 40, 700))
+        assertTrue("A long selected fade keeps a visible tail", sample(900, 40, 1000) >= 15)
+        val full = sample(900, 40, 440)
+        val halfway = sample(900, 40, 890)
+        assertTrue("Halfway through the selected fade retains about half of its visible exposure", halfway in (full * 0.40f).toInt()..(full * 0.60f).toInt())
+        assertTrue("A selected hold delays the fade", sample(100, 500, 700) >= 40)
+        assertEquals("The full selected wave lifetime ends in black", 0, sample(900, 40, 1340))
     }
 
     @Test
@@ -254,29 +323,5 @@ class SamWavePropagationTest {
         }
     }
 
-    @Test
-    fun configuredExpansionTimeChangesTheObservedTravelTime() {
-        fun arrivalTime(expansion: Int): Long = Field(expansion = expansion).use { field ->
-            arrival((40L..expansion.toLong() step 10).map { time ->
-                val frame = field.render(time)
-                try { time to light(frame, 280) } finally { frame.recycle() }
-            })
-        }
-        val fast = arrivalTime(400)
-        val slow = arrivalTime(800)
-        assertTrue("Doubling the expansion setting delays arrival at a fixed physical location", slow > fast * 1.7f)
-        assertTrue("Propagation still scales with the selected duration", abs(slow - fast * 2) <= 50)
-    }
 
-    @Test
-    fun selectedFadeAndHoldRemainVisibleWithoutExtendingTheConfiguredLifetime() {
-        fun sample(fade: Int, hold: Int, time: Long): Int = Field(fade = fade, hold = hold).use { field ->
-            val frame = field.render(time)
-            try { light(frame, 280) } finally { frame.recycle() }
-        }
-        assertEquals("Short selected fade has ended", 0, sample(100, 40, 700))
-        assertTrue("A long fade retains the later outer tail", sample(900, 40, 900) >= 15)
-        assertTrue("A selected hold delays local fade", sample(100, 500, 600) >= 30)
-        assertEquals("No source outlives expansion + hold + fade", 0, sample(900, 40, 1340))
-    }
 }

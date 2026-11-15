@@ -92,7 +92,7 @@ class LightEffectProbeTest {
         private val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val activity = controller.get()
         val root = FrameLayout(activity)
-        val pixelHeight = KeyboardSizePolicy.heightForLayout(root.dp(288), true, true, false)
+        val pixelHeight = KeyboardSizePolicy.heightForLayout(root.dp(288), true, true, true)
         val keyboard: TextKeyboard
         val letters: Map<String, TextKeyView>
         var elapsed = 0L
@@ -101,8 +101,8 @@ class LightEffectProbeTest {
         private val start: Long
 
         init {
-            // Everything stays at its default: this is what a new installation shows.
-            ThemeManager.prefs.portraitNumberRow.setValue(false)
+            // As on the phone it is compared with; everything else is a new installation's default.
+            ThemeManager.prefs.portraitNumberRow.setValue(true)
             AppPrefs.getInstance().keyboard.popupOnKeyPress.setValue(false)
             activity.setTheme(R.style.Theme_InputViewTheme)
             activity.setContentView(FrameLayout(activity).apply {
@@ -223,6 +223,14 @@ class LightEffectProbeTest {
         val presses = listOf("n" to 0L, "i" to 150L, "h" to 300L, "a" to 450L, "o" to 600L)
         val moments = listOf(0L, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 800, 900, 1000, 1200, 1500, 2000)
         val coverage = record("typing", presses, moments, columns = 7)
+        assertTrue("Light must appear while typing: $coverage", coverage.max() > 400)
+    }
+
+    @Test
+    fun fastTypingKeepsBrightAndDimPlaces() {
+        val presses = "zheshiyigeceshi".mapIndexed { index, letter -> letter.toString() to index * 120L }
+        val moments = (0L..2400L step 120).map { it + 60 }
+        val coverage = record("fast-typing", presses, moments, columns = 7)
         assertTrue("Light must appear while typing: $coverage", coverage.max() > 400)
     }
 

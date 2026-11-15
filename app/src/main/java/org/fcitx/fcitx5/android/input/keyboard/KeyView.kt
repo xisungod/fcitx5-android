@@ -53,6 +53,7 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.existingOrNewId
 import splitties.views.imageResource
 import splitties.views.padding
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -145,8 +146,9 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             if (landscape) prefs.keyHorizontalMarginLandscape else prefs.keyHorizontalMargin
         val vMarginPref =
             if (landscape) prefs.keyVerticalMarginLandscape else prefs.keyVerticalMargin
-        hMargin = if (def.margin) dp(hMarginPref.getValue()) else 0
-        vMargin = if (def.margin) dp(vMarginPref.getValue()) else 0
+        // Sam needs room between its caps: that is the only place where its light shows.
+        hMargin = if (def.margin) dp(max(hMarginPref.getValue(), if (samMode) SAM_LEAST_H_MARGIN else 0)) else 0
+        vMargin = if (def.margin) dp(max(vMarginPref.getValue(), if (samMode) SAM_LEAST_V_MARGIN else 0)) else 0
     }
 
     private val cachedLocation = intArrayOf(0, 0)
@@ -227,8 +229,8 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         }
         // key border
         if (theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam) {
-            // Keep unpressed caps dark while a little backlight reveals their
-            // edges. The pressed cap has its own independently coloured face.
+            // Caps are opaque black, as on the Samsung keyboard this mode follows: the light
+            // shows only in the gaps between them. A pressed cap has its own coloured face.
             appearanceView.background = insetRadiusDrawable(hMargin, vMargin, radius, SAM_CAP_COLOR)
             appearanceView.padding = 0
             appearanceView.foreground = null
@@ -587,5 +589,6 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
     }
 }
 
-/** A dark default mask; the reference recordings do not establish an exact opacity. */
-private val SAM_CAP_COLOR = Color.argb(0xEB, 0, 0, 0)
+private val SAM_CAP_COLOR = Color.BLACK
+private const val SAM_LEAST_H_MARGIN = 4
+private const val SAM_LEAST_V_MARGIN = 5

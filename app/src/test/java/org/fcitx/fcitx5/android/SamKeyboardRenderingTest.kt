@@ -348,7 +348,7 @@ class SamKeyboardRenderingTest {
     }
 
     @Test
-    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindDarkGlassCaps() {
+    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBetweenBlackCaps() {
         Keyboard(ThemePrefs.RippleShape.Sam).use { board ->
             board.frame().also { save(it, "idle"); it.recycle() }
             board.assertBlackSurface("Before typing")
@@ -379,10 +379,8 @@ class SamKeyboardRenderingTest {
                 try {
                     board.letters.filterKeys { it != "f" }.values.forEach { key ->
                         val r = board.bounds(key)
-                        // A little light may reveal an unpressed cap, but it must
-                        // remain substantially darker than the surrounding gaps.
                         val cap = intensity(surface.getPixel(r.centerX(), r.centerY()))
-                        assertTrue("Unpressed cap interiors stay dark while the gaps reveal the field: $cap", cap <= 24)
+                        assertTrue("Unpressed caps stay black while the gaps reveal the field: $cap", cap <= 8)
                     }
                 } finally { surface.recycle() }
             } finally { frame.recycle() }
