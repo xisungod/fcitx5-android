@@ -221,6 +221,38 @@ class SamWavePropagationTest {
         }
     }
 
+    @Test fun complementaryWavesStayChromaticAsTheirSharedHaloFades() {
+        val onlySource = grid().filter { it.id == SOURCE }
+        Field(geometry = onlySource, palette = intArrayOf(Color.RED, Color.CYAN), autoPress = false).use { field ->
+            // Equal red and cyan would cancel to grey in an RGB average. Use the
+            // same source/timing so both contributions always have equal energy.
+            field.press(0); field.release(50)
+            field.press(0); field.release(50)
+            val bright = field.frame(125)
+            val faded = field.frame(650)
+            try {
+                val cap = onlySource.single().capBounds
+                fun channels(frame: Bitmap): List<Int> {
+                    val pixel = frame.getPixel(cap.centerX(), cap.centerY())
+                    return listOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+                }
+                val a = channels(bright)
+                val b = channels(faded)
+                val peak = a.max()
+                val dimPeak = b.max()
+                assertTrue("The mixed halo fades without becoming brighter than the RGB peak: $peak/$dimPeak",
+                    dimPeak in 20 until peak && peak in 100..130)
+                assertTrue("A complementary overlap remains saturated at both brightnesses: $a / $b",
+                    a.min() <= peak / 8 && b.min() <= dimPeak / 8)
+                a.indices.forEach { index ->
+                    assertEquals("Dimming does not shift the mixed hue", a[index].toFloat() / peak,
+                        b[index].toFloat() / dimPeak, 0.06f)
+                }
+                save(faded, "graph-complementary-fade")
+            } finally { bright.recycle(); faded.recycle() }
+        }
+    }
+
     @Test fun weakOverlapUsesL3AndRasterWorkDoesNotMultiplyByTheWaveCount() {
         Field().use { single -> Field(autoPress = false).use { many ->
             repeat(12) { many.press(0); many.release(50) }

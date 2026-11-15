@@ -29,6 +29,8 @@ internal class SamKeyLightField(
     data class KeyGeometry(val id: Int, val capBounds: Rect, val touchBounds: Rect)
 
     private class Stamp(val pixels: IntArray, val coverage: FloatArray)
+    private data class Pigment(val red: Float, val green: Float, val blue: Float,
+        val saturation: Float, var hue: Float)
     private class Schedule {
         var start = Long.MIN_VALUE
         var keyId = -1
@@ -48,6 +50,8 @@ internal class SamKeyLightField(
     private var keyRed = FloatArray(0)
     private var keyGreen = FloatArray(0)
     private var keyBlue = FloatArray(0)
+    private var keySaturation = FloatArray(0)
+    private var keyHue = FloatArray(0)
     private var pitch = density
     private var width = 0
     private var height = 0
@@ -55,6 +59,10 @@ internal class SamKeyLightField(
     private val red = FloatArray(columns * rows)
     private val green = FloatArray(columns * rows)
     private val blue = FloatArray(columns * rows)
+    private val saturation = FloatArray(columns * rows)
+    private val hue = FloatArray(columns * rows)
+    private var palette = IntArray(0)
+    private var pigments = emptyArray<Pigment>()
     var visitedSamples = 0
         private set
     var sourceCount = 0
@@ -100,6 +108,8 @@ internal class SamKeyLightField(
         keyRed = FloatArray(keys.size)
         keyGreen = FloatArray(keys.size)
         keyBlue = FloatArray(keys.size)
+        keySaturation = FloatArray(keys.size)
+        keyHue = FloatArray(keys.size)
         stamps = emptyArray()
         schedules.clear()
     }
@@ -193,8 +203,39 @@ internal class SamKeyLightField(
         return Stamp(indices.copyOf(count), coverage.copyOf(count))
     }
 
+    private fun setPalette(colours: IntArray) {
+        if (palette.contentEquals(colours)) return
+        palette = colours.copyOf()
+        pigments = Array(colours.size) { i ->
+            val colour = colours[i]
+            val r = Color.red(colour) / 255f
+            val g = Color.green(colour) / 255f
+            val b = Color.blue(colour) / 255f
+            val peak = maxOf(r, g, b)
+            val chroma = peak - minOf(r, g, b)
+            Pigment(r, g, b, if (peak > 0f) chroma / peak else 0f,
+                if (chroma > 0f) hueOf(r, g, b, peak, chroma) else 0f)
+        }
+        // This hint is only used near a neutral RGB mix, where hue is ambiguous.
+        // Fix the hue seam in the palette's largest empty arc, independent of
+        // which wave currently wins. Nearly complementary waves then crossfade
+        // instead of picking a different dominant hue on each side of a tie.
+        val hues = pigments.filter { it.saturation > 0f }.map { it.hue }.sorted()
+        var seam = 0f
+        var gap = -1f
+        for (i in hues.indices) {
+            val next = if (i == hues.lastIndex) hues[0] + 6f else hues[i + 1]
+            if (next - hues[i] > gap) {
+                gap = next - hues[i]
+                seam = (hues[i] + gap * 0.5f) % 6f
+            }
+        }
+        for (pigment in pigments) if (pigment.hue < seam) pigment.hue += 6f
+    }
+
     fun render(trail: PressEffectTrail, colours: IntArray, time: Long, hostWidth: Int,
         hostHeight: Int, glowOnCandidates: Boolean, pixels: IntArray) {
+        setPalette(colours)
         if (hostWidth != width || hostHeight != height || stamps.size != keys.size) {
             width = hostWidth
             height = hostHeight
@@ -205,10 +246,14 @@ internal class SamKeyLightField(
         java.util.Arrays.fill(red, 0f)
         java.util.Arrays.fill(green, 0f)
         java.util.Arrays.fill(blue, 0f)
+        java.util.Arrays.fill(saturation, 0f)
+        java.util.Arrays.fill(hue, 0f)
         java.util.Arrays.fill(keyLight, 0f)
         java.util.Arrays.fill(keyRed, 0f)
         java.util.Arrays.fill(keyGreen, 0f)
         java.util.Arrays.fill(keyBlue, 0f)
+        java.util.Arrays.fill(keySaturation, 0f)
+        java.util.Arrays.fill(keyHue, 0f)
         visitedSamples = 0
         sourceCount = 0
         var strongestWaveExposure = 0f
@@ -217,10 +262,7 @@ internal class SamKeyLightField(
             val age = (time - ripple.start).toFloat()
             if (age < 0 || age >= expansionMs + holdMs + fadeMs) continue
             val propagation = schedule(ripple)
-            val colour = colours[ripple.colorIndex]
-            val r = Color.red(colour) / 255f
-            val g = Color.green(colour) / 255f
-            val b = Color.blue(colour) / 255f
+            val colour = pigments[ripple.colorIndex]
             sourceCount++
             val fallback = propagation.fallback
             if (fallback != null) {
@@ -228,7 +270,8 @@ internal class SamKeyLightField(
                 // independently rendered key face already supplies immediate feedback.
                 if (i == trail.size - 1) {
                     val e = envelope(age)
-                    accumulate(fallback, e * e * e, r, g, b)
+                    accumulate(fallback, e * e * e, colour.red, colour.green, colour.blue,
+                        colour.saturation, colour.hue * colour.saturation)
                 }
                 continue
             }
@@ -241,9 +284,11 @@ internal class SamKeyLightField(
                 waveExposure += exposure
                 val energy = exposure * exposure * exposure
                 keyLight[key] += energy
-                keyRed[key] += energy * r
-                keyGreen[key] += energy * g
-                keyBlue[key] += energy * b
+                keyRed[key] += energy * colour.red
+                keyGreen[key] += energy * colour.green
+                keyBlue[key] += energy * colour.blue
+                keySaturation[key] += energy * colour.saturation
+                keyHue[key] += energy * colour.saturation * colour.hue
             }
             strongestWaveExposure = max(strongestWaveExposure, waveExposure)
         }
@@ -269,8 +314,10 @@ internal class SamKeyLightField(
             val tail = if (crowding > 0f) smooth(0.14f * crowding, 0.40f * crowding, exposure) else 1f
             val dim = scale * tail
             if (exposure * dim <= 0.001f) continue
-            accumulate(stamps[key], energy.coerceAtMost(1f) * dim * dim * dim, keyRed[key] / energy,
-                keyGreen[key] / energy, keyBlue[key] / energy)
+            val inverse = 1f / energy
+            accumulate(stamps[key], energy.coerceAtMost(1f) * dim * dim * dim, keyRed[key] * inverse,
+                keyGreen[key] * inverse, keyBlue[key] * inverse, keySaturation[key] * inverse,
+                keyHue[key] * inverse)
         }
         for (y in 0 until rows) {
             val logicalY = -height * 0.25f + (y + 0.5f) * height * 1.25f / rows
@@ -281,10 +328,10 @@ internal class SamKeyLightField(
                 val w = light[index]
                 if (w <= 0.000000001f || candidate <= 0) { pixels[index] = 0; continue }
                 val exposure = Math.cbrt(w.toDouble()).toFloat().coerceAtMost(1f) * candidate
-                pixels[index] = ((exposure * 255).toInt() shl 24) or
-                    ((red[index] / w * 255).toInt().coerceIn(0, 255) shl 16) or
-                    ((green[index] / w * 255).toInt().coerceIn(0, 255) shl 8) or
-                    (blue[index] / w * 255).toInt().coerceIn(0, 255)
+                val inverse = 1f / w
+                val rgb = saturatedRgb(red[index] * inverse, green[index] * inverse, blue[index] * inverse,
+                    saturation[index] * inverse, hue[index], saturation[index])
+                pixels[index] = ((exposure * 255).toInt() shl 24) or rgb
             }
         }
     }
@@ -292,7 +339,8 @@ internal class SamKeyLightField(
     private fun envelope(age: Float): Float = smooth(0f, 32f, age) *
         samLightFade(age, holdMs, fadeMs)
 
-    private fun accumulate(stamp: Stamp, energy: Float, r: Float, g: Float, b: Float) {
+    private fun accumulate(stamp: Stamp, energy: Float, r: Float, g: Float, b: Float,
+        sat: Float, weightedHue: Float) {
         for (i in stamp.pixels.indices) {
             visitedSamples++
             val w = energy * stamp.coverage[i]
@@ -301,8 +349,49 @@ internal class SamKeyLightField(
             red[index] += w * r
             green[index] += w * g
             blue[index] += w * b
+            saturation[index] += w * sat
+            hue[index] += w * weightedHue
         }
     }
+
+    private fun saturatedRgb(r: Float, g: Float, b: Float, sourceSaturation: Float,
+        hueWeight: Float, saturationWeight: Float): Int {
+        val peak = maxOf(r, g, b)
+        val chroma = peak - minOf(r, g, b)
+        val saturation = sourceSaturation.coerceIn(0f, 1f)
+        val targetChroma = peak * saturation
+        if (targetChroma - chroma < 0.001f) return packRgb(r, g, b)
+        // Keep the existing peak and apply the light field's independent alpha
+        // afterwards: preserving saturation cannot raise the brightness budget.
+        if (chroma >= targetChroma * 0.40f) {
+            val spread = targetChroma / chroma
+            return packRgb(peak - (peak - r) * spread, peak - (peak - g) * spread, peak - (peak - b) * spread)
+        }
+        val hint = (hueWeight / saturationWeight) % 6f
+        val measured = if (chroma > 0.000001f) hueOf(r, g, b, peak, chroma) else hint
+        var delta = measured - hint
+        if (delta > 3f) delta -= 6f
+        if (delta < -3f) delta += 6f
+        val h = (hint + delta * smooth(0f, targetChroma * 0.40f, chroma) + 6f) % 6f
+        val base = peak - targetChroma
+        return packRgb(base + targetChroma * hueChannel(h), base + targetChroma * hueChannel(h + 4f),
+            base + targetChroma * hueChannel(h + 2f))
+    }
+
+    private fun hueOf(r: Float, g: Float, b: Float, peak: Float, chroma: Float): Float {
+        val hue = when (peak) {
+            r -> (g - b) / chroma
+            g -> 2f + (b - r) / chroma
+            else -> 4f + (r - g) / chroma
+        }
+        return if (hue < 0f) hue + 6f else hue
+    }
+
+    private fun hueChannel(hue: Float): Float = (abs(hue % 6f - 3f) - 1f).coerceIn(0f, 1f)
+
+    private fun packRgb(r: Float, g: Float, b: Float): Int =
+        ((r * 255f).toInt().coerceIn(0, 255) shl 16) or ((g * 255f).toInt().coerceIn(0, 255) shl 8) or
+            (b * 255f).toInt().coerceIn(0, 255)
 
     private fun smooth(start: Float, end: Float, value: Float): Float {
         val x = ((value - start) / (end - start)).coerceIn(0f, 1f)
