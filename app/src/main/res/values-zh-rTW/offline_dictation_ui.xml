@@ -19,4 +19,5 @@
     <string name="offline_dictation_ui_error_hint">輕點重試</string>
     <string name="offline_dictation_inline_dismiss">知道了</string>
     <string name="offline_dictation_inline_done">完成</string>
+    <string name="offline_dictation_ui_loading_recording">正在聆聽，模型準備中</string>
 </resources>

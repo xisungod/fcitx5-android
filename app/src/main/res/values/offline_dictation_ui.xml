@@ -19,4 +19,5 @@
     <string name="offline_dictation_ui_error_hint">Tap to try again</string>
     <string name="offline_dictation_inline_dismiss">OK</string>
     <string name="offline_dictation_inline_done">Done</string>
+    <string name="offline_dictation_ui_loading_recording">Listening while the model loads</string>
 </resources>
