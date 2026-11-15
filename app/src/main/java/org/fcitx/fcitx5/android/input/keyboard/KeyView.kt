@@ -227,8 +227,8 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         }
         // key border
         if (theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam) {
-            // Caps are dark glass over the light plate: black at rest, and a fifth of the
-            // light below shows through, as on the Samsung keyboard this mode follows.
+            // Keep unpressed caps dark while a little backlight reveals their
+            // edges. The pressed cap has its own independently coloured face.
             appearanceView.background = insetRadiusDrawable(hMargin, vMargin, radius, SAM_CAP_COLOR)
             appearanceView.padding = 0
             appearanceView.foreground = null
@@ -314,7 +314,10 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             val w = right - left
             val h = bottom - top
             val layoutWidth = (w * (1f - layoutMarginLeft - layoutMarginRight)).roundToInt()
-            appearanceView.updateLayoutParams<LayoutParams> {
+            // This layout pass already measures and positions the appearance below.
+            // Setting layoutParams here would call requestLayout() from onLayout(),
+            // scheduling another whole keyboard traversal for every expanded edge key.
+            (appearanceView.layoutParams as LayoutParams).apply {
                 leftMargin = (w * layoutMarginLeft).roundToInt()
                 rightMargin = (w * layoutMarginRight).roundToInt()
             }
@@ -584,5 +587,5 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
     }
 }
 
-/** Black at 80% opacity. */
-private val SAM_CAP_COLOR = Color.argb(0xCC, 0, 0, 0)
+/** A dark default mask; the reference recordings do not establish an exact opacity. */
+private val SAM_CAP_COLOR = Color.argb(0xEB, 0, 0, 0)
