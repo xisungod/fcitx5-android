@@ -1101,9 +1101,10 @@ internal class PressEffect(
             val reach = sqrt(sizeScale * glowReach)
             val sourceRadius = min(ripple.flashWidth, ripple.flashHeight) * 0.5f
             // Use the measured touch-cell pitch, including nine-key layouts.
-            // A space bar must not become a keyboard-wide source, and a coarse
-            // keypad must not enlarge the wave beyond the visible panel.
-            val limit = min(pitch * 3.3f, min(logicalWidth, logicalHeight) * 0.65f)
+            // A single wave may cross roughly half the panel. Do not clamp its
+            // horizontal reach to the much shorter height of a landscape board.
+            // Local arrival/fade, rather than a small radius, preserves dark areas.
+            val limit = min(pitch * 5f, logicalWidth * 0.55f)
             val travel = (limit * reach * ripple.size - sourceRadius).coerceAtLeast(2f * density)
             node.x = ripple.x
             node.y = ripple.y
@@ -1115,7 +1116,7 @@ internal class PressEffect(
             node.candidateCoreHalfHeight = node.halfHeight
             node.corner = min(node.halfWidth, node.halfHeight)
             // Feather a fraction of a key, not half of an ever-growing wave.
-            node.feather = max(2f * density, pitch * 0.18f)
+            node.feather = max(2f * density, pitch * 0.40f)
             node.bendX = 0f
             node.bendY = 0f
             node.curveX = 0f
@@ -1128,8 +1129,17 @@ internal class PressEffect(
             node.samSourceRadius = sourceRadius
             node.samTravel = travel
             val color = colors[ripple.colorIndex]
-            // A press keeps its selected colour. Different presses may blend
-            // locally; distance and age do not invent a blue/violet outer hue.
+            // The key face keeps its own selected colour. A preset's background
+            // light travels through that preset in space and time, independently
+            // for each press. Start bounded families near their leading colours
+            // so a randomly purple key still has a visible cyan-to-violet wave.
+            node.samPaletteStart = if (cyclicNeon) ripple.colorPosition
+                else ripple.colorIndex * 0.18f
+            node.samPaletteSpan = if (cyclicNeon) colors.size * 0.32f
+                else colors.lastIndex - node.samPaletteStart
+            node.samPaletteAge = smoothstep(0f, waveDuration * 0.75f, node.samElapsed)
+            // Single/custom colour choices retain their actual selected RGB;
+            // only coordinated presets acquire the travelling colour path.
             node.red = Color.red(color) / 255f
             node.green = Color.green(color) / 255f
             node.blue = Color.blue(color) / 255f
@@ -1295,8 +1305,27 @@ internal class PressEffect(
                 val coverage = 1f - smoothstep(-feather * 0.20f, feather, distance)
                 if (coverage <= 0f) continue
                 val index = y * gridWidth + x
+                var sampleRed = node.red
+                var sampleGreen = node.green
+                var sampleBlue = node.blue
                 val w = if (samGlare) {
                     val fraction = ((samDistance - node.samSourceRadius) / node.samTravel).coerceIn(0f, 1f)
+                    if (coordinatedNeon) {
+                        // A fixed location evolves as its source ages; at one
+                        // instant, the outside leads the centre along the same
+                        // palette. Neither quantity depends on subsequent keys.
+                        val phase = 1f - (1f - node.samPaletteAge) * (1f - 0.65f * fraction)
+                        val raw = node.samPaletteStart + node.samPaletteSpan * phase
+                        val position = if (cyclicNeon) ((raw % colors.size) + colors.size) % colors.size
+                            else raw.coerceIn(0f, colors.lastIndex.toFloat())
+                        val first = position.toInt()
+                        val mix = position - first
+                        val from = colors[first]
+                        val to = colors[if (cyclicNeon) (first + 1) % colors.size else min(first + 1, colors.lastIndex)]
+                        sampleRed = (Color.red(from) + (Color.red(to) - Color.red(from)) * mix) / 255f
+                        sampleGreen = (Color.green(from) + (Color.green(to) - Color.green(from)) * mix) / 255f
+                        sampleBlue = (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * mix) / 255f
+                    }
                     // Invert waveProgress's ease-out to find when this location
                     // is reached. Each point then retains a broad soft tail;
                     // old central light can fall while the outside still shines.
@@ -1321,9 +1350,9 @@ internal class PressEffect(
                         node.weight * coverage * (compact + (bridge - compact) * node.candidateMix[y])
                     } else node.weight * coverage * node.columnDensity[x] * node.rowDensity[y]
                 wBuffer[index] += w
-                rBuffer[index] += w * node.red
-                gBuffer[index] += w * node.green
-                bBuffer[index] += w * node.blue
+                rBuffer[index] += w * sampleRed
+                gBuffer[index] += w * sampleGreen
+                bBuffer[index] += w * sampleBlue
             }
         }
     }
@@ -1353,6 +1382,9 @@ internal class PressEffect(
         var samElapsed = 0f
         var samSourceRadius = 0f
         var samTravel = 0f
+        var samPaletteStart = 0f
+        var samPaletteSpan = 0f
+        var samPaletteAge = 0f
         var fluidCos2 = 0f
         var fluidSin2 = 0f
         var fluidCos3 = 0f

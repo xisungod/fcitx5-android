@@ -348,7 +348,7 @@ class SamKeyboardRenderingTest {
     }
 
     @Test
-    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindDarkGlassCaps() {
+    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindOpaqueCaps() {
         Keyboard(ThemePrefs.RippleShape.Sam).use { board ->
             board.frame().also { save(it, "idle"); it.recycle() }
             board.assertBlackSurface("Before typing")
@@ -379,10 +379,10 @@ class SamKeyboardRenderingTest {
                 try {
                     board.letters.filterKeys { it != "f" }.values.forEach { key ->
                         val r = board.bounds(key)
-                        // A little light may reveal an unpressed cap, but it must
-                        // remain substantially darker than the surrounding gaps.
+                        // Board light belongs in the gutters. An unpressed cap
+                        // must not acquire its colour through a translucent mask.
                         val cap = intensity(surface.getPixel(r.centerX(), r.centerY()))
-                        assertTrue("Unpressed cap interiors stay dark while the gaps reveal the field: $cap", cap <= 24)
+                        assertEquals("Unpressed cap interiors stay black while the gaps reveal the field", 0, cap)
                     }
                 } finally { surface.recycle() }
             } finally { frame.recycle() }
@@ -538,7 +538,7 @@ class SamKeyboardRenderingTest {
                 "source=actual Android TextKeyboard and PressEffect\ngraphics=Robolectric NATIVE\n" +
                     "portrait_width_dp=360\nheight_px=${board.pixelHeight}\ndensity=${board.root.resources.displayMetrics.density}\nbase_height_dp=288\nfps=60\nframes=145\n" +
                     "input=${input.joinToString("")}\npress_times_ms=${presses.joinToString(",")}\nrelease_after_ms=50\n" +
-                    "portrait_number_row=false\npalette=production Cyberpunk random\nseed=1401\nripple_shape=Sam\n" +
+                    "portrait_number_row=false\npalette=production SamsungCool random\nseed=1401\nripple_shape=Sam\n" +
                     "idle_breathing_preference=true (Sam suppresses it)\npopup=false\n" +
                     "gap_metrics=fixed physical gaps outside all resting cap interiors; no glyphs or deliberately hidden cap drawings\n" +
                     "direct_native_frames=true\ninterpolation=false\nphysical_device_capture=false\n")

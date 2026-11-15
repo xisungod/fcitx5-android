@@ -9,6 +9,7 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.view.View
 import android.widget.FrameLayout
+import org.fcitx.fcitx5.android.data.theme.PressColorPalette
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.input.keyboard.IdleBreathing
 import org.fcitx.fcitx5.android.input.keyboard.PressEffect
@@ -34,7 +35,8 @@ class SamWavePropagationTest {
     private class Field(
         expansion: Int = 400, fade: Int = 900, hold: Int = 40,
         val width: Int = 600, val height: Int = 300,
-        palette: IntArray = intArrayOf(Color.CYAN), autoPress: Boolean = true
+        palette: IntArray = intArrayOf(Color.CYAN), autoPress: Boolean = true,
+        coordinatePalette: Boolean = true
     ) : AutoCloseable {
         private val controller = Robolectric.buildActivity(Activity::class.java).setup()
         private val activity = controller.get()
@@ -46,7 +48,8 @@ class SamWavePropagationTest {
             true, false, IdleBreathing(), intArrayOf(Color.CYAN), clock = { now },
             keySurfaceEffects = true, holdWhilePressed = true, exactKeyShape = true,
             keyCornerRadius = 5f, glowOnCandidates = false, animationsAllowed = { true },
-            waveHoldTimeMs = hold, rippleShape = ThemePrefs.RippleShape.Sam)
+            waveHoldTimeMs = hold, coordinatePalette = coordinatePalette,
+            rippleShape = ThemePrefs.RippleShape.Sam)
 
         init {
             activity.setContentView(FrameLayout(activity).apply {
@@ -163,19 +166,19 @@ class SamWavePropagationTest {
     }
 
     @Test
-    fun onePressKeepsItsSelectedColourAtEveryDistanceAndAge() {
-        Field(palette = PressEffect.CYBERPUNK).use { field ->
+    fun explicitSingleColourKeepsItsSelectedColourAtEveryDistanceAndAge() {
+        Field(palette = intArrayOf(0xFF20FFB1.toInt()), coordinatePalette = false).use { field ->
             val expected = field.sourceColour
             fun normalized(pixel: Int) = listOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
                 .map { it.toFloat() / intensity(pixel).coerceAtLeast(1) }
             val wanted = normalized(expected)
-            for ((time, x) in listOf(80L to 130, 240L to 210, 400L to 280, 900L to 280)) {
+            for ((time, x) in listOf(80L to 130, 240L to 210, 400L to 280, 900L to 360)) {
                 val frame = field.render(time)
                 try {
                     val actual = frame.getPixel(x, 150)
                     assertTrue("Colour must be measured where the wave remains visible: $time/$x", intensity(actual) >= 20)
                     normalized(actual).zip(wanted).forEach { (a, b) ->
-                        assertEquals("A single source must not acquire a different rim or aging colour: $time/$x", b, a, 0.09f)
+                        assertEquals("Single colour must not acquire a preset's colour migration: $time/$x", b, a, 0.09f)
                     }
                     save(frame, "single-colour-$time")
                 } finally { frame.recycle() }
@@ -184,10 +187,77 @@ class SamWavePropagationTest {
     }
 
     @Test
+    fun defaultCoolWaveMovesFromGreenCyanThroughBlueToVioletInTimeAndDistance() {
+        Field(palette = PressEffect.SAMSUNG_COOL).use { field ->
+            fun hueAt(time: Long, x: Int, name: String): Float {
+                val frame = field.render(time)
+                try {
+                    val pixel = frame.getPixel(x, 150)
+                    assertTrue("Measure hue while the actual wave remains visible: $time/$x", intensity(pixel) >= 20)
+                    val hsv = FloatArray(3)
+                    Color.colorToHSV(pixel, hsv)
+                    assertTrue("The default wave retains saturated cold light", hsv[1] >= 0.65f)
+                    save(frame, name)
+                    return hsv[0]
+                } finally { frame.recycle() }
+            }
+            val start = hueAt(80, 130, "cool-time-80")
+            val middle = hueAt(480, 130, "cool-time-480")
+            val end = hueAt(740, 130, "cool-time-740")
+            assertTrue("An isolated wave starts green/cyan, not random red/orange or already purple: $start", start in 135f..205f)
+            assertTrue("The same location becomes blue: $middle", middle in 205f..250f)
+            assertTrue("The same location then becomes violet: $end", end in 250f..295f)
+            assertTrue("The time path has a substantial green/cyan-to-blue-to-violet progression", middle > start + 20f && end > middle + 20f)
+            val inner = hueAt(240, 130, "cool-distance-inner")
+            val outer = hueAt(240, 340, "cool-distance-outer")
+            assertTrue("At the same instant the travelling outside is farther along the cold path: $inner/$outer", outer > inner + 25f && outer in 215f..295f)
+        }
+    }
+
+    @Test
+    fun selectedWarmPresetEvolvesWithinItsOwnFamily() {
+        Field(palette = PressColorPalette.RED_ORANGE_YELLOW).use { field ->
+            val greenFractions = listOf(80L, 400L, 700L).map { time ->
+                val frame = field.render(time)
+                try {
+                    val pixel = frame.getPixel(130, 150)
+                    val red = Color.red(pixel).coerceAtLeast(1)
+                    assertTrue("The warm preset stays visible", intensity(pixel) >= 20)
+                    assertTrue("A warm preset must not be forced towards cyan/blue/violet", Color.red(pixel) > Color.blue(pixel) * 3)
+                    save(frame, "warm-time-$time")
+                    Color.green(pixel).toFloat() / red
+                } finally { frame.recycle() }
+            }
+            assertTrue("The warm path advances from red/orange towards yellow: $greenFractions",
+                greenFractions.last() > greenFractions.first() + 0.35f)
+        }
+    }
+
+    @Test
+    fun onePressReachesAcrossHalfThePanelWhileTheUnreachedSideStaysBlack() {
+        Field().use { field ->
+            val early = field.render(80)
+            val expanded = field.render(400)
+            try {
+                assertTrue("The remote region is dark before the front arrives", light(early, 360) < 5)
+                assertTrue("A single wave reaches well beyond a few neighbouring keys", light(expanded, 360) >= 25)
+                var left = expanded.width
+                var right = 0
+                for (x in 0 until expanded.width) if (intensity(expanded.getPixel(x, 150)) >= 25) {
+                    left = minOf(left, x); right = maxOf(right, x)
+                }
+                assertTrue("The visible span covers at least half the actual panel", right - left >= expanded.width / 2)
+                assertTrue("A broad wave is not a uniformly lit whole panel", light(expanded, 560) < 5)
+                save(expanded, "half-panel-reach")
+            } finally { early.recycle(); expanded.recycle() }
+        }
+    }
+
+    @Test
     fun aDistantSecondPressDoesNotRecolourOrRestartTheOlderWave() {
-        Field().use { control ->
-            Field().use { multiple ->
-                multiple.press(200, 500f, 150f, keyId = 42)
+        Field(width = 1000, palette = PressEffect.SAMSUNG_COOL).use { control ->
+            Field(width = 1000, palette = PressEffect.SAMSUNG_COOL).use { multiple ->
+                multiple.press(200, 820f, 150f, keyId = 42)
                 multiple.release(250)
                 for (time in listOf(300L, 600L, 900L)) {
                     val expected = control.render(time)
@@ -221,8 +291,8 @@ class SamWavePropagationTest {
 
     @Test
     fun measuredKeyPitchControlsBothAxesInsteadOfAssumingTenColumns() {
-        fun boundsForPitch(pitch: Float): Rect = Field(width = 1000, height = 800, autoPress = false).use { field ->
-            field.press(0, 500f, 400f, pitch)
+        fun boundsForPitch(pitch: Float): Rect = Field(width = 1600, height = 1400, autoPress = false).use { field ->
+            field.press(0, 800f, 700f, pitch)
             field.release(50)
             val frame = field.render(400)
             try {
