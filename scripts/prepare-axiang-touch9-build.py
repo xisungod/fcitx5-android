@@ -8,7 +8,8 @@ application code and resources of the checked-out tree.
 
 `prepare` downloads and verifies that APK, extracts its assets and libraries,
 restores the speech compile JAR and writes the Gradle init script.
-`verify` proves that the built APK still carries exactly those assets and libraries.
+`verify` proves that the built APK carries exactly those inputs, plus any
+explicitly staged Rime overlays. Native libraries are always byte-identical.
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 sys.dont_write_bytecode = True
+from touch_rime_overlay import SOURCE_WHITELIST, expected_inputs, file_hash
 
 BASE_APK = {
     "filename": "AXiang-1.2-touch.8.2.2-arm64.apk",
@@ -177,21 +179,26 @@ gradle.beforeProject {{ p ->
 
 def verify(args):
     work, apk = args.work.resolve(), args.apk.resolve()
-    manifest = json.loads((work / "prebuilt-manifest.json").read_text(encoding="utf-8"))
-    expected = {record["path"]: record for record in manifest["files"]}
+    baseline, expected, history = expected_inputs(work, args.rime_overlay)
     with zipfile.ZipFile(apk) as archive:
         names, counts = packaged_inputs(archive)
         require(set(names) == set(expected),
                 "Built APK asset/native membership differs: "
                 + ", ".join(sorted(set(names) ^ set(expected))[:20]))
         for name in names:
-            data = archive.read(name)
-            require(len(data) == expected[name]["bytes"] and digest(data) == expected[name]["sha256"],
-                    "Built APK changed a reused asset/library: " + name)
+            with archive.open(name) as stream:
+                sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
+            require(archive.getinfo(name).file_size == expected[name]["bytes"] and sha256 == expected[name]["sha256"],
+                    "Built APK differs from the verified staged input: " + name)
         require(any(name.startswith("classes") and name.endswith(".dex") for name in archive.namelist()),
                 "Built APK has no compiled application code")
-    print(json.dumps({"reused_inputs_byte_identical": len(names), "counts": counts,
-                      "apk_sha256": digest(apk.read_bytes()), "apk_bytes": apk.stat().st_size}))
+    bytes_now = apk.stat().st_size
+    print(json.dumps({
+        "reused_inputs_byte_identical": sum(baseline.get(name) == expected[name] for name in names),
+        "overlays": [item["kind"] for item in history],
+        "counts": counts, "native_libraries_byte_identical": counts["lib"],
+        "apk_sha256": file_hash(apk), "apk_bytes": bytes_now, "apk_delta_bytes": bytes_now - BASE_APK["bytes"],
+    }))
 
 
 def main():
@@ -206,6 +213,8 @@ def main():
     verification = commands.add_parser("verify")
     verification.add_argument("--work", type=Path, required=True)
     verification.add_argument("--apk", type=Path, required=True)
+    verification.add_argument("--rime-overlay", action="append", default=[], choices=SOURCE_WHITELIST,
+                              help="Require a particular verified Rime overlay in the APK")
     verification.set_defaults(run=verify)
     args = parser.parse_args()
     args.run(args)

@@ -16,7 +16,8 @@ local function exact_evidence(input, seg, env)
     for candidate in translation:iter() do
       count = count + 1
       if not head then
-        head = {type = candidate.type, _end = candidate._end, comment = candidate.comment}
+        head = {type = candidate.type, _end = candidate._end, comment = candidate.comment,
+          text = candidate.text}
       end
       local spelling = candidate.comment:gsub("[%s']", '')
       local quality = candidate.quality
@@ -206,6 +207,36 @@ local function short_repair(input, seg, env, head, priority)
   end
 end
 
+local function single_edit_repair(input, seg, env, head, priority)
+  -- Preserve intentional pinyin abbreviations, aliases and completions.
+  if head and head._end == seg._end and head.type ~= 'sentence'
+      and head.comment:gsub('[^a-z]', '') ~= input then return end
+  local seen = {}
+  if head then seen[head.text] = true end
+  for rank, match in ipairs(typo_index.single_edits(env.typo_index, input)) do
+    -- Reuse the original segment and its abc tag. Native exact decoding uses
+    -- the probed string's length; only our final candidate spans the raw input.
+    local translation = env.exact:query(match.code, seg)
+    if translation then
+      local inspected = 0
+      for candidate in translation:iter() do
+        inspected = inspected + 1
+        if candidate.type == 'phrase' and candidate._end == seg.start + #match.code
+            and candidate.comment:gsub('[^a-z]', '') == match.code and not seen[candidate.text] then
+          seen[candidate.text] = true
+          local result = Candidate('axiang_' .. match.kind .. '_repair', seg.start, seg._end,
+            candidate.text, '纠错')
+          result.preedit = input
+          result.quality = 1.16 - rank * 0.01
+          yield(below_literal(result, priority))
+          break
+        end
+        if inspected >= 3 then break end
+      end
+    end
+  end
+end
+
 function M.init(env)
   env.translator = Component.Translator(env.engine, '', 'script_translator@xuancai_correction')
   env.exact = Component.Translator(env.engine, '', 'script_translator@xuancai_exact')
@@ -236,6 +267,7 @@ function M.func(input, seg, env)
   -- continue the same iterator. Candidate references stay within this invocation;
   -- only the existing dictionary value snapshots survive between keystrokes.
   phrase_repair(input, seg, env, head, priority, stream)
+  single_edit_repair(input, seg, env, head, priority)
   if stream then
     for _, candidate in ipairs(stream.prefix) do
       yield(below_literal(candidate, priority))

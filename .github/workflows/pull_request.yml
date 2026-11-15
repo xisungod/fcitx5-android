@@ -19,10 +19,8 @@ concurrency:
 
 jobs:
   build_pull_request:
-    # The touch series changes application code and resources only. Like touch.2 to
-    # touch.8, the test package reuses every asset and native library of the last
-    # published package byte for byte and compiles the checked-out Kotlin tree.
-    # full-source-build.yml keeps the complete native and data build.
+    # Reuse the signed baseline's native libraries and offline speech assets.
+    # Only the explicitly verified Rime data overlay may change.
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -56,6 +54,17 @@ jobs:
           python3 scripts/prepare-axiang-touch9-build.py prepare \
             --work "$RUNNER_TEMP/axiang-touch9" --label "$APP_LABEL"
 
+      - name: Install Lua for the Rime correction test
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y liblua5.4-0
+
+      - name: Apply and verify the bounded Pinyin corrections
+        run: |
+          python3 scripts/prepare-touch-rime-corrections.py --work "$RUNNER_TEMP/axiang-touch9"
+          python3 scripts/test-axiang-single-edit-corrections.py \
+            --stage "$RUNNER_TEMP/axiang-touch9/prebuilt/assets/usr/share/rime-data"
+
       # Later builds of the same pull request keep one debug certificate, so a newer
       # test package installs over the previous one.
       - name: Reuse this pull request's debug certificate
@@ -88,7 +97,7 @@ jobs:
           path: ~/.android/debug.keystore
           key: axiang-touch10-debug-certificate-v2
 
-      - name: Verify the signature, alignment and the 380 reused assets and libraries
+      - name: Verify the signature, alignment and exact staged assets and libraries
         run: |
           shopt -s nullglob
           apks=(app/build/outputs/apk/debug/*.apk)
@@ -101,7 +110,8 @@ jobs:
           "$sdk_tools/zipalign" -c -P 16 4 "$apk"
           "$sdk_tools/aapt" dump badging "$apk" | head -n 3
           python3 scripts/prepare-axiang-touch9-build.py verify \
-            --work "$RUNNER_TEMP/axiang-touch9" --apk "$apk"
+            --work "$RUNNER_TEMP/axiang-touch9" --apk "$apk" \
+            --rime-overlay single-edit-corrections-v1
           cd "$RUNNER_TEMP/axiang-pr"
           sha256sum "AXiang-$BUILD_VERSION_NAME-arm64.apk" > SHA256SUMS.txt
 
@@ -168,5 +178,6 @@ jobs:
             ${{ runner.temp }}/axiang-touch9/build.log
             ${{ runner.temp }}/axiang-touch9/test.log
             ${{ runner.temp }}/axiang-touch9/prebuilt-manifest.json
+            ${{ runner.temp }}/axiang-touch9/staged-inputs-manifest.json
           if-no-files-found: warn
           retention-days: 14
