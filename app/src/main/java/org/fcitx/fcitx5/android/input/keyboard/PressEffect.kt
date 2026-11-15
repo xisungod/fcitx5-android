@@ -685,6 +685,8 @@ internal class PressEffect(
     private fun waveProgress(spread: Long): Float {
         val t = (spread.toFloat() / expansionDuration).coerceIn(0f, 1f)
         val remaining = 1f - t
+        // The reference pool is still visibly growing in its second quarter.
+        if (samGlare) return 1f - remaining * remaining
         return 1f - remaining * remaining * remaining
     }
 
@@ -1122,9 +1124,17 @@ internal class PressEffect(
             val aging = smoothstep(expansionDuration * 0.5f, waveDuration.toFloat(), elapsed)
             val color = colors[ripple.colorIndex]
             if (coordinatedNeon) {
-                val span = if (cyclicNeon) colors.size * SAM_HUE_SPAN
-                    else (colors.size - 1) * SAM_FAMILY_SPAN *
-                        (if (ripple.colorIndex * 2 < colors.size) 1f else -1f)
+                val span = if (cyclicNeon) {
+                    // On the full wheel the rim of every pool leans towards blue-violet, by
+                    // the shorter way round: green passes through teal, pink through purple.
+                    val size = colors.size.toFloat()
+                    var turn = ((SAM_COOL_ANCHOR * size - ripple.colorPosition) % size + size) % size
+                    if (turn > size / 2f) turn -= size
+                    val least = size * SAM_LEAST_HUE_SPAN
+                    val most = size * SAM_HUE_SPAN
+                    if (turn >= 0f) turn.coerceIn(least, most) else turn.coerceIn(-most, -least)
+                } else (colors.size - 1) * SAM_FAMILY_SPAN *
+                    (if (ripple.colorIndex * 2 < colors.size) 1f else -1f)
                 node.red = ripple.colorPosition + span * 0.30f * aging
                 node.green = 0f
                 node.blue = 0f
@@ -1538,8 +1548,12 @@ internal class PressEffect(
         private const val FIELD_OLD_WIDTH = 40
         private const val FIELD_OLD_HEIGHT = 32
         private const val FIELD_OLD_PIXELS = FIELD_OLD_WIDTH * FIELD_OLD_HEIGHT
-        /** Of the full colour wheel: about a quarter turn from the centre of a pool to its edge. */
-        private const val SAM_HUE_SPAN = 0.24f
+        /** Of the full colour wheel: at most a quarter turn from the centre of a pool to its edge. */
+        private const val SAM_HUE_SPAN = 0.25f
+        /** A pool that is already blue-violet still changes hue visibly towards its rim. */
+        private const val SAM_LEAST_HUE_SPAN = 0.10f
+        /** Where blue turns violet on the full wheel, as a fraction of the way round. */
+        private const val SAM_COOL_ANCHOR = 0.175f
         /** Of a bounded colour family: most of the way to its far end. */
         private const val SAM_FAMILY_SPAN = 0.7f
         private const val FRESH_LIGHT_BUDGET = 1.50f
