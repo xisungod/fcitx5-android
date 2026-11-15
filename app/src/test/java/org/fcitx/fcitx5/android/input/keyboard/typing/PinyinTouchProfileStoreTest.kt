@@ -182,7 +182,8 @@ class PinyinTouchProfileStoreTest {
         assertEquals(1, store.confirmedSampleCount(cells, 1f, 'n'))
         // A repaired tap counts for the key that was meant, measured from that key's centre.
         val slipped = PinyinTapEvidence(TapEvidence('b', 95f, 84f, 1f), cells)
-        assertEquals(1, store.observeTyped(listOf(PinyinTouchHabitJournal.Sample(slipped, 'n'))))
+        assertEquals(1, store.observeTyped(listOf(PinyinTouchHabitJournal.Sample(slipped, 'n',
+            PinyinTouchHabitJournal.Confirmation.SelectedRepair))))
         assertEquals(2, store.confirmedSampleCount(cells, 1f, 'n'))
         assertEquals(0, store.confirmedSampleCount(cells, 1f, 'b'))
         val deviceProtected = PinyinTouchProfileStore(object : ContextWrapper(context) {
@@ -191,5 +192,60 @@ class PinyinTouchProfileStoreTest {
         })
         assertEquals(0, deviceProtected.observeTyped(listOf(PinyinTouchHabitJournal.Sample(evidence, 'n'))))
         assertFalse(deviceProtected.flush())
+    }
+
+    @Test fun `turning learning off rejects queued writes even after it is enabled again`() {
+        val store = PinyinTouchProfileStore(context)
+        repeat(8) { store.observe(cells, tap, 'n') }
+        val savedOffsets = store.offsets(cells, 1f)
+        val queuedGeneration = store.generation
+        val queued = listOf(PinyinTouchHabitJournal.Sample(PinyinTapEvidence(tap, cells), 'n'))
+        store.invalidatePendingObservations() // off
+        store.invalidatePendingObservations() // on again before the IO task executes
+        assertEquals(0, store.observeTyped(queued, queuedGeneration, stillAuthorized = { true }))
+        assertEquals(8, store.confirmedSampleCount(cells, 1f, 'n'))
+        assertEquals("Consent changes preserve the existing profile", savedOffsets, store.offsets(cells, 1f))
+        assertEquals(1, store.observeTyped(queued, store.generation, stillAuthorized = { true }))
+    }
+
+    @Test fun `learning consent is checked inside the eventual write`() {
+        val store = PinyinTouchProfileStore(context)
+        val generation = store.generation
+        val queued = listOf(PinyinTouchHabitJournal.Sample(PinyinTapEvidence(tap, cells), 'n'))
+        var allowed = true
+        val authorize = { allowed }
+        allowed = false // after the UI accepted this composition, before its IO work runs
+        assertEquals(0, store.observeTyped(queued, generation, stillAuthorized = authorize))
+        assertEquals(0, store.confirmedSampleCount(cells, 1f, 'n'))
+        assertFalse(store.flush())
+    }
+
+    @Test fun `weak evidence stays weak after saving and reloading`() {
+        fun reloaded(name: String) = PinyinTouchProfileStore(object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+            override fun getDataDir(): File = File(super.getDataDir(), name)
+        })
+        val store = PinyinTouchProfileStore(context)
+        val ordinary = PinyinTouchHabitJournal.Sample(PinyinTapEvidence(tap, cells), 'n')
+        assertEquals(63, store.observeTyped(List(63) { ordinary }, nowNanos = 100_000_000_000L))
+        val fresh = reloaded("weak-reload-before-threshold")
+        assertEquals(63, fresh.confirmedSampleCount(cells, 1f, 'n'))
+        assertTrue("A reload must not turn weak samples into full confirmations", fresh.offsets(cells, 1f).isEmpty())
+        assertEquals(1, fresh.observeTyped(listOf(ordinary)))
+        fresh.flush()
+        assertTrue(reloaded("weak-reload-after-threshold").offsets(cells, 1f).getValue('n').x > 0f)
+    }
+
+    @Test fun `legacy numeric profiles retain their existing confidence when upgraded`() {
+        val signature = PinyinTouchProfile.layoutSignature(cells, 1f)!!
+        val oldProfile = """{"version":1,"confirmed_receipts":[],"layouts":[{"layout":"$signature","keys":[["n",8,0.1,0.1,0.0,0.0]]}]}"""
+        context.getSharedPreferences("axiang_pinyin_touch_profile", Context.MODE_PRIVATE)
+            .edit().putString("normalized_statistics_v1", oldProfile).commit()
+        val legacy = PinyinTouchProfileStore(object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+            override fun getDataDir(): File = File(super.getDataDir(), "legacy-confidence-profile")
+        })
+        assertEquals(8, legacy.confirmedSampleCount(cells, 1f, 'n'))
+        assertEquals(0.1f * 8 / 28, legacy.offsets(cells, 1f).getValue('n').x, 0.00001f)
     }
 }

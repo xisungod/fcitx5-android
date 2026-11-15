@@ -9,7 +9,8 @@ import kotlin.math.roundToInt
  * Bounded numeric statistics of where on each key this person's taps land.
  * Labels come from two sources: a letter the user explicitly confirmed, and a letter of a
  * composition they typed and committed without correcting it ([PinyinTouchHabitJournal]).
- * The decoder's own prediction is never a label.
+ * Unchanged commits are weak evidence: the engine may have corrected them internally.
+ * They contribute one eighth of an explicit confirmation's statistical weight.
  * A profile retains no spelling, editor identity, timestamps or individual taps.
  */
 class PinyinTouchProfile {
@@ -24,10 +25,12 @@ class PinyinTouchProfile {
         val meanX: Double,
         val meanY: Double,
         val m2X: Double,
-        val m2Y: Double
+        val m2Y: Double,
+        val weight: Double = count.toDouble()
     ) {
         internal fun isValid() = count in 1..MAXIMUM_COUNT &&
-            listOf(meanX, meanY, m2X, m2Y).all { it.isFinite() } &&
+            listOf(meanX, meanY, m2X, m2Y, weight).all { it.isFinite() } &&
+            weight > 0.0 && weight <= count &&
             abs(meanX) <= MAX_SAMPLE_OFFSET && abs(meanY) <= MAX_SAMPLE_OFFSET &&
             m2X in 0.0..(count * 4.0) && m2Y in 0.0..(count * 4.0)
     }
@@ -41,8 +44,8 @@ class PinyinTouchProfile {
         val key = layoutSignature(cells, density) ?: return emptyMap()
         val statistics = layouts[key] ?: return emptyMap()
         return statistics.mapNotNull { (letter, sample) ->
-            if (sample.count < MINIMUM_CONFIRMED_COUNT) null else {
-                val shrinkage = sample.count.toDouble() / (sample.count + PRIOR_COUNT)
+            if (sample.weight < MINIMUM_CONFIRMED_COUNT) null else {
+                val shrinkage = sample.weight / (sample.weight + PRIOR_COUNT)
                 letter to CenterOffset(
                     (sample.meanX.coerceIn(-MAX_OFFSET, MAX_OFFSET) * shrinkage).toFloat(),
                     (sample.meanY.coerceIn(-MAX_OFFSET, MAX_OFFSET) * shrinkage).toFloat()
@@ -54,7 +57,18 @@ class PinyinTouchProfile {
     fun confirmedSampleCount(cells: List<KeyCell>, density: Float, letter: Char): Int =
         layoutSignature(cells, density)?.let { layouts[it]?.get(letter)?.count } ?: 0
 
-    fun observeConfirmed(cells: List<KeyCell>, tap: TapEvidence, intended: Char): Boolean {
+    fun observeConfirmed(cells: List<KeyCell>, tap: TapEvidence, intended: Char): Boolean =
+        observe(cells, tap, intended, 1.0)
+
+    internal fun observeHabit(sample: PinyinTouchHabitJournal.Sample): Boolean {
+        val confirmed = sample.confirmation == PinyinTouchHabitJournal.Confirmation.SelectedRepair
+        // Only an explicit repair can tell us that another key was intended.
+        if (!confirmed && sample.intended != sample.evidence.tap.original) return false
+        return observe(sample.evidence.cells, sample.evidence.tap, sample.intended,
+            if (confirmed) 1.0 else UNCHANGED_COMMIT_WEIGHT)
+    }
+
+    private fun observe(cells: List<KeyCell>, tap: TapEvidence, intended: Char, weight: Double): Boolean {
         val key = layoutSignature(cells, tap.density) ?: return false
         if (!tap.downX.isFinite() || !tap.downY.isFinite() || intended !in 'a'..'z') return false
         val original = cells.firstOrNull { it.letter == tap.original } ?: return false
@@ -62,28 +76,32 @@ class PinyinTouchProfile {
         val cell = cells.firstOrNull { it.letter == intended } ?: return false
         val x = (tap.downX.toDouble() - cell.centerX) / cell.width
         val y = (tap.downY.toDouble() - cell.centerY) / cell.height
-        return observeConfirmed(ConfirmedSample(key, intended, x, y))
+        return observe(ConfirmedSample(key, intended, x, y), weight)
     }
 
     /** Same bounded aggregate for already validated, uniquely aligned prompted-test labels. */
-    internal fun observeConfirmed(sample: ConfirmedSample): Boolean {
+    internal fun observeConfirmed(sample: ConfirmedSample): Boolean = observe(sample, 1.0)
+
+    private fun observe(sample: ConfirmedSample, weight: Double): Boolean {
         if (!sample.isValid()) return false
         val (key, intended, x, y) = sample
         val values = layouts.remove(key) ?: linkedMapOf()
         var old = values[intended]
         if (old != null && old.count == MAXIMUM_COUNT) {
             // Discount the oldest aggregate after enough evidence, without retaining taps.
-            old = old.copy(count = old.count / 2, m2X = old.m2X / 2, m2Y = old.m2Y / 2)
+            old = old.copy(count = old.count / 2, m2X = old.m2X / 2, m2Y = old.m2Y / 2,
+                weight = old.weight / 2)
         }
-        val updated = if (old == null) Statistics(1, x, y, 0.0, 0.0) else {
+        val updated = if (old == null) Statistics(1, x, y, 0.0, 0.0, weight) else {
             val count = old.count + 1
+            val totalWeight = old.weight + weight
             val dx = x - old.meanX
             val dy = y - old.meanY
-            val meanX = old.meanX + dx / count
-            val meanY = old.meanY + dy / count
+            val meanX = old.meanX + dx * weight / totalWeight
+            val meanY = old.meanY + dy * weight / totalWeight
             Statistics(count, meanX, meanY,
-                (old.m2X + dx * (x - meanX)).coerceAtLeast(0.0),
-                (old.m2Y + dy * (y - meanY)).coerceAtLeast(0.0))
+                (old.m2X + weight * dx * (x - meanX)).coerceAtLeast(0.0),
+                (old.m2Y + weight * dy * (y - meanY)).coerceAtLeast(0.0), totalWeight)
         }
         values[intended] = updated
         layouts[key] = values
@@ -108,6 +126,7 @@ class PinyinTouchProfile {
         const val MAXIMUM_LAYOUTS = 16
         const val MINIMUM_CONFIRMED_COUNT = 8
         private const val PRIOR_COUNT = 20
+        private const val UNCHANGED_COMMIT_WEIGHT = 0.125
         private const val MAXIMUM_COUNT = 4096
         private const val MAX_SAMPLE_OFFSET = 0.65
         private const val MAX_OFFSET = 0.12

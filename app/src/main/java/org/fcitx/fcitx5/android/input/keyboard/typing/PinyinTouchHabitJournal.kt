@@ -4,7 +4,7 @@ package org.fcitx.fcitx5.android.input.keyboard.typing
 /**
  * Turns everyday typing into touch calibration evidence.
  *
- * A letter someone typed, kept, and then committed is very probably the letter they meant.
+ * An unchanged commit supplies weak evidence only: Rime may have repaired its spelling.
  * This journal holds the taps of the compositions still on screen and hands back the taps
  * of one composition only when that exact spelling was committed without any correction
  * in between. The caller then stores where on each key those taps landed.
@@ -15,7 +15,14 @@ package org.fcitx.fcitx5.android.input.keyboard.typing
  */
 internal class PinyinTouchHabitJournal {
     /** One tap and the key it is evidence for, which differs from the key hit after a repair. */
-    data class Sample(val evidence: PinyinTapEvidence, val intended: Char)
+    data class Sample(
+        val evidence: PinyinTapEvidence,
+        val intended: Char,
+        val confirmation: Confirmation = Confirmation.UnchangedCommit
+    )
+
+    /** A normal commit must never acquire the confidence of an explicitly chosen repair. */
+    enum class Confirmation { UnchangedCommit, SelectedRepair }
 
     private sealed interface Entry
     private class Tap(
@@ -83,7 +90,9 @@ internal class PinyinTouchHabitJournal {
         if (editor == null || typed.isNullOrEmpty() || intended == null) return null
         val taps = takeChain(editor, typed) ?: return null
         if (intended.length != typed.length || intended.any { it !in 'a'..'z' }) return null
-        return taps.mapIndexed { index, tap -> Sample(tap.evidence, intended[index]) }
+        return taps.mapIndexed { index, tap ->
+            Sample(tap.evidence, intended[index], Confirmation.SelectedRepair)
+        }
     }
 
     private fun takeChain(editor: Any, spelling: String): List<Tap>? {

@@ -199,8 +199,8 @@ class CommonKeyActionListener :
 
     /**
      * The service calls this on the main thread, in event order, when the editor accepted
-     * committed text. The spelling shown just before is then known to be what the user
-     * wanted, so its taps may teach where this person's fingers land on each key.
+     * committed text. The spelling shown just before supplies weak touch evidence;
+     * Rime may have corrected it internally, so this is not an explicit confirmation.
      * Password fields, the typing test and anything edited on the way teach nothing.
      */
     fun onTextCommitted() {
@@ -218,7 +218,10 @@ class CommonKeyActionListener :
         if (samples.isNullOrEmpty() || !kbdPrefs.pinyinTouchPersonalization.getValue()) return
         val store = pinyinTouchModels.profileStore ?: return
         val generation = store.generation
-        service.lifecycleScope.launch(Dispatchers.IO) { store.observeTyped(samples, generation) }
+        service.lifecycleScope.launch(Dispatchers.IO) {
+            store.observeTyped(samples, generation,
+                stillAuthorized = { kbdPrefs.pinyinTouchPersonalization.getValue() })
+        }
     }
 
     private fun FcitxAPI.recordHabitTap(
@@ -249,6 +252,9 @@ class CommonKeyActionListener :
 
     @Keep
     private val personalizationPreferenceListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        // Both transitions invalidate old work: toggling off and back on must not revive it.
+        habitJournal.clear()
+        pinyinTouchModels.profileStore?.invalidatePendingObservations()
         clearPinyinTapFeedback()
     }
 

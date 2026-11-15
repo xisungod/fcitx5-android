@@ -36,6 +36,7 @@ class PinyinTouchHabitJournalTest {
         val samples = journal.takeCommitted(editor, "nihao")!!
         assertEquals("nihao", samples.map { it.intended }.joinToString(""))
         assertEquals("nihao", samples.map { it.evidence.tap.original }.joinToString(""))
+        assertTrue(samples.all { it.confirmation == PinyinTouchHabitJournal.Confirmation.UnchangedCommit })
         assertEquals(0, journal.size)
         assertNull("A commit is consumed once", journal.takeCommitted(editor, "nihao"))
     }
@@ -114,6 +115,7 @@ class PinyinTouchHabitJournalTest {
         val samples = journal.takeRepaired(editor, "nuhao", "nihao")!!
         assertEquals("nihao", samples.map { it.intended }.joinToString(""))
         assertEquals('u', samples[1].evidence.tap.original)
+        assertTrue(samples.all { it.confirmation == PinyinTouchHabitJournal.Confirmation.SelectedRepair })
         assertEquals(0, journal.size)
     }
 
@@ -140,19 +142,19 @@ class PinyinTouchHabitJournalTest {
         val profile = PinyinTouchProfile()
         val journal = PinyinTouchHabitJournal()
         // This thumb lands a fifth of a key to the right of "i", every time.
-        repeat(PinyinTouchProfile.MINIMUM_CONFIRMED_COUNT - 1) {
+        repeat(63) {
             journal.recordTap(editor, "", "i", tap('i', dx = 20f))
             for (sample in journal.takeCommitted(editor, "i")!!)
-                assertTrue(profile.observeConfirmed(sample.evidence.cells, sample.evidence.tap, sample.intended))
+                assertTrue(profile.observeHabit(sample))
         }
         assertTrue("Too few taps change nothing", profile.offsets(cells, 2f).isEmpty())
         repeat(200) {
             journal.recordTap(editor, "", "i", tap('i', dx = 20f))
             for (sample in journal.takeCommitted(editor, "i")!!)
-                profile.observeConfirmed(sample.evidence.cells, sample.evidence.tap, sample.intended)
+                profile.observeHabit(sample)
         }
         val offset = profile.offsets(cells, 2f).getValue('i')
-        assertTrue("Learned direction is to the right: ${offset.x}", offset.x > 0.08f)
+        assertTrue("Learned direction is to the right: ${offset.x}", offset.x > 0.05f)
         assertTrue("And stays inside the bound: ${offset.x}", offset.x <= PinyinSpatialKeyDecider.MAX_CENTER_OFFSET)
         assertEquals(0f, offset.y, 0.001f)
         assertEquals(setOf('i'), profile.offsets(cells, 2f).keys)
