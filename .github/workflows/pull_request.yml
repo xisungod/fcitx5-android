@@ -162,6 +162,7 @@ jobs:
           name: axiang-touch10-checks-${{ github.run_id }}
           path: |
             app/build/test-results/testDebugUnitTest/
+            app/build/outputs/effect-checks/
             ${{ runner.temp }}/axiang-touch9/build.log
             ${{ runner.temp }}/axiang-touch9/test.log
             ${{ runner.temp }}/axiang-touch9/prebuilt-manifest.json

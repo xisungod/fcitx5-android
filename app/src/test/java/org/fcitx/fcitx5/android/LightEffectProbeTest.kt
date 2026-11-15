@@ -171,10 +171,11 @@ class LightEffectProbeTest {
         }
     }
 
-    /** [presses] are letter to DOWN time; every key is released 70 ms after its DOWN. */
-    private fun record(name: String, presses: List<Pair<String, Long>>, moments: List<Long>, columns: Int): List<Int> {
+    /** [presses] are letter to DOWN time; release time is controlled independently. */
+    private fun record(name: String, presses: List<Pair<String, Long>>, moments: List<Long>, columns: Int,
+        holdMillis: Long = 70L): List<Int> {
         val events = presses.flatMap { (letter, at) ->
-            listOf(Triple(at, letter, MotionEvent.ACTION_DOWN), Triple(at + 70, letter, MotionEvent.ACTION_UP))
+            listOf(Triple(at, letter, MotionEvent.ACTION_DOWN), Triple(at + holdMillis, letter, MotionEvent.ACTION_UP))
         }.sortedBy { it.first }
         val coverage = ArrayList<Int>()
         Keyboard().use { board ->
@@ -190,7 +191,7 @@ class LightEffectProbeTest {
                 while (next < events.size && events[next].first <= moment) {
                     val (at, letter, action) = events[next++]
                     board.go(at)
-                    board.touch(letter, action, if (action == MotionEvent.ACTION_DOWN) at else at - 70)
+                    board.touch(letter, action, if (action == MotionEvent.ACTION_DOWN) at else at - holdMillis)
                 }
                 board.go(moment)
                 val image = board.frame()
@@ -223,5 +224,16 @@ class LightEffectProbeTest {
         val moments = listOf(0L, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 800, 900, 1000, 1200, 1500, 2000)
         val coverage = record("typing", presses, moments, columns = 7)
         assertTrue("Light must appear while typing: $coverage", coverage.max() > 400)
+    }
+
+    @Test
+    fun holdingAKeyThenReleasingReturnsToBlack() {
+        val moments = listOf(0L, 50, 100, 200, 400, 650, 900, 1200, 1500, 1750,
+            1800, 1833, 1900, 2000, 2200, 2500, 2800, 3200, 3600, 4000, 4500)
+        val coverage = record("long-hold", listOf("g" to 0L), moments, columns = 7,
+            holdMillis = 1800L)
+        assertTrue("Light must appear during the press: $coverage", coverage.max() > 400)
+        assertTrue("Release must return to the resting keyboard: $coverage",
+            coverage.last() < coverage.max() / 20)
     }
 }
