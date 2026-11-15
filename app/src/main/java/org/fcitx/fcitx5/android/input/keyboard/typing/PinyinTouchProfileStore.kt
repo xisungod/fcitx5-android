@@ -71,6 +71,53 @@ class PinyinTouchProfileStore(context: Context) {
         }
     }
 
+    /**
+     * Everyday typing: the taps of one composition the user committed as typed, or repaired
+     * by choosing another spelling. Returns how many taps were accepted. The aggregate is
+     * updated at once and written to disk at most every [SAVE_INTERVAL_NANOS], because a
+     * commit can follow every second and a lost half minute of statistics costs nothing.
+     */
+    internal fun observeTyped(
+        samples: List<PinyinTouchHabitJournal.Sample>,
+        expectedGeneration: Long = generation,
+        nowNanos: Long = System.nanoTime()
+    ): Int {
+        if (samples.isEmpty() || !storageAvailable()) return 0
+        return synchronized(states) {
+            if (expectedGeneration != state.generation) return@synchronized 0
+            if (runCatching { loadIfNeeded() }.isFailure) return@synchronized 0
+            var accepted = 0
+            for (sample in samples) {
+                if (state.profile.observeConfirmed(sample.evidence.cells, sample.evidence.tap, sample.intended))
+                    accepted++
+            }
+            if (accepted > 0) {
+                state.unsaved += accepted
+                if (nowNanos - state.savedAtNanos >= SAVE_INTERVAL_NANOS || state.unsaved >= SAVE_AFTER_SAMPLES)
+                    save(nowNanos)
+            }
+            accepted
+        }
+    }
+
+    /** Writes statistics gathered since the last save. Call when the input field changes. */
+    fun flush(nowNanos: Long = System.nanoTime()): Boolean {
+        if (!storageAvailable()) return false
+        return synchronized(states) { state.unsaved > 0 && state.loaded && save(nowNanos) }
+    }
+
+    /** Caller holds the lock, like every other write, so a clear cannot be overtaken. */
+    private fun save(nowNanos: Long): Boolean {
+        val saved = runCatching {
+            preferences().edit().putString(DATA_KEY, encode(state.profile.snapshot(), state.receipts)).apply()
+        }.isSuccess
+        if (saved) {
+            state.unsaved = 0
+            state.savedAtNanos = nowNanos
+        }
+        return saved
+    }
+
     data class ImportResult(val applied: Int, val alreadyApplied: Int, val unavailable: Boolean = false)
 
     /**
@@ -143,6 +190,8 @@ class PinyinTouchProfileStore(context: Context) {
         private const val DATA_KEY = "normalized_statistics_v1"
         private const val MAXIMUM_SERIALIZED_BYTES = 128 * 1024
         private const val MAXIMUM_RECEIPTS = 32
+        private const val SAVE_INTERVAL_NANOS = 30_000_000_000L
+        private const val SAVE_AFTER_SAMPLES = 400
         private val states = LinkedHashMap<String, State>()
 
         private class State {
@@ -151,6 +200,9 @@ class PinyinTouchProfileStore(context: Context) {
             var generation = 0L
             var loaded = false
             var pendingClear = false
+            /** Accepted everyday taps not yet written to disk. */
+            var unsaved = 0
+            var savedAtNanos = 0L
         }
 
         private fun storageIdentity(context: Context) = context.dataDir.absolutePath
@@ -171,6 +223,8 @@ class PinyinTouchProfileStore(context: Context) {
                 state.generation++
                 state.profile.clear()
                 state.receipts.clear()
+                state.unsaved = 0
+                state.savedAtNanos = 0L
                 state.loaded = true
                 val accessible = !credentialContext.isDeviceProtectedStorage &&
                     runCatching { credentialContext.getSystemService(UserManager::class.java)?.isUserUnlocked }

@@ -502,6 +502,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 val acceptedAtNanos = System.nanoTime()
                 if (accepted) {
                     TypingTestSession.observeCommit(currentInputEditorInfo, event)
+                    inputView?.onTextCommitted()
                     if (!replacesSelection) nextWordController.onActualCommitted(
                         event.nextWordPredictionOrigin, event.data.text, start, end, acceptedAtNanos)
                     else invalidateNextWordPrediction(clearContext = true)

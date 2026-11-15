@@ -148,4 +148,48 @@ class PinyinTouchProfileStoreTest {
         assertEquals(1, next.observeConfirmedGroup("d".repeat(64), sample, next.generation).alreadyApplied)
         assertEquals(1, next.confirmedSampleCount(cells, 1f, 'n'))
     }
+
+    @Test fun `everyday taps count at once but reach disk only after an interval or a flush`() {
+        val store = PinyinTouchProfileStore(context)
+        val evidence = PinyinTapEvidence(tap, cells)
+        val typed = List(8) { PinyinTouchHabitJournal.Sample(evidence, 'n') }
+        fun onDisk(name: String) = PinyinTouchProfileStore(object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+            override fun getDataDir(): File = File(super.getDataDir(), name)
+        }).confirmedSampleCount(cells, 1f, 'n')
+        val start = 100_000_000_000L
+        assertEquals(8, store.observeTyped(typed, store.generation, start))
+        assertEquals(8, store.observeTyped(typed, store.generation, start + 1_000_000_000L))
+        assertEquals(16, PinyinTouchProfileStore(context).confirmedSampleCount(cells, 1f, 'n'))
+        assertEquals("The second batch is still only in memory", 8, onDisk("habit-before-flush"))
+        assertTrue(store.flush(start + 2_000_000_000L))
+        assertEquals(16, onDisk("habit-after-flush"))
+        assertFalse("Nothing is left to write", store.flush(start + 3_000_000_000L))
+        assertEquals(8, store.observeTyped(typed, store.generation, start + 40_000_000_000L))
+        assertEquals("After the interval a batch is written by itself", 24, onDisk("habit-after-interval"))
+    }
+
+    @Test fun `everyday taps obey reset and the same validity rules as confirmed ones`() {
+        val store = PinyinTouchProfileStore(context)
+        val evidence = PinyinTapEvidence(tap, cells)
+        val stale = store.generation
+        PinyinTouchProfileStore.clear(context)
+        assertEquals(0, store.observeTyped(listOf(PinyinTouchHabitJournal.Sample(evidence, 'n')), stale))
+        // A tap outside the key it was reported for is not evidence.
+        val outside = PinyinTapEvidence(TapEvidence('n', 60f, 84f, 1f), cells)
+        assertEquals(1, store.observeTyped(listOf(
+            PinyinTouchHabitJournal.Sample(outside, 'n'), PinyinTouchHabitJournal.Sample(evidence, 'n'))))
+        assertEquals(1, store.confirmedSampleCount(cells, 1f, 'n'))
+        // A repaired tap counts for the key that was meant, measured from that key's centre.
+        val slipped = PinyinTapEvidence(TapEvidence('b', 95f, 84f, 1f), cells)
+        assertEquals(1, store.observeTyped(listOf(PinyinTouchHabitJournal.Sample(slipped, 'n'))))
+        assertEquals(2, store.confirmedSampleCount(cells, 1f, 'n'))
+        assertEquals(0, store.confirmedSampleCount(cells, 1f, 'b'))
+        val deviceProtected = PinyinTouchProfileStore(object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+            override fun isDeviceProtectedStorage() = true
+        })
+        assertEquals(0, deviceProtected.observeTyped(listOf(PinyinTouchHabitJournal.Sample(evidence, 'n'))))
+        assertFalse(deviceProtected.flush())
+    }
 }

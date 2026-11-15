@@ -6,8 +6,10 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Bounded numeric statistics. observeConfirmed must only receive a letter the
- * user explicitly confirmed, never the decoder's prediction or an inferred edit.
+ * Bounded numeric statistics of where on each key this person's taps land.
+ * Labels come from two sources: a letter the user explicitly confirmed, and a letter of a
+ * composition they typed and committed without correcting it ([PinyinTouchHabitJournal]).
+ * The decoder's own prediction is never a label.
  * A profile retains no spelling, editor identity, timestamps or individual taps.
  */
 class PinyinTouchProfile {
