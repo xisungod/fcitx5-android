@@ -180,8 +180,11 @@ class SamKeyboardRenderingTest {
             elapsed = time
         }
 
-        fun touch(letter: String, action: Int, downAt: Long = elapsed) {
-            val rectangle = bounds(letters.getValue(letter))
+        fun touch(letter: String, action: Int, downAt: Long = elapsed) =
+            touch(letters.getValue(letter), action, downAt)
+
+        fun touch(key: KeyView, action: Int, downAt: Long = elapsed) {
+            val rectangle = bounds(key)
             val event = MotionEvent.obtain(start + downAt, now, action, rectangle.exactCenterX(), rectangle.exactCenterY(), 0)
             try { assertTrue(keyboard.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
@@ -195,7 +198,7 @@ class SamKeyboardRenderingTest {
         }
 
         /** Observe the real appearance Canvas while its normal black mask, fill and glyphs draw. */
-        fun motionFrame(key: KeyView): MotionFrame {
+        fun motionFrame(key: KeyView, hideLegends: Boolean = false): MotionFrame {
             val painter = key.keySurfacePainter
             var scale = Float.NaN
             var centreY = Float.NaN
@@ -214,7 +217,7 @@ class SamKeyboardRenderingTest {
                     sampleY = points[3]
                     painter?.draw(canvas, width, height)
                 }
-                val image = frame()
+                val image = if (hideLegends) withoutLegends() else frame()
                 assertTrue("The actual key surface must draw through the recorded transform", scale.isFinite())
                 val x = sampleX.toInt()
                 val y = sampleY.toInt()
@@ -618,25 +621,40 @@ class SamKeyboardRenderingTest {
     }
 
     @Test
-    fun holdingAndReleasingPastTheFadeDoesNotReviveTheCap() {
-        Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
+    fun actualSamLetterAndBackspaceStayLitUntilLiftAndThenFade() {
+        Keyboard(ThemePrefs.RippleShape.Sam, configure = {
             it.pressGlowBrightness.setValue(0)
             it.pressWaveHoldTime.setValue(40)
-            it.pressFadeOutTime.setValue(280)
+            it.pressFadeOutTime.setValue(900)
         }).use { board ->
-            val key = board.letters.getValue("f")
-            fun capBrightness(): Int {
-                val frame = board.motionFrame(key)
-                return try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
+            for ((name, key) in listOf("G" to board.letters.getValue("g"), "Backspace" to board.keyboard.backspace)) {
+                val downAt = board.elapsed
+                fun capBrightness(): Int {
+                    val frame = board.motionFrame(key, hideLegends = true)
+                    return try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
+                }
+                board.touch(key, MotionEvent.ACTION_DOWN, downAt)
+                val initial = capBrightness()
+                assertTrue("$name gives immediate key-face feedback even with the gutter light disabled", initial >= 30)
+                for (age in listOf(900L, 1700L)) {
+                    board.go(downAt + age)
+                    val held = capBrightness()
+                    assertTrue("$name holds around 35% brightness at ${age}ms: $held/$initial",
+                        held >= initial * 0.30f && held <= initial * 0.40f)
+                }
+                board.go(downAt + 1800)
+                val beforeLift = capBrightness()
+                assertTrue("$name is still lit right before UP", beforeLift >= initial * 0.30f)
+                board.touch(key, MotionEvent.ACTION_UP, downAt)
+                val afterLift = capBrightness()
+                assertTrue("$name does not visibly jump at UP: $beforeLift/$afterLift",
+                    abs(beforeLift - afterLift) <= 2)
+                board.go(downAt + 1940)
+                val retreat = capBrightness()
+                assertTrue("$name gently fades after UP: $afterLift/$retreat", retreat in 1 until afterLift)
+                board.go(downAt + 2799)
+                assertEquals("$name is fully black less than one second after UP", 0, capBrightness())
             }
-            board.touch("f", MotionEvent.ACTION_DOWN)
-            assertTrue("The face responds even with the gutter light disabled", capBrightness() >= 30)
-            board.go(350)
-            assertEquals("A held cap completes its fade", 0, capBrightness())
-            board.go(380)
-            board.touch("f", MotionEvent.ACTION_UP, 0)
-            board.go(450)
-            assertEquals("Releasing the held cap does not relight it", 0, capBrightness())
         }
     }
 

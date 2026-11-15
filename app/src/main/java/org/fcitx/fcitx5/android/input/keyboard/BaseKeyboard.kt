@@ -617,7 +617,8 @@ abstract class BaseKeyboard(
             // physical UP must never dispatch this contact a second time.
             touchTargets.remove(pid)
             if (contact.tapCells.isNotEmpty()) physicalUpsPending[pid] = contact.contactId
-            pressEffectLayer?.onRelease(pid)
+            // Sam's held glow follows the physical pointer, not an early tap commit.
+            if (!samMode) pressEffectLayer?.onRelease(pid)
             motionReleasePointer(pid)
             releaseTouch(event, index, contact, phantom = true)
             // The child's UP clears timers before its click callback. Never
@@ -1009,8 +1010,9 @@ abstract class BaseKeyboard(
             }
             effect.onPress(sample?.x ?: event.getX(index), sample?.y ?: event.getY(index), bounds,
                 target?.view?.let { key ->
-                    key.def.variant == KeyDef.Appearance.Variant.Normal &&
-                        (key.def as? KeyDef.Appearance.Text)?.displayText?.isNotBlank() == true
+                    (samMode && key.id == R.id.button_backspace) ||
+                        (key.def.variant == KeyDef.Appearance.Variant.Normal &&
+                            (key.def as? KeyDef.Appearance.Text)?.displayText?.isNotBlank() == true)
                 } == true, target?.view?.id ?: View.NO_ID,
                 pointerId = event.getPointerId(index),
                 keyPitch = target?.hitRect?.let { minOf(it.width(), it.height()).toFloat() } ?: 0f)
@@ -1061,6 +1063,7 @@ abstract class BaseKeyboard(
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            pressEffectLayer?.startTouchStream()
             physicalUpsPending.clear()
             boundarySettlingForGesture = prefs.keyboard.touchBoundarySettling.getValue()
             downOrderEditorForGesture = if (prefs.keyboard.pinyinDownOrder.getValue()) downOrderEditorInfo() else null

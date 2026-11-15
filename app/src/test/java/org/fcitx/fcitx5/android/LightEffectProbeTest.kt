@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
@@ -45,12 +44,14 @@ import org.robolectric.util.ReflectionHelpers
 import splitties.dimensions.dp
 import java.io.File
 import java.time.Duration
+import kotlin.math.abs
 import kotlin.random.Random
 
 /**
  * Renders the real keyboard with the default light effect at fixed moments after a press and
  * writes the frames side by side, so a person can compare them with a reference recording.
- * It asserts only that light appears and is gone again; the picture is the result.
+ * Also checks the key face itself during a long hold, rather than measuring
+ * the surrounding halo or counting the permanent white legend as feedback.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], application = Application::class, qualifiers = "zh-rCN-w360dp-h800dp-hdpi")
@@ -155,6 +156,23 @@ class LightEffectProbeTest {
             Canvas(it).apply { drawColor(Color.BLACK); root.draw(this) }
         }
 
+        fun faceChroma(image: Bitmap, letter: String): Int {
+            val key = letters.getValue(letter)
+            val cap = key.restingCapBounds()
+            root.offsetDescendantRectToMyCoords(key.parent as View, cap)
+            // Sample inside the cap, left of the letter and below its upper hint.
+            val x = cap.left + cap.width() / 6
+            val y = cap.top + cap.height() / 3
+            var chroma = 0
+            for (dy in -1..1) for (dx in -1..1) {
+                val pixel = image.getPixel(x + dx, y + dy)
+                val high = maxOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+                val low = minOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+                chroma += high - low
+            }
+            return chroma / 9
+        }
+
         override fun close() {
             keyboard.onDetach()
             controller.pause().stop().destroy()
@@ -173,7 +191,8 @@ class LightEffectProbeTest {
 
     /** [presses] are letter to DOWN time; release time is controlled independently. */
     private fun record(name: String, presses: List<Pair<String, Long>>, moments: List<Long>, columns: Int,
-        holdMillis: Long = 70L, observe: (Long, Bitmap) -> Unit = { _, _ -> }): List<Int> {
+        holdMillis: Long = 70L, momentLabel: (Long) -> String = { "$it ms" },
+        observe: Keyboard.(Long, Bitmap) -> Unit = { _, _ -> }): List<Int> {
         val events = presses.flatMap { (letter, at) ->
             listOf(Triple(at, letter, MotionEvent.ACTION_DOWN), Triple(at + holdMillis, letter, MotionEvent.ACTION_UP))
         }.sortedBy { it.first }
@@ -196,11 +215,11 @@ class LightEffectProbeTest {
                 board.go(moment)
                 val image = board.frame()
                 coverage += lit(image)
-                observe(moment, image)
+                board.observe(moment, image)
                 val left = (index % columns) * tileWidth
                 val top = (index / columns) * (tileHeight + 14)
                 canvas.drawBitmap(image, null, Rect(left, top + 14, left + tileWidth, top + 14 + tileHeight), smooth)
-                canvas.drawText("$moment ms", left + 3f, top + 11f, label)
+                canvas.drawText(momentLabel(moment), left + 3f, top + 11f, label)
                 image.recycle()
             }
             val file = File("build/outputs/effect-checks/probe/$name.jpg")
@@ -258,12 +277,30 @@ class LightEffectProbeTest {
 
     @Test
     fun holdingAKeyThenReleasingReturnsToBlack() {
-        val moments = listOf(0L, 50, 100, 200, 400, 650, 900, 1200, 1500, 1750,
-            1800, 1833, 1900, 2000, 2200, 2500, 2800, 3200, 3600, 4000, 4500)
+        val lift = 1800L
+        val moments = listOf(0L, 50, 200, 400, 650, 900, 1200, 1500, 1700, 1750, 1799,
+            lift, 1833, 1900, 2000, 2100, 2200, 2500, 2600, 2799, 2800)
+        val capChroma = mutableMapOf<Long, Int>()
         val coverage = record("long-hold", listOf("g" to 0L), moments, columns = 7,
-            holdMillis = 1800L)
+            holdMillis = lift,
+            momentLabel = { time ->
+                when {
+                    time == 0L -> "0 ms - DOWN"
+                    time < lift -> "$time ms - HELD"
+                    time == lift -> "$time ms - UP"
+                    else -> "$time ms - UP + ${time - lift} ms"
+                }
+            }) { time, bitmap -> capChroma[time] = faceChroma(bitmap, "g") }
         assertTrue("Light must appear during the press: $coverage", coverage.max() > 400)
-        assertTrue("Release must return to the resting keyboard: $coverage",
-            coverage.last() < coverage.max() / 20)
+        val initial = capChroma.getValue(0L)
+        assertTrue("The face responds on DOWN: $capChroma", initial >= 40)
+        for (time in listOf(900L, 1700L)) {
+            assertTrue("G keeps at least 30% of its initial colour at ${time}ms: $capChroma",
+                capChroma.getValue(time) >= initial * 0.30f)
+        }
+        assertTrue("The visible face does not jump as the finger lifts: $capChroma",
+            abs(capChroma.getValue(lift) - capChroma.getValue(lift - 1)) <= 2)
+        assertEquals("Less than one second after UP the face is black: $capChroma", 0, capChroma.getValue(2799L))
+        assertEquals("The last frame has no remaining coloured pixels", 0, coverage.last())
     }
 }

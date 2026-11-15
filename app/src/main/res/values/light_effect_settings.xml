@@ -24,7 +24,7 @@
     <string name="light_effect_fade_duration">Fade duration</string>
     <string name="light_effect_face_hold">Key colour hold</string>
     <string name="light_effect_face_exit">Key colour fade</string>
-    <string name="light_effect_fade_hint">Key colour and the light between keys use the same fade duration.</string>
+    <string name="light_effect_fade_hint">SAM keys keep a soft glow while held, then finish fading on release.</string>
     <string name="sam_wave_total_detail">Light spreads on touch. The total includes spread, hold and fade. Key motion has its own timing.</string>
     <string name="light_effect_total">Total wave duration: %1$d ms</string>
     <string name="light_effect_total_detail">Includes %1$d ms of ignition. Wave and key holds are independent.</string>

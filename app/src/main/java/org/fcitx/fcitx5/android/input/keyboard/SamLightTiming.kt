@@ -4,8 +4,11 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-/** The pressed key and its source halo fade on the same clock. Neighbours pass their local age. */
+/** The common fade curve; each halo passes the time since the wave reached its key. */
 internal fun samLightFade(ageMs: Float, holdMs: Long, fadeMs: Long): Float {
     val progress = ((ageMs - holdMs) / fadeMs).coerceIn(0f, 1f)
     return 1f - progress * progress * (3f - 2f * progress)
 }
+
+/** At 60% of the fade the easing curve still has 35.2% of its initial brightness. */
+internal fun samHeldFaceFadeAge(holdMs: Long, fadeMs: Long): Float = holdMs + fadeMs * 0.6f
