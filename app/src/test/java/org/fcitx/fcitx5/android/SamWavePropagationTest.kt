@@ -149,7 +149,7 @@ class SamWavePropagationTest {
                 val frame = field.render(time)
                 try {
                     save(frame, "local-fade-$time")
-                    Triple(time, light(frame, 120), light(frame, 280))
+                    Triple(time, light(frame, 120), light(frame, 340))
                 } finally { frame.recycle() }
             }
             val early = samples.first()
@@ -270,6 +270,29 @@ class SamWavePropagationTest {
                         save(actual, "two-sources-$time")
                     } finally { expected.recycle(); actual.recycle() }
                 }
+            }
+        }
+    }
+
+    @Test
+    fun overlappingWeakTailsStayDimInsteadOfRapidlySaturating() {
+        Field().use { single ->
+            Field().use { pair ->
+                pair.press(0, keyId = 42)
+                pair.release(50)
+                val one = single.render(650)
+                val two = pair.render(650)
+                try {
+                    // Sample the background field at the common centre: each
+                    // source has the same age, irrespective of its random reach.
+                    val isolated = light(one, 120)
+                    val combined = light(two, 120)
+                    assertTrue("Both sampled tails are visibly weak", isolated in 30..90)
+                    assertTrue("Two weak tails add light without nearly doubling it: $isolated/$combined",
+                        combined > isolated * 1.15f && combined < isolated * 1.40f)
+                    assertTrue("Weak overlap must not approach a saturated plate", combined < 120)
+                    save(two, "weak-tail-overlap")
+                } finally { one.recycle(); two.recycle() }
             }
         }
     }
