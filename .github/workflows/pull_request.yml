@@ -65,6 +65,18 @@ jobs:
           python3 scripts/test-axiang-single-edit-corrections.py \
             --stage "$RUNNER_TEMP/axiang-touch9/prebuilt/assets/usr/share/rime-data"
 
+      # This upstream LTS URL is mutable. Reuse the already hash-verified
+      # payload if the publisher updates the URL or a runner must be retried.
+      - name: Cache the pinned Rime dictionary downloads
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/axiang-touch9/downloads/rime-overlay
+          key: axiang-rime-lts-20261114-zhwiki-0.3.1-v1
+
+      - name: Precompile and evaluate the pinned Wanxiang LTS and zhwiki overlay
+        run: |
+          python3 scripts/prepare-touch-rime-lexicon.py --work "$RUNNER_TEMP/axiang-touch9"
+
       - name: Precompile the default-off Rime encyclopedia hooks
         run: |
           python3 scripts/prepare-touch-rime-moegirl-hooks.py --work "$RUNNER_TEMP/axiang-touch9"
@@ -115,7 +127,8 @@ jobs:
           "$sdk_tools/aapt" dump badging "$apk" | head -n 3
           python3 scripts/prepare-axiang-touch9-build.py verify \
             --work "$RUNNER_TEMP/axiang-touch9" --apk "$apk" \
-            --rime-overlay single-edit-corrections-v1 --rime-overlay moegirl-hooks-v1
+            --rime-overlay single-edit-corrections-v1 --rime-overlay wanxiang-zhwiki-v1 \
+            --rime-overlay moegirl-hooks-v1
           cd "$RUNNER_TEMP/axiang-pr"
           sha256sum "AXiang-$BUILD_VERSION_NAME-arm64.apk" > SHA256SUMS.txt
 
@@ -154,7 +167,7 @@ jobs:
           sdk_tools="$ANDROID_HOME/build-tools/36.1.0"
           python3 scripts/verify-xuancai-rime-package.py \
             "$RUNNER_TEMP/axiang-pr/AXiang-$BUILD_VERSION_NAME-arm64.apk" \
-            --bundled-rime --offline-dictation --aapt "$sdk_tools/aapt" --apksigner "$sdk_tools/apksigner" \
+            --bundled-rime --offline-dictation --wanxiang-zhwiki --aapt "$sdk_tools/aapt" --apksigner "$sdk_tools/apksigner" \
             --expected-main-package "org.fcitx.fcitx5.android${XUANCAI_APP_SUFFIX}" \
             --expected-app-label "$APP_LABEL" \
             --expected-version-name "$BUILD_VERSION_NAME" --expected-version-code "$BUILD_VERSION_CODE"
@@ -184,5 +197,8 @@ jobs:
             ${{ runner.temp }}/axiang-touch9/prebuilt-manifest.json
             ${{ runner.temp }}/axiang-touch9/staged-inputs-manifest.json
             ${{ runner.temp }}/axiang-touch9/rime-moegirl-hooks.json
+            ${{ runner.temp }}/axiang-touch9/rime-precompile.json
+            ${{ runner.temp }}/axiang-touch9/rime-sentence-ab.json
+            ${{ runner.temp }}/axiang-touch9/rime-sentence-*.log
           if-no-files-found: warn
           retention-days: 14
