@@ -559,6 +559,7 @@ class KeyPressDepthTest {
             setting(p.keyRadius, 5)
             setting(AppPrefs.getInstance().advanced.disableAnimation, appAnimationsDisabled)
             setting(AppPrefs.getInstance().keyboard.popupOnKeyPress, false)
+            setting(AppPrefs.getInstance().keyboard.expandKeypressArea, true)
             activity.setTheme(R.style.Theme_InputViewTheme)
             keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
             activity.setContentView(keyboard)
@@ -601,6 +602,12 @@ class KeyPressDepthTest {
         }
 
         fun appearance(key: KeyView): View = ReflectionHelpers.getField(key, "appearanceView")
+
+        fun appearanceBounds(key: KeyView) = Rect().also {
+            val view = appearance(key)
+            view.getDrawingRect(it)
+            keyboard.offsetDescendantRectToMyCoords(view, it)
+        }
 
         fun depth(key: KeyView): KeyPressDepth = ReflectionHelpers.getField(key, "pressDepth")
 
@@ -696,6 +703,40 @@ class KeyPressDepthTest {
     }
 
     @Test
+    fun expandedEdgeCellsKeepTheirAppearanceAndKeyboardSizeStableAfterLayoutAndResize() {
+        val h = Harness(mode = ThemePrefs.KeyMotionEffect.Off)
+        try {
+            for ((width, height) in listOf(600 to 450, 480 to 320)) {
+                h.keyboard.measure(
+                    View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+                h.keyboard.layout(0, 0, width, height)
+                val a = h.key("A")
+                val l = h.key("L")
+                val middle = h.key("G")
+                val aAppearance = h.appearance(a)
+                val lAppearance = h.appearance(l)
+                assertTrue("A's extra touch strip must stay outside its drawn cap", aAppearance.left > 0)
+                assertTrue("L's extra touch strip must stay outside its drawn cap", lAppearance.right < l.width)
+                assertEquals("Expanded A keeps the same cap width as an ordinary letter",
+                    h.appearance(middle).width, aAppearance.width)
+                assertEquals("Expanded L keeps the same cap width as an ordinary letter",
+                    h.appearance(middle).width, lAppearance.width)
+                val aBounds = h.appearanceBounds(a)
+                val lBounds = h.appearanceBounds(l)
+                val resting = h.render(h.keyboard)
+                h.advance(96)
+                assertEquals("Expanded keys must not schedule an unsolicited parent relayout", width, h.keyboard.width)
+                assertEquals("Idle time must preserve the requested keyboard height", height, h.keyboard.height)
+                assertEquals(aBounds, h.appearanceBounds(a))
+                assertEquals(lBounds, h.appearanceBounds(l))
+                assertTrue("Idle layout must preserve every resting keyboard pixel", resting.sameAs(h.render(h.keyboard)))
+                resting.recycle()
+            }
+        } finally { h.finish() }
+    }
+
+    @Test
     fun realPressCompressesThenReboundsTheBackgroundAndCharacterTogetherEvenWithAllLightsOff() {
         val h = Harness()
         try {
@@ -706,17 +747,19 @@ class KeyPressDepthTest {
             val values = FloatArray(9)
             var paintedScale = 1f
             // Capture the transform at the neon-face hook, without painting any light.
-            key.keySurfacePainter = KeyView.KeySurfacePainter { canvas, _, _ ->
+            key.keySurfacePainter = KeyView.KeySurfacePainter { canvas, width, height ->
                 @Suppress("DEPRECATION")
                 val matrix = canvas.matrix
                 matrix.getValues(values)
                 paintedScale = values[Matrix.MSCALE_X]
                 assertEquals(paintedScale, values[Matrix.MSCALE_Y], 0.00001f)
                 val cap = floatArrayOf(key.hMargin.toFloat(), key.vMargin.toFloat(),
-                    (key.width - key.hMargin).toFloat(), (key.height - key.vMargin + 1).toFloat())
+                    (width - key.hMargin).toFloat(), (height - key.vMargin + 1).toFloat())
                 matrix.mapPoints(cap)
+                val appearance = h.appearance(key)
                 assertTrue("The moving cap and its bottom shadow must stay inside the fixed cell",
-                    cap[0] >= 0f && cap[1] >= 0f && cap[2] <= key.width && cap[3] <= key.height)
+                    cap[0] >= appearance.left && cap[1] >= appearance.top &&
+                        cap[2] <= appearance.right && cap[3] <= appearance.bottom)
             }
             val before = Bitmap.createBitmap(key.width, key.height, Bitmap.Config.ARGB_8888)
             val beforeCanvas = GlyphRecordingCanvas(before, "A").apply { drawColor(Color.BLACK) }
@@ -814,8 +857,10 @@ class KeyPressDepthTest {
                     val cap = floatArrayOf(key.hMargin.toFloat(), key.vMargin.toFloat(),
                         (width - key.hMargin).toFloat(), (height - key.vMargin + 1).toFloat())
                     matrix.mapPoints(cap)
+                    val appearance = h.appearance(key)
                     assertTrue("Even maximum amplitude keeps the cap inside its own cell",
-                        cap[0] >= 0f && cap[1] >= 0f && cap[2] <= width && cap[3] <= height)
+                        cap[0] >= appearance.left && cap[1] >= appearance.top &&
+                            cap[2] <= appearance.right && cap[3] <= appearance.bottom)
                 }
                 h.event(MotionEvent.ACTION_DOWN, 7 to "A")
                 h.advance(300)
@@ -888,7 +933,7 @@ class KeyPressDepthTest {
                     canvas.glyphBaselineY
                 }
                 fun redCoverage(image: Bitmap, key: KeyView): Float {
-                    val cell = h.outerBounds(key)
+                    val cell = h.appearanceBounds(key)
                     var red = 0
                     var pixels = 0
                     for (y in cell.top + key.vMargin + 8 until cell.bottom - key.vMargin - 8) {
