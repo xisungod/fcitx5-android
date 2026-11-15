@@ -227,8 +227,8 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         }
         // key border
         if (theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam) {
-            // Keep unpressed caps dark while a little backlight reveals their
-            // edges. The pressed cap has its own independently coloured face.
+            // The light plate appears through the gaps, not through unpressed caps.
+            // The pressed cap has its own independently coloured face above this mask.
             appearanceView.background = insetRadiusDrawable(hMargin, vMargin, radius, SAM_CAP_COLOR)
             appearanceView.padding = 0
             appearanceView.foreground = null
@@ -587,5 +587,5 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
     }
 }
 
-/** A dark default mask; the reference recordings do not establish an exact opacity. */
-private val SAM_CAP_COLOR = Color.argb(0xEB, 0, 0, 0)
+/** Opaque keycaps separate the coloured light plate from the key face. */
+private const val SAM_CAP_COLOR = Color.BLACK
