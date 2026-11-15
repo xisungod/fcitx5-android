@@ -181,7 +181,9 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val pressEffectPalette = enumList(
         R.string.press_effect_palette,
         "press_effect_palette",
-        PressEffectPalette.Cyberpunk,
+        // Sam is the default effect: start on the green/cyan/blue/violet path.
+        // A saved palette remains an explicit choice, including the full colour wheel.
+        PressEffectPalette.SamsungCool,
         enableUiOn = { pressEffect.getValue() && pressColorMode.getValue() == PressColorMode.Random }
     )
 

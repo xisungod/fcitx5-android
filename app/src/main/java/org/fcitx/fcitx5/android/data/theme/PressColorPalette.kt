@@ -22,7 +22,7 @@ object PressColorPalette {
     )
 
     /** Narrow neon hue paths. Their ends are not neighbours, so selection reflects at either end. */
-    val CYAN_BLUE_PURPLE = intArrayOf(0xFF00F0FF.toInt(), 0xFF00B8FF.toInt(), 0xFF0075FF.toInt(),
+    val CYAN_BLUE_PURPLE = intArrayOf(0xFF24FF83.toInt(), 0xFF00F0FF.toInt(), 0xFF00B8FF.toInt(), 0xFF0075FF.toInt(),
         0xFF334BFF.toInt(), 0xFF7028FF.toInt(), 0xFFB126FF.toInt())
     val RED_ORANGE_YELLOW = intArrayOf(0xFFFF243F.toInt(), 0xFFFF3824.toInt(), 0xFFFF6320.toInt(),
         0xFFFF8A1F.toInt(), 0xFFFFB521.toInt(), 0xFFFFED25.toInt())

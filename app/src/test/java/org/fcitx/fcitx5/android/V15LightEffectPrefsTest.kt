@@ -50,11 +50,18 @@ class V15LightEffectPrefsTest {
         .getSharedPreferences(name, Context.MODE_PRIVATE).also { it.edit().clear().commit() }
 
     @Test
-    fun newInstallationUsesFloatingMotionAboveTheLongerMistTail() {
+    fun newInstallationUsesSamWithACoolPaletteAndIndependentKeyMotion() {
         val stored = storage("v15-neon-defaults")
         val prefs = ThemePrefs(stored)
         assertEquals(ThemePrefs.PressColorMode.Random, prefs.pressColorMode.getValue())
-        assertEquals(ThemePrefs.PressEffectPalette.Cyberpunk, prefs.pressEffectPalette.getValue())
+        assertEquals(ThemePrefs.RippleShape.Sam, prefs.rippleShape.getValue())
+        assertEquals(ThemePrefs.PressEffectPalette.SamsungCool, prefs.pressEffectPalette.getValue())
+        val colors = PressColorPalette.colorsFor(prefs, 0)
+        assertArrayEquals(PressColorPalette.CYAN_BLUE_PURPLE, colors)
+        assertTrue("The default starts with green before moving through cyan and blue",
+            (colors.first() ushr 8 and 255) > (colors.first() and 255))
+        assertTrue("The default path must not introduce red, orange or yellow",
+            colors.all { color -> (color ushr 16 and 255) < maxOf(color ushr 8 and 255, color and 255) })
         assertEquals(40, prefs.pressIgnitionTime.getValue())
         assertEquals(50, prefs.pressKeyHoldTime.getValue())
         assertEquals(ThemePrefs.KeyMotionEffect.Press, prefs.keyMotionEffect.getValue())
@@ -68,6 +75,46 @@ class V15LightEffectPrefsTest {
             prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
         assertTrue("Defaults must not turn into an implicit settings migration", stored.all.isEmpty())
         assertTrue(prefs.previewSameColor.getValue())
+    }
+
+    @Test
+    fun upgradeAdoptsCoolDefaultOnlyWhenNoPaletteWasSaved() {
+        val stored = storage("sam-cool-unsaved-upgrade")
+        stored.edit().putBoolean("sam_mode_default_applied", true)
+            .putString("ripple_shape", "Sam").putInt("press_motion_amplitude", 13).commit()
+        val before = stored.all.toMap()
+        val prefs = ThemePrefs(stored)
+        prefs.applySamDefaultOnce()
+        assertEquals(ThemePrefs.PressEffectPalette.SamsungCool, prefs.pressEffectPalette.getValue())
+        assertEquals(13, prefs.pressMotionAmplitude.getValue())
+        assertEquals("An unsaved palette reads the default without rewriting user settings", before, stored.all)
+    }
+
+    @Test
+    fun coolDefaultDoesNotOverwriteSavedPalettesSingleOrCustomColours() {
+        val stored = storage("sam-cool-explicit-upgrade")
+        for (palette in ThemePrefs.PressEffectPalette.entries) {
+            stored.edit().clear().putBoolean("sam_mode_default_applied", true)
+                .putString("ripple_shape", "Sam").putString("press_effect_palette", palette.name).commit()
+            val before = stored.all.toMap()
+            val prefs = ThemePrefs(stored)
+            prefs.applySamDefaultOnce()
+            assertEquals("Explicit ${palette.name} remains selected", palette, prefs.pressEffectPalette.getValue())
+            assertEquals(before, stored.all)
+        }
+        val orange = 0xFFFF6320.toInt()
+        val custom = intArrayOf(orange, 0xFF00B8FF.toInt())
+        for (mode in listOf(ThemePrefs.PressColorMode.Single, ThemePrefs.PressColorMode.Custom)) {
+            stored.edit().putString("press_color_mode", mode.name)
+                .putInt("press_single_argb", orange)
+                .putString("press_user_colors", PressColorPalette.encode(custom)).commit()
+            val before = stored.all.toMap()
+            val prefs = ThemePrefs(stored)
+            assertEquals(mode, prefs.pressColorMode.getValue())
+            assertArrayEquals(if (mode == ThemePrefs.PressColorMode.Single) intArrayOf(orange) else custom,
+                PressColorPalette.colorsFor(prefs, 0))
+            assertEquals(before, stored.all)
+        }
     }
 
     @Test

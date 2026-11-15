@@ -98,7 +98,10 @@ class V15PreviewRenderingTest {
         // registered ThemePrefs from another test class, backed by a different file.
         // Reset that actual file rather than leaving a previous palette/timing fixture active.
         ThemeManager.prefs.pressEffect.sharedPreferences.edit().clear().commit()
+        // This suite keeps the historical SoftMist/full-wheel rendering fixture.
+        // The default Sam palette is covered by its own preference and keyboard tests.
         ThemeManager.prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
+        ThemeManager.prefs.pressEffectPalette.setValue(ThemePrefs.PressEffectPalette.Cyberpunk)
         assertEquals(ThemePrefs.PressColorMode.Random, ThemeManager.prefs.pressColorMode.getValue())
         assertEquals(ThemePrefs.PressEffectPalette.Cyberpunk, ThemeManager.prefs.pressEffectPalette.getValue())
     }
