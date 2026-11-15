@@ -91,7 +91,7 @@ class DictationLifecycleBoundsTest {
         fun create(audio: Audio) = LocalOfflineDictationSession(null, { true }, {}, { audio }, {
             attempts.incrementAndGet(); entered.countDown(); release.await(); engine
         }, { _, _, current, applied -> applied(current()) }, {}, { it.name }, worker,
-            captureWhileLoading = true, engineLoader = loader, timers = timers, loadTimeoutMillis = 100L)
+            captureWhileLoading = true, engineLoader = loader, timers = timers, loadTimeoutMillis = 250L)
         val first = create(firstAudio)
         val second = create(secondAudio)
         try {
@@ -112,6 +112,36 @@ class DictationLifecycleBoundsTest {
             assertEquals("", second.state.value.transcript)
         } finally {
             release.countDown(); first.close(); second.close()
+            worker.shutdownNow(); loader.shutdownNow(); timers.shutdownNow()
+        }
+    }
+
+    @Test fun finishingDuringColdLoadStillHasADeadlineAndCannotWaitForever() {
+        val worker = Executors.newSingleThreadExecutor()
+        val loader = Executors.newSingleThreadExecutor()
+        val timers = ScheduledThreadPoolExecutor(1)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val engine = Engine()
+        val audio = Audio()
+        val session = LocalOfflineDictationSession(null, { true }, {}, { audio }, {
+            entered.countDown(); release.await(); engine
+        }, { _, _, current, applied -> applied(current()) }, {}, { it.name }, worker,
+            captureWhileLoading = true, engineLoader = loader, timers = timers, loadTimeoutMillis = 250L)
+        try {
+            session.start()
+            assertTrue(entered.await(3, TimeUnit.SECONDS))
+            session.stop()
+            assertTrue(audio.stopped)
+            assertEquals(OfflineDictationPhase.Finishing, session.state.value.phase)
+            assertEquals("LoadTimeout", waitFor(session, OfflineDictationPhase.Error).message)
+            assertEquals("free", worker.submit<String> { "free" }.get(1, TimeUnit.SECONDS))
+            release.countDown()
+            assertTrue(engine.closed.await(3, TimeUnit.SECONDS))
+            assertEquals(1, engine.closes.get())
+            assertEquals("", session.state.value.transcript)
+        } finally {
+            release.countDown(); session.close()
             worker.shutdownNow(); loader.shutdownNow(); timers.shutdownNow()
         }
     }
