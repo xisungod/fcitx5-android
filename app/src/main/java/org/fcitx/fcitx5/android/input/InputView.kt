@@ -120,6 +120,9 @@ class InputView(
     private val kawaiiBar = KawaiiBarComponent()
     private val horizontalCandidate = HorizontalCandidateComponent()
 
+    /** The editor accepted committed text; lets everyday typing calibrate the touch model. */
+    internal fun onTextCommitted() = commonKeyActionListener.onTextCommitted()
+
     internal fun showNextWordPrediction(
         offer: org.fcitx.fcitx5.android.input.prediction.NextWordPredictionOffer?
     ) {

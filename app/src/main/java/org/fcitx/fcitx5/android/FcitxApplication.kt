@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android
 import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
@@ -26,6 +27,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.ui.main.LogActivity
+import org.fcitx.fcitx5.android.input.voice.SherpaModels
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.setupForest
@@ -160,6 +162,20 @@ class FcitxApplication : Application() {
             null,
             ContextCompat.RECEIVER_EXPORTED
         )
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // Hiding the settings Activity is not memory pressure: the IME may still be in
+        // active use, and its two-minute warm cache should survive UI_HIDDEN (20).
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) SherpaModels.trim()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        SherpaModels.trim()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

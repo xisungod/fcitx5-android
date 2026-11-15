@@ -950,7 +950,8 @@ abstract class BaseKeyboard(
                     key.def.variant == KeyDef.Appearance.Variant.Normal &&
                         (key.def as? KeyDef.Appearance.Text)?.displayText?.isNotBlank() == true
                 } == true, target?.view?.id ?: View.NO_ID,
-                pointerId = event.getPointerId(index))
+                pointerId = event.getPointerId(index),
+                keyPitch = target?.hitRect?.let { minOf(it.width(), it.height()).toFloat() } ?: 0f)
         }
     }
 

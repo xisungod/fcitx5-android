@@ -17,4 +17,7 @@
     <string name="offline_dictation_ui_finished_hint">Tap to continue</string>
     <string name="offline_dictation_ui_unavailable_hint">Return to the keyboard to continue typing.</string>
     <string name="offline_dictation_ui_error_hint">Tap to try again</string>
+    <string name="offline_dictation_inline_dismiss">OK</string>
+    <string name="offline_dictation_inline_done">Done</string>
+    <string name="offline_dictation_ui_loading_recording">Listening while the model loads</string>
 </resources>

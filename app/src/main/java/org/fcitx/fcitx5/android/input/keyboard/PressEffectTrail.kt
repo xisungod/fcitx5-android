@@ -28,6 +28,8 @@ internal class PressEffectTrail(capacity: Int) {
         var driftY = 0f
         var start = 0L
         var releasedAt = -1L
+        /** Measured touch-cell pitch; keeps effects proportional on every layout. */
+        var pitch = 0f
         /** Legacy layered renderer's gain. The shared field uses bounded spatial exposure. */
         var lightGain = 1f
         /** Legacy candidate-shoulder gain; V15 samples the same field above the keys. */
@@ -43,6 +45,7 @@ internal class PressEffectTrail(capacity: Int) {
             stretchX = other.stretchX; stretchY = other.stretchY
             driftX = other.driftX; driftY = other.driftY
             start = other.start; releasedAt = other.releasedAt; lightGain = other.lightGain
+            pitch = other.pitch
             bridgeGain = other.bridgeGain
         }
     }

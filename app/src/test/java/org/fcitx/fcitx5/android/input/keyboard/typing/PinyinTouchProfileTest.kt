@@ -95,4 +95,37 @@ class PinyinTouchProfileTest {
         profile.clear()
         assertTrue(profile.offsets(cells, 1f).isEmpty())
     }
+
+    @Test fun `unchanged commits need more evidence and cannot relabel a neighbouring key`() {
+        val profile = PinyinTouchProfile()
+        val ordinary = PinyinTouchHabitJournal.Sample(PinyinTapEvidence(tap, cells), 'n')
+        repeat(63) { assertTrue(profile.observeHabit(ordinary)) }
+        assertTrue("Unconfirmed typing must not meet the eight-confirmation threshold", profile.offsets(cells, 1f).isEmpty())
+        assertTrue(profile.observeHabit(ordinary))
+        assertTrue(profile.offsets(cells, 1f).getValue('n').x > 0f)
+        val neighbour = ordinary.copy(evidence = PinyinTapEvidence(tap.copy(original = 'b', downX = 95f), cells))
+        assertFalse("A normal commit does not prove a different intended letter", profile.observeHabit(neighbour))
+        assertTrue(profile.observeHabit(neighbour.copy(
+            confirmation = PinyinTouchHabitJournal.Confirmation.SelectedRepair)))
+    }
+
+    @Test fun `explicit confirmations outweigh equally many contrary ordinary commits`() {
+        val profile = PinyinTouchProfile()
+        repeat(8) { profile.observeConfirmed(cells, tap.copy(downX = 140f), 'n') }
+        repeat(8) { profile.observeHabit(PinyinTouchHabitJournal.Sample(PinyinTapEvidence(tap, cells), 'n')) }
+        assertTrue("Weak unverified labels cannot cancel equally many explicit confirmations",
+            profile.offsets(cells, 1f).getValue('n').x < -0.02f)
+        val restored = PinyinTouchProfile().apply { restore(profile.snapshot()) }
+        assertEquals(profile.offsets(cells, 1f), restored.offsets(cells, 1f))
+    }
+
+    @Test fun `invalid confidence weights cannot restore learned centres`() {
+        val signature = PinyinTouchProfile.layoutSignature(cells, 1f)!!
+        for (weight in listOf(Double.NaN, Double.POSITIVE_INFINITY, -1.0, 0.0, 9.0)) {
+            val profile = PinyinTouchProfile()
+            profile.restore(mapOf(signature to mapOf('n' to
+                PinyinTouchProfile.Statistics(8, 0.1, 0.1, 0.0, 0.0, weight))))
+            assertTrue(profile.snapshot().isEmpty())
+        }
+    }
 }

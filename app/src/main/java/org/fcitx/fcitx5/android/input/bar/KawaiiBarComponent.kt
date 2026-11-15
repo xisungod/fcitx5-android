@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.bar
 import android.graphics.Color
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
 import android.os.Build
+import android.os.SystemClock
 import android.util.Size
 import android.view.KeyEvent
 import android.view.View
@@ -71,7 +72,11 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
 import org.fcitx.fcitx5.android.input.status.StatusAreaWindow
-import org.fcitx.fcitx5.android.input.voice.OfflineDictationWindow
+import org.fcitx.fcitx5.android.input.voice.DictationSilencePolicy
+import org.fcitx.fcitx5.android.input.voice.InlineDictationBar
+import org.fcitx.fcitx5.android.input.voice.OfflineDictationPhase
+import org.fcitx.fcitx5.android.input.voice.OfflineDictationSession
+import org.fcitx.fcitx5.android.input.voice.OfflineDictationState
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
@@ -415,10 +420,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     }
                     chooser.show()
                 }
-                microphoneButton.setOnClickListener {
-                    val session = service.createOfflineDictationSession()
-                    windowManager.attachWindow(OfflineDictationWindow(session))
-                }
+                microphoneButton.setOnClickListener { startInlineDictation() }
                 undoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
                 }
@@ -457,12 +459,107 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 }
             }
             clipboardUi.dismissButton.setOnClickListener { dismissClipboardSuggestion() }
+            dictationBar.setOnClickListener { tapInlineDictation() }
             numberRow.apply {
                 onCollapseListener = {
                     numberRowState = NumberRowState.ForceHide
                     evalIdleUiState(fromUser = true)
                 }
             }
+        }
+    }
+
+    private var inlineDictation: OfflineDictationSession? = null
+    private var inlineDictationJob: Job? = null
+
+    /**
+     * One tap on the toolbar microphone starts listening right there: the keyboard stays,
+     * the words go into the editor as they are recognised, and the toolbar shows a status
+     * strip until one more tap, a key press or a pause ends it.
+     */
+    private fun startInlineDictation() {
+        inlineDictation?.let { service.endOfflineDictation(it) }
+        val session = service.createOfflineDictationSession()
+        inlineDictation = session
+        renderInlineDictation(session.state.value)
+        idleUi.showDictation(true)
+        inlineDictationJob?.cancel()
+        inlineDictationJob = service.lifecycleScope.launch {
+            launch { session.level.collect { idleUi.dictationBar.setLevel(it) } }
+            val inactivity = DictationSilencePolicy(SystemClock.uptimeMillis(), INLINE_DICTATION_SILENCE_MS)
+            launch {
+                session.audioActivity.collect {
+                    inactivity.onAudioActivity(it, SystemClock.uptimeMillis())
+                }
+            }
+            launch {
+                while (true) {
+                    delay(1_000L)
+                    if (inactivity.shouldStop(session.state.value, SystemClock.uptimeMillis())) {
+                        session.stop()
+                    }
+                }
+            }
+            var notice: Job? = null
+            session.state.collect { state ->
+                if (inlineDictation !== session) return@collect
+                inactivity.onState(state, SystemClock.uptimeMillis())
+                renderInlineDictation(state)
+                when (state.phase) {
+                    OfflineDictationPhase.Finished -> service.endOfflineDictation(session)
+                    OfflineDictationPhase.Error, OfflineDictationPhase.Unavailable -> {
+                        // Leave the reason readable for a moment, then give the toolbar back.
+                        if (notice == null) notice = launch {
+                            delay(INLINE_DICTATION_NOTICE_MS)
+                            service.endOfflineDictation(session)
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+        session.start()
+    }
+
+    private fun renderInlineDictation(state: OfflineDictationState) {
+        val bar = idleUi.dictationBar
+        val done = context.getString(R.string.offline_dictation_inline_done)
+        when (state.phase) {
+            OfflineDictationPhase.Ready, OfflineDictationPhase.Preparing -> bar.render(
+                InlineDictationBar.Mode.Preparing,
+                context.getString(R.string.offline_dictation_ui_preparing), done)
+            OfflineDictationPhase.Recording -> bar.render(
+                InlineDictationBar.Mode.Listening,
+                context.getString(if (state.loadingModel) R.string.offline_dictation_ui_loading_recording
+                    else R.string.offline_dictation_ui_recording), done)
+            OfflineDictationPhase.Finishing, OfflineDictationPhase.Finished -> bar.render(
+                InlineDictationBar.Mode.Finishing,
+                context.getString(R.string.offline_dictation_ui_finishing), done)
+            OfflineDictationPhase.Error, OfflineDictationPhase.Unavailable -> bar.render(
+                InlineDictationBar.Mode.Notice,
+                state.message?.takeIf { it.isNotBlank() }
+                    ?: context.getString(R.string.offline_dictation_ui_unavailable),
+                context.getString(R.string.offline_dictation_inline_dismiss))
+        }
+    }
+
+    /** A tap on the strip finishes the dictation, or dismisses the notice it is showing. */
+    private fun tapInlineDictation() {
+        val session = inlineDictation ?: return idleUi.showDictation(false)
+        when (session.state.value.phase) {
+            OfflineDictationPhase.Error, OfflineDictationPhase.Unavailable,
+            OfflineDictationPhase.Finished -> service.endOfflineDictation(session)
+            else -> session.stop()
+        }
+    }
+
+    /** Called for every way a dictation can end, so the strip never outlives its session. */
+    private val onInlineDictationEnded: (OfflineDictationSession) -> Unit = { session ->
+        if (inlineDictation === session) {
+            inlineDictation = null
+            inlineDictationJob?.cancel()
+            inlineDictationJob = null
+            idleUi.showDictation(false)
         }
     }
 
@@ -589,6 +686,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onScopeSetupFinished(scope: DynamicScope) {
         suggestionListenersActive = true
+        service.onOfflineDictationEnded = onInlineDictationEnded
         fun collectPinyinFeedback() {
             pinyinFeedbackJob?.cancel()
             pinyinFeedbackJob = service.lifecycleScope.launch {
@@ -635,6 +733,11 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     /** InputView destroys its dependency scope after detaching; don't retain listeners or timers. */
     internal fun dispose() {
         suggestionListenersActive = false
+        inlineDictation?.let { service.endOfflineDictation(it) }
+        inlineDictationJob?.cancel()
+        inlineDictationJob = null
+        // A newer keyboard view may already listen; only withdraw this one.
+        if (service.onOfflineDictationEnded === onInlineDictationEnded) service.onOfflineDictationEnded = null
         codeFromSms.unregisterOnChangeListener(onSmsCodePreferenceListener)
         VerificationCodes.removeListener(onVerificationCodeListener)
         ClipboardManager.removeOnUpdateListener(onClipboardUpdateListener)
@@ -673,6 +776,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override fun onWindowAttached(window: InputWindow) {
+        // Another panel hides the strip; never leave the microphone on behind it.
+        if (window !is KeyboardWindow) inlineDictation?.let { service.endOfflineDictation(it) }
         when (window) {
             is InputWindow.ExtendedInputWindow<*> -> {
                 titleUi.setTitle(window.title)
@@ -753,6 +858,9 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     companion object {
         const val HEIGHT = 52
+        /** Listening ends by itself after this long without a newly recognised word. */
+        private const val INLINE_DICTATION_SILENCE_MS = 15_000L
+        private const val INLINE_DICTATION_NOTICE_MS = 3_200L
     }
 
     fun onKeyboardLayoutSwitched(isNumber: Boolean) {

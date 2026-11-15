@@ -2,6 +2,8 @@
 package org.fcitx.fcitx5.android.input.voice
 
 import android.content.res.AssetManager
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OnlineModelConfig
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
@@ -11,37 +13,83 @@ import com.k2fsa.sherpa.onnx.OfflinePunctuation
 import com.k2fsa.sherpa.onnx.OfflinePunctuationConfig
 import com.k2fsa.sherpa.onnx.OfflinePunctuationModelConfig
 
-/** "OnlineRecognizer" is Sherpa's streaming API; provider=cpu never uses a network. */
-internal class SherpaDictationSpeechEngine(assets: AssetManager) : DictationSpeechEngine {
-    private val recognizer = OnlineRecognizer(assets, OnlineRecognizerConfig(
-        featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
-        modelConfig = OnlineModelConfig(
-            transducer = OnlineTransducerModelConfig(
-                encoder = "$MODEL_PATH/encoder.int8.onnx",
-                decoder = "$MODEL_PATH/decoder.onnx",
-                joiner = "$MODEL_PATH/joiner.int8.onnx"
+/**
+ * The recognizer and punctuation models stay loaded for a while after a dictation ends, so the
+ * next tap on the microphone starts listening at once instead of reloading about 100 MB.
+ * Each dictation owns only its stream. Memory is given back after two minutes without use, or earlier on memory pressure.
+ */
+internal object SherpaModels {
+    class Loaded(val recognizer: OnlineRecognizer, val punctuation: OfflinePunctuation)
+
+    private val scheduler = ScheduledThreadPoolExecutor(1) { runnable ->
+        Thread(runnable, "axiang-dictation-model-cache").apply { isDaemon = true }
+    }.apply {
+        removeOnCancelPolicy = true
+        setKeepAliveTime(15L, TimeUnit.SECONDS)
+        allowCoreThreadTimeOut(true)
+    }
+    // Application assets are immutable for this process. Initialization does not load models.
+    private var cache: IdleDictationModelCache<Loaded>? = null
+    private val cacheLock = Any()
+
+    /** "OnlineRecognizer" is Sherpa's streaming API; provider=cpu never uses a network. */
+    private fun load(assets: AssetManager): Loaded {
+        val recognizer = OnlineRecognizer(assets, OnlineRecognizerConfig(
+            featConfig = FeatureConfig(sampleRate = 16_000, featureDim = 80),
+            modelConfig = OnlineModelConfig(
+                transducer = OnlineTransducerModelConfig(
+                    encoder = "${SherpaDictationSpeechEngine.MODEL_PATH}/encoder.int8.onnx",
+                    decoder = "${SherpaDictationSpeechEngine.MODEL_PATH}/decoder.onnx",
+                    joiner = "${SherpaDictationSpeechEngine.MODEL_PATH}/joiner.int8.onnx"
+                ),
+                tokens = "${SherpaDictationSpeechEngine.MODEL_PATH}/tokens.txt",
+                numThreads = 2,
+                debug = false,
+                provider = "cpu",
+                modelType = "zipformer"
             ),
-            tokens = "$MODEL_PATH/tokens.txt",
-            numThreads = 2,
-            debug = false,
-            provider = "cpu",
-            modelType = "zipformer"
-        ),
-        enableEndpoint = true,
-        decodingMethod = "greedy_search"
-    ))
+            enableEndpoint = true,
+            decodingMethod = "greedy_search"
+        ))
+        val punctuation = try {
+            OfflinePunctuation(assets, OfflinePunctuationConfig(OfflinePunctuationModelConfig(
+                ctTransformer = "asr/punctuation/model.int8.onnx", numThreads = 1, provider = "cpu")))
+        } catch (error: Throwable) {
+            recognizer.release()
+            throw error
+        }
+        return Loaded(recognizer, punctuation)
+    }
+
+    /** Blocks only the dedicated native loader, never the UI or cancellation worker. */
+    fun acquire(assets: AssetManager): Loaded {
+        val current = synchronized(cacheLock) {
+            cache ?: IdleDictationModelCache(
+                create = { load(assets) },
+                destroy = { idle ->
+                    try { idle.recognizer.release() } finally { idle.punctuation.release() }
+                },
+                scheduler = scheduler
+            ).also { cache = it }
+        }
+        return current.acquire()
+    }
+
+    fun release() = synchronized(cacheLock) { cache }?.release() ?: Unit
+
+    /** Active streams keep ownership; low memory releases models as soon as they become idle. */
+    fun trim() = synchronized(cacheLock) { cache }?.trim() ?: Unit
+
+}
+
+internal class SherpaDictationSpeechEngine(assets: AssetManager) : DictationSpeechEngine {
+    private val models = SherpaModels.acquire(assets)
+    private val recognizer = models.recognizer
+    private val punctuation = models.punctuation
     private val stream = try {
         recognizer.createStream()
     } catch (error: Throwable) {
-        recognizer.release()
-        throw error
-    }
-    private val punctuation = try {
-        OfflinePunctuation(assets, OfflinePunctuationConfig(OfflinePunctuationModelConfig(
-            ctTransformer = "asr/punctuation/model.int8.onnx", numThreads = 1, provider = "cpu")))
-    } catch (error: Throwable) {
-        stream.release()
-        recognizer.release()
+        SherpaModels.release()
         throw error
     }
     private val completed = StringBuilder()
@@ -86,9 +134,7 @@ internal class SherpaDictationSpeechEngine(assets: AssetManager) : DictationSpee
     override fun close() {
         if (closed) return
         closed = true
-        try { stream.release() } finally {
-            try { recognizer.release() } finally { punctuation.release() }
-        }
+        try { stream.release() } finally { SherpaModels.release() }
     }
 
     companion object {

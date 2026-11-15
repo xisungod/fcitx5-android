@@ -40,7 +40,10 @@ object OfflineDictationFactory {
                 DictationFailure.Audio -> R.string.offline_dictation_backend_audio
                 DictationFailure.Engine -> R.string.offline_dictation_backend_engine
                 DictationFailure.Editor -> R.string.offline_dictation_backend_editor
-            }) }
+                DictationFailure.LoadTimeout -> R.string.offline_dictation_backend_load_timeout
+                DictationFailure.LoadBusy -> R.string.offline_dictation_backend_load_busy
+            }) },
+            captureWhileLoading = true
         )
     }
 

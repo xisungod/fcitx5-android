@@ -27,11 +27,11 @@ jobs:
     timeout-minutes: 45
     env:
       BUILD_ABI: arm64-v8a
-      BUILD_VERSION_CODE: "14"
-      BUILD_VERSION_NAME: 1.2-touch.9
+      BUILD_VERSION_CODE: "16"
+      BUILD_VERSION_NAME: 1.2-touch.10.1
       BUILD_COMMIT_HASH: ${{ github.sha }}
-      XUANCAI_APP_SUFFIX: .axiang.touch9
-      APP_LABEL: 阿翔 触点测试9
+      XUANCAI_APP_SUFFIX: .axiang.touch10
+      APP_LABEL: 阿翔 触点测试10
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -59,10 +59,11 @@ jobs:
       # Later builds of the same pull request keep one debug certificate, so a newer
       # test package installs over the previous one.
       - name: Reuse this pull request's debug certificate
-        uses: actions/cache@v5
+        id: debug_certificate
+        uses: actions/cache/restore@v5
         with:
           path: ~/.android/debug.keystore
-          key: axiang-touch9-debug-certificate-v1
+          key: axiang-touch10-debug-certificate-v2
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -77,6 +78,15 @@ jobs:
             -x :app:installFcitxComponent \
             -x :app:deleteFcitxComponentExcludeFiles \
             2>&1 | tee "$RUNNER_TEMP/axiang-touch9/build.log"
+
+      # Saved here, not at the end of the job: a failing later check must not throw the
+      # certificate away, or the next package could not be installed over this one.
+      - name: Keep the debug certificate for later builds
+        if: steps.debug_certificate.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.android/debug.keystore
+          key: axiang-touch10-debug-certificate-v2
 
       - name: Verify the signature, alignment and the 380 reused assets and libraries
         run: |
@@ -98,10 +108,28 @@ jobs:
       - name: Upload the test APK
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-touch9-${{ github.run_id }}-arm64
+          name: axiang-touch10-${{ github.run_id }}-arm64
           path: ${{ runner.temp }}/axiang-pr/*
           if-no-files-found: error
           retention-days: 14
+
+      # Frames of the real keyboard's light effect, printed into the log as text so they
+      # can be read back and compared with a reference recording without a phone.
+      - name: Render the light effect probe
+        continue-on-error: true
+        run: |
+          ./gradlew --no-daemon --max-workers=2 \
+            -I "$RUNNER_TEMP/axiang-touch9/touch9.init.gradle" \
+            :app:testDebugUnitTest --tests '*LightEffectProbeTest*' \
+            -x :app:generateDataDescriptor \
+            -x :app:installFcitxComponent \
+            -x :app:deleteFcitxComponentExcludeFiles || true
+          for image in app/build/outputs/effect-checks/probe/*.jpg; do
+            [ -f "$image" ] || continue
+            echo "PROBE-BEGIN $(basename "$image")"
+            base64 -w 160 "$image" | sed 's/^/PROBE:/'
+            echo "PROBE-END"
+          done
 
       # After the APK upload: a failing check still fails this job, but no longer
       # withholds the package from the person who has to try it on a phone.
@@ -131,9 +159,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: axiang-touch9-checks-${{ github.run_id }}
+          name: axiang-touch10-checks-${{ github.run_id }}
           path: |
             app/build/test-results/testDebugUnitTest/
+            app/build/outputs/effect-checks/
             ${{ runner.temp }}/axiang-touch9/build.log
             ${{ runner.temp }}/axiang-touch9/test.log
             ${{ runner.temp }}/axiang-touch9/prebuilt-manifest.json

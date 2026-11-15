@@ -72,6 +72,8 @@ class V14TouchRoutingTest {
         init {
             val p = ThemeManager.prefs
             setting(p.pressEffect, true)
+            // Held face colour is the Soft Mist contract; SAM lights the plate below it.
+            setting(p.rippleShape, ThemePrefs.RippleShape.SoftMist)
             setting(p.idleBreathing, false)
             setting(p.pressColorMode, ThemePrefs.PressColorMode.Random)
             setting(p.pressEffectPalette, ThemePrefs.PressEffectPalette.Custom)
@@ -156,7 +158,12 @@ class V14TouchRoutingTest {
         /** Small patches inside the key face avoid the white/dark centre character. */
         fun sample(image: Bitmap, label: String): IntArray {
             val key = key(label)
-            val rect = bounds(key)
+            // Expanded edge touch cells include a strip outside the drawn keycap.
+            val appearance = ReflectionHelpers.getField<View>(key, "appearanceView")
+            val rect = Rect().also {
+                appearance.getDrawingRect(it)
+                keyboard.offsetDescendantRectToMyCoords(appearance, it)
+            }
             val x = rect.left + key.hMargin + ((rect.width() - key.hMargin * 2) * 0.18f).toInt()
             val y = rect.top + key.vMargin + ((rect.height() - key.vMargin * 2) * 0.55f).toInt()
             val rgb = IntArray(3)

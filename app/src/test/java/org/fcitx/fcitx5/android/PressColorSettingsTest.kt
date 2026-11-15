@@ -101,6 +101,8 @@ class PressColorSettingsTest {
 
         init {
             setting(prefs.pressEffect, true)
+            // These assertions cover a filled key face and its matching popup.
+            setting(prefs.rippleShape, ThemePrefs.RippleShape.SoftMist)
             setting(prefs.idleBreathing, false)
             setting(prefs.effectsFollowSystemAnimation, false)
             setting(prefs.pressGlowBrightness, 0)
@@ -190,7 +192,12 @@ class PressColorSettingsTest {
 
         /** A patch beside the glyph measures the key face through its real view background. */
         private fun sample(image: Bitmap, key: KeyView): IntArray {
-            val rect = bounds(key)
+            // The expanded A touch target extends beyond the actual painted face.
+            val appearance = ReflectionHelpers.getField<View>(key, "appearanceView")
+            val rect = Rect().also {
+                appearance.getDrawingRect(it)
+                keyboard!!.offsetDescendantRectToMyCoords(appearance, it)
+            }
             val x = rect.left + key.hMargin + ((rect.width() - key.hMargin * 2) * 0.18f).toInt()
             val y = rect.top + key.vMargin + ((rect.height() - key.vMargin * 2) * 0.55f).toInt()
             val rgb = IntArray(3)

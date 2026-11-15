@@ -71,6 +71,7 @@ import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchModelRepository
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinMultiPathSearch
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinMultiPathTracker
 import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchCandidateRuntime
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchHabitJournal
 import org.fcitx.fcitx5.android.input.keyboard.typing.resolveReservedPinyinTouchCandidate
 import org.fcitx.fcitx5.android.input.keyboard.typing.resolvePinyinTapFeedback
 import org.fcitx.fcitx5.android.utils.switchToNextIME
@@ -110,6 +111,8 @@ class CommonKeyActionListener :
     private val pinyinTouchModels by lazy { PinyinTouchModelRepository(context.applicationContext) }
     val pinyinTapFeedback get() = pinyinTapRuntime.feedback
     private val touchCandidateRuntime = PinyinTouchCandidateRuntime()
+    /** Taps of the compositions on screen, kept only until they are committed or abandoned. */
+    private val habitJournal = PinyinTouchHabitJournal()
     val touchCandidateOffer get() = touchCandidateRuntime.offer
     @Volatile private var touchQueryJob: Job? = null
     private data class TouchOfferObservation(val token: Long, val ticket: TypingTestObservationTicket?)
@@ -194,6 +197,49 @@ class CommonKeyActionListener :
     private fun touchFeaturesEnabled() = kbdPrefs.pinyinTouchCorrection.getValue() ||
         kbdPrefs.pinyinTouchAlternatives.getValue()
 
+    /**
+     * The service calls this on the main thread, in event order, when the editor accepted
+     * committed text. The spelling shown just before supplies weak touch evidence;
+     * Rime may have corrected it internally, so this is not an explicit confirmation.
+     * Password fields, the typing test and anything edited on the way teach nothing.
+     */
+    fun onTextCommitted() {
+        val editor = service.currentInputEditorInfo
+        if (!kbdPrefs.pinyinTouchPersonalization.getValue() || !TouchDiagnosticPolicy.allows(editor) ||
+            TypingTestSession.isEligibleEditor(editor)) {
+            habitJournal.clear()
+            return
+        }
+        learnTouchHabit(habitJournal.takeCommitted(editor, lastPanelSpelling))
+    }
+
+    /** Only per-key averages are kept; the taps and the spelling are dropped here. */
+    private fun learnTouchHabit(samples: List<PinyinTouchHabitJournal.Sample>?) {
+        if (samples.isNullOrEmpty() || !kbdPrefs.pinyinTouchPersonalization.getValue()) return
+        val store = pinyinTouchModels.profileStore ?: return
+        val generation = store.generation
+        service.lifecycleScope.launch(Dispatchers.IO) {
+            store.observeTyped(samples, generation,
+                stillAuthorized = { kbdPrefs.pinyinTouchPersonalization.getValue() })
+        }
+    }
+
+    private fun FcitxAPI.recordHabitTap(
+        action: FcitxKeyAction, source: KeyActionListener.Source, editor: EditorInfo?, epoch: Long,
+        before: String?, after: String?
+    ) {
+        val evidence = action.pinyinTapEvidence
+        val eligible = evidence != null && source == KeyActionListener.Source.Keyboard &&
+            action.act.length == 1 && action.act[0] == evidence.tap.original &&
+            action.states == KeyStates.Virtual &&
+            kbdPrefs.pinyinTouchPersonalization.getValue() && epoch == editorEpoch &&
+            editor === service.currentInputEditorInfo && TouchDiagnosticPolicy.allows(editor) &&
+            !TypingTestSession.isEligibleEditor(editor) &&
+            RimeActions.isPinyinSchema(inputMethodEntryCached, false)
+        if (eligible) habitJournal.recordTap(editor, before, after, evidence)
+        else habitJournal.recordEdit()
+    }
+
     @Keep
     private val correctionPreferenceListener = ManagedPreference.OnChangeListener<Boolean> { _, enabled ->
         editorEpoch++
@@ -206,6 +252,9 @@ class CommonKeyActionListener :
 
     @Keep
     private val personalizationPreferenceListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
+        // Both transitions invalidate old work: toggling off and back on must not revive it.
+        habitJournal.clear()
+        pinyinTouchModels.profileStore?.invalidatePendingObservations()
         clearPinyinTapFeedback()
     }
 
@@ -234,6 +283,10 @@ class CommonKeyActionListener :
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         editorEpoch++
         lastPanelSpelling = null
+        habitJournal.clear()
+        pinyinTouchModels.profileStore?.let { store ->
+            service.lifecycleScope.launch(Dispatchers.IO) { store.flush() }
+        }
         clearPinyinTapFeedback()
         if (touchFeaturesEnabled()) {
             pinyinTouchModels.preload(service.lifecycleScope)
@@ -247,6 +300,7 @@ class CommonKeyActionListener :
     override fun onImeUpdate(ime: InputMethodEntry) {
         editorEpoch++
         lastPanelSpelling = null
+        habitJournal.clear()
         clearPinyinTapFeedback()
         service.postFcitxJob { withInputTransaction { RimeTouchProbe.close() } }
     }
@@ -254,6 +308,7 @@ class CommonKeyActionListener :
     override fun onWindowDetached(window: InputWindow) {
         editorEpoch++
         lastPanelSpelling = null
+        habitJournal.clear()
         clearPinyinTapFeedback()
         service.postFcitxJob { withInputTransaction { RimeTouchProbe.close() } }
     }
@@ -364,6 +419,11 @@ class CommonKeyActionListener :
         // The literal letter reaches live Rime even when the old inline mode is enabled.
         sendMeasuredLetter(action.act, action.states.states, action.code, observation)
         recordPinyinDecision(evidence, action.act, bypass = "LiteralWithTouchAlternative")
+        inputPanelCached.preedit.let { sent ->
+            recordHabitTap(action, source, editor, epoch,
+                PinyinMultiPathTracker.spellingAtEnd(before.toString(), before.cursor),
+                PinyinMultiPathTracker.spellingAtEnd(sent.toString(), sent.cursor))
+        }
         if (!supported || !allowsTouchAlternatives(editor, epoch)) {
             TypingTestSession.recordAlternative(observation, sequence,
                 TypingTestAlternativeEventKind.Rejected,
@@ -514,6 +574,8 @@ class CommonKeyActionListener :
         observation: TypingTestObservationTicket?
     ) = withInputTransaction {
         val before = inputPanelCached.preedit
+        // A deletion means some letter was not what the user wanted; which one is unknown.
+        habitJournal.recordEdit()
         sendKey(action.sym, action.states)
         val model = pinyinTouchModels.languageModel
         if (model == null || !allowsTouchAlternatives(editor, epoch)) return@withInputTransaction
@@ -538,6 +600,9 @@ class CommonKeyActionListener :
             val resolved = resolveReservedPinyinTouchCandidate(reservation.native, editor, ::allowed)
             TypingTestSession.recordAlternative(observation, token,
                 TypingTestAlternativeEventKind.Resolved, success = resolved)
+            // Choosing the repaired spelling says which key each differing tap was meant for.
+            if (resolved) learnTouchHabit(habitJournal.takeRepaired(editor,
+                reservation.native.offer.originalSpelling, reservation.native.offer.alternativeSpelling))
             if (touchCandidateRuntime.isCurrent(token)) invalidateTouchCandidates(cancelSelections = false)
             resolved
         }
@@ -593,7 +658,7 @@ class CommonKeyActionListener :
             val intended = if (restore) pending.feedback.original else pending.feedback.selected
             val generation = pending.profileGeneration
             service.lifecycleScope.launch(Dispatchers.IO) {
-                // Explicit choice is the only label. Ordinary continued typing never trains this store.
+                // An explicit choice on the chip is a label of its own, stored at once.
                 if (kbdPrefs.pinyinTouchPersonalization.getValue() && generation != null &&
                     epoch == editorEpoch && editor === service.currentInputEditorInfo &&
                     TouchDiagnosticPolicy.allows(editor)) {
