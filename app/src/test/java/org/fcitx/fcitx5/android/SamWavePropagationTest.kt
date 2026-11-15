@@ -141,13 +141,31 @@ class SamWavePropagationTest {
         }
     }
 
+    @Test fun aSingleKeyFeathersLightPastTheNarrowRimBeforeNeighboursArrive() {
+        Field().use { field ->
+            val cap = field.geometry.first { it.id == SOURCE }.capBounds
+            val frame = field.frame(60)
+            try {
+                val peak = field.light(frame, SOURCE)
+                val inner = intensity(frame.getPixel(cap.right + 10, cap.centerY()))
+                val outer = intensity(frame.getPixel(cap.right + 20, cap.centerY()))
+                assertTrue("Soft light survives outside the old rim: $peak/$inner/$outer", inner > peak / 2)
+                assertTrue("The wide feather fades rather than ending at a bright edge", outer in 16 until inner)
+                assertEquals(0, intensity(frame.getPixel(cap.right + 32, cap.centerY())))
+                save(frame, "graph-soft-feather")
+            } finally { frame.recycle() }
+        }
+    }
+
     @Test fun sourceFinishesBeforeLaterKeysAndLongHoldDoesNotRestartTheWave() {
         Field(autoPress = false).use { field ->
             field.press(0)
             val tail = field.frame(900)
             try {
-                assertTrue("Source already faded", field.light(tail, SOURCE) < 12)
-                assertTrue("Later keys retain their independent tail", field.light(tail, SOURCE + 3) > 20)
+                val source = field.light(tail, SOURCE)
+                val later = field.light(tail, SOURCE + 3)
+                assertTrue("Source already faded: $source", source < 4)
+                assertTrue("Even the dim third hop retains a visible independent tail: $source/$later", later >= source + 9)
                 save(tail, "graph-local-tail")
             } finally { tail.recycle() }
             val ended = field.frame(1500)
@@ -217,6 +235,26 @@ class SamWavePropagationTest {
                 save(several, "graph-burst-tail")
             } finally { one.recycle(); several.recycle() }
         } }
+    }
+
+    @Test fun rapidBroadBurstKeepsHotSpotsAndLetsTheOuterKeyboardStayDark() {
+        Field(autoPress = false).use { field ->
+            val presses = (1..3).flatMap { row -> (2..7).map { column -> row * 10 + column + 1 } }
+            presses.forEachIndexed { index, key ->
+                val time = index * 30L
+                field.press(time, key)
+                field.release(time + 20)
+            }
+            val frame = field.frame(730)
+            try {
+                val brightness = field.geometry.map { field.light(frame, it.id) }
+                assertTrue("The burst still has visibly bright local keys: $brightness", brightness.max() >= 48)
+                assertTrue("Weak tails leave several dark regions amid overlapping waves: $brightness",
+                    brightness.count { it <= 12 } >= 8)
+                assertTrue("The burst does not saturate the background field: $brightness", brightness.max() < 160)
+                save(frame, "graph-burst-contrast")
+            } finally { frame.recycle() }
+        }
     }
 
     @Test fun reachSettingChangesTheHopBudgetWithoutChangingTheSource() {

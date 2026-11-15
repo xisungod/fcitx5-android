@@ -21,6 +21,11 @@ internal class SamKeyLightField(
     private val fadeMs: Long,
     private val reach: Float
 ) {
+    private companion object {
+        val HOP_EXPOSURE = floatArrayOf(1f, 0.60f, 0.35f, 0.20f, 0.12f)
+        const val EXPOSURE_BUDGET = 9f
+    }
+
     data class KeyGeometry(val id: Int, val capBounds: Rect, val touchBounds: Rect)
 
     private class Stamp(val pixels: IntArray, val coverage: FloatArray)
@@ -39,6 +44,7 @@ internal class SamKeyLightField(
     private val schedules = IdentityHashMap<PressEffectTrail.Ripple, Schedule>()
     private var distances = FloatArray(0)
     private var keyLight = FloatArray(0)
+    private var keyExposure = FloatArray(0)
     private var keyRed = FloatArray(0)
     private var keyGreen = FloatArray(0)
     private var keyBlue = FloatArray(0)
@@ -90,6 +96,7 @@ internal class SamKeyLightField(
         costs = Array(keys.size) { lengths[it].toFloatArray() }
         distances = FloatArray(keys.size * 5)
         keyLight = FloatArray(keys.size)
+        keyExposure = FloatArray(keys.size)
         keyRed = FloatArray(keys.size)
         keyGreen = FloatArray(keys.size)
         keyBlue = FloatArray(keys.size)
@@ -135,8 +142,8 @@ internal class SamKeyLightField(
             if (arrival < result.arrivals[key]) {
                 result.arrivals[key] = arrival
                 result.gains[key] = if (hop == 0) 1f else
-                    (variation(ripple.keyId, keys[key].id, ripple.shape) / (1f + 0.16f * hop) *
-                        (budget - hop + 1f).coerceIn(0f, 1f)).coerceAtMost(1f)
+                    HOP_EXPOSURE[hop] * variation(ripple.keyId, keys[key].id, ripple.shape) *
+                        (budget - hop + 1f).coerceIn(0f, 1f)
             }
             if (hop == hops) continue
             for (edge in neighbours[key].indices) {
@@ -164,7 +171,7 @@ internal class SamKeyLightField(
         val halfWidth = rect.width() / 2f
         val halfHeight = rect.height() / 2f
         val radius = cornerRadius.coerceIn(0f, min(halfWidth, halfHeight))
-        val halo = max(2f * density, min(rect.width(), rect.height()) * 0.30f)
+        val halo = max(2f * density, min(rect.width(), rect.height()) * 0.55f)
         val x0 = ((rect.left - halo) / cellWidth).toInt().coerceIn(0, columns - 1)
         val x1 = ((rect.right + halo) / cellWidth).toInt().coerceIn(0, columns - 1)
         val y0 = ((rect.top - halo - top) / cellHeight).toInt().coerceIn(0, rows - 1)
@@ -180,7 +187,7 @@ internal class SamKeyLightField(
             val alpha = 1f - smooth(0f, halo, distance)
             if (alpha <= 0f) continue
             indices[count] = y * columns + x
-            coverage[count] = alpha * alpha * alpha
+            coverage[count] = alpha * alpha
             count++
         }
         return Stamp(indices.copyOf(count), coverage.copyOf(count))
@@ -204,6 +211,7 @@ internal class SamKeyLightField(
         java.util.Arrays.fill(keyBlue, 0f)
         visitedSamples = 0
         sourceCount = 0
+        var strongestWaveExposure = 0f
         for (i in 0 until trail.size) {
             val ripple = trail[i]
             val age = (time - ripple.start).toFloat()
@@ -224,24 +232,44 @@ internal class SamKeyLightField(
                 }
                 continue
             }
+            var waveExposure = 0f
             for (key in keys.indices) {
                 val localAge = age - propagation.arrivals[key]
                 if (localAge < 0) continue
                 val exposure = envelope(localAge) * propagation.gains[key]
                 if (exposure <= 0.001f) continue
+                waveExposure += exposure
                 val energy = exposure * exposure * exposure
                 keyLight[key] += energy
                 keyRed[key] += energy * r
                 keyGreen[key] += energy * g
                 keyBlue[key] += energy * b
             }
+            strongestWaveExposure = max(strongestWaveExposure, waveExposure)
         }
         // Aggregate all waves at key level first. Each cached halo is stamped
         // once per frame, irrespective of how many presses overlap this key.
+        var totalExposure = 0f
+        for (key in keys.indices) {
+            val exposure = Math.cbrt(keyLight[key].coerceAtMost(1f).toDouble()).toFloat()
+            keyExposure[key] = exposure
+            totalExposure += exposure
+        }
+        // Keep single waves at their intended brightness. When many waves
+        // overlap, cap their summed exposure and ease weak tails toward black.
+        // This preserves contrast without flickering as equally bright keys
+        // exchange rank. Scaling energy rather than RGB leaves the hue intact.
+        val budget = max(EXPOSURE_BUDGET, strongestWaveExposure)
+        val scale = if (totalExposure > budget) budget / totalExposure else 1f
+        val crowding = smooth(budget, budget * 1.7f, totalExposure)
         for (key in keys.indices) {
             val energy = keyLight[key]
             if (energy <= 0.000000001f) continue
-            accumulate(stamps[key], energy.coerceAtMost(1f), keyRed[key] / energy,
+            val exposure = keyExposure[key]
+            val tail = if (crowding > 0f) smooth(0.14f * crowding, 0.40f * crowding, exposure) else 1f
+            val dim = scale * tail
+            if (exposure * dim <= 0.001f) continue
+            accumulate(stamps[key], energy.coerceAtMost(1f) * dim * dim * dim, keyRed[key] / energy,
                 keyGreen[key] / energy, keyBlue[key] / energy)
         }
         for (y in 0 until rows) {
