@@ -348,7 +348,7 @@ class SamKeyboardRenderingTest {
     }
 
     @Test
-    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindBlackCaps() {
+    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindDarkGlassCaps() {
         Keyboard(ThemePrefs.RippleShape.Sam).use { board ->
             board.frame().also { save(it, "idle"); it.recycle() }
             board.assertBlackSurface("Before typing")
@@ -379,8 +379,9 @@ class SamKeyboardRenderingTest {
                 try {
                     board.letters.filterKeys { it != "f" }.values.forEach { key ->
                         val r = board.bounds(key)
-                        assertEquals("Unpressed cap interiors remain black while the gaps reveal the field", 0,
-                            intensity(surface.getPixel(r.centerX(), r.centerY())))
+                        // Caps are dark glass: a fifth of the light below may show through, no more.
+                        val cap = intensity(surface.getPixel(r.centerX(), r.centerY()))
+                        assertTrue("Unpressed cap interiors stay dark while the gaps reveal the field: $cap", cap <= 56)
                     }
                 } finally { surface.recycle() }
             } finally { frame.recycle() }
@@ -590,7 +591,8 @@ class SamKeyboardRenderingTest {
                 try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
             }
         }
-        assertEquals("A short selected Sam tail has fully ended", 0, samples[0])
+        // The cap's own colour is gone; only the last of the fading pool shows through the glass.
+        assertTrue("A short selected Sam tail has fully ended: ${samples[0]}", samples[0] <= 8)
         assertTrue("A long selected Sam tail is still visibly coloured", samples[1] >= 25)
         assertEquals(30, ThemeManager.prefs.pressKeyHoldTime.getValue())
         assertEquals(100, ThemeManager.prefs.pressKeyRetreatTime.getValue())

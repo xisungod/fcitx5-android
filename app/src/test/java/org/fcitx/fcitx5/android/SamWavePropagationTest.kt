@@ -86,95 +86,104 @@ class SamWavePropagationTest {
         file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    /** First sampled moment at which a location shows half of the most light it ever shows. */
+    private fun arrival(samples: List<Pair<Long, Int>>): Long {
+        val most = samples.maxOf { it.second }
+        return samples.first { it.second * 2 >= most }.first
+    }
+
     @Test
-    fun lightCrestVisitsNearThenFarPixelsAndLeavesASoftWake() {
+    fun lightReachesNearKeysBeforeFarOnesAndStaysLitBehindItsEdge() {
         Field().use { field ->
             val samples = (50L..400L step 10).map { time ->
                 val frame = field.render(time)
                 try {
-                    if (time in listOf(80L, 160L, 240L, 320L, 400L)) save(frame, "front-$time")
-                    Triple(time, light(frame, 210), light(frame, 300))
+                    if (time in listOf(80L, 160L, 240L, 320L, 400L)) save(frame, "pool-$time")
+                    listOf(time.toInt(), light(frame, 210), light(frame, 300), light(frame, 480))
                 } finally { frame.recycle() }
             }
-            val near = samples.maxBy { it.second }
-            val far = samples.maxBy { it.third }
-            assertTrue("A real visible crest reaches both sampled distances", near.second >= 40 && far.third >= 30)
-            assertTrue("Light peaks at the farther location later, rather than only filling a growing pool: $near / $far",
-                far.first >= near.first + 60)
-            assertTrue("Near pixels dim after the crest has moved outward", samples.last().second < near.second * 0.65f)
-            assertTrue("A coloured wake remains behind the travelling front",
-                samples.first { it.first == 300L }.second >= 5)
+            val near = samples.map { it[0].toLong() to it[1] }
+            val middle = samples.map { it[0].toLong() to it[2] }
+            val far = samples.map { it[0].toLong() to it[3] }
+            assertTrue("The pool is clearly visible at every sampled distance: $samples",
+                near.maxOf { it.second } >= 100 && middle.maxOf { it.second } >= 80 && far.maxOf { it.second } >= 30)
+            assertTrue("It grows outwards: a far key lights up later than one half as far: ${arrival(middle)} / ${arrival(far)}",
+                arrival(far) >= arrival(middle) + 60)
+            assertTrue("The area behind the edge stays lit instead of going dark again: $near",
+                near.last().second >= near.maxOf { it.second } * 0.9f)
+            for ((previous, next) in middle.zipWithNext()) {
+                assertTrue("No flicker while the pool grows: $previous / $next", next.second >= previous.second - 3)
+            }
             File("build/outputs/effect-checks/sam-propagation/arrival.csv").writeText(
-                "time_ms,near_light,far_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
+                "time_ms,near_light,middle_light,far_light\n" + samples.joinToString("\n") { it.joinToString(",") } + "\n")
         }
     }
 
     @Test
-    fun travellingBandStaysBroadAndVisibleBeyondItsInitialBurst() {
+    fun aPoolIsBrightestAtItsKeyAndHasNeitherARimNorAHollowCentre() {
         Field().use { field ->
             for (time in listOf(240L, 400L)) {
                 val frame = field.render(time)
                 try {
-                    val profile = (180..480).map { x -> x to light(frame, x) }
+                    val profile = (120..580 step 4).map { x -> x to light(frame, x) }
                     val peak = profile.maxOf { it.second }
-                    var run = 0
-                    var longestRun = 0
-                    for ((_, value) in profile) {
-                        run = if (value >= peak * 0.55f) run + 1 else 0
-                        longestRun = maxOf(longestRun, run)
+                    assertTrue("The pool is bright at $time ms: $peak", peak >= 120)
+                    assertEquals("Its brightest point is the pressed key at $time ms", peak, profile.first().second)
+                    for ((inner, outer) in profile.zipWithNext()) {
+                        assertTrue("Light only falls with distance at $time ms, so there is no ring: $inner / $outer",
+                            outer.second <= inner.second + 3)
                     }
-                    assertTrue("The travelling band remains visible at $time ms: $peak", peak >= 80)
-                    assertTrue("Light spans neighbouring gaps instead of a thin outline at $time ms: $longestRun px",
-                        longestRun >= 84)
-                    assertTrue("The front retains a dark area ahead instead of lighting the entire field",
-                        light(frame, 500) < peak * 0.15f)
-                    if (time == 400L) assertTrue("The source retains a visible afterglow below the outgoing band: ${light(frame, 120)} / $peak",
-                        light(frame, 120) in (peak * 0.35f).toInt()..(peak * 0.90f).toInt())
-                    save(frame, "wide-band-$time")
+                    val broad = profile.count { it.second >= peak * 0.4f } * 4
+                    assertTrue("It is a broad pool rather than a spot at $time ms: $broad px", broad >= if (time == 400L) 260 else 150)
+                    assertTrue("Its edge is soft: light at the far side is low but not cut off: ${profile.last()}",
+                        time != 400L || profile.last().second in 1..(peak * 0.45f).toInt())
+                    save(frame, "pool-profile-$time")
                 } finally { frame.recycle() }
             }
         }
     }
 
     @Test
-    fun sourceAfterglowRetreatsGraduallyWhileTheFrontContinuesOutward() {
+    fun thePoolDimsAsAWholeAndEndsInBlack() {
         Field().use { field ->
-            val samples = listOf(160L, 240L, 320L, 400L, 500L, 650L, 900L, 1340L).map { time ->
+            val samples = listOf(440L, 500L, 650L, 900L, 1100L, 1340L).map { time ->
                 val frame = field.render(time)
                 try {
-                    save(frame, "afterglow-$time")
-                    Triple(time, light(frame, 120), light(frame, 360))
+                    save(frame, "fade-$time")
+                    Triple(time, light(frame, 120), light(frame, 420))
                 } finally { frame.recycle() }
             }
-            val early = samples.first().second
-            val expanded = samples.first { it.first == 400L }
-            val receding = samples.first { it.first == 650L }
-            assertTrue("The initial source is visibly lit: $early", early >= 100)
-            assertTrue("The centre is still coloured when expansion finishes: $expanded", expanded.second >= 60)
-            assertTrue("The centre has begun fading, leaving the outward motion visible: $early / $expanded",
-                expanded.second < early * 0.80f && expanded.third > expanded.second)
-            assertTrue("The source retreats instead of becoming a static bright pool: $receding",
-                receding.second < expanded.second * 0.35f && receding.third > receding.second * 2)
+            val full = samples.first()
+            assertTrue("Fully grown, the key and a place five keys away are both lit: $full",
+                full.second >= 120 && full.third >= 40)
             for ((previous, next) in samples.zipWithNext()) {
-                assertTrue("Afterglow fades smoothly without a later flash: $previous / $next", next.second <= previous.second + 2)
+                assertTrue("Both places only dim once the fade has begun: $previous / $next",
+                    next.second <= previous.second + 2 && next.third <= previous.third + 2)
             }
-            assertEquals("Source and front obey the full selected lifetime", Triple(1340L, 0, 0), samples.last())
-            File("build/outputs/effect-checks/sam-propagation/afterglow.csv").writeText(
-                "time_ms,source_light,front_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
+            val shape = full.third.toFloat() / full.second
+            for (sample in samples.filter { it.first in listOf(500L, 650L, 900L) }) {
+                assertTrue("The pool keeps its shape while it dims, it does not retreat to a ring or a spot: $full / $sample",
+                    abs(sample.third.toFloat() / sample.second - shape) <= 0.08f)
+            }
+            assertTrue("Halfway through the fade it is clearly dimmer but still there: $samples",
+                samples.first { it.first == 900L }.second in (full.second * 0.3f).toInt()..(full.second * 0.7f).toInt())
+            assertEquals("The whole pool obeys the selected lifetime", Triple(1340L, 0, 0), samples.last())
+            File("build/outputs/effect-checks/sam-propagation/fade.csv").writeText(
+                "time_ms,key_light,far_light\n" + samples.joinToString("\n") { "${it.first},${it.second},${it.third}" } + "\n")
         }
     }
 
     @Test
     fun configuredExpansionTimeChangesTheObservedTravelTime() {
-        fun peakTime(expansion: Int): Long = Field(expansion = expansion).use { field ->
-            (50L..expansion.toLong() step 10).map { time ->
+        fun arrivalTime(expansion: Int): Long = Field(expansion = expansion).use { field ->
+            arrival((50L..expansion.toLong() step 10).map { time ->
                 val frame = field.render(time)
-                try { time to light(frame, 300) } finally { frame.recycle() }
-            }.maxBy { it.second }.first
+                try { time to light(frame, 420) } finally { frame.recycle() }
+            })
         }
-        val fast = peakTime(400)
-        val slow = peakTime(800)
-        assertTrue("Doubling the expansion setting must delay actual distant pixel peaks: $fast / $slow", slow > fast * 1.7f)
+        val fast = arrivalTime(400)
+        val slow = arrivalTime(800)
+        assertTrue("Doubling the expansion setting must delay when distant keys light up: $fast / $slow", slow > fast * 1.7f)
         assertTrue("The propagation scales with the selected duration", abs(slow - fast * 2) <= 40)
     }
 
@@ -182,7 +191,7 @@ class SamWavePropagationTest {
     fun selectedWaveFadeAndHoldAreVisibleAndEndAtTheirConfiguredTimes() {
         fun sample(fade: Int, hold: Int, time: Long): Int = Field(fade = fade, hold = hold).use { field ->
             val frame = field.render(time)
-            // Observe the outgoing band independently of the source afterglow.
+            // Observe the pool away from the pressed key.
             try { light(frame, 360) } finally { frame.recycle() }
         }
         assertEquals("Short selected fade has ended", 0, sample(100, 40, 700))
