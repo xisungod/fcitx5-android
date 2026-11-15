@@ -379,9 +379,10 @@ class SamKeyboardRenderingTest {
                 try {
                     board.letters.filterKeys { it != "f" }.values.forEach { key ->
                         val r = board.bounds(key)
-                        // Caps are dark glass: a fifth of the light below may show through, no more.
+                        // A little light may reveal an unpressed cap, but it must
+                        // remain substantially darker than the surrounding gaps.
                         val cap = intensity(surface.getPixel(r.centerX(), r.centerY()))
-                        assertTrue("Unpressed cap interiors stay dark while the gaps reveal the field: $cap", cap <= 56)
+                        assertTrue("Unpressed cap interiors stay dark while the gaps reveal the field: $cap", cap <= 24)
                     }
                 } finally { surface.recycle() }
             } finally { frame.recycle() }
