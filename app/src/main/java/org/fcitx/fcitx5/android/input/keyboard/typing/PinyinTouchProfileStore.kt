@@ -38,6 +38,9 @@ class PinyinTouchProfileStore(context: Context) {
     /** Capture with the pending confirmation, before scheduling asynchronous work. */
     val generation: Long get() = synchronized(states) { state.generation }
 
+    /** Changing learning consent revokes queued work without discarding the saved profile. */
+    fun invalidatePendingObservations() = synchronized(states) { state.generation++ }
+
     fun offsets(cells: List<KeyCell>, density: Float): Map<Char, CenterOffset> {
         if (!storageAvailable()) return emptyMap()
         return synchronized(states) {
@@ -80,15 +83,16 @@ class PinyinTouchProfileStore(context: Context) {
     internal fun observeTyped(
         samples: List<PinyinTouchHabitJournal.Sample>,
         expectedGeneration: Long = generation,
-        nowNanos: Long = System.nanoTime()
+        nowNanos: Long = System.nanoTime(),
+        stillAuthorized: () -> Boolean = { true }
     ): Int {
         if (samples.isEmpty() || !storageAvailable()) return 0
         return synchronized(states) {
-            if (expectedGeneration != state.generation) return@synchronized 0
+            if (!stillAuthorized() || expectedGeneration != state.generation) return@synchronized 0
             if (runCatching { loadIfNeeded() }.isFailure) return@synchronized 0
             var accepted = 0
             for (sample in samples) {
-                if (state.profile.observeConfirmed(sample.evidence.cells, sample.evidence.tap, sample.intended))
+                if (state.profile.observeHabit(sample))
                     accepted++
             }
             if (accepted > 0) {
@@ -239,14 +243,15 @@ class PinyinTouchProfileStore(context: Context) {
 
         private fun encode(snapshot: Map<String, Map<Char, PinyinTouchProfile.Statistics>>, receipts: List<String>): String =
             JSONObject().apply {
-                put("version", 1)
+                put("version", 2)
                 put("confirmed_receipts", JSONArray(receipts))
                 put("layouts", JSONArray().apply {
                     for ((layout, statistics) in snapshot) put(JSONObject().apply {
                         put("layout", layout)
                         put("keys", JSONArray().apply {
                             for ((letter, data) in statistics) put(JSONArray(listOf(
-                                letter.toString(), data.count, data.meanX, data.meanY, data.m2X, data.m2Y
+                                letter.toString(), data.count, data.meanX, data.meanY, data.m2X, data.m2Y,
+                                data.weight
                             )))
                         })
                     })
@@ -256,7 +261,8 @@ class PinyinTouchProfileStore(context: Context) {
         private fun decode(encoded: String): Map<String, Map<Char, PinyinTouchProfile.Statistics>> {
             require(encoded.length <= MAXIMUM_SERIALIZED_BYTES) { "Oversized touch profile" }
             val root = JSONObject(encoded)
-            require(root.getInt("version") == 1)
+            val version = root.getInt("version")
+            require(version in 1..2)
             val layouts = root.getJSONArray("layouts")
             require(layouts.length() <= PinyinTouchProfile.MAXIMUM_LAYOUTS)
             val result = LinkedHashMap<String, Map<Char, PinyinTouchProfile.Statistics>>()
@@ -268,9 +274,10 @@ class PinyinTouchProfileStore(context: Context) {
                 for (j in 0 until keys.length()) {
                     val row = keys.getJSONArray(j)
                     val letter = row.getString(0)
-                    require(row.length() == 6 && letter.length == 1)
+                    require(row.length() == (if (version == 1) 6 else 7) && letter.length == 1)
                     statistics[letter[0]] = PinyinTouchProfile.Statistics(row.getInt(1),
-                        row.getDouble(2), row.getDouble(3), row.getDouble(4), row.getDouble(5))
+                        row.getDouble(2), row.getDouble(3), row.getDouble(4), row.getDouble(5),
+                        if (version == 1) row.getInt(1).toDouble() else row.getDouble(6))
                 }
                 result[entry.getString("layout")] = statistics
             }
