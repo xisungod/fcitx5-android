@@ -149,8 +149,11 @@ class SamWavePropagationTest {
                 val peak = field.light(frame, SOURCE)
                 val inner = intensity(frame.getPixel(cap.right + 10, cap.centerY()))
                 val outer = intensity(frame.getPixel(cap.right + 20, cap.centerY()))
+                val diagonal = intensity(frame.getPixel(cap.right + 10, cap.bottom + 10))
                 assertTrue("Soft light survives outside the old rim: $peak/$inner/$outer", inner > peak / 2)
                 assertTrue("The wide feather fades rather than ending at a bright edge", outer in 16 until inner)
+                assertTrue("Early glow rounds off diagonal corners while retaining its side light: $diagonal/$inner",
+                    diagonal in 16..inner / 2)
                 assertEquals(0, intensity(frame.getPixel(cap.right + 32, cap.centerY())))
                 save(frame, "graph-soft-feather")
             } finally { frame.recycle() }

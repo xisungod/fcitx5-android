@@ -180,8 +180,11 @@ internal class SamKeyLightField(
         val top = -height * 0.25f
         val halfWidth = rect.width() / 2f
         val halfHeight = rect.height() / 2f
-        val radius = cornerRadius.coerceIn(0f, min(halfWidth, halfHeight))
-        val halo = max(2f * density, min(rect.width(), rect.height()) * 0.55f)
+        val shortSide = min(rect.width(), rect.height()).toFloat()
+        // The cap keeps its own corner shape. Give the light a rounder outline so
+        // the intersecting gutters at its corners do not show four bright points.
+        val radius = min(max(cornerRadius, shortSide * 0.34f), shortSide * 0.5f)
+        val halo = max(2f * density, shortSide * 0.55f)
         val x0 = ((rect.left - halo) / cellWidth).toInt().coerceIn(0, columns - 1)
         val x1 = ((rect.right + halo) / cellWidth).toInt().coerceIn(0, columns - 1)
         val y0 = ((rect.top - halo - top) / cellHeight).toInt().coerceIn(0, rows - 1)
@@ -190,17 +193,33 @@ internal class SamKeyLightField(
         val coverage = FloatArray(indices.size)
         var count = 0
         for (y in y0..y1) for (x in x0..x1) {
-            val dx = abs((x + 0.5f) * cellWidth - rect.exactCenterX()) - halfWidth + radius
-            val dy = abs(top + (y + 0.5f) * cellHeight - rect.exactCenterY()) - halfHeight + radius
-            val distance = if (dx > 0f && dy > 0f) sqrt(dx * dx + dy * dy) - radius
-                else max(dx, dy) - radius
-            val alpha = 1f - smooth(0f, halo, distance)
+            // Four samples amortized over the cached stamp soften pixel-phase
+            // changes at low exposure without a full-frame blur on each draw.
+            val left = (x + 0.25f) * cellWidth - rect.exactCenterX()
+            val upper = top + (y + 0.25f) * cellHeight - rect.exactCenterY()
+            val right = left + cellWidth * 0.5f
+            val lower = upper + cellHeight * 0.5f
+            val alpha = 0.25f * (
+                coverageAt(left, upper, halfWidth, halfHeight, radius, halo) +
+                    coverageAt(right, upper, halfWidth, halfHeight, radius, halo) +
+                    coverageAt(left, lower, halfWidth, halfHeight, radius, halo) +
+                    coverageAt(right, lower, halfWidth, halfHeight, radius, halo))
             if (alpha <= 0f) continue
             indices[count] = y * columns + x
-            coverage[count] = alpha * alpha
+            coverage[count] = alpha
             count++
         }
         return Stamp(indices.copyOf(count), coverage.copyOf(count))
+    }
+
+    private fun coverageAt(x: Float, y: Float, halfWidth: Float, halfHeight: Float,
+        radius: Float, halo: Float): Float {
+        val dx = abs(x) - halfWidth + radius
+        val dy = abs(y) - halfHeight + radius
+        val distance = if (dx > 0f && dy > 0f) sqrt(dx * dx + dy * dy) - radius
+            else max(dx, dy) - radius
+        val alpha = 1f - smooth(0f, halo, distance)
+        return alpha * alpha
     }
 
     private fun setPalette(colours: IntArray) {

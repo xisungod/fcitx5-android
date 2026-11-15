@@ -182,7 +182,7 @@ internal class PressEffect(
     // erase a still-visible key, and repeated presses never stack old colours on a face.
     private val ripples = PressEffectTrail(MAX_RIPPLES)
     private val freshAttention = FloatArray(MAX_RIPPLES)
-    private val samKeyField = if (samGlare) SamKeyLightField(FIELD_WIDTH, FIELD_HEIGHT, density,
+    private val samKeyField = if (samGlare) SamKeyLightField(SAM_FIELD_WIDTH, SAM_FIELD_HEIGHT, density,
         keyCornerRadius, expansionDuration, waveHoldDuration, fadeDuration,
         sqrt(sizeScale) * glowReach) else null
     private val neonField = if (sharedFieldEnabled) NeonField() else null
@@ -857,11 +857,13 @@ internal class PressEffect(
      * promoting a source to the older grid never turns it into a uniform box.
      */
     private inner class NeonField {
+        private val rasterWidth = if (samGlare) SAM_FIELD_WIDTH else FIELD_WIDTH
+        private val rasterHeight = if (samGlare) SAM_FIELD_HEIGHT else FIELD_HEIGHT
         private val red = FloatArray(FIELD_PIXELS)
         private val green = FloatArray(FIELD_PIXELS)
         private val blue = FloatArray(FIELD_PIXELS)
         private val weight = FloatArray(FIELD_PIXELS)
-        private val pixels = IntArray(FIELD_PIXELS)
+        private val pixels = IntArray(rasterWidth * rasterHeight)
         private val oldRed = FloatArray(FIELD_OLD_PIXELS)
         private val oldGreen = FloatArray(FIELD_OLD_PIXELS)
         private val oldBlue = FloatArray(FIELD_OLD_PIXELS)
@@ -871,7 +873,7 @@ internal class PressEffect(
         private val oldMixX = FloatArray(FIELD_WIDTH)
         private val oldMixY = FloatArray(FIELD_HEIGHT)
         private val nodes = Array(FIELD_DIRECT_SOURCES + 1) { FieldNode() }
-        val bitmap = Bitmap.createBitmap(FIELD_WIDTH, FIELD_HEIGHT, Bitmap.Config.ARGB_8888).apply {
+        val bitmap = Bitmap.createBitmap(rasterWidth, rasterHeight, Bitmap.Config.ARGB_8888).apply {
             density = Bitmap.DENSITY_NONE
         }
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -913,7 +915,7 @@ internal class PressEffect(
                 sourceCount = field.sourceCount
                 visitedSamples = field.visitedSamples
                 mergedSamples = 0
-                bitmap.setPixels(pixels, 0, FIELD_WIDTH, 0, 0, FIELD_WIDTH, FIELD_HEIGHT)
+                bitmap.setPixels(pixels, 0, rasterWidth, 0, 0, rasterWidth, rasterHeight)
                 return
             }
             java.util.Arrays.fill(red, 0f)
@@ -1445,6 +1447,8 @@ internal class PressEffect(
         private const val FIELD_WIDTH = 120
         private const val FIELD_HEIGHT = 96
         private const val FIELD_PIXELS = FIELD_WIDTH * FIELD_HEIGHT
+        private const val SAM_FIELD_WIDTH = 160
+        private const val SAM_FIELD_HEIGHT = 128
         private const val FIELD_DIRECT_SOURCES = 8
         private const val FIELD_OLD_WIDTH = 40
         private const val FIELD_OLD_HEIGHT = 32
