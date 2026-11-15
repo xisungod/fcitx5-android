@@ -113,6 +113,24 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Frames of the real keyboard's light effect, printed into the log as text so they
+      # can be read back and compared with a reference recording without a phone.
+      - name: Render the light effect probe
+        continue-on-error: true
+        run: |
+          ./gradlew --no-daemon --max-workers=2 \
+            -I "$RUNNER_TEMP/axiang-touch9/touch9.init.gradle" \
+            :app:testDebugUnitTest --tests '*LightEffectProbeTest*' \
+            -x :app:generateDataDescriptor \
+            -x :app:installFcitxComponent \
+            -x :app:deleteFcitxComponentExcludeFiles || true
+          for image in app/build/outputs/effect-checks/probe/*.jpg; do
+            [ -f "$image" ] || continue
+            echo "PROBE-BEGIN $(basename "$image")"
+            base64 -w 160 "$image" | sed 's/^/PROBE:/'
+            echo "PROBE-END"
+          done
+
       # After the APK upload: a failing check still fails this job, but no longer
       # withholds the package from the person who has to try it on a phone.
       - name: Verify the package contents, permissions and identity
