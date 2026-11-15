@@ -62,9 +62,12 @@ LICENSE_SPECS = {
 }
 GRAMMAR_CONFIG = {
     "language": "wanxiang-lts-zh-hans",
-    "collocation_max_length": "5",
+    "collocation_max_length": "8",
     "collocation_min_length": "2",
-    "non_collocation_penalty": "-4",
+    "collocation_penalty": "-18",
+    "non_collocation_penalty": "-8",
+    "weak_collocation_penalty": "-100",
+    "rear_penalty": "-20",
 }
 CONTEXT_CONFIG = {"contextual_suggestions": "true", "max_homophones": "7", "max_homographs": "7"}
 
@@ -145,6 +148,7 @@ def evaluate_sentences(deployer, old, new, compiled, temp, work):
         for line in Path(__file__).with_name("rime").joinpath("lexicon-sentences.tsv").read_text(encoding="utf-8").splitlines()
         if line and not line.startswith("#")
     ]
+    require(len(cases) == 66, "Rime benchmark must run all 66 fixed cases")
     original = temp / "original-share"
     original.mkdir()
     for entry in old.iterdir():
@@ -175,7 +179,18 @@ def evaluate_sentences(deployer, old, new, compiled, temp, work):
             "top1": sum(case["expected"] == case["candidates"][0] for case in candidates),
             "top5": sum(case["expected"] in case["candidates"] for case in candidates),
         }
-    write_json(work / "rime-sentence-ab.json", {"cases": len(cases), "summary": summary, "results": result})
+    write_json(work / "rime-sentence-ab.json", {
+        "cases": len(cases), "grammar": GRAMMAR_CONFIG, "translator": CONTEXT_CONFIG,
+        "summary": summary, "results": result,
+    })
+    params = ", ".join(f"{key}={value}" for key, value in (GRAMMAR_CONFIG | CONTEXT_CONFIG).items())
+    print(f"Rime after parameters: {params}")
+    for index, (before, after) in enumerate(zip(result["before"], result["after"]), 1):
+        expected = after["expected"]
+        first = after["candidates"][0]
+        status = "PASS" if first == expected else "MISS"
+        print(f"Rime case {index:02d}/{len(cases)} [{after['category']}] {status}: "
+              f"pinyin={after['pinyin']}; expected={expected}; before={before['candidates'][0]}; after={first}")
     print(f"Rime full-pinyin fixed fixtures: top1 {summary['before']['top1']}/{len(cases)} -> "
           f"{summary['after']['top1']}/{len(cases)}. Top5 {summary['before']['top5']}/{len(cases)} -> "
           f"{summary['after']['top5']}/{len(cases)}.")
