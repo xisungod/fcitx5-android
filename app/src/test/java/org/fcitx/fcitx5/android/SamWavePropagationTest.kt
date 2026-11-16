@@ -184,6 +184,26 @@ class SamWavePropagationTest {
         }
     }
 
+    @Test fun aWaveBridgesWideGuttersBetweenTouchAdjacentKeys() {
+        val spaced = grid().filter { it.id in setOf(SOURCE, SOURCE + 1, SOURCE + 10) }.map { key ->
+            key.copy(capBounds = Rect(key.capBounds).apply { inset(12, 12) })
+        }
+        Field(geometry = spaced).use { field ->
+            val origin = spaced.first { it.id == SOURCE }.capBounds
+            val right = spaced.first { it.id == SOURCE + 1 }.capBounds
+            val below = spaced.first { it.id == SOURCE + 10 }.capBounds
+            val image = field.frame(250)
+            try {
+                val horizontal = intensity(image.getPixel((origin.right + right.left) / 2, origin.centerY()))
+                val vertical = intensity(image.getPixel(origin.centerX(), (origin.bottom + below.top) / 2))
+                assertTrue("Shared side gutters carry visible light: $horizontal/$vertical",
+                    horizontal >= 30 && vertical >= 30)
+                assertEquals("A side with no adjacent key remains dark at the same distance", 0,
+                    intensity(image.getPixel(origin.centerX(), origin.top - (below.top - origin.bottom) / 2)))
+            } finally { image.recycle() }
+        }
+    }
+
     @Test fun aSingleKeyFeathersLightPastTheNarrowRim() {
         Field(geometry = grid().filter { it.id == SOURCE }).use { field ->
             val cap = field.geometry.first { it.id == SOURCE }.capBounds
@@ -296,6 +316,21 @@ class SamWavePropagationTest {
                 }
                 save(faded, "graph-complementary-fade")
             } finally { bright.recycle(); faded.recycle() }
+        }
+    }
+
+    @Test fun aNearComplementaryMixDoesNotFlipHueWhenItsChannelsCross() {
+        Field(autoPress = false).use { field ->
+            val renderer = ReflectionHelpers.getField<SamKeyLightField>(field.effect, "samKeyField")
+            fun number(value: Float) = ReflectionHelpers.ClassParameter.from(Float::class.javaPrimitiveType!!, value)
+            fun mixed(green: Float, blue: Float) = ReflectionHelpers.callInstanceMethod<Int>(
+                renderer, "saturatedRgb", number(0.60f), number(green), number(blue),
+                number(1f), number(0f), number(1f))
+            val before = mixed(0.731f, 0.729f)
+            val after = mixed(0.729f, 0.731f)
+            val change = maxOf(abs(Color.red(before) - Color.red(after)),
+                abs(Color.green(before) - Color.green(after)), abs(Color.blue(before) - Color.blue(after)))
+            assertTrue("A slight weight change must not flip to the opposite hue arc: $change", change <= 8)
         }
     }
 

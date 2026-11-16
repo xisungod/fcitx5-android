@@ -418,6 +418,19 @@ internal class PressEffect(
         fieldPreparedAt = Long.MIN_VALUE
     }
 
+    private fun samBurstAtPress(now: Long): Float {
+        var load = 0f
+        var count = 0
+        for (i in 0 until ripples.size) {
+            val recent = (1f - (now - ripples[i].start) / 520f).coerceIn(0f, 1f)
+            if (recent <= 0f) continue
+            load += recent * recent
+            count++
+        }
+        // One overlapping tap keeps its full halo; sustained typing builds load.
+        return if (count >= 2) smoothstep(0.25f, 0.95f, load) else 0f
+    }
+
     fun onPress(pressX: Float, pressY: Float, keyBounds: Rect? = null, highlightKey: Boolean = false,
         keyId: Int = -1, pointerId: Int = 0, keyPitch: Float = 0f) {
         if (!canDraw() || !animatorsEnabled()) {
@@ -483,6 +496,10 @@ internal class PressEffect(
         lastShapeIndex = selectedShape
         // Sliding retargets only this finger; another finger can keep its own key held.
         releasePointer(pointerId, now)
+        val burstAtPress = if (samGlare) samBurstAtPress(now) else 0f
+        if (burstAtPress > 0f) for (i in 0 until ripples.size) {
+            ripples[i].deepenSamBurst(burstAtPress, now)
+        }
         val wave = ripples.obtain(now).apply {
             this.pointerId = pointerId
             releasedAt = -1L
@@ -498,6 +515,7 @@ internal class PressEffect(
             colorIndex = index
             colorPosition = cyberColorPosition
             shape = selectedShape
+            resetSamBurst(burstAtPress)
             echoShape = (selectedShape + 1 + random.nextInt(max(1, shapes - 1))) % shapes
             rotation = random.nextFloat() * 360f
             spin = (random.nextFloat() * 2f - 1f) * 24f
