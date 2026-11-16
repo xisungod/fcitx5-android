@@ -25,7 +25,6 @@ sealed class StatusAreaEntry(
             Settings,
             KeyboardHeight,
             KeyboardSettings,
-            RippleShape,
             IdleBreathing
         }
     }

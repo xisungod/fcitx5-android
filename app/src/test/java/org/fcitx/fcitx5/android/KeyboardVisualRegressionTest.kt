@@ -82,8 +82,6 @@ class KeyboardVisualRegressionTest {
         // existing backing store. Reset the actual store, not just this filename.
         val prefs = ThemeManager.prefs
         assertTrue(prefs.idleBreathing.sharedPreferences.edit().clear().commit())
-        prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
-        assertTrue("Every visual fixture must start with idle breathing enabled", prefs.idleBreathing.getValue())
     }
 
     private fun render(view: View): Bitmap {
@@ -128,6 +126,7 @@ class KeyboardVisualRegressionTest {
 
     @Test
     fun realKeyboardBreathesBeforeAnyTouchAndFunctionKeysHaveNoPressedRectangle() {
+        ThemeManager.prefs.idleBreathing.setValue(true)
         val controller = Robolectric.buildActivity(Activity::class.java).setup()
         val activity = controller.get()
         activity.setTheme(R.style.Theme_InputViewTheme)
@@ -226,7 +225,7 @@ class KeyboardVisualRegressionTest {
     fun samsungKeycapsHaveVisibleGapsButNoDeadTouchZonesAndSpaceUsesAnIcon() {
         val context = RuntimeEnvironment.getApplication()
         for (width in listOf(360, 800)) {
-            val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV09)
+            val keyboard = TextKeyboard(context, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
             layout(keyboard, width, 260)
             val row = keyboard.getChildAt(keyboard.childCount - 1) as ViewGroup
             val bottom = (0 until row.childCount).map { row.getChildAt(it) }.sortedBy { it.left }
@@ -380,7 +379,7 @@ class KeyboardVisualRegressionTest {
         root.addView(rippleBar, FrameLayout.LayoutParams(360, 52))
         val glowOnBar = org.fcitx.fcitx5.android.data.theme.ThemeManager.prefs.pressGlowOnCandidates
         assertTrue("V12: the ripple reaches the candidate bar by default", glowOnBar.getValue())
-        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
+        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
         root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
         rippleBar.keyboard = keyboard
         controller.visible()
@@ -557,7 +556,7 @@ class KeyboardVisualRegressionTest {
         val rippleBar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
         rippleBar.addView(bar.root, FrameLayout.LayoutParams(360, 52))
         root.addView(rippleBar, FrameLayout.LayoutParams(360, 52))
-        val keyboard = TextKeyboard(activity, theme)
+        val keyboard = TextKeyboard(activity, theme, useEffectTheme = false)
         root.addView(keyboard, FrameLayout.LayoutParams(360, 260).apply { topMargin = 52 })
         rippleBar.keyboard = keyboard
         val popup = org.fcitx.fcitx5.android.input.popup.PopupEntryUi(activity, theme, 52, 12f)

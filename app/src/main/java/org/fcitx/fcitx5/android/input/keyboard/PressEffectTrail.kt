@@ -19,6 +19,9 @@ internal class PressEffectTrail(capacity: Int) {
         var colorPosition = 0f
         var shape = 0
         var echoShape = 0
+        private var samBurstFrom = 0f
+        private var samBurstTarget = 0f
+        private var samBurstStart = 0L
         var rotation = 0f
         var spin = 0f
         var size = 1f
@@ -27,6 +30,8 @@ internal class PressEffectTrail(capacity: Int) {
         var driftX = 0f
         var driftY = 0f
         var start = 0L
+        var sequence = 0L
+            internal set
         var releasedAt = -1L
         /** Measured touch-cell pitch; keeps effects proportional on every layout. */
         var pitch = 0f
@@ -35,12 +40,36 @@ internal class PressEffectTrail(capacity: Int) {
         /** Legacy candidate-shoulder gain; V15 samples the same field above the keys. */
         var bridgeGain = 1f
 
+        fun resetSamBurst(amount: Float) {
+            samBurstFrom = amount
+            samBurstTarget = amount
+            samBurstStart = start
+        }
+
+        fun samBurstAt(now: Long): Float {
+            if (samBurstFrom == samBurstTarget) return samBurstTarget
+            val elapsed = ((now - samBurstStart) / 96f).coerceIn(0f, 1f)
+            val ease = elapsed * elapsed * (3f - 2f * elapsed)
+            return samBurstFrom + (samBurstTarget - samBurstFrom) * ease
+        }
+
+        /** Later taps can tighten an earlier wave. Its suppression is never undone. */
+        fun deepenSamBurst(amount: Float, now: Long) {
+            if (amount <= samBurstTarget) return
+            samBurstFrom = samBurstAt(now)
+            samBurstTarget = amount
+            samBurstStart = now
+        }
+
         fun copyFrom(other: Ripple) {
             x = other.x; y = other.y
             flashWidth = other.flashWidth; flashHeight = other.flashHeight
             keyFill = other.keyFill; keyId = other.keyId; pointerId = other.pointerId
             colorIndex = other.colorIndex; colorPosition = other.colorPosition
             shape = other.shape; echoShape = other.echoShape
+            samBurstFrom = other.samBurstFrom
+            samBurstTarget = other.samBurstTarget
+            samBurstStart = other.samBurstStart
             rotation = other.rotation; spin = other.spin; size = other.size
             stretchX = other.stretchX; stretchY = other.stretchY
             driftX = other.driftX; driftY = other.driftY
@@ -52,6 +81,7 @@ internal class PressEffectTrail(capacity: Int) {
 
     init { require(capacity > 0) }
     private val slots = Array(capacity) { Ripple() }
+    private var sequence = 0L
     var size = 0
         private set
 
@@ -68,7 +98,10 @@ internal class PressEffectTrail(capacity: Int) {
 
     fun obtain(now: Long): Ripple {
         if (size == slots.size) removeAt(0)
-        return slots[size++].also { it.start = now }
+        return slots[size++].also {
+            it.start = now
+            it.sequence = ++sequence
+        }
     }
 
     fun removeAt(index: Int) {

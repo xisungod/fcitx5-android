@@ -515,7 +515,6 @@ class KeyPressDepthTest {
         appAnimationsDisabled: Boolean = false,
         lights: Boolean = false,
         savedRetreat: Int = 100,
-        shape: ThemePrefs.RippleShape = ThemePrefs.RippleShape.SoftMist,
         singleColor: Int = 0xFFFF243F.toInt(),
         waveFade: Int = 520,
         motion: KeyMotionSettings = KeyMotionSettings()
@@ -534,7 +533,6 @@ class KeyPressDepthTest {
         init {
             val p = ThemeManager.prefs
             setting(p.pressEffect, lights)
-            setting(p.rippleShape, shape)
             setting(p.idleBreathing, false)
             setting(p.pressColorMode, ThemePrefs.PressColorMode.Single)
             setting(p.pressSingleColor, singleColor)
@@ -561,7 +559,7 @@ class KeyPressDepthTest {
             setting(AppPrefs.getInstance().keyboard.popupOnKeyPress, false)
             setting(AppPrefs.getInstance().keyboard.expandKeypressArea, true)
             activity.setTheme(R.style.Theme_InputViewTheme)
-            keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
+            keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
             activity.setContentView(keyboard)
             controller.visible()
             advance(32)
@@ -1126,186 +1124,6 @@ class KeyPressDepthTest {
             assertTrue(baseline.sameAs(h.render(h.keyboard)))
             baseline.recycle()
         } finally { h.finish() }
-    }
-
-    @Test
-    fun actualTextKeyboardShowsDifferentFluidBoundariesForTheSavedShapeWithTheSameColourAndTouches() {
-        val reviewTimes = setOf(150, 300, 450, 600, 800, 1000, 1400, 1800)
-        data class Recording(val baseline: Bitmap, val frames: Map<Int, Bitmap>,
-            val gapSamples: Map<Int, ByteArray>, val gapIndices: IntArray)
-        fun save(image: Bitmap, name: String) {
-            val file = File("build/outputs/ripple-shape-checks/$name.png")
-            file.parentFile!!.mkdirs()
-            file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        }
-        fun record(shape: ThemePrefs.RippleShape): Recording {
-            val h = Harness(lights = true, shape = shape, waveFade = 900)
-            try {
-                val effect = ReflectionHelpers.getField<PressEffect>(h.keyboard, "pressEffectLayer")
-                assertEquals("The actual BaseKeyboard must read the persisted shape into its renderer", shape,
-                    ReflectionHelpers.getField<ThemePrefs.RippleShape>(effect, "rippleShape"))
-                ReflectionHelpers.setField(effect, "random", kotlin.random.Random(1401))
-                val baseline = h.render(h.keyboard)
-                val touched = listOf("G", "H", "J").map { h.outerBounds(h.key(it)) }
-                // Real black gaps only: neither glyphs nor the coloured, floating
-                // faces may masquerade as a difference in base-light geometry.
-                val gaps = (0 until baseline.width * baseline.height).filter { index ->
-                    val x = index % baseline.width
-                    val y = index / baseline.width
-                    brightness(baseline.getPixel(x, y)) <= 3 && touched.none { it.contains(x, y) }
-                }.toIntArray()
-                assertTrue("The real keyboard fixture must expose enough inter-key gaps", gaps.size > 1000)
-                val inactiveCapPoints = listOf("Q", "W", "Z", "X", "P").map { label ->
-                    val key = h.key(label)
-                    val bounds = h.outerBounds(key)
-                    (bounds.left + key.hMargin + 8) to (bounds.top + key.vMargin + 8)
-                }
-                val samples = linkedMapOf<Int, ByteArray>()
-                val frames = linkedMapOf<Int, Bitmap>()
-                val folder = if (shape == ThemePrefs.RippleShape.SoftMist) "keyboard-mist" else "keyboard-fluid"
-                for (time in 0..1800 step 25) {
-                    when (time) {
-                        0 -> h.event(MotionEvent.ACTION_DOWN, 7 to "G")
-                        50 -> h.event(MotionEvent.ACTION_UP, 7 to "G")
-                        150 -> h.event(MotionEvent.ACTION_DOWN, 7 to "H")
-                        200 -> h.event(MotionEvent.ACTION_UP, 7 to "H")
-                        300 -> h.event(MotionEvent.ACTION_DOWN, 7 to "J")
-                        350 -> h.event(MotionEvent.ACTION_UP, 7 to "J")
-                    }
-                    val image = h.render(h.keyboard)
-                    save(image, "$folder/frame-%04d".format(time))
-                    samples[time] = ByteArray(gaps.size) { i ->
-                        brightness(image.getPixel(gaps[i] % image.width, gaps[i] / image.width)).toByte()
-                    }
-                    for ((x, y) in inactiveCapPoints) {
-                        // The production black cap has alpha 0xEB, deliberately
-                        // admitting a faint glow rather than being fully opaque.
-                        assertTrue("A liquid boundary must leave untouched key interiors dark and readable at ${time}ms",
-                            brightness(image.getPixel(x, y)) < 45)
-                    }
-                    if (time == 350) assertEquals("Changing geometry must not change typing", listOf("g", "h", "j"), h.typed)
-                    if (time == 1800) assertTrue("Both real keyboard modes must finish at their exact resting pixels", baseline.sameAs(image))
-                    if (time in reviewTimes) frames[time] = image else image.recycle()
-                    if (time < 1800) h.advance(25)
-                }
-                return Recording(baseline, frames, samples, gaps)
-            } finally { h.finish() }
-        }
-        val mist = record(ThemePrefs.RippleShape.SoftMist)
-        val fluid = record(ThemePrefs.RippleShape.IrregularFluid)
-        try {
-            assertTrue("Only the ripple choice changes between recordings", mist.baseline.sameAs(fluid.baseline))
-            assertArrayEquals(mist.gapIndices, fluid.gapIndices)
-            var maximumBoundaryChanges = 0
-            var maximumBoundaryFraction = 0f
-            var maximumShapeResidual = 0.0
-            val metrics = mutableListOf("time_ms,mist_peak,fluid_peak,normalised_boundary_changed,normalised_boundary_union,shape_residual_after_global_gain_fit")
-            for (time in 100..1000 step 25) {
-                val a = mist.gapSamples.getValue(time)
-                val b = fluid.gapSamples.getValue(time)
-                val peakA = a.maxOf { it.toInt() and 255 }.coerceAtLeast(1)
-                val peakB = b.maxOf { it.toInt() and 255 }.coerceAtLeast(1)
-                var changed = 0
-                var union = 0
-                var aa = 0.0
-                var ab = 0.0
-                for (i in a.indices) {
-                    val old = a[i].toInt() and 255
-                    val next = b[i].toInt() and 255
-                    val oldBoundary = old > peakA * 0.30f
-                    val newBoundary = next > peakB * 0.30f
-                    if (oldBoundary != newBoundary) changed++
-                    if (oldBoundary || newBoundary) union++
-                    aa += old.toDouble() * old
-                    ab += old.toDouble() * next
-                }
-                val gain = ab / aa.coerceAtLeast(1.0)
-                var residual = 0.0
-                var visible = 0
-                for (i in a.indices) {
-                    val old = a[i].toInt() and 255
-                    val next = b[i].toInt() and 255
-                    if (old >= 20 || next >= 20) {
-                        residual += abs(next - gain * old)
-                        visible++
-                    }
-                }
-                residual /= visible.coerceAtLeast(1)
-                maximumBoundaryChanges = maxOf(maximumBoundaryChanges, changed)
-                maximumBoundaryFraction = maxOf(maximumBoundaryFraction, changed.toFloat() / union.coerceAtLeast(1))
-                maximumShapeResidual = maxOf(maximumShapeResidual, residual)
-                metrics.add("$time,$peakA,$peakB,$changed,$union,$residual")
-            }
-            assertTrue("The irregular boundary must visibly change real exposed keyboard gaps, not a hidden bare canvas",
-                maximumBoundaryChanges > 150 && maximumBoundaryFraction > 0.15f)
-            assertTrue("A uniform brightness or colour change cannot explain the fluid contour", maximumShapeResidual > 4.0)
-            fun sampleDifference(a: ByteArray, b: ByteArray): Double =
-                a.indices.sumOf { abs((a[it].toInt() and 255) - (b[it].toInt() and 255)).toDouble() } / a.size
-            val flowing = sampleDifference(fluid.gapSamples.getValue(400), fluid.gapSamples.getValue(650))
-            val singleFrame = (425..650 step 25).maxOf { time ->
-                sampleDifference(fluid.gapSamples.getValue(time - 25), fluid.gapSamples.getValue(time))
-            }
-            assertTrue("Real liquid gaps evolve continuously after the last DOWN, without whole-keyboard frame flashes",
-                flowing > 0.1 && singleFrame < flowing * 0.45)
-            // A bright cyan surface uses dark glyph ink. Compare the actual
-            // rendered glyph to the same-time surface with only that glyph hidden;
-            // old white-pixel locations are invalid while its cap is floating.
-            val cyan = Harness(lights = true, shape = ThemePrefs.RippleShape.IrregularFluid,
-                singleColor = 0xFF00EFFF.toInt(), waveFade = 900)
-            try {
-                val key = cyan.key("G")
-                val bounds = cyan.outerBounds(key)
-                cyan.event(MotionEvent.ACTION_DOWN, 7 to "G")
-                for (time in 0..400 step 50) {
-                    if (time == 100) cyan.event(MotionEvent.ACTION_UP, 7 to "G")
-                    val withText = cyan.render(cyan.keyboard)
-                    key.mainText.visibility = View.INVISIBLE
-                    val withoutText = cyan.render(cyan.keyboard)
-                    key.mainText.visibility = View.VISIBLE
-                    var readable = 0
-                    for (y in bounds.top until bounds.bottom) for (x in bounds.left until bounds.right) {
-                        val a = withText.getPixel(x, y)
-                        val b = withoutText.getPixel(x, y)
-                        if (maxOf(abs(Color.red(a) - Color.red(b)), abs(Color.green(a) - Color.green(b)),
-                                abs(Color.blue(a) - Color.blue(b))) >= 40) readable++
-                    }
-                    assertTrue("The actual moving glyph stays readable above the bright liquid at ${time}ms", readable >= 12)
-                    save(withText, "keyboard-fluid-cyan/frame-%04d".format(time))
-                    withText.recycle(); withoutText.recycle()
-                    if (time < 400) cyan.advance(50)
-                }
-            } finally { cyan.finish() }
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textSize = 18f }
-            for ((name, times) in listOf("keyboard-shapes-early" to listOf(150, 300, 450, 600),
-                "keyboard-shapes-tail" to listOf(800, 1000, 1400, 1800))) {
-                val strip = Bitmap.createBitmap(1200, times.size * 484, Bitmap.Config.ARGB_8888)
-                Canvas(strip).apply {
-                    drawColor(0xFF0B1018.toInt())
-                    times.forEachIndexed { index, time ->
-                        val y = index * 484f
-                        drawText("Soft mist / ${time}ms", 12f, y + 24f, paint)
-                        drawText("Irregular fluid / ${time}ms", 612f, y + 24f, paint)
-                        drawBitmap(mist.frames.getValue(time), 0f, y + 34f, null)
-                        drawBitmap(fluid.frames.getValue(time), 600f, y + 34f, null)
-                    }
-                }
-                save(strip, name)
-                strip.recycle()
-            }
-            File("build/outputs/ripple-shape-checks/keyboard-geometry.csv").writeText(metrics.joinToString("\n") + "\n")
-            File("build/outputs/ripple-shape-checks/keyboard-provenance.txt").writeText(
-                "source=actual TextKeyboard via persisted ThemePrefs and MotionEvent\n" +
-                    "graphics=Robolectric NATIVE\nframes_per_mode=73\nfps=40\nseed=1401\n" +
-                    "single_colour=#FF243F\nwave_fade_ms=900\nevents=G down0 up50; H down150 up200; J down300 up350\n" +
-                    "geometry_measurement=fixed actual black key gaps, all touched cells excluded\n" +
-                    "normalised_boundary_changed_max=$maximumBoundaryChanges\nnormalised_boundary_fraction_max=$maximumBoundaryFraction\n" +
-                    "shape_residual_after_gain_fit=$maximumShapeResidual\nflow_400_to_650_ms=$flowing\nmaximum_25ms_step=$singleFrame\n" +
-                    "frames_are_direct_native_draws=true\ninterpolation=false\n")
-        } finally {
-            mist.baseline.recycle(); fluid.baseline.recycle()
-            mist.frames.values.forEach(Bitmap::recycle)
-            fluid.frames.values.forEach(Bitmap::recycle)
-        }
     }
 
     @Test

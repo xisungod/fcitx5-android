@@ -234,15 +234,49 @@ def verify_bundled_assets(apk):
  combined.update(symlinks)
  digest=hashlib.sha256(', '.join(path+value for path,value in combined.items()).encode()).hexdigest()
  require(digest==descriptor['sha256'],'Asset descriptor aggregate hash is invalid')
- prefixes=('usr/share/rime-data/','usr/share/opencc/','usr/share/licenses/rime-ice/','usr/share/licenses/rime-grammar/','usr/share/licenses/rime-builtin/')
+ prefixes=('usr/share/rime-data/','usr/share/opencc/','usr/share/licenses/rime-ice/','usr/share/licenses/rime-grammar/','usr/share/licenses/rime-builtin/','usr/share/licenses/rime-zhwiki/')
  covered={name.removeprefix('assets/') for name in names if name.startswith('assets/') and not name.endswith('/') and name.removeprefix('assets/').startswith(prefixes)} | set(required)
  for path in covered:
   require(path in files and files[path], 'Bundled Rime file is absent from the asset descriptor: '+path)
-  require(hashlib.sha256(apk.read('assets/'+path)).hexdigest()==files[path],'Bundled Rime descriptor hash mismatch: '+path)
+  require(archive_digest(apk,'assets/'+path)==files[path],'Bundled Rime descriptor hash mismatch: '+path)
  for path,digest in files.items():
   if digest and path.startswith(prefixes):
    require('assets/'+path in names,'Descriptor references a missing bundled Rime file: '+path)
  print(f'Bundled native Rime, addon registration, OpenCC link, licenses and {len(covered)} descriptor file hashes verified.')
+
+
+def archive_digest(apk, path):
+ with apk.open(path) as member:
+  return hashlib.file_digest(member,'sha256').hexdigest()
+
+
+def verify_wanxiang_zhwiki(apk, dictionary, prebuilt):
+ # Import the exact same pinned data records and grammar checks used to stage it.
+ from importlib.util import module_from_spec, spec_from_file_location
+ spec=spec_from_file_location('touch_rime_lexicon',Path(__file__).with_name('prepare-touch-rime-lexicon.py'))
+ lexicon=module_from_spec(spec)
+ spec.loader.exec_module(lexicon)
+ for path,pin in ((lexicon.MODEL,lexicon.MODEL_SPEC),(lexicon.ZHWIKI,lexicon.ZHWIKI_SPEC)):
+  require(apk.getinfo('assets/'+path).file_size==pin['bytes'] and
+          archive_digest(apk,'assets/'+path)==pin['sha256'],'Pinned offline dictionary asset differs: '+path)
+ require('assets/'+lexicon.OLD_MODEL not in apk.namelist(),'Do not ship both grammar models')
+ for name,pin in lexicon.LICENSE_SPECS.items():
+  require(archive_digest(apk,'assets/'+lexicon.GRAMMAR+name)==pin['sha256'],'Grammar license differs: '+name)
+ for path,pin in ((lexicon.GRAMMAR,lexicon.MODEL_SPEC),(lexicon.ZHWIKI_LICENSE,lexicon.ZHWIKI_SPEC)):
+  require(json.loads(apk.read('assets/'+path+'SOURCE.json'))==pin,'Rime external data attribution differs: '+path)
+ table_lines=[line.split('#',1)[0].strip() for line in dictionary.splitlines()]
+ require(table_lines.count('- zhwiki')==1 and table_lines.index('- cn_dicts/tencent')<table_lines.index('- zhwiki'),
+         'Encyclopedia entries should follow existing Rime Ice vocabulary in import order')
+ expected_inputs={name:archive_digest(apk,'assets/'+lexicon.RIME+name) for name in
+                  ('rime_ice.schema.yaml','rime_ice.dict.yaml','zhwiki.dict.yaml','wanxiang-lts-zh-hans.gram')}
+ require(prebuilt.get('overlay')=={'name':'wanxiang-zhwiki-v1','inputs':expected_inputs},
+         'Precompiled Rime data does not attest to these exact source inputs')
+ require(lexicon.COMPILED<=prebuilt['files_sha256'].keys(),'Full and nine-key compiled artifacts must be hashed')
+ for schema in ('rime_ice.schema.yaml','rime_ice_t9.schema.yaml'):
+  compiled=apk.read('assets/'+lexicon.RIME+'build/'+schema).decode()
+  lexicon.require_keys(compiled,'grammar',lexicon.GRAMMAR_CONFIG)
+  lexicon.require_keys(compiled,'translator',lexicon.CONTEXT_CONFIG|{'dictionary':'rime_ice'})
+ print('Verified the pinned Wanxiang LTS grammar and zhwiki table, attribution and matching precompiled alphabetic/T9 schemas.')
 
 
 parser=argparse.ArgumentParser(description='Verify packaged Rime data and optionally its actual APK host manifest.')
@@ -256,6 +290,7 @@ parser.add_argument('--expected-version-name',default='1.0',help='Exact expected
 parser.add_argument('--expected-version-code',type=int,default=822,help='Exact expected Android versionCode (default: 822)')
 parser.add_argument('--bundled-rime',action='store_true',help='Verify native Rime and all data directly inside the single main APK')
 parser.add_argument('--offline-dictation',action='store_true',help='Require the explicitly enabled local microphone feature; network/system recognition remains forbidden')
+parser.add_argument('--wanxiang-zhwiki',action='store_true',help='Require the pinned Wanxiang LTS and zhwiki overlay')
 args=parser.parse_args()
 require(not (args.bundled_rime and args.main_apk),'--bundled-rime accepts one main APK, not a separate Rime/main pair')
 require(not args.offline_dictation or args.bundled_rime,'--offline-dictation requires the single bundled main APK')
@@ -274,20 +309,22 @@ with zipfile.ZipFile(args.rime_apk) as apk:
  for name,digest in manifest['files_sha256'].items():
   if name in ['LICENSE','README.md']:path='licenses/rime-ice/'+name
   elif name.startswith('grammar-license/'):path='licenses/rime-grammar/'+name.removeprefix('grammar-license/')
+  elif name.startswith('zhwiki-license/'):path='licenses/rime-zhwiki/'+name.removeprefix('zhwiki-license/')
   elif name.startswith('opencc/'):path=name
   else:path='rime-data/'+name
-  assert hashlib.sha256(apk.read('assets/usr/share/'+path)).hexdigest()==digest,name
+  assert archive_digest(apk,'assets/usr/share/'+path)==digest,name
  base='assets/usr/share/rime-data/build/'
  prebuilt=json.loads(apk.read(base+'PREBUILT.json'))
  assert prebuilt['engine']=='1.12.0'
- for name,digest in prebuilt['files_sha256'].items():assert hashlib.sha256(apk.read(base+name)).hexdigest()==digest,name
+ for name,digest in prebuilt['files_sha256'].items():assert archive_digest(apk,base+name)==digest,name
  schema=apk.read('assets/usr/share/rime-data/rime_ice.schema.yaml').decode()
  assert 'lua_translator@*date_translator' in schema and 'lua_translator@*xuancai_correction' in schema
  assert 'lua_processor@*xuancai_ascii' in schema
  assert 'script_translator@xuancai_user' in schema
  assert '- xuancai_user' in schema
  assert 'derive/^([a-z]*[aeio])ng$/$1g/' in schema
- assert 'language: zh-hans-t-essay-bgw-compact' in schema
+ if not args.wanxiang_zhwiki:
+  assert 'language: zh-hans-t-essay-bgw-compact' in schema
  typo_base='assets/usr/share/rime-data/lua/axiang_typo/'
  typo=json.loads(apk.read(typo_base+'SOURCE.json'))
  require(typo['scope']=={'min_letters':4,'max_letters':24,'min_characters':2,'max_characters':5,'max_adjacent_substitutions':2},'Adjacent-key index scope is incorrect')
@@ -312,6 +349,8 @@ with zipfile.ZipFile(args.rime_apk) as apk:
  compiled_main=apk.read(base+'rime_ice.schema.yaml').decode()
  require(re.search(r'xuancai_exact:\n(?:  [^\n]+\n)*?  spelling_hints: 32\n',compiled_main),'Exact translator lacks short-word spelling validation')
  dictionary=apk.read('assets/usr/share/rime-data/rime_ice.dict.yaml').decode()
+ if args.wanxiang_zhwiki:
+  verify_wanxiang_zhwiki(apk,dictionary,prebuilt)
  table_lines=[line.split('#',1)[0].strip() for line in dictionary.splitlines()]
  require('- cn_dicts/41448' in table_lines,'Extended character table was not enabled')
  require(table_lines.index('- cn_dicts/8105') < table_lines.index('- cn_dicts/41448'),'Rare characters precede the common-character table')

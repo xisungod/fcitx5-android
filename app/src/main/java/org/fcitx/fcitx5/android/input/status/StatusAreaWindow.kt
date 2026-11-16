@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.daemon.FcitxConnection
 import org.fcitx.fcitx5.android.daemon.launchOnReady
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
@@ -37,7 +36,6 @@ import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.TextEd
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.Settings
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.KeyboardHeight
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.KeyboardSettings
-import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.RippleShape
 import org.fcitx.fcitx5.android.input.status.StatusAreaEntry.Android.Type.IdleBreathing
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.settings.KeyboardQuickSettingsWindow
@@ -70,7 +68,6 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
     private val staticEntries by lazy {
         arrayOf(
             StatusAreaEntry.Android(context.getString(R.string.axiang_quick_title), R.drawable.ic_baseline_palette_24, KeyboardSettings),
-            StatusAreaEntry.Android(context.getString(R.string.ripple_shape), R.drawable.ic_baseline_auto_awesome_24, RippleShape),
             StatusAreaEntry.Android(context.getString(if (ThemeManager.prefs.idleBreathing.getValue())
                 R.string.keyboard_menu_breathing_on else R.string.keyboard_menu_breathing_off),
                 R.drawable.ic_baseline_light_mode_24, IdleBreathing, ThemeManager.prefs.idleBreathing.getValue()),
@@ -156,26 +153,6 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                         Settings -> AppUtil.launchMain(context)
                         KeyboardHeight -> inputView.showKeyboardHeightEditor()
                         KeyboardSettings -> windowManager.attachWindow(KeyboardQuickSettingsWindow())
-                        RippleShape -> {
-                            val preference = ThemeManager.prefs.rippleShape
-                            val target = windowManager
-                            val popup = PopupMenu(context, view)
-                            ThemePrefs.RippleShape.entries.forEachIndexed { index, shape ->
-                                popup.menu.add(0, index + 1, index, shape.stringRes).apply {
-                                    isCheckable = true
-                                    isChecked = shape == preference.getValue()
-                                    setOnMenuItemClickListener {
-                                        target.attachWindow(KeyboardWindow)
-                                        preference.setValue(shape)
-                                        true
-                                    }
-                                }
-                            }
-                            popup.menu.setGroupCheckable(0, true, true)
-                            popupMenu?.dismiss()
-                            popupMenu = popup
-                            popup.show()
-                        }
                         IdleBreathing -> {
                             val preference = ThemeManager.prefs.idleBreathing
                             val next = !preference.getValue()

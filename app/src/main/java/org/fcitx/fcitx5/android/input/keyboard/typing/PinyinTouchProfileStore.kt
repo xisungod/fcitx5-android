@@ -48,6 +48,15 @@ class PinyinTouchProfileStore(context: Context) {
         }
     }
 
+    /** UI DOWN must not wait for background profile IO, even when an update is in flight. */
+    internal fun hitOffsets(cells: List<KeyCell>, density: Float): Map<Char, CenterOffset> {
+        if (!unlocked) return emptyMap()
+        val snapshot = state.hitOffsets
+        if (snapshot.isEmpty()) return emptyMap()
+        val signature = PinyinTouchProfile.layoutSignature(cells, density) ?: return emptyMap()
+        return snapshot[signature].orEmpty()
+    }
+
     fun confirmedSampleCount(cells: List<KeyCell>, density: Float, letter: Char): Int {
         if (!storageAvailable()) return 0
         return synchronized(states) {
@@ -67,6 +76,7 @@ class PinyinTouchProfileStore(context: Context) {
             if (expectedGeneration != state.generation) return@synchronized false
             if (runCatching { loadIfNeeded() }.isFailure) return@synchronized false
             if (!state.profile.observeConfirmed(cells, tap, intended)) return@synchronized false
+            state.hitOffsets = state.profile.offsetSnapshot()
             val encoded = encode(state.profile.snapshot(), state.receipts)
             // apply updates SharedPreferences memory before enqueueing its disk operation.
             // Holding the same lock as clear prevents a queued older write restoring data.
@@ -96,6 +106,7 @@ class PinyinTouchProfileStore(context: Context) {
                     accepted++
             }
             if (accepted > 0) {
+                state.hitOffsets = state.profile.offsetSnapshot()
                 state.unsaved += accepted
                 if (nowNanos - state.savedAtNanos >= SAVE_INTERVAL_NANOS || state.unsaved >= SAVE_AFTER_SAMPLES)
                     save(nowNanos)
@@ -153,7 +164,10 @@ class PinyinTouchProfileStore(context: Context) {
                 state.receipts.remove(receipt)
                 removed?.let { state.receipts.add(0, it) }
                 ImportResult(0, 0, unavailable = true)
-            } else ImportResult(samples.size, 0)
+            } else {
+                state.hitOffsets = state.profile.offsetSnapshot()
+                ImportResult(samples.size, 0)
+            }
         }
     }
 
@@ -186,6 +200,7 @@ class PinyinTouchProfileStore(context: Context) {
                 if (receipt !in state.receipts) state.receipts.add(receipt)
             }
         }.onFailure { state.receipts.clear() }
+        state.hitOffsets = state.profile.offsetSnapshot()
         state.loaded = true
     }
 
@@ -200,6 +215,7 @@ class PinyinTouchProfileStore(context: Context) {
 
         private class State {
             val profile = PinyinTouchProfile()
+            @Volatile var hitOffsets: Map<String, Map<Char, CenterOffset>> = emptyMap()
             val receipts = mutableListOf<String>()
             var generation = 0L
             var loaded = false
@@ -225,6 +241,7 @@ class PinyinTouchProfileStore(context: Context) {
             synchronized(states) {
                 val state = states.getOrPut(storageIdentity(credentialContext)) { State() }
                 state.generation++
+                state.hitOffsets = emptyMap()
                 state.profile.clear()
                 state.receipts.clear()
                 state.unsaved = 0

@@ -49,3 +49,4 @@ editor:
   __include: rime_ice.schema:/editor
 grammar:
   __include: rime_ice.schema:/grammar
+__patch: axiang_moegirl:/t9

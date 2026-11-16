@@ -21,13 +21,11 @@
     <string name="light_effect_color_number">颜色 %1$d</string>
     <string name="light_effect_animation">动画节奏</string>
     <string name="light_effect_expand">扩散时间</string>
-    <string name="light_effect_wave_fade">消失淡出</string>
+    <string name="light_effect_fade_duration">淡出时长</string>
     <string name="light_effect_face_hold">键面亮色保持</string>
     <string name="light_effect_face_exit">键面退场</string>
-    <string name="sam_key_hold_time">Sam 松手留色</string>
-    <string name="sam_key_retreat_time">Sam 余色淡出</string>
-    <string name="sam_key_timing_hint">Sam 回弹过程保持颜色，松手后的余色独立计时；柔雾、流体沿用原来的时长设置。</string>
-    <string name="sam_wave_total_detail">Sam 按下即扩散；波纹、键面余色与回弹分别计时。</string>
+    <string name="light_effect_fade_hint">SAM 键面按住时保留微光，松手后继续淡出。</string>
+    <string name="sam_wave_total_detail">按下即扩散；总时长包括扩散、保持和淡出，按键动作单独计时。</string>
     <string name="light_effect_total">一次波纹总时长：%1$d 毫秒</string>
     <string name="light_effect_total_detail">已含 %1$d 毫秒点亮；波纹与键面分别计时。</string>
     <string name="light_effect_light">柔光范围</string>

@@ -23,6 +23,8 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
+import org.fcitx.fcitx5.android.input.keyboard.typing.CenterOffset
+import org.fcitx.fcitx5.android.input.keyboard.typing.KeyCell
 import splitties.views.imageResource
 
 @SuppressLint("ViewConstructor")
@@ -138,6 +140,10 @@ class TextKeyboard(
     private var capsState: CapsState = CapsState.None
     private var englishMode = false
     private var chineseMode = false
+    private var fullPinyinMode = false
+    internal var pinyinHitOffsets: ((List<KeyCell>, Float) -> Map<Char, CenterOffset>)? = null
+    internal val acceptsPersonalizedHits: Boolean
+        get() = fullPinyinMode && capsState == CapsState.None
     internal var downOrderStateGeneration = 0L
         private set
     internal val acceptsDownOrderedLetterTaps: Boolean
@@ -240,6 +246,7 @@ class TextKeyboard(
         downOrderStateGeneration++
         englishMode = isEnglish(ime)
         chineseMode = !englishMode && (ime.uniqueName == "rime" || ime.languageCode.startsWith("zh"))
+        fullPinyinMode = RimeActions.isPinyinSchema(ime, false)
         lang.contentDescription = if (englishMode) "English" else "中文"
         lang.mainText.text = if (englishMode) "英" else "中"
         capsState = CapsState.None

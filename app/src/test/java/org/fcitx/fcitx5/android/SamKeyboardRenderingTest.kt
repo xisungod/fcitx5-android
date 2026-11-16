@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardSizePolicy
 import org.fcitx.fcitx5.android.input.keyboard.PressEffect
+import org.fcitx.fcitx5.android.input.keyboard.SamKeyLightField
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyView
 import org.junit.After
@@ -120,8 +121,8 @@ class SamKeyboardRenderingTest {
         init {
             val prefs = ThemeManager.prefs
             prefs.rippleShape.setValue(shape)
-            // Deliberately ON: Sam must remain black even after upgrading a saved breathing setting.
-            prefs.idleBreathing.setValue(true)
+            // Isolate the touch light from the optional idle breathing layer.
+            prefs.idleBreathing.setValue(false)
             prefs.pressColorMode.setValue(when {
                 customColours != null -> ThemePrefs.PressColorMode.Custom
                 randomColours -> ThemePrefs.PressColorMode.Random
@@ -179,8 +180,11 @@ class SamKeyboardRenderingTest {
             elapsed = time
         }
 
-        fun touch(letter: String, action: Int, downAt: Long = elapsed) {
-            val rectangle = bounds(letters.getValue(letter))
+        fun touch(letter: String, action: Int, downAt: Long = elapsed) =
+            touch(letters.getValue(letter), action, downAt)
+
+        fun touch(key: KeyView, action: Int, downAt: Long = elapsed) {
+            val rectangle = bounds(key)
             val event = MotionEvent.obtain(start + downAt, now, action, rectangle.exactCenterX(), rectangle.exactCenterY(), 0)
             try { assertTrue(keyboard.dispatchTouchEvent(event)) } finally { event.recycle() }
         }
@@ -194,7 +198,7 @@ class SamKeyboardRenderingTest {
         }
 
         /** Observe the real appearance Canvas while its normal black mask, fill and glyphs draw. */
-        fun motionFrame(key: KeyView): MotionFrame {
+        fun motionFrame(key: KeyView, hideLegends: Boolean = false): MotionFrame {
             val painter = key.keySurfacePainter
             var scale = Float.NaN
             var centreY = Float.NaN
@@ -213,7 +217,7 @@ class SamKeyboardRenderingTest {
                     sampleY = points[3]
                     painter?.draw(canvas, width, height)
                 }
-                val image = frame()
+                val image = if (hideLegends) withoutLegends() else frame()
                 assertTrue("The actual key surface must draw through the recorded transform", scale.isFinite())
                 val x = sampleX.toInt()
                 val y = sampleY.toInt()
@@ -328,7 +332,8 @@ class SamKeyboardRenderingTest {
                     previousTime = time
                 } finally { observed.image.recycle() }
             }
-            board.assertBlackSurface("Single tap completes its physical landing")
+            board.go(1600)
+            board.assertBlackSurface("Single tap completes its physical landing and the extended wave fades")
             val restored = board.motionFrame(key)
             try {
                 assertEquals(1f, restored.scale, 0f)
@@ -348,7 +353,7 @@ class SamKeyboardRenderingTest {
     }
 
     @Test
-    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBetweenBlackCaps() {
+    fun idleIsSeamlessBlackAndOneTapRapidlyRevealsBroadGuttersBehindOpaqueCaps() {
         Keyboard(ThemePrefs.RippleShape.Sam).use { board ->
             board.frame().also { save(it, "idle"); it.recycle() }
             board.assertBlackSurface("Before typing")
@@ -379,8 +384,10 @@ class SamKeyboardRenderingTest {
                 try {
                     board.letters.filterKeys { it != "f" }.values.forEach { key ->
                         val r = board.bounds(key)
+                        // Board light belongs in the gutters. An unpressed cap
+                        // must not acquire its colour through a translucent mask.
                         val cap = intensity(surface.getPixel(r.centerX(), r.centerY()))
-                        assertTrue("Unpressed caps stay black while the gaps reveal the field: $cap", cap <= 8)
+                        assertEquals("Unpressed cap interiors stay black while the gaps reveal the field", 0, cap)
                     }
                 } finally { surface.recycle() }
             } finally { frame.recycle() }
@@ -536,24 +543,26 @@ class SamKeyboardRenderingTest {
                 "source=actual Android TextKeyboard and PressEffect\ngraphics=Robolectric NATIVE\n" +
                     "portrait_width_dp=360\nheight_px=${board.pixelHeight}\ndensity=${board.root.resources.displayMetrics.density}\nbase_height_dp=288\nfps=60\nframes=145\n" +
                     "input=${input.joinToString("")}\npress_times_ms=${presses.joinToString(",")}\nrelease_after_ms=50\n" +
-                    "portrait_number_row=false\npalette=production Cyberpunk random\nseed=1401\nripple_shape=Sam\n" +
-                    "idle_breathing_preference=true (Sam suppresses it)\npopup=false\n" +
+                    "portrait_number_row=false\npalette=production NeonDistrict random\nseed=1401\nripple_shape=Sam\n" +
+                    "idle_breathing=false\npopup=false\n" +
                     "gap_metrics=fixed physical gaps outside all resting cap interiors; no glyphs or deliberately hidden cap drawings\n" +
                     "direct_native_frames=true\ninterpolation=false\nphysical_device_capture=false\n")
         }
     }
 
     @Test
-    fun samColourTailRemainsVisibleAfterGeometryLandsWithEitherMotionPath() {
+    fun samColourTailIsIndependentOfTheKeyGeometry() {
         for (motion in listOf(ThemePrefs.KeyMotionEffect.Press, ThemePrefs.KeyMotionEffect.Off)) {
             Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
                 it.keyMotionEffect.setValue(motion)
                 it.reboundMotionDuration.setValue(400)
-                // Old, explicitly saved mist values must not shorten Sam's tail.
+                it.pressWaveHoldTime.setValue(40)
+                it.pressFadeOutTime.setValue(900)
+                // Old, explicitly saved face timings must not shorten the shared fade.
                 it.pressKeyHoldTime.setValue(20)
                 it.pressKeyRetreatTime.setValue(20)
-                it.samKeyHoldTime.setValue(80)
-                it.samKeyRetreatTime.setValue(800)
+                it.samKeyHoldTime.setValue(20)
+                it.samKeyRetreatTime.setValue(100)
             }).use { board ->
                 board.touch("f", MotionEvent.ACTION_DOWN)
                 board.go(50)
@@ -567,53 +576,109 @@ class SamKeyboardRenderingTest {
                     save(late.image, "release-tail-${motion.name}-650ms")
                 } finally { late.image.recycle() }
                 board.go(1600)
-                board.assertBlackSurface("$motion finishes the independent colour tail and wave")
+                board.assertBlackSurface("$motion finishes both the cap fade and propagating light")
             }
         }
     }
 
     @Test
-    fun samCapTimingPreferencesChangeRealPixelsWithoutChangingLegacyValues() {
-        val samples = listOf(200, 1600).map { fade ->
+    fun actualSamCapAndSourceHaloHaveTheSameAdjustableFade() {
+        for (fade in listOf(240L, 900L)) {
             Keyboard(ThemePrefs.RippleShape.Sam, numberRow = false, configure = {
                 it.keyMotionEffect.setValue(ThemePrefs.KeyMotionEffect.Off)
-                it.samKeyHoldTime.setValue(120)
-                it.samKeyRetreatTime.setValue(fade)
-                it.pressKeyHoldTime.setValue(30)
-                it.pressKeyRetreatTime.setValue(100)
+                it.pressWaveHoldTime.setValue(180)
+                it.pressFadeOutTime.setValue(fade.toInt())
             }).use { board ->
+                val key = board.letters.getValue("f")
+                val mask = board.gapMask()
+                fun brightness(): Pair<Int, Int> {
+                    // Isolate the source: neighbours have an intentionally later
+                    // fade, and their overlapping halos should not count here.
+                    val cell = board.bounds(key)
+                    val cap = Rect(cell).apply { inset(key.hMargin, key.vMargin) }
+                    board.effect.setSamKeyGeometry(listOf(SamKeyLightField.KeyGeometry(key.id, cap, cell)))
+                    val frame = board.motionFrame(key)
+                    return try {
+                        intensity(frame.actualCapColour) to gapLevels(frame.image, mask).peak
+                    } finally { frame.image.recycle() }
+                }
                 board.touch("f", MotionEvent.ACTION_DOWN)
+                assertTrue("The face gives feedback on the very first frame", brightness().first >= 30)
                 board.go(50)
                 board.touch("f", MotionEvent.ACTION_UP, 0)
-                board.go(1200)
-                val frame = board.motionFrame(board.letters.getValue("f"))
-                try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
+                // Observe the common fade after the longer halo ignition has finished.
+                board.go(180)
+                val (capStart, haloStart) = brightness()
+                assertTrue("The source and cap both light up", capStart >= 30 && haloStart >= 30)
+                board.go(180 + fade / 2)
+                val (capMid, haloMid) = brightness()
+                val capFraction = capMid.toFloat() / capStart
+                val haloFraction = haloMid.toFloat() / haloStart
+                assertEquals("The key cap is halfway through its ${fade}ms fade", 0.5f, capFraction, 0.12f)
+                assertEquals("The source halo tracks the cap through its ${fade}ms fade", capFraction, haloFraction, 0.12f)
+                board.go(180 + fade)
+                assertEquals("Cap and source both finish at the configured cutoff", 0 to 0, brightness())
             }
         }
-        // The cap's own colour is gone; only the last of the fading pool shows through the glass.
-        assertTrue("A short selected Sam tail has fully ended: ${samples[0]}", samples[0] <= 8)
-        assertTrue("A long selected Sam tail is still visibly coloured", samples[1] >= 25)
-        assertEquals(30, ThemeManager.prefs.pressKeyHoldTime.getValue())
-        assertEquals(100, ThemeManager.prefs.pressKeyRetreatTime.getValue())
     }
 
     @Test
-    fun oldModesRemainVisuallyDistinctAndDisabledOrDetachedSamStopsDrawing() {
-        val frames = ThemePrefs.RippleShape.entries.associateWith { shape ->
+    fun actualSamLetterAndBackspaceStayLitUntilLiftAndThenFade() {
+        Keyboard(ThemePrefs.RippleShape.Sam, configure = {
+            it.pressGlowBrightness.setValue(0)
+            it.pressWaveHoldTime.setValue(40)
+            it.pressFadeOutTime.setValue(900)
+        }).use { board ->
+            for ((name, key) in listOf("G" to board.letters.getValue("g"), "Backspace" to board.keyboard.backspace)) {
+                val downAt = board.elapsed
+                fun capBrightness(): Int {
+                    val frame = board.motionFrame(key, hideLegends = true)
+                    return try { intensity(frame.actualCapColour) } finally { frame.image.recycle() }
+                }
+                board.touch(key, MotionEvent.ACTION_DOWN, downAt)
+                val initial = capBrightness()
+                assertTrue("$name gives immediate key-face feedback even with the gutter light disabled", initial >= 30)
+                for (age in listOf(900L, 1700L)) {
+                    board.go(downAt + age)
+                    val held = capBrightness()
+                    assertTrue("$name holds around 35% brightness at ${age}ms: $held/$initial",
+                        held >= initial * 0.30f && held <= initial * 0.40f)
+                }
+                board.go(downAt + 1800)
+                val beforeLift = capBrightness()
+                assertTrue("$name is still lit right before UP", beforeLift >= initial * 0.30f)
+                board.touch(key, MotionEvent.ACTION_UP, downAt)
+                val afterLift = capBrightness()
+                assertTrue("$name does not visibly jump at UP: $beforeLift/$afterLift",
+                    abs(beforeLift - afterLift) <= 2)
+                board.go(downAt + 1940)
+                val retreat = capBrightness()
+                assertTrue("$name gently fades after UP: $afterLift/$retreat", retreat in 1 until afterLift)
+                board.go(downAt + 2799)
+                assertEquals("$name is fully black less than one second after UP", 0, capBrightness())
+            }
+        }
+    }
+
+    @Test
+    fun restoringOldModesStillDrawsSamAndDisabledOrDetachedSamStopsDrawing() {
+        for (shape in ThemePrefs.RippleShape.entries) {
             Keyboard(shape).use { board ->
+                assertEquals("Restoring $shape must still select the SAM renderer", ThemePrefs.RippleShape.Sam,
+                    ReflectionHelpers.getField<ThemePrefs.RippleShape>(board.effect, "rippleShape"))
                 board.touch("f", MotionEvent.ACTION_DOWN)
                 board.go(50)
                 board.touch("f", MotionEvent.ACTION_UP, 0)
                 board.go(250)
-                board.frame().also { save(it, "mode-${shape.name}-250ms") }
+                val frame = board.frame()
+                try {
+                    assertTrue("Restoring $shape must still render colour",
+                        (0 until frame.height).any { y ->
+                            (0 until frame.width).any { x -> coloured(frame.getPixel(x, y)) }
+                        })
+                } finally { frame.recycle() }
             }
         }
-        try {
-            frames.values.toList().let { images ->
-                for (i in images.indices) for (j in i + 1 until images.size)
-                    assertFalse("Each mode must produce visibly different actual keyboard pixels", images[i].sameAs(images[j]))
-            }
-        } finally { frames.values.forEach(Bitmap::recycle) }
         Keyboard(ThemePrefs.RippleShape.Sam).use { board ->
             board.touch("f", MotionEvent.ACTION_DOWN)
             board.go(50)

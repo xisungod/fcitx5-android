@@ -98,7 +98,9 @@ class V15PreviewRenderingTest {
         // registered ThemePrefs from another test class, backed by a different file.
         // Reset that actual file rather than leaving a previous palette/timing fixture active.
         ThemeManager.prefs.pressEffect.sharedPreferences.edit().clear().commit()
-        ThemeManager.prefs.rippleShape.setValue(ThemePrefs.RippleShape.SoftMist)
+        // This suite keeps the historical SoftMist/full-wheel rendering fixture.
+        // The default Sam palette is covered by its own preference and keyboard tests.
+        ThemeManager.prefs.pressEffectPalette.setValue(ThemePrefs.PressEffectPalette.Cyberpunk)
         assertEquals(ThemePrefs.PressColorMode.Random, ThemeManager.prefs.pressColorMode.getValue())
         assertEquals(ThemePrefs.PressEffectPalette.Cyberpunk, ThemeManager.prefs.pressEffectPalette.getValue())
     }
@@ -301,7 +303,8 @@ class V15PreviewRenderingTest {
     private fun defaultSoftTiming(): EffectTiming {
         val prefs = ThemeManager.prefs
         val timing = EffectTiming(prefs.pressIgnitionTime.getValue().toLong(),
-            prefs.pressExpansionTime.getValue().toLong(), prefs.pressWaveHoldTime.getValue().toLong(),
+            prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.SoftMist).toLong(),
+            prefs.pressWaveHoldTime.getValue().toLong(),
             prefs.pressFadeOutTime.getValue().toLong(), prefs.pressKeyHoldTime.getValue().toLong(),
             prefs.pressKeyRetreatTime.getValue().toLong())
         assertEquals("Use the APK's current extended default wave tail", 1380L, timing.waveTotal)
@@ -407,7 +410,7 @@ class V15PreviewRenderingTest {
         val bar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
         bar.addView(candidates.root, FrameLayout.LayoutParams(600, 60))
         root.addView(bar, FrameLayout.LayoutParams(600, 60))
-        val keyboard = TextKeyboard(activity, theme)
+        val keyboard = TextKeyboard(activity, theme, useEffectTheme = false)
         root.addView(keyboard, FrameLayout.LayoutParams(600, 360).apply { topMargin = 60 })
         bar.keyboard = keyboard
         val previews = PreviewHost(root)
@@ -680,7 +683,7 @@ class V15PreviewRenderingTest {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
         val activity = controller.get()
         activity.setTheme(R.style.Theme_InputViewTheme)
-        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
+        val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
         activity.setContentView(keyboard)
         controller.visible()
         advance(32)
@@ -783,7 +786,7 @@ class V15PreviewRenderingTest {
             activity.setTheme(R.style.Theme_InputViewTheme)
             val root = FrameLayout(activity)
             activity.setContentView(root)
-            val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
+            val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
             root.addView(keyboard, FrameLayout.LayoutParams(600, 360))
             keyboard.keyActionListener = KeyActionListener { _, _ -> }
             val previews = PreviewHost(root)
@@ -873,7 +876,7 @@ class V15PreviewRenderingTest {
         val bar = RippleBarView(activity).apply { setBackgroundColor(Color.BLACK) }
         bar.addView(candidates.root, FrameLayout.LayoutParams(600, 60))
         root.addView(bar, FrameLayout.LayoutParams(600, 60))
-        val keyboard = TextKeyboard(activity, theme)
+        val keyboard = TextKeyboard(activity, theme, useEffectTheme = false)
         root.addView(keyboard, FrameLayout.LayoutParams(600, 360).apply { topMargin = 60 })
         bar.keyboard = keyboard
         val previews = PreviewHost(root)
@@ -1035,7 +1038,7 @@ class V15PreviewRenderingTest {
             activity.setTheme(R.style.Theme_InputViewTheme)
             val root = FrameLayout(activity)
             activity.setContentView(root)
-            val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09)
+            val keyboard = TextKeyboard(activity, ThemePreset.XuancaiBlackV09, useEffectTheme = false)
             root.addView(keyboard, FrameLayout.LayoutParams(600, keyboardHeight))
             val previews = PreviewHost(root)
             keyboard.popupActionListener = previews.listener
@@ -1270,7 +1273,7 @@ class V15PreviewRenderingTest {
                 addView(CandidateUi(activity, theme, list).root, FrameLayout.LayoutParams(600, 60))
                 root.addView(this, FrameLayout.LayoutParams(600, 60))
             } else null
-            val keyboard = TextKeyboard(activity, theme)
+            val keyboard = TextKeyboard(activity, theme, useEffectTheme = false)
             root.addView(keyboard, FrameLayout.LayoutParams(600, keyboardHeight).apply { topMargin = barHeight })
             bar?.keyboard = keyboard
             val previews = PreviewHost(root)

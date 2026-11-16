@@ -36,10 +36,12 @@ import java.util.Date
 class TypingSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().keyboard) {
     private val viewModel: MainViewModel by activityViewModels()
     private val dictionaryImport = RimeDictionaryImportUi(this)
+    private val moegirlDictionary = RimeMoegirlDictionaryUi(this)
     private val touchDiagnostics = TouchDiagnosticSettingsControls(this)
 
     override fun onPreferenceUiCreated(screen: PreferenceScreen) {
         dictionaryImport.attach(screen, viewModel)
+        moegirlDictionary.attach(screen, viewModel)
         touchDiagnostics.attach(screen)
         screen.addPreference(Preference(requireContext()).apply {
             key = KeyboardPreferenceSections.NEXT_WORD_PREDICTION_HELP_KEY

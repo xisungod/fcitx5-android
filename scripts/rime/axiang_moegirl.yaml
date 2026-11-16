@@ -1,0 +1,3 @@
+# Disabled by default. An explicit import can add an independent translator.
+qwerty: {}
+t9: {}

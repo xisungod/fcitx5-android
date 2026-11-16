@@ -17,21 +17,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 class ThemePrefs(sharedPreferences: SharedPreferences) :
     ManagedPreferenceCategory(R.string.theme, sharedPreferences) {
 
-    fun applySamDefaultOnce() {
-        // The requested dev.6 default also applies to upgrades once. Later mode
-        // choices survive process restarts, further updates, and backup restores.
-        if (!sharedPreferences.getBoolean("sam_mode_default_applied", false)) {
-            sharedPreferences.edit {
-                putString("ripple_shape", "Sam")
-                putBoolean("sam_mode_default_applied", true)
-            }
-        }
-    }
-
-    // Include the migration stamp in preference backups and device-protected storage.
-    private val samDefaultApplied = ManagedPreference.PBool(sharedPreferences, "sam_mode_default_applied", false)
-        .also { it.register() }
-
     private fun themePreference(
         @StringRes
         title: Int,
@@ -62,6 +47,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val keyRippleEffect = switch(R.string.key_ripple_effect, "key_ripple_effect", false)
 
     enum class PressEffectPalette(override val stringRes: Int) : ManagedPreferenceEnum {
+        NeonDistrict(R.string.cyber_palette_neon_district),
+        AcidCircuit(R.string.cyber_palette_acid_circuit),
         SamsungCool(R.string.cyber_palette_cyan_blue_purple),
         Cyberpunk(R.string.press_effect_palette_cyberpunk),
         RedOrangeYellow(R.string.cyber_palette_red_orange_yellow),
@@ -119,7 +106,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     )
 
     val idleBreathing = switch(
-        R.string.idle_breathing, "idle_breathing", true, R.string.idle_breathing_summary
+        R.string.idle_breathing, "idle_breathing", false, R.string.idle_breathing_summary
     )
 
     enum class NeonColor(override val stringRes: Int, val argb: Int) : ManagedPreferenceEnum {
@@ -181,7 +168,8 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     val pressEffectPalette = enumList(
         R.string.press_effect_palette,
         "press_effect_palette",
-        PressEffectPalette.Cyberpunk,
+        // Existing explicit palette choices are kept. Otherwise use the mixed neon set.
+        PressEffectPalette.NeonDistrict,
         enableUiOn = { pressEffect.getValue() && pressColorMode.getValue() == PressColorMode.Random }
     )
 
@@ -247,7 +235,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     )
 
     val pressGlowReach = int(
-        R.string.press_glow_reach, "press_glow_reach", 100, 20, 100, "%", 5,
+        R.string.press_glow_reach, "press_glow_reach", 100, 20, 150, "%", 5,
         enableUiOn = { pressEffect.getValue() }
     )
     val pressGlowOnCandidates = switch(
@@ -260,44 +248,37 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         enableUiOn = { pressEffect.getValue() }
     )
 
-    val rippleShape = enumList(
-        R.string.ripple_shape, "ripple_shape", RippleShape.Sam,
-        enableUiOn = { pressEffect.getValue() }
-    )
+    // Preserve old backup data without letting a restored shape select a renderer.
+    val rippleShape = ManagedPreference.PStringLike(
+        sharedPreferences, "ripple_shape", RippleShape.Sam,
+        object : ManagedPreference.StringLikeCodec<RippleShape> {
+            override fun decode(raw: String): RippleShape = enumValueOf(raw)
+        }
+    ).also { it.register() }
 
-    val pressIgnitionTime = int(
-        R.string.press_ignition_time, "press_ignition_time", 40, 30, 300, "ms", 10,
-        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() != RippleShape.Sam }
-    )
+    // Legacy layout previews read these values; they are no longer user-facing controls.
+    val pressIgnitionTime = ManagedPreference.PInt(sharedPreferences, "press_ignition_time", 40)
+        .also { it.register() }
+    val pressKeyHoldTime = ManagedPreference.PInt(sharedPreferences, "press_key_hold_time", 50)
+        .also { it.register() }
+    val pressKeyRetreatTime = ManagedPreference.PInt(sharedPreferences, "press_key_retreat_time", 100)
+        .also { it.register() }
 
-    val pressKeyHoldTime = int(
-        R.string.press_key_hold_time, "press_key_hold_time", 50, 20, 1000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() != RippleShape.Sam }
-    )
-
-    val pressKeyRetreatTime = int(
-        // Existing installs without an explicit value pick up the softer default.
-        // Preserve every saved value, including a deliberately chosen 30ms.
-        R.string.press_key_retreat_time, "press_key_retreat_time", 100, 20, 5000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() != RippleShape.Sam }
-    )
-
-    // Sam leaves an independent colour tail after release; saved mist/fluid timings
-    // remain untouched when switching modes or upgrading an existing installation.
-    val samKeyHoldTime = int(
-        R.string.sam_key_hold_time, "sam_key_hold_time", 80, 0, 1000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() == RippleShape.Sam }
-    )
-
-    val samKeyRetreatTime = int(
-        R.string.sam_key_retreat_time, "sam_key_retreat_time", 800, 100, 5000, "ms", 10,
-        enableUiOn = { pressEffect.getValue() && rippleShape.getValue() == RippleShape.Sam }
-    )
+    // Preserve the previous independent SAM timings when reading or restoring backups.
+    val samKeyHoldTime = ManagedPreference.PInt(sharedPreferences, "sam_key_hold_time", 80)
+        .also { it.register() }
+    val samKeyRetreatTime = ManagedPreference.PInt(sharedPreferences, "sam_key_retreat_time", 800)
+        .also { it.register() }
 
     val pressExpansionTime = int(
-        R.string.press_expansion_time, "press_expansion_time", 400, 100, 4000, "ms", 50,
+        R.string.press_expansion_time, "press_expansion_time", 550, 100, 4000, "ms", 50,
         enableUiOn = { pressEffect.getValue() }
     )
+
+    fun pressExpansionTimeFor(shape: RippleShape): Int =
+        if (shape == RippleShape.Sam || sharedPreferences.contains(pressExpansionTime.key))
+            pressExpansionTime.getValue()
+        else 400
 
     val pressWaveHoldTime = int(
         R.string.press_wave_hold_time, "press_wave_hold_time", 40, 0, 2000, "ms", 10,
@@ -306,7 +287,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
 
     val pressFadeOutTime = int(
         // Unset timings receive the longer tail; saved 520ms and custom values stay intact.
-        R.string.press_fade_out_time, "press_fade_out_time", 900, 100, 5000, "ms", 50,
+        R.string.light_effect_fade_duration, "press_fade_out_time", 900, 100, 5000, "ms", 20,
         enableUiOn = { pressEffect.getValue() }
     )
 

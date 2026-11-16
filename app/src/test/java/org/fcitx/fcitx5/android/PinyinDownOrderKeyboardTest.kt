@@ -25,6 +25,8 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.KeyView
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.RimeActions
+import org.fcitx.fcitx5.android.input.keyboard.typing.PinyinTouchProfile
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -160,6 +162,9 @@ class PinyinDownOrderKeyboardTest {
             restore += { if (existed) pref.setValue(old) else pref.sharedPreferences.edit().remove(pref.key).commit(); Unit }
             pref.setValue(value)
         }
+
+        fun personalize(enabled: Boolean) =
+            setting(AppPrefs.getInstance().keyboard.pinyinTouchPersonalization, enabled)
 
         private fun keys(view: View = keyboard): List<KeyView> = when (view) {
             is KeyView -> listOf(view)
@@ -667,6 +672,56 @@ class PinyinDownOrderKeyboardTest {
             assertEquals(listOf("l", "g"), h.typed)
             assertNull(h.actions.filterIsInstance<KeyAction.FcitxKeyAction>().last().pinyinTapEvidence)
             assertEquals("settle", h.traces.single().getJSONArray("decisions").getJSONObject(0).getString("mode"))
+        }
+    }
+
+    @Test fun learnedPinyinBoundaryUsesEnoughEvidenceWithoutMovingTheKeys() {
+        Harness(ordered = false, alternatives = true).use { h ->
+            val fullPinyin = chinese().copy(subMode = InputMethodSubMode(RimeActions.FULL_PINYIN_SCHEMA,
+                "中", "fcitx_rime"))
+            h.keyboard.onInputMethodUpdate(fullPinyin)
+            h.personalize(true)
+            val profile = PinyinTouchProfile()
+            var signature: String? = null
+            h.keyboard.pinyinHitOffsets = { cells, density ->
+                signature = PinyinTouchProfile.layoutSignature(cells, density)
+                profile.offsets(cells, density)
+            }
+            val g = h.bounds("G")
+            val hKey = h.bounds("H")
+            val edge = Finger(7, g.right - .5f, g.exactCenterY())
+            assertEquals(g.right, hKey.left)
+            fun tap(finger: Finger): KeyAction.FcitxKeyAction {
+                h.event(MotionEvent.ACTION_DOWN, finger)
+                h.event(MotionEvent.ACTION_UP, finger)
+                return h.actions.filterIsInstance<KeyAction.FcitxKeyAction>().last()
+            }
+            assertEquals("g", tap(edge).act)
+            fun teach() {
+                for (letter in "gh") assertTrue(profile.observeConfirmed(
+                    PinyinTouchProfile.ConfirmedSample(checkNotNull(signature), letter, -.4, 0.0)))
+            }
+            repeat(PinyinTouchProfile.MINIMUM_CONFIRMED_COUNT - 1) { teach() }
+            assertEquals("g", tap(edge).act)
+            teach()
+            val learned = tap(edge)
+            assertEquals("h", learned.act)
+            assertTrue(learned.pinyinTapEvidence!!.personalizedBoundary)
+            assertEquals(edge.x, learned.pinyinTapEvidence!!.tap.downX, 0f)
+            assertEquals("g", tap(h.center("G")).act)
+            assertEquals(g, h.bounds("G"))
+            assertEquals(hKey, h.bounds("H"))
+
+            h.editor = EditorInfo().apply {
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
+            assertEquals("Password fields keep literal hit targets", "g", tap(edge).act)
+            h.editor = EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT }
+            h.keyboard.onInputMethodUpdate(english())
+            assertEquals("English keeps literal hit targets", "g", tap(edge).act)
+            h.keyboard.onInputMethodUpdate(fullPinyin)
+            h.personalize(false)
+            assertEquals("Disabling personalization restores literal hits immediately", "g", tap(edge).act)
         }
     }
 

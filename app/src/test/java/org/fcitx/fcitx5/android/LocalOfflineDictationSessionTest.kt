@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 package org.fcitx.fcitx5.android
 
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -37,7 +38,11 @@ class LocalOfflineDictationSessionTest {
     }
 
     private fun waitFor(session: OfflineDictationSession, phase: OfflineDictationPhase) = runBlocking {
-        withTimeout(3_000) { session.state.first { it.phase == phase } }
+        try {
+            withTimeout(3_000) { session.state.first { it.phase == phase } }
+        } catch (timeout: TimeoutCancellationException) {
+            throw AssertionError("Expected $phase; actual=${session.state.value}", timeout)
+        }
     }
 
     private fun session(

@@ -80,7 +80,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val keyboards: HashMap<String, BaseKeyboard> by lazy {
         hashMapOf(
-            TextKeyboard.Name to TextKeyboard(context, theme),
+            TextKeyboard.Name to TextKeyboard(context, theme).apply {
+                pinyinHitOffsets = commonKeyActionListener::personalizedHitOffsets
+            },
             PinyinT9Keyboard.Name to PinyinT9Keyboard(context, theme),
             NumberKeyboard.Name to NumberKeyboard(context, theme)
         )

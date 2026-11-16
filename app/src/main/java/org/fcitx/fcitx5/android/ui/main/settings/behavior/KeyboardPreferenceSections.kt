@@ -17,6 +17,8 @@ internal object KeyboardPreferenceSections {
 
     const val APPLY_TYPING_KEY = "axiang_apply_typing"
     const val DICTIONARY_IMPORT_KEY = "rime_personal_dictionary_import"
+    const val MOEGIRL_IMPORT_KEY = "rime_moegirl_import"
+    const val MOEGIRL_ENABLE_KEY = "rime_moegirl_enable"
     const val TOUCH_DIAGNOSTIC_STATUS_KEY = "touch_diagnostic_status"
     const val TOUCH_DIAGNOSTIC_EXPORT_KEY = "touch_diagnostic_export"
     const val TOUCH_DIAGNOSTIC_CLEAR_KEY = "touch_diagnostic_clear"
@@ -56,7 +58,7 @@ internal object KeyboardPreferenceSections {
             Section(Page.Typing, "typing_fuzzy", R.string.axiang_typing_fuzzy,
                 listOf(rimeFuzzyNl.key, rimeFuzzyZh.key, rimeFuzzyAng.key, APPLY_TYPING_KEY)),
             Section(Page.Typing, "typing_dictionary", R.string.axiang_typing_dictionary,
-                listOf(DICTIONARY_IMPORT_KEY)),
+                listOf(DICTIONARY_IMPORT_KEY, MOEGIRL_ENABLE_KEY, MOEGIRL_IMPORT_KEY)),
             Section(Page.Typing, "typing_candidates", R.string.axiang_typing_candidates,
                 listOf(horizontalCandidateStyle.key, expandedCandidateStyle.key,
                     expandedCandidateGridSpanCount.key)),

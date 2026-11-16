@@ -64,6 +64,7 @@ for name, target in [
     ('xuancai_user.schema.yaml', 'xuancai_user.schema.yaml'),
     ('rime_ice_t9.schema.yaml', 'rime_ice_t9.schema.yaml'),
     ('xuancai_user_t9.schema.yaml', 'xuancai_user_t9.schema.yaml'),
+    ('axiang_moegirl.yaml', 'axiang_moegirl.yaml'),
 ]:
     (stage / target).write_bytes((extension_dir / name).read_bytes())
 
@@ -79,7 +80,7 @@ schema = schema.replace('    - script_translator\n', '    - script_translator\n 
 schema += '\nxuancai_correction:\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: true\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n  spelling_hints: 32\n  always_show_comments: true\n  initial_quality: 0.2\n'
 schema += '\nxuancai_exact:\n  spelling_hints: 32\n  always_show_comments: true\n  dictionary: rime_ice\n  prism: rime_ice\n  enable_correction: false\n  enable_user_dict: false\n  enable_completion: false\n  enable_word_completion: false\n'
 schema += '\nxuancai_user:\n  dictionary: xuancai_user\n  enable_completion: false\n  enable_word_completion: false\n  enable_sentence: false\n  enable_user_dict: false\n  initial_quality: 1.1\n'
-schema += '\n# Xuancai mobile settings (user copy takes precedence).\n__patch: xuancai_mobile:/patch\ngrammar:\n  language: zh-hans-t-essay-bgw-compact\n'
+schema += '\n# Mobile settings and the optional local dictionary (user copies take precedence).\n__patch: [xuancai_mobile:/patch, axiang_moegirl:/qwerty]\ngrammar:\n  language: zh-hans-t-essay-bgw-compact\n'
 schema_path.write_text(schema)
 for script in ['xuancai_correction.lua', 'xuancai_ascii.lua', 'axiang_typo_index.lua', 'axiang_qwerty_neighbors.lua']:
     (stage / 'lua' / script).write_bytes((Path(__file__).parent / 'rime' / script).read_bytes())

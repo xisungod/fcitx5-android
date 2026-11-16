@@ -12,6 +12,15 @@ object PressColorPalette {
     const val MAX_COLORS = 8
     private val rgb = Regex("[0-9a-fA-F]{6}")
 
+    val NEON_DISTRICT = intArrayOf(
+        0xFFFF2BD6.toInt(), 0xFF00F0FF.toInt(), 0xFFC6FF00.toInt(),
+        0xFFFF5A1F.toInt(), 0xFF8B5CFF.toInt(), 0xFF2D7BFF.toInt(), 0xFF00FFA3.toInt()
+    )
+    val ACID_CIRCUIT = intArrayOf(
+        0xFFE6FF2C.toInt(), 0xFFAAFF24.toInt(), 0xFF61FF24.toInt(),
+        0xFF1EFF67.toInt(), 0xFF1EFFAF.toInt(), 0xFF1EFFF1.toInt()
+    )
+
     /** Full neon hue wheel: cyan/blue/violet/pink/red/orange/yellow/lime/green/mint. */
     val CYBERPUNK = intArrayOf(
         0xFF00EFFF.toInt(), 0xFF00B8FF.toInt(), 0xFF0075FF.toInt(), 0xFF344BFF.toInt(),
@@ -22,7 +31,7 @@ object PressColorPalette {
     )
 
     /** Narrow neon hue paths. Their ends are not neighbours, so selection reflects at either end. */
-    val CYAN_BLUE_PURPLE = intArrayOf(0xFF00F0FF.toInt(), 0xFF00B8FF.toInt(), 0xFF0075FF.toInt(),
+    val CYAN_BLUE_PURPLE = intArrayOf(0xFF24FF83.toInt(), 0xFF00F0FF.toInt(), 0xFF00B8FF.toInt(), 0xFF0075FF.toInt(),
         0xFF334BFF.toInt(), 0xFF7028FF.toInt(), 0xFFB126FF.toInt())
     val RED_ORANGE_YELLOW = intArrayOf(0xFFFF243F.toInt(), 0xFFFF3824.toInt(), 0xFFFF6320.toInt(),
         0xFFFF8A1F.toInt(), 0xFFFFB521.toInt(), 0xFFFFED25.toInt())
@@ -42,6 +51,8 @@ object PressColorPalette {
         0xFF7B6CFF.toInt(), 0xFFE0B3FF.toInt())
 
     val recommendedPresets = linkedMapOf(
+        ThemePrefs.PressEffectPalette.NeonDistrict to NEON_DISTRICT,
+        ThemePrefs.PressEffectPalette.AcidCircuit to ACID_CIRCUIT,
         ThemePrefs.PressEffectPalette.SamsungCool to CYAN_BLUE_PURPLE,
         ThemePrefs.PressEffectPalette.RedOrangeYellow to RED_ORANGE_YELLOW,
         ThemePrefs.PressEffectPalette.PurplePinkRed to PURPLE_PINK_RED,

@@ -208,7 +208,7 @@ class KeyWidthControlsTest {
         assertEquals(125, KeyWidthSettings.parse(prefs.keyWidthOverrides.getValue())["T9:5"])
     }
 
-    @Test fun editorSelectsIndividualKeysStagesWidthsAndSwitchesBreathingWithTheEffectMode() {
+    @Test fun editorSelectsIndividualKeysStagesWidthsAndOffersOptionalSamBreathing() {
         val controller = Robolectric.buildActivity(ComponentActivity::class.java).also {
             it.get().setTheme(R.style.Theme_InputViewTheme)
         }.setup()
@@ -226,10 +226,11 @@ class KeyWidthControlsTest {
             ui.root.findViewWithTag<View>("quick_open_effects").performClick()
             layout(container, 360, 650)
             val breathing = ui.root.findViewWithTag<SwitchCompat>("quick_idle_breathing")
-            assertFalse("Default sam idle must remain black", breathing.isEnabled)
-            ui.root.findViewWithTag<Spinner>("quick_ripple_shape").setSelection(ThemePrefs.RippleShape.SoftMist.ordinal)
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(32))
             assertTrue(breathing.isEnabled)
+            assertFalse("Default SAM idle must remain black", breathing.isChecked)
+            breathing.performClick()
+            assertTrue(draft.values.idleBreathing)
+            assertFalse(storage.contains("idle_breathing"))
             ui.root.findViewWithTag<View>("quick_page_back").performClick()
             ui.root.findViewWithTag<View>("quick_key_width_expand").performClick()
             layout(container, 360, 650)

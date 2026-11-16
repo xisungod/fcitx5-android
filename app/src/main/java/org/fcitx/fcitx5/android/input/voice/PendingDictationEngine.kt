@@ -13,12 +13,25 @@ internal class PendingDictationEngine(factory: () -> DictationSpeechEngine) : Ru
     private val lock = Any()
     private var abandoned = false
     private var claimed = false
+    private var started = false
     private val future = object : FutureTask<DictationSpeechEngine>({ factory() }) {
         override fun done() = releaseAbandoned()
     }
 
     val isDone: Boolean get() = future.isDone
-    override fun run() = future.run()
+    override fun run() {
+        synchronized(lock) {
+            if (started) return
+            started = true
+            if (abandoned) {
+                // Only cancel before run starts. Cancelling an already-running native
+                // factory would discard its late result and lose our cleanup ownership.
+                future.cancel(false)
+                return
+            }
+        }
+        future.run()
+    }
 
     /** A short wait lets cancellation return without waiting for native construction. */
     fun await(stillCurrent: () -> Boolean): DictationSpeechEngine? {

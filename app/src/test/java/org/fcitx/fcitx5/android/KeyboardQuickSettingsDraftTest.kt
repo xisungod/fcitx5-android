@@ -64,14 +64,14 @@ class KeyboardQuickSettingsDraftTest {
         val keyboard = AppPrefs(stored).keyboard
         val canceled = KeyboardQuickSettingsDraft(theme, keyboard)
         canceled.values = canceled.values.copy(pressEffect = false, hapticStrength = 0, numberRow = false,
-            rippleShape = ThemePrefs.RippleShape.IrregularFluid,
+            idleBreathing = true,
             motionSettings = KeyMotionSettings(16, 300, 6, 1800))
         assertTrue(stored.all.isEmpty())
         val reopened = KeyboardQuickSettingsDraft(theme, keyboard)
         assertTrue(reopened.values.pressEffect)
         assertTrue(reopened.values.numberRow)
         assertEquals(100, reopened.values.hapticStrength)
-        assertEquals(ThemePrefs.RippleShape.Sam, reopened.values.rippleShape)
+        assertFalse(reopened.values.idleBreathing)
         assertEquals(KeyMotionSettings(), reopened.values.motionSettings)
         assertFalse(reopened.apply())
         assertEquals(0, stored.edits)
@@ -86,8 +86,7 @@ class KeyboardQuickSettingsDraftTest {
         val keyboard = AppPrefs(stored).keyboard
         val draft = KeyboardQuickSettingsDraft(theme, keyboard)
         draft.values = draft.values.copy(pressEffect = false, glowBrightness = 35,
-            rippleShape = ThemePrefs.RippleShape.IrregularFluid,
-            glowReach = 45, keyRetreatTime = 220, candidateGlow = false, idleBreathing = false,
+            glowReach = 45, fadeDuration = 220, candidateGlow = false, idleBreathing = true,
             keyMotion = ThemePrefs.KeyMotionEffect.Bounce, numberRow = false, popup = false,
             hapticMode = InputFeedbackMode.Enabled, hapticStrength = 0,
             motionSettings = KeyMotionSettings(pressAmplitude = 14, pressDuration = 260,
@@ -104,8 +103,8 @@ class KeyboardQuickSettingsDraftTest {
             assertEquals(0, keyboard.hapticStrength.getValue())
             assertEquals(InputFeedbackMode.Enabled, keyboard.hapticOnKeyPress.getValue())
             assertEquals(ThemePrefs.KeyMotionEffect.Bounce, theme.keyMotionEffect.getValue())
-            assertEquals(220, theme.pressKeyRetreatTime.getValue())
-            assertEquals(ThemePrefs.RippleShape.IrregularFluid, theme.rippleShape.getValue())
+            assertEquals(220, theme.pressFadeOutTime.getValue())
+            assertTrue(theme.idleBreathing.getValue())
             assertEquals(14, theme.pressMotionAmplitude.getValue())
             assertEquals(260, theme.pressMotionDuration.getValue())
             assertEquals(5, theme.reboundMotionAmplitude.getValue())
@@ -171,7 +170,7 @@ class KeyboardQuickSettingsDraftTest {
         assertEquals(1, theme.reboundMotionAmplitude.getValue())
         assertEquals(400, theme.reboundMotionDuration.getValue())
 
-        draft.values = draft.values.copy(glowBrightness = 35, keyRetreatTime = 250,
+        draft.values = draft.values.copy(glowBrightness = 35, fadeDuration = 250,
             keyMotion = ThemePrefs.KeyMotionEffect.Bounce, popup = false,
             colorMode = ThemePrefs.PressColorMode.Single,
             motionSettings = KeyMotionSettings(12, 240, 5, 1500))
@@ -187,7 +186,7 @@ class KeyboardQuickSettingsDraftTest {
         assertEquals(2, stored.applies)
         assertEquals(KeyMotionSettings(), KeyboardQuickSettingsDraft(theme, keyboard).values.motionSettings)
         assertEquals(35, theme.pressGlowBrightness.getValue())
-        assertEquals(250, theme.pressKeyRetreatTime.getValue())
+        assertEquals(250, theme.pressFadeOutTime.getValue())
         assertEquals(ThemePrefs.KeyMotionEffect.Bounce, theme.keyMotionEffect.getValue())
         assertFalse(keyboard.popupOnKeyPress.getValue())
         assertFalse(draft.apply())
@@ -219,54 +218,30 @@ class KeyboardQuickSettingsDraftTest {
         assertArrayEquals(intArrayOf(0xFF18FFC1.toInt(), 0xFFD96EFF.toInt()), PressColorPalette.colorsFor(theme, 0))
     }
 
-    @Test fun shapeChangesAreStagedReversibleAndDoNotReplaceCustomColors() {
-        val stored = storage("quick-shape")
-        val theme = ThemePrefs(stored)
-        val keyboard = AppPrefs(stored).keyboard
-        theme.pressColorMode.setValue(ThemePrefs.PressColorMode.Custom)
-        theme.pressUserColors.setValue("#18FFC1,#D96EFF")
-        val draft = KeyboardQuickSettingsDraft(theme, keyboard)
-        assertEquals(ThemePrefs.RippleShape.Sam, draft.values.rippleShape)
-        draft.values = draft.values.copy(rippleShape = ThemePrefs.RippleShape.IrregularFluid)
-        assertEquals("Selection alone must not rebuild the keyboard", ThemePrefs.RippleShape.Sam,
-            theme.rippleShape.getValue())
-        draft.apply()
-        val reopened = KeyboardQuickSettingsDraft(ThemePrefs(stored), AppPrefs(stored).keyboard)
-        assertEquals(ThemePrefs.RippleShape.IrregularFluid, reopened.values.rippleShape)
-        reopened.values = reopened.values.copy(rippleShape = ThemePrefs.RippleShape.SoftMist)
-        reopened.apply()
-        assertEquals(ThemePrefs.RippleShape.SoftMist, theme.rippleShape.getValue())
-        assertEquals(ThemePrefs.PressColorMode.Custom, theme.pressColorMode.getValue())
-        assertEquals("#18FFC1,#D96EFF", theme.pressUserColors.getValue())
-    }
-
-    @Test fun samAndLegacyColourEditsStayIndependentAcrossModeChangesAndConcurrentUpdates() {
+    @Test fun sharedFadeEditsPreserveLegacyPreferencesAndConcurrentChanges() {
         val stored = storage("quick-sam-colour-timing")
         val theme = ThemePrefs(stored)
         val keyboard = AppPrefs(stored).keyboard
         theme.pressKeyHoldTime.setValue(37)
         theme.pressKeyRetreatTime.setValue(1783)
+        theme.samKeyHoldTime.setValue(190)
+        theme.samKeyRetreatTime.setValue(1573)
         val draft = KeyboardQuickSettingsDraft(theme, keyboard)
-        assertEquals(80, draft.values.samKeyHoldTime)
-        assertEquals(800, draft.values.samKeyRetreatTime)
-        draft.values = draft.values.copy(samKeyHoldTime = 160, samKeyRetreatTime = 1400)
-        draft.values = draft.values.copy(rippleShape = ThemePrefs.RippleShape.SoftMist)
-        draft.values = draft.values.copy(rippleShape = ThemePrefs.RippleShape.Sam)
-        assertEquals("Staging Sam controls cannot persist before Done", 800, theme.samKeyRetreatTime.getValue())
+        assertEquals(900, draft.values.fadeDuration)
+        draft.values = draft.values.copy(fadeDuration = 1400)
+        assertEquals("Staging fade duration cannot persist before Done", 900, theme.pressFadeOutTime.getValue())
         assertTrue(draft.apply())
-        assertEquals(160, theme.samKeyHoldTime.getValue())
-        assertEquals(1400, theme.samKeyRetreatTime.getValue())
+        assertEquals(1400, theme.pressFadeOutTime.getValue())
+        assertEquals(190, theme.samKeyHoldTime.getValue())
+        assertEquals(1573, theme.samKeyRetreatTime.getValue())
         assertEquals(37, theme.pressKeyHoldTime.getValue())
         assertEquals(1783, theme.pressKeyRetreatTime.getValue())
 
         val reopened = KeyboardQuickSettingsDraft(theme, keyboard)
-        reopened.values = reopened.values.copy(rippleShape = ThemePrefs.RippleShape.IrregularFluid,
-            keyRetreatTime = 230)
-        theme.samKeyHoldTime.setValue(190)
-        theme.samKeyRetreatTime.setValue(1573)
+        reopened.values = reopened.values.copy(glowReach = 150)
+        theme.pressFadeOutTime.setValue(1820)
         assertTrue(reopened.apply())
-        assertEquals(230, theme.pressKeyRetreatTime.getValue())
-        assertEquals("Changing another mode preserves a concurrent Sam hold edit", 190, theme.samKeyHoldTime.getValue())
-        assertEquals(1573, theme.samKeyRetreatTime.getValue())
+        assertEquals("Quick settings saves the full SAM reach", 150, theme.pressGlowReach.getValue())
+        assertEquals("Changing reach preserves a concurrent fade edit", 1820, theme.pressFadeOutTime.getValue())
     }
 }

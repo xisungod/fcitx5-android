@@ -7,17 +7,22 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.text.InputType
 import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatButton
+import androidx.appcompat.widget.AppCompatEditText
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.RimeTouchProbe
 import org.fcitx.fcitx5.android.core.RimeTouchProbeStatus
+import org.fcitx.fcitx5.android.input.keyboard.SamFrameTiming
 import org.fcitx.fcitx5.android.ui.common.AXiangSettingsPalette
 import java.util.Locale
 
@@ -40,6 +45,8 @@ internal class TouchProbeSelfCheckUi(private val context: Context, check: () -> 
     }
     val root = ScrollView(context).apply {
         tag = "touch-probe-self-check"
+        isFocusableInTouchMode = true
+        descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
         setBackgroundColor(palette.background)
         addView(content)
         ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
@@ -62,6 +69,8 @@ internal class TouchProbeSelfCheckUi(private val context: Context, check: () -> 
     private val timing = text(size = 14f).apply { tag = "touch-probe-timing" }
     private val counts = text(size = 13f, secondary = true)
     private val failure = text(size = 13f, secondary = true)
+    private val samFrames = text(size = 14f).apply { tag = "sam-frame-timing" }
+    private val samRender = text(size = 14f).apply { tag = "sam-render-timing" }
     private val notice = text(size = 14f, secondary = true).apply {
         tag = "touch-probe-check-notice"
         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -108,7 +117,29 @@ internal class TouchProbeSelfCheckUi(private val context: Context, check: () -> 
         content.addView(notice, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
         content.addView(text(context.getString(R.string.touch_probe_readonly_note), 12f, true),
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
+        card {
+            addView(title(R.string.sam_frame_timing_title))
+            addView(samFrames, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+            addView(samRender, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            addView(AppCompatEditText(context).apply {
+                setHint(R.string.sam_frame_timing_input)
+                inputType = InputType.TYPE_CLASS_TEXT
+                imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+                isSaveEnabled = false
+                setSingleLine()
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            addView(AppCompatButton(context, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
+                tag = "sam-frame-timing-reset"
+                setText(R.string.sam_frame_timing_reset)
+                isAllCaps = false
+                setOnClickListener {
+                    SamFrameTiming.reset()
+                    renderSamTiming(SamFrameTiming.snapshot())
+                }
+            })
+        }
         render(RimeTouchProbe.Diagnostics(null, null, null))
+        renderSamTiming(SamFrameTiming.snapshot())
     }
 
     private fun card(build: LinearLayout.() -> Unit) {
@@ -131,6 +162,16 @@ internal class TouchProbeSelfCheckUi(private val context: Context, check: () -> 
 
     fun setNotice(message: Int?) {
         notice.text = message?.let(context::getString).orEmpty()
+    }
+
+    fun renderSamTiming(snapshot: SamFrameTiming.Snapshot) {
+        samFrames.text = snapshot.averageFrameMs?.let { average ->
+            context.getString(R.string.sam_frame_timing_summary, average, snapshot.framesOver20Ms, snapshot.frameIntervals)
+        } ?: context.getString(R.string.sam_frame_timing_empty)
+        samRender.text = snapshot.averageRenderMs?.let { average ->
+            context.getString(R.string.sam_render_timing_summary, average, snapshot.maxRenderMs,
+                snapshot.rendersOver4Ms, snapshot.renders)
+        }.orEmpty()
     }
 
     fun render(snapshot: RimeTouchProbe.Diagnostics) {

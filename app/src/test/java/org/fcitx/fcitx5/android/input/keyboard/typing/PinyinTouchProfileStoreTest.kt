@@ -32,10 +32,13 @@ class PinyinTouchProfileStoreTest {
         repeat(8) { assertTrue(first.observe(cells, tap, 'n')) }
         val second = PinyinTouchProfileStore(context)
         assertFalse(second.offsets(cells, 1f).isEmpty())
+        assertEquals(second.offsets(cells, 1f), second.hitOffsets(cells, 1f))
         val staleGeneration = first.generation
         PinyinTouchProfileStore.clear(context)
         assertTrue(first.offsets(cells, 1f).isEmpty())
         assertTrue(second.offsets(cells, 1f).isEmpty())
+        assertTrue(first.hitOffsets(cells, 1f).isEmpty())
+        assertTrue(second.hitOffsets(cells, 1f).isEmpty())
         assertFalse(first.observe(cells, tap, 'n', staleGeneration))
         assertEquals(0, second.confirmedSampleCount(cells, 1f, 'n'))
         assertTrue(first.observe(cells, tap, 'n', first.generation))
@@ -58,6 +61,7 @@ class PinyinTouchProfileStoreTest {
         val unavailable = PinyinTouchProfileStore(deviceProtected)
         assertFalse(unavailable.observe(cells, tap, 'n'))
         assertTrue(unavailable.offsets(cells, 1f).isEmpty())
+        assertTrue(unavailable.hitOffsets(cells, 1f).isEmpty())
     }
 
     @Test fun `first unlock background preload restores saved offsets without observing a new tap`() {
@@ -77,6 +81,7 @@ class PinyinTouchProfileStoreTest {
         assertFalse(early.isPreloaded)
         assertFalse(early.preload())
         assertTrue(early.offsets(cells, 1f).isEmpty())
+        assertTrue(early.hitOffsets(cells, 1f).isEmpty())
         manager.setUserUnlocked(true)
         // No implicit disk load in the decision path, even after unlock.
         assertTrue(early.offsets(cells, 1f).isEmpty())
@@ -84,6 +89,7 @@ class PinyinTouchProfileStoreTest {
         assertTrue(early.preload())
         assertTrue(early.isPreloaded)
         assertEquals(expected, early.offsets(cells, 1f))
+        assertEquals(expected, early.hitOffsets(cells, 1f))
         assertEquals(8, early.confirmedSampleCount(cells, 1f, 'n'))
     }
 

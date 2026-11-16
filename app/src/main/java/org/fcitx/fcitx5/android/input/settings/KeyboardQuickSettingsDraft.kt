@@ -18,12 +18,9 @@ internal class KeyboardQuickSettingsDraft(
         val pressEffect: Boolean,
         val colorMode: ThemePrefs.PressColorMode,
         val palette: ThemePrefs.PressEffectPalette,
-        val rippleShape: ThemePrefs.RippleShape,
         val glowBrightness: Int,
         val glowReach: Int,
-        val keyRetreatTime: Int,
-        val samKeyHoldTime: Int,
-        val samKeyRetreatTime: Int,
+        val fadeDuration: Int,
         val candidateGlow: Boolean,
         val idleBreathing: Boolean,
         val keyMotion: ThemePrefs.KeyMotionEffect,
@@ -45,10 +42,9 @@ internal class KeyboardQuickSettingsDraft(
 
     private var original = Values(
         theme.pressEffect.getValue(), theme.pressColorMode.getValue(), theme.pressEffectPalette.getValue(),
-        theme.rippleShape.getValue(),
         theme.pressGlowBrightness.getValue(),
-        theme.pressGlowReach.getValue(), theme.pressKeyRetreatTime.getValue(),
-        theme.samKeyHoldTime.getValue(), theme.samKeyRetreatTime.getValue(),
+        theme.pressGlowReach.getValue(),
+        theme.pressFadeOutTime.getValue(),
         theme.pressGlowOnCandidates.getValue(), theme.idleBreathing.getValue(),
         theme.keyMotionEffect.getValue(), KeyMotionSettings(
             pressAmplitude = theme.pressMotionAmplitude.getValue(),
@@ -87,12 +83,9 @@ internal class KeyboardQuickSettingsDraft(
         bool(theme.pressEffect, original.pressEffect, next.pressEffect)
         if (original.colorMode != next.colorMode) editor.putString(theme.pressColorMode.key, next.colorMode.name)
         if (original.palette != next.palette) editor.putString(theme.pressEffectPalette.key, next.palette.name)
-        if (original.rippleShape != next.rippleShape) editor.putString(theme.rippleShape.key, next.rippleShape.name)
         int(theme.pressGlowBrightness, original.glowBrightness, next.glowBrightness, 0..100)
-        int(theme.pressGlowReach, original.glowReach, next.glowReach, 20..100)
-        int(theme.pressKeyRetreatTime, original.keyRetreatTime, next.keyRetreatTime, 20..5000)
-        int(theme.samKeyHoldTime, original.samKeyHoldTime, next.samKeyHoldTime, 0..1000)
-        int(theme.samKeyRetreatTime, original.samKeyRetreatTime, next.samKeyRetreatTime, 100..5000)
+        int(theme.pressGlowReach, original.glowReach, next.glowReach, 20..150)
+        int(theme.pressFadeOutTime, original.fadeDuration, next.fadeDuration, 100..5000)
         bool(theme.pressGlowOnCandidates, original.candidateGlow, next.candidateGlow)
         bool(theme.idleBreathing, original.idleBreathing, next.idleBreathing)
         if (original.keyMotion != next.keyMotion) editor.putString(theme.keyMotionEffect.key, next.keyMotion.name)

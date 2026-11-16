@@ -53,7 +53,6 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.existingOrNewId
 import splitties.views.imageResource
 import splitties.views.padding
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -146,9 +145,8 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
             if (landscape) prefs.keyHorizontalMarginLandscape else prefs.keyHorizontalMargin
         val vMarginPref =
             if (landscape) prefs.keyVerticalMarginLandscape else prefs.keyVerticalMargin
-        // Sam needs room between its caps: that is the only place where its light shows.
-        hMargin = if (def.margin) dp(max(hMarginPref.getValue(), if (samMode) SAM_LEAST_H_MARGIN else 0)) else 0
-        vMargin = if (def.margin) dp(max(vMarginPref.getValue(), if (samMode) SAM_LEAST_V_MARGIN else 0)) else 0
+        hMargin = if (def.margin) dp(hMarginPref.getValue()) else 0
+        vMargin = if (def.margin) dp(vMarginPref.getValue()) else 0
     }
 
     private val cachedLocation = intArrayOf(0, 0)
@@ -158,6 +156,14 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         get() = cachedBounds.also {
             if (!boundsValid) updateBounds()
         }
+
+    /** Resting key face in row coordinates, independent of press animations. */
+    internal fun restingCapBounds(): Rect = Rect(
+        left + appearanceView.left + hMargin,
+        top + appearanceView.top + vMargin,
+        left + appearanceView.right - hMargin,
+        top + appearanceView.bottom - vMargin
+    )
 
     /**
      * KeyView content left margin, in percentage of parent width
@@ -229,8 +235,8 @@ abstract class KeyView(ctx: Context, val theme: Theme, val def: KeyDef.Appearanc
         }
         // key border
         if (theme == org.fcitx.fcitx5.android.data.theme.ThemePreset.Sam) {
-            // Caps are opaque black, as on the Samsung keyboard this mode follows: the light
-            // shows only in the gaps between them. A pressed cap has its own coloured face.
+            // The light plate appears through the gaps, not through unpressed caps.
+            // The pressed cap has its own independently coloured face above this mask.
             appearanceView.background = insetRadiusDrawable(hMargin, vMargin, radius, SAM_CAP_COLOR)
             appearanceView.padding = 0
             appearanceView.foreground = null
@@ -589,6 +595,5 @@ class ImageTextKeyView(ctx: Context, theme: Theme, def: KeyDef.Appearance.ImageT
     }
 }
 
-private val SAM_CAP_COLOR = Color.BLACK
-private const val SAM_LEAST_H_MARGIN = 4
-private const val SAM_LEAST_V_MARGIN = 5
+/** Opaque keycaps separate the coloured light plate from the key face. */
+private const val SAM_CAP_COLOR = Color.BLACK

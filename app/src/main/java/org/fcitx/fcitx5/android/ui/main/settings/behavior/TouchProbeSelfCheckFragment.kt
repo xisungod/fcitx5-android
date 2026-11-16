@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.RimeTouchProbe
 import org.fcitx.fcitx5.android.core.RimeTouchProbePolicy
+import org.fcitx.fcitx5.android.input.keyboard.SamFrameTiming
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 
 /** An explicit synthetic check uses the same native queue and privacy gates as typing. */
@@ -32,6 +33,7 @@ class TouchProbeSelfCheckFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 while (isActive) {
                     ui?.render(RimeTouchProbe.diagnostics())
+                    ui?.renderSamTiming(SamFrameTiming.snapshot())
                     delay(1000)
                 }
             }

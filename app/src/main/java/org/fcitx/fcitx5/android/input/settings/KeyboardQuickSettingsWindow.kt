@@ -217,14 +217,6 @@ internal class KeyboardQuickSettingsUi(
         setTextColor(textColor.alpha(0.65f))
     }
     private val widthEditor by lazy { KeyWidthEditor(context, theme, draft) }
-    private var breathingToggle: SwitchCompat? = null
-    private val breathingAvailability = label(context.getString(R.string.sam_idle_hint), 12f).apply {
-        setTextColor(textColor.alpha(0.65f))
-    }
-    private val legacyKeyTiming = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-    private val samKeyTiming = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-    private val retreatHint = label("", 12f).apply { setTextColor(textColor.alpha(0.65f)) }
-
     private fun label(text: CharSequence, size: Float = 14f) = TextView(context).apply {
         this.text = text
         textSize = size
@@ -565,25 +557,15 @@ internal class KeyboardQuickSettingsUi(
     private fun toggle(title: Int, key: String, checked: Boolean, update: (Boolean) -> Unit): SwitchCompat =
         toggleView(title, key, checked, update).also { content.addView(it, LinearLayout.LayoutParams(match, wrap)) }
 
-    private fun updateEffectAvailability() {
-        val sam = draft.values.rippleShape == ThemePrefs.RippleShape.Sam
-        breathingToggle?.isEnabled = !sam
-        breathingToggle?.alpha = if (sam) 0.4f else 1f
-        breathingAvailability.visibility = if (sam) View.VISIBLE else View.GONE
-        legacyKeyTiming.visibility = if (sam) View.GONE else View.VISIBLE
-        samKeyTiming.visibility = if (sam) View.VISIBLE else View.GONE
-        retreatHint.setText(if (sam) R.string.sam_key_timing_hint else R.string.keyboard_quick_settings_retreat_hint)
-    }
-
     private fun slider(
         title: Int, key: String, value: Int, min: Int, max: Int, step: Int,
         format: Int = R.string.keyboard_quick_settings_value_percent,
-        parent: LinearLayout = content, update: (Int) -> Unit
+        update: (Int) -> Unit
     ) {
         val caption = label("${context.getString(title)} · ${context.getString(format, value)}")
         caption.setPadding(0, context.dp(8), 0, 0)
-        parent.addView(caption, LinearLayout.LayoutParams(match, wrap))
-        parent.addView(SeekBar(context).apply {
+        content.addView(caption, LinearLayout.LayoutParams(match, wrap))
+        content.addView(SeekBar(context).apply {
             tag = key
             contentDescription = context.getString(title)
             this.max = (max - min) / step
@@ -712,15 +694,9 @@ internal class KeyboardQuickSettingsUi(
         }
         createPage(Page.Effects) {
             note(R.string.axiang_quick_effects_hint)
-            choice(R.string.keyboard_effect_mode, "quick_ripple_shape", ThemePrefs.RippleShape.entries.toTypedArray(), draft.values.rippleShape) {
-                draft.values = draft.values.copy(rippleShape = it)
-                updateEffectAvailability()
-            }
-            breathingToggle = toggle(R.string.idle_breathing, "quick_idle_breathing", draft.values.idleBreathing) {
+            toggle(R.string.idle_breathing, "quick_idle_breathing", draft.values.idleBreathing) {
                 draft.values = draft.values.copy(idleBreathing = it)
             }
-            content.addView(breathingAvailability, LinearLayout.LayoutParams(match, wrap))
-            updateEffectAvailability()
             colorModeSpinner = choice(R.string.press_color_mode, "quick_color_mode",
                 ThemePrefs.PressColorMode.entries.toTypedArray(), draft.values.colorMode) {
                 draft.values = draft.values.copy(colorMode = it)
@@ -733,26 +709,15 @@ internal class KeyboardQuickSettingsUi(
                 topMargin = context.dp(4); bottomMargin = context.dp(8)
             })
             updatePalettePreview()
-            slider(R.string.press_key_retreat_time, "quick_key_retreat", draft.values.keyRetreatTime,
-                20, maxOf(500, draft.values.keyRetreatTime).coerceAtMost(5000), 10,
-                R.string.keyboard_quick_settings_value_ms, legacyKeyTiming) {
-                draft.values = draft.values.copy(keyRetreatTime = it)
+            slider(R.string.light_effect_fade_duration, "quick_glow_fade", draft.values.fadeDuration,
+                100, 5000, 20, R.string.keyboard_quick_settings_value_ms) {
+                draft.values = draft.values.copy(fadeDuration = it)
             }
-            content.addView(legacyKeyTiming, LinearLayout.LayoutParams(match, wrap))
-            slider(R.string.sam_key_hold_time, "quick_sam_key_hold", draft.values.samKeyHoldTime,
-                0, 1000, 10, R.string.keyboard_quick_settings_value_ms, samKeyTiming) {
-                draft.values = draft.values.copy(samKeyHoldTime = it)
-            }
-            slider(R.string.sam_key_retreat_time, "quick_sam_key_retreat", draft.values.samKeyRetreatTime,
-                100, 5000, 10, R.string.keyboard_quick_settings_value_ms, samKeyTiming) {
-                draft.values = draft.values.copy(samKeyRetreatTime = it)
-            }
-            content.addView(samKeyTiming, LinearLayout.LayoutParams(match, wrap))
-            content.addView(retreatHint, LinearLayout.LayoutParams(match, wrap))
+            note(R.string.light_effect_fade_hint)
             slider(R.string.press_glow_brightness, "quick_glow_brightness", draft.values.glowBrightness, 0, 100, 5) {
                 draft.values = draft.values.copy(glowBrightness = it)
             }
-            slider(R.string.press_glow_reach, "quick_glow_reach", draft.values.glowReach, 20, 100, 5) {
+            slider(R.string.press_glow_reach, "quick_glow_reach", draft.values.glowReach, 20, 150, 5) {
                 draft.values = draft.values.copy(glowReach = it)
             }
             toggle(R.string.press_glow_on_candidates, "quick_candidate_glow", draft.values.candidateGlow) {

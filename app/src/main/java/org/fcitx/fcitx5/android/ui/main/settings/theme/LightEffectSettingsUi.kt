@@ -12,11 +12,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
@@ -85,7 +82,6 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
     private val modeSummary = text("", color = subdued)
     private val totalLabel = text("", 13f, accent).apply { tag = "effect-total-time" }
     private val totalDetailLabel = text("", 12f, subdued).apply { tag = "effect-total-detail" }
-    private val keyTimingHint = text("", 12f, subdued)
     val durationControls = linkedMapOf<String, EffectRangeControl>()
     var activeColorDialog: AlertDialog? = null
         private set
@@ -96,9 +92,7 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         val basics = card().apply { tag = "effect-basics" }
         addSwitch(basics, R.string.light_effect_enable, prefs.pressEffect)
         addDivider(basics)
-        basics.addView(text(context.getString(R.string.ripple_shape), 15f),
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
-        addShapeSelector(basics)
+        addSwitch(basics, R.string.idle_breathing, prefs.idleBreathing)
         body.addView(basics)
         section(R.string.light_effect_palette)
         val modeRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
@@ -180,25 +174,20 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         animationCard.addView(totalDetailLabel,
             LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
         listOf(
-            Range(R.string.press_ignition_time, prefs.pressIgnitionTime, 30, 300, 10),
-            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 20),
+            Range(R.string.light_effect_expand, prefs.pressExpansionTime, 100, 4000, 10),
             Range(R.string.press_wave_hold_time, prefs.pressWaveHoldTime, 0, 2000, 10),
-            Range(R.string.light_effect_wave_fade, prefs.pressFadeOutTime, 100, 5000, 20),
-            Range(R.string.light_effect_face_hold, prefs.pressKeyHoldTime, 20, 1000, 10),
-            Range(R.string.light_effect_face_exit, prefs.pressKeyRetreatTime, 20, 5000, 10),
-            Range(R.string.sam_key_hold_time, prefs.samKeyHoldTime, 0, 1000, 10),
-            Range(R.string.sam_key_retreat_time, prefs.samKeyRetreatTime, 100, 5000, 10)
+            Range(R.string.light_effect_fade_duration, prefs.pressFadeOutTime, 100, 5000, 20)
         ).forEach { range -> addRange(animationCard, range, "ms") }
         advanced.addView(animationCard)
-        advanced.addView(keyTimingHint,
+        advanced.addView(text(context.getString(R.string.light_effect_fade_hint), 12f, subdued),
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(16) })
-        updateTimingVisibility()
+        updateTotal()
         addDivider(advanced)
         advanced.addView(text(context.getString(R.string.light_effect_light), 15f).apply {
             setTypeface(typeface, Typeface.BOLD)
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16); bottomMargin = dp(12) })
         val lightCard = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 100, 5), "%")
+        addRange(lightCard, Range(R.string.light_effect_reach, prefs.pressGlowReach, 20, 150, 5), "%")
         addRange(lightCard, Range(R.string.light_effect_brightness, prefs.pressGlowBrightness, 0, 100, 5), "%")
         advanced.addView(lightCard)
         addSwitch(advanced, R.string.light_effect_glow_candidates, prefs.pressGlowOnCandidates)
@@ -221,34 +210,6 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         addSwitch(keyboardCard, R.string.keyboard_show_number_row, prefs.portraitNumberRow)
         keyboardCard.addView(text(context.getString(R.string.keyboard_show_number_row_summary), 12f, subdued))
         body.addView(keyboardCard)
-    }
-
-    private fun addShapeSelector(parent: LinearLayout) {
-        val shapes = ThemePrefs.RippleShape.entries
-        parent.addView(Spinner(context).apply {
-            tag = "effect-ripple-shape"
-            contentDescription = context.getString(R.string.ripple_shape)
-            adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_spinner_item,
-                shapes.map { context.getString(it.stringRes) }) {
-                init { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
-                    super.getView(position, convertView, parent).also { (it as TextView).setTextColor(ink) }
-                override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
-                    super.getDropDownView(position, convertView, parent).also {
-                        (it as TextView).setTextColor(ink)
-                        it.setBackgroundColor(surface)
-                    }
-            }
-            setSelection(shapes.indexOf(prefs.rippleShape.getValue()))
-            onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    val selected = shapes[position]
-                    if (prefs.rippleShape.getValue() != selected) prefs.rippleShape.setValue(selected)
-                    updateTimingVisibility()
-                }
-                override fun onNothingSelected(parent: AdapterView<*>?) {}
-            }
-        }, LinearLayout.LayoutParams(-1, dp(48)))
     }
 
     private data class Range(val title: Int, val pref: ManagedPreference.PInt, val min: Int, val max: Int, val step: Int)
@@ -295,26 +256,11 @@ class LightEffectSettingsUi(val context: Context, private val prefs: ThemePrefs 
         parent.addView(control.root)
     }
 
-    private fun updateTimingVisibility() {
-        val sam = prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
-        listOf(prefs.pressIgnitionTime, prefs.pressKeyHoldTime, prefs.pressKeyRetreatTime).forEach {
-            durationControls[it.key]?.root?.visibility = if (sam) View.GONE else View.VISIBLE
-        }
-        listOf(prefs.samKeyHoldTime, prefs.samKeyRetreatTime).forEach {
-            durationControls[it.key]?.root?.visibility = if (sam) View.VISIBLE else View.GONE
-        }
-        keyTimingHint.setText(if (sam) R.string.sam_key_timing_hint else R.string.keyboard_quick_settings_retreat_hint)
-        updateTotal()
-    }
-
     private fun updateTotal() {
-        val sam = prefs.rippleShape.getValue() == ThemePrefs.RippleShape.Sam
-        val ignition = if (sam) 0 else prefs.pressIgnitionTime.getValue()
         totalLabel.text = context.getString(R.string.light_effect_total,
-            ignition + prefs.pressExpansionTime.getValue() +
+            prefs.pressExpansionTime.getValue() +
                 prefs.pressWaveHoldTime.getValue() + prefs.pressFadeOutTime.getValue())
-        totalDetailLabel.text = if (sam) context.getString(R.string.sam_wave_total_detail)
-            else context.getString(R.string.light_effect_total_detail, ignition)
+        totalDetailLabel.setText(R.string.sam_wave_total_detail)
     }
 
     private fun renderColors() {

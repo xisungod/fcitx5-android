@@ -28,7 +28,6 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.hypot
-import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -68,7 +67,7 @@ internal class PressEffect(
     /** 0 = colour fills the key, 1 = glowing border, 2 = no key colour (only the spreading light) */
     private val keyColorStyle: Int = 0,
     private val keyCornerRadius: Float = 0f,
-    /** 100 = the V09 reach; the Samsung reference keeps the coloured light around neighbouring keys */
+    /** SAM extends its key graph beyond 100%. The other renderers keep their original range. */
     glowReachPercent: Int = 100,
     private val glowOnCandidates: Boolean = true,
     /** V13: key colour follows the finger (full while held, tail starts on release) */
@@ -94,35 +93,17 @@ internal class PressEffect(
     coordinatePalette: Boolean = true,
     private val rippleShape: org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape =
         org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.SoftMist,
-    /** Floating motion keeps colour visible through the rise; Sam also has its own release tail. */
-    private val keyFloatOpacity: ((Int) -> Float)? = null,
-    samKeyHoldTimeMs: Int = 80,
-    samKeyRetreatTimeMs: Int = 800
+    /** Legacy faces can follow the per-key floating motion. */
+    private val keyFloatOpacity: ((Int) -> Float)? = null
 ) {
 
     private val samGlare = rippleShape == org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.Sam
-    // Sam's black mask has no resting light, even when an older installation
-    // retains its breathing preference for the other two effects.
-    private val idleEnabled = idleEnabled && !samGlare
+    private val idleEnabled = idleEnabled
     private val lightLegends = isDark || samGlare
-    private val defaultPalette = palette.isEmpty() || palette.contentEquals(CYBERPUNK)
-    // Sam with the default palette follows the Samsung reference: a pressed cap takes one
-    // of a few accents, and the light around it is the green-to-violet sequence below.
-    private val colors: IntArray = (if (samGlare && defaultPalette) SAM_ACCENTS
-        else if (palette.isEmpty()) CYBERPUNK else palette).map { adapt(it, lightLegends) }.toIntArray()
-    private val cyclicNeon = !samGlare && coordinatePalette && defaultPalette
-    private val coordinatedNeon = !samGlare && coordinatePalette &&
-        (cyclicNeon || PressColorPalette.isCoordinated(palette))
-    /**
-     * Sam: the colours a lit place passes through as its light ages, youngest first.
-     * Null for a palette of unrelated colours, where each pool keeps its key's colour.
-     */
-    private val samPath: IntArray? = when {
-        !samGlare -> null
-        defaultPalette -> SAM_AURORA
-        PressColorPalette.isCoordinated(palette) && colors.size > 1 -> colors
-        else -> null
-    }
+    private val colors: IntArray =
+        (if (palette.isEmpty()) CYBERPUNK else palette).map { adapt(it, lightLegends) }.toIntArray()
+    private val cyclicNeon = coordinatePalette && (palette.isEmpty() || palette.contentEquals(CYBERPUNK))
+    private val coordinatedNeon = coordinatePalette && (cyclicNeon || PressColorPalette.isCoordinated(palette))
     private val sharedFieldEnabled = samGlare || (keySurfaceEffects && exactKeyShape)
     private val liquidKeyFaces = keySurfaceEffects && exactKeyShape && keyColorStyle == KEY_STYLE_FILL &&
         rippleShape == org.fcitx.fcitx5.android.data.theme.ThemePrefs.RippleShape.IrregularFluid
@@ -140,12 +121,11 @@ internal class PressEffect(
     private val ignitionDuration = if (samGlare) 0L else ignitionTimeMs.coerceIn(30, 300).toLong()
     private val waveHoldDuration = waveHoldTimeMs.coerceIn(0, 2000).toLong()
     private val fadeDuration = fadeOutTimeMs.coerceIn(100, 5000).toLong()
+    private val samHeldFaceAge = samHeldFaceFadeAge(waveHoldDuration, fadeDuration)
     private val fadeStart = ignitionDuration + expansionDuration + waveHoldDuration
     private val waveDuration = fadeStart + fadeDuration
     private val keyHoldDuration = keyHoldTimeMs.coerceIn(20, 1000).toLong()
     private val keyRetreatDuration = keyRetreatTimeMs.coerceIn(20, 5000).toLong()
-    private val samKeyHoldDuration = samKeyHoldTimeMs.coerceIn(0, 1000).toLong()
-    private val samKeyRetreatDuration = samKeyRetreatTimeMs.coerceIn(100, 5000).toLong()
     private val duration = max(waveDuration, keyHoldDuration + keyRetreatDuration)
     private val keyFlashTextures = KEY_FLASH_TEXTURES
     private val underStrength = if (lightLegends) 1f else 0.9f
@@ -154,19 +134,19 @@ internal class PressEffect(
     @Suppress("UNUSED_PARAMETER")
     private val legacyOverKeys = overKeysPercent
 
-    /** returns (alpha, retreat 0..1) of the key face, or null once the face is gone */
+    /** Returns the face alpha and updates its retreat fraction for the legacy renderer. */
     private fun keyEnvelope(r: PressEffectTrail.Ripple, now: Long): Float {
         if (samGlare) {
             envelopeRetreat = 0f
-            if (r.releasedAt < 0L) return 0.92f
-            val released = (now - r.releasedAt).coerceAtLeast(0L).toFloat()
-            val tail = 1f - smoothstep(samKeyHoldDuration.toFloat(),
-                (samKeyHoldDuration + samKeyRetreatDuration).toFloat(), released)
-            val motion = if (holdWhilePressed && r.keyFill)
-                keyFloatOpacity?.invoke(r.keyId)?.coerceIn(0f, 1f) ?: 0f else 0f
-            // Geometry may land first or last depending on the motion settings.
-            // Neither clock can cut off the other; subsequent keys own neither.
-            return 0.92f * max(motion, tail)
+            val age = (now - r.start).toFloat()
+            val faceAge = when {
+                r.releasedAt < 0L -> age.coerceAtMost(samHeldFaceAge)
+                r.releasedAt - r.start <= samHeldFaceAge -> age
+                // A long hold pauses only the face. Continue the same curve
+                // from the paused brightness as soon as its last pointer lifts.
+                else -> samHeldFaceAge + (now - r.releasedAt).coerceAtLeast(0L)
+            }
+            return 0.92f * samLightFade(faceAge, waveHoldDuration, fadeDuration)
         }
         if (holdWhilePressed && r.keyFill && keyFloatOpacity != null) {
             // The real KeyView supplies its own per-key elevation/fade state.
@@ -196,12 +176,31 @@ internal class PressEffect(
         var i = 0
         while (i < keyFaces.size) {
             if (keyEnvelope(keyFaces[i], now) <= 0f) {
-                val keyId = keyFaces[i].keyId
-                forgetKeyColor(keyId)
-                ownedColorKeys.delete(keyId)
-                keyFaces.removeAt(i)
+                removeKeyFaceAt(i)
             } else i++
         }
+    }
+
+    private fun removeKeyFaceAt(index: Int) {
+        val face = keyFaces[index]
+        // Even a dropped face must not let a later UP affect the slot's new
+        // occupant. Keep the pointer itself tracked for idle light until UP.
+        for (i in 0 until heldFaces.size()) {
+            if (heldFaces.valueAt(i) === face) heldFaces.setValueAt(i, null)
+        }
+        forgetKeyColor(face.keyId)
+        ownedColorKeys.delete(face.keyId)
+        keyFaces.removeAt(index)
+    }
+
+    private fun obtainKeyFace(keyId: Int, now: Long): PressEffectTrail.Ripple {
+        keyFaces.findKey(keyId)?.let { return it }
+        if (samGlare && keyFaces.size == MAX_KEY_FACES) {
+            // Keep still-held keys ahead of old tails when the face pool fills.
+            val victim = (0 until keyFaces.size).firstOrNull { keyFaces[it].releasedAt >= 0L } ?: 0
+            removeKeyFaceAt(victim)
+        }
+        return keyFaces.obtain(now)
     }
 
     private val random = Random(SystemClock.uptimeMillis())
@@ -209,10 +208,13 @@ internal class PressEffect(
     // erase a still-visible key, and repeated presses never stack old colours on a face.
     private val ripples = PressEffectTrail(MAX_RIPPLES)
     private val freshAttention = FloatArray(MAX_RIPPLES)
+    private val samKeyField = if (samGlare) SamKeyLightField(SAM_FIELD_WIDTH, SAM_FIELD_HEIGHT, density,
+        keyCornerRadius, expansionDuration, waveHoldDuration, fadeDuration,
+        glowReachPercent.coerceIn(10, 150) / 100f, sqrt(sizeScale)) else null
     private val neonField = if (sharedFieldEnabled) NeonField() else null
     private var fieldPreparedAt = Long.MIN_VALUE
     private val keyFaces = PressEffectTrail(MAX_KEY_FACES)
-    private val heldFaces = android.util.SparseArray<PressEffectTrail.Ripple>()
+    private val heldFaces = android.util.SparseArray<PressEffectTrail.Ripple?>()
     private val ownedColorKeys = android.util.SparseBooleanArray()
     private fun clearOwnedColors() {
         for (i in 0 until ownedColorKeys.size()) forgetKeyColor(ownedColorKeys.keyAt(i))
@@ -227,6 +229,7 @@ internal class PressEffect(
     private var frameTime = 0L
     private val choreographer = Choreographer.getInstance()
     private var callbackFrameId = Long.MIN_VALUE
+    private var lastSamFrame = Long.MIN_VALUE
     private var callbackFrameClock = 0L
     private var displayFrameId = Long.MIN_VALUE
     private var displayFrameClock = 0L
@@ -290,8 +293,10 @@ internal class PressEffect(
         host.removeCallbacks(endDisplayFrame)
         callbackFrameId = Long.MIN_VALUE
         displayFrameId = Long.MIN_VALUE
+        lastSamFrame = Long.MIN_VALUE
         if (!canDraw() || !animatorsEnabled()) {
             ripples.clear()
+            samKeyField?.clear()
             clearOwnedColors()
             keyFaces.clear()
             heldFaces.clear()
@@ -316,12 +321,17 @@ internal class PressEffect(
         }
     }
 
-    /** Releasing one finger must leave the other pressed keys illuminated. */
+    /** Releasing one finger must not disturb the other pressed keys. */
     fun onRelease(pointerId: Int) {
         val now = clock()
         releasePointer(pointerId, now)
         breathing.activity(now, held = heldFaces.size() > 0)
         requestDraw()
+    }
+
+    fun startTouchStream() {
+        // A new DOWN ends any interrupted pointer stream that missed UP/CANCEL.
+        if (samGlare && heldFaces.size() > 0) onRelease()
     }
 
     /** Cancellation/final teardown releases every held pointer. */
@@ -403,6 +413,24 @@ internal class PressEffect(
         if (pressEnabled && !sharedFieldEnabled) Textures.ensure()
     }
 
+    fun setSamKeyGeometry(keys: List<SamKeyLightField.KeyGeometry>) {
+        samKeyField?.setGeometry(keys)
+        fieldPreparedAt = Long.MIN_VALUE
+    }
+
+    private fun samBurstAtPress(now: Long): Float {
+        var load = 0f
+        var count = 0
+        for (i in 0 until ripples.size) {
+            val recent = (1f - (now - ripples[i].start) / 520f).coerceIn(0f, 1f)
+            if (recent <= 0f) continue
+            load += recent * recent
+            count++
+        }
+        // One overlapping tap keeps its full halo; sustained typing builds load.
+        return if (count >= 2) smoothstep(0.25f, 0.95f, load) else 0f
+    }
+
     fun onPress(pressX: Float, pressY: Float, keyBounds: Rect? = null, highlightKey: Boolean = false,
         keyId: Int = -1, pointerId: Int = 0, keyPitch: Float = 0f) {
         if (!canDraw() || !animatorsEnabled()) {
@@ -423,11 +451,11 @@ internal class PressEffect(
         }
         if (!sharedFieldEnabled && Textures.ready == null) Textures.ensure()
         val previousColorIndex = lastColorIndex
-        var index = if (sequentialColors) (lastColorIndex + 1).mod(colors.size)
+        var index = if (sequentialColors || samGlare) (lastColorIndex + 1).mod(colors.size)
             else if (cyclicNeon) PressColorPalette.nextCyberpunkIndex(lastColorIndex, random)
             else if (coordinatedNeon) PressColorPalette.nextFamilyIndex(lastColorIndex, colors.size, random)
             else random.nextInt(colors.size)
-        if (!sequentialColors && !coordinatedNeon && colors.size > 1 && index == lastColorIndex) {
+        if ((samGlare || (!sequentialColors && !coordinatedNeon)) && colors.size > 1 && index == lastColorIndex) {
             index = (index + 1 + random.nextInt(colors.size - 1)) % colors.size
         }
         if (coordinatedNeon && !cyclicNeon) {
@@ -468,6 +496,10 @@ internal class PressEffect(
         lastShapeIndex = selectedShape
         // Sliding retargets only this finger; another finger can keep its own key held.
         releasePointer(pointerId, now)
+        val burstAtPress = if (samGlare) samBurstAtPress(now) else 0f
+        if (burstAtPress > 0f) for (i in 0 until ripples.size) {
+            ripples[i].deepenSamBurst(burstAtPress, now)
+        }
         val wave = ripples.obtain(now).apply {
             this.pointerId = pointerId
             releasedAt = -1L
@@ -475,14 +507,15 @@ internal class PressEffect(
             bridgeGain = 1f
             keyFill = highlightKey && keyBounds != null
             this.keyId = keyId
-            x = keyBounds?.exactCenterX() ?: pressX
-            y = keyBounds?.exactCenterY() ?: pressY
+            x = if (samGlare) pressX else keyBounds?.exactCenterX() ?: pressX
+            y = if (samGlare) pressY else keyBounds?.exactCenterY() ?: pressY
             flashWidth = if (keyBounds != null) max(density, keyBounds.width().toFloat()) else flashRadius * 2f
             flashHeight = if (keyBounds != null) max(density, keyBounds.height().toFloat()) else flashRadius * 2f
             pitch = if (keyPitch > 0f) keyPitch else min(flashWidth, flashHeight)
             colorIndex = index
             colorPosition = cyberColorPosition
             shape = selectedShape
+            resetSamBurst(burstAtPress)
             echoShape = (selectedShape + 1 + random.nextInt(max(1, shapes - 1))) % shapes
             rotation = random.nextFloat() * 360f
             spin = (random.nextFloat() * 2f - 1f) * 24f
@@ -492,7 +525,7 @@ internal class PressEffect(
             driftX = (random.nextFloat() - 0.5f) * 22f * density
             driftY = (random.nextFloat() - 0.5f) * 16f * density
         }
-        val face = keyFaces.findKey(keyId) ?: keyFaces.obtain(now)
+        val face = obtainKeyFace(keyId, now)
         face.copyFrom(wave)
         if (!face.keyFill) {
             // Functions retain the soft feedback instead of introducing a pressed block.
@@ -524,16 +557,26 @@ internal class PressEffect(
         if (ripples.size > 0 || keyFaces.size > 0) draw(canvas, underStrength)
     }
 
-    /** Mist faces rest while held; a visible liquid rim continues its local flow. */
+    /** Schedule frames while a visible effect is still changing. */
     fun drawOver(canvas: Canvas) {
         if (!canDraw() || !animatorsEnabled()) return
         var changing = glowStrength > 0f && ripples.size > 0
         if (!changing) for (i in 0 until keyFaces.size) {
             val face = keyFaces[i]
-            if ((!holdWhilePressed || face.releasedAt >= 0L || (liquidKeyFaces && face.keyFill)) &&
-                keyEnvelope(face, frameTime) > 0f) {
+            val faceChanging = if (samGlare) {
+                keySurfaceEffects && keyColorStyle != KEY_STYLE_OFF && face.keyFill &&
+                    (face.releasedAt >= 0L || frameTime - face.start < samHeldFaceAge)
+            } else !holdWhilePressed || face.releasedAt >= 0L || (liquidKeyFaces && face.keyFill)
+            if (faceChanging && keyEnvelope(face, frameTime) > 0f) {
                 changing = true
                 break
+            }
+        }
+        if (samGlare) {
+            if (!changing) lastSamFrame = Long.MIN_VALUE
+            else if (callbackFrameId != Long.MIN_VALUE && callbackFrameId != lastSamFrame) {
+                if (lastSamFrame != Long.MIN_VALUE) SamFrameTiming.recordFrame(callbackFrameId - lastSamFrame)
+                lastSamFrame = callbackFrameId
             }
         }
         if (changing) scheduleFrame(0L)
@@ -547,12 +590,14 @@ internal class PressEffect(
         choreographer.removeFrameCallback(frameCallback)
         host.removeCallbacks(endDisplayFrame)
         ripples.clear()
+        samKeyField?.clear()
         clearOwnedColors()
         keyFaces.clear()
         heldFaces.clear()
         fieldPreparedAt = Long.MIN_VALUE
         displayFrameId = Long.MIN_VALUE
         callbackFrameId = Long.MIN_VALUE
+        lastSamFrame = Long.MIN_VALUE
         breathing.stop()
     }
 
@@ -687,7 +732,7 @@ internal class PressEffect(
         horizontalInset: Int = 0, verticalInset: Int = 0): Float {
         if (!keySurfaceEffects || !canDraw() || !animatorsEnabled()) return 0f
         if (keyColorStyle == KEY_STYLE_OFF) return 0f
-        val now = clock()
+        val now = if (samGlare) drawClock() else clock()
         val ripple = keyFaces.findKey(keyId) ?: return 0f
         if (!ripple.keyFill) return 0f
         val a = keyEnvelope(ripple, now)
@@ -702,6 +747,8 @@ internal class PressEffect(
     private fun waveProgress(spread: Long): Float {
         val t = (spread.toFloat() / expansionDuration).coerceIn(0f, 1f)
         val remaining = 1f - t
+        // The reference pool is still visibly growing in its second quarter.
+        if (samGlare) return 1f - remaining * remaining
         return 1f - remaining * remaining * remaining
     }
 
@@ -726,9 +773,9 @@ internal class PressEffect(
         val elapsed = (frameTime - r.start).coerceAtLeast(0L)
         if (samGlare) {
             if (elapsed >= waveDuration) return 0f
-            val onset = 0.20f + 0.80f * smoothstep(0f, 32f, elapsed.toFloat())
-            val end = fadeEnvelope(r)
-            return onset * end
+            // Each location has its own arrival and release envelope. A global
+            // fade here would dim the centre and the travelling tail together.
+            return 1.35f
         }
         val spread = elapsed - ignitionDuration
         if (spread < 0L || elapsed >= waveDuration) return 0f
@@ -870,13 +917,13 @@ internal class PressEffect(
      * promoting a source to the older grid never turns it into a uniform box.
      */
     private inner class NeonField {
+        private val rasterWidth = if (samGlare) SAM_FIELD_WIDTH else FIELD_WIDTH
+        private val rasterHeight = if (samGlare) SAM_FIELD_HEIGHT else FIELD_HEIGHT
         private val red = FloatArray(FIELD_PIXELS)
         private val green = FloatArray(FIELD_PIXELS)
         private val blue = FloatArray(FIELD_PIXELS)
         private val weight = FloatArray(FIELD_PIXELS)
-        private val samLight = FloatArray(SAM_PROFILE + 2)
-        private val samAge = FloatArray(SAM_PROFILE + 2)
-        private val pixels = IntArray(FIELD_PIXELS)
+        private val pixels = IntArray(rasterWidth * rasterHeight)
         private val oldRed = FloatArray(FIELD_OLD_PIXELS)
         private val oldGreen = FloatArray(FIELD_OLD_PIXELS)
         private val oldBlue = FloatArray(FIELD_OLD_PIXELS)
@@ -886,7 +933,7 @@ internal class PressEffect(
         private val oldMixX = FloatArray(FIELD_WIDTH)
         private val oldMixY = FloatArray(FIELD_HEIGHT)
         private val nodes = Array(FIELD_DIRECT_SOURCES + 1) { FieldNode() }
-        val bitmap = Bitmap.createBitmap(FIELD_WIDTH, FIELD_HEIGHT, Bitmap.Config.ARGB_8888).apply {
+        val bitmap = Bitmap.createBitmap(rasterWidth, rasterHeight, Bitmap.Config.ARGB_8888).apply {
             density = Bitmap.DENSITY_NONE
         }
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -923,7 +970,14 @@ internal class PressEffect(
             logicalHeight = host.height
             bounds.set(0f, -logicalHeight * 0.25f, logicalWidth.toFloat(), logicalHeight.toFloat())
             if (samGlare) {
-                prepareSam()
+                val field = requireNotNull(samKeyField)
+                val start = System.nanoTime()
+                field.render(ripples, colors, frameTime, logicalWidth, logicalHeight, glowOnCandidates, pixels)
+                if (ripples.size > 0) SamFrameTiming.recordRender(System.nanoTime() - start)
+                sourceCount = field.sourceCount
+                visitedSamples = field.visitedSamples
+                mergedSamples = 0
+                bitmap.setPixels(pixels, 0, rasterWidth, 0, 0, rasterWidth, rasterHeight)
                 return
             }
             java.util.Arrays.fill(red, 0f)
@@ -947,7 +1001,7 @@ internal class PressEffect(
             val directStart = if (hasOlder) 1 else 0
             for (i in directStart until sourceCount) accumulate(nodes[i], FIELD_WIDTH, FIELD_HEIGHT,
                 cellWidth, cellHeight, red, green, blue, weight)
-            if (coordinatedNeon) {
+            if (coordinatedNeon && !samGlare) {
                 // Smooth hue numerators/weights before colour lookup. Otherwise
                 // a narrow lime-to-cyan edge can still turn grey when Android
                 // filters the final RGB bitmap. Reuse the two unused RGB buffers;
@@ -971,14 +1025,14 @@ internal class PressEffect(
                 for (x in 0 until FIELD_WIDTH) {
                     val index = y * FIELD_WIDTH + x
                     val w = weight[index]
-                    if (w <= 0.001f || candidate <= 0f) {
+                    if (w <= (if (samGlare) 0.000000001f else 0.001f) || candidate <= 0f) {
                         pixels[index] = 0
                         continue
                     }
                     var r = red[index] / w
                     var g = green[index] / w
                     var b = blue[index] / w
-                    if (coordinatedNeon) {
+                    if (coordinatedNeon && !samGlare) {
                         val above = if (y > 0) index - FIELD_WIDTH else index
                         val below = if (y + 1 < FIELD_HEIGHT) index + FIELD_WIDTH else index
                         val hueWeight = blue[above] + 2f * blue[index] + blue[below]
@@ -995,12 +1049,17 @@ internal class PressEffect(
                         r = (Color.red(from) + (Color.red(to) - Color.red(from)) * mix) / 255f
                         g = (Color.green(from) + (Color.green(to) - Color.green(from)) * mix) / 255f
                         b = (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * mix) / 255f
-                        val high = max(r, max(g, b))
-                        val low = min(r, min(g, b))
-                        val chroma = (high - low).coerceAtLeast(0.001f)
-                        r = (r - low) / chroma
-                        g = (g - low) / chroma
-                        b = (b - low) / chroma
+                        if (!samGlare) {
+                            val high = max(r, max(g, b))
+                            val low = min(r, min(g, b))
+                            val chroma = (high - low).coerceAtLeast(0.001f)
+                            // The original two modes keep their pure neon path.
+                            // Sam retains the palette's own RGB/chroma so its
+                            // weak light does not become a harsh coloured grid.
+                            r = (r - low) / chroma
+                            g = (g - low) / chroma
+                            b = (b - low) / chroma
+                        }
                     }
                     // A spatial exposure ceiling is independent of source count:
                     // a new key cannot globally divide the already travelling front.
@@ -1094,184 +1153,6 @@ internal class PressEffect(
             node.blue = if (coordinatedNeon) 0f else Color.blue(color) / 255f
         }
 
-        /**
-         * The Samsung reference is a pool of light, not a ring: it grows quickly from the key
-         * to about six keys' reach, stays lit all the way back to its centre, shifts hue from
-         * the centre outwards, and then the whole pool dims together.
-         */
-        /**
-         * Sam follows the Samsung Keys Cafe keyboard. A press starts a round pool of light
-         * that grows fast at first and then ever more slowly. Every place lights up in the
-         * youngest colour when the edge of the pool reaches it and then ages through the
-         * colour sequence, so a young pool has one colour and a grown one has rings. A pool
-         * is brightest at its key and falls to nothing at its full reach.
-         *
-         * Where pools overlap the brightest one decides the light and the others add only a
-         * little, so a keyboard full of pools keeps its bright and dim places.
-         */
-        private fun prepareSam() {
-            java.util.Arrays.fill(red, 0f)
-            java.util.Arrays.fill(green, 0f)
-            java.util.Arrays.fill(blue, 0f)
-            java.util.Arrays.fill(weight, 0f)
-            sourceCount = 0
-            visitedSamples = 0
-            mergedSamples = 0
-            val first = max(0, ripples.size - FIELD_DIRECT_SOURCES)
-            if (first > 0) {
-                java.util.Arrays.fill(oldRed, 0f)
-                java.util.Arrays.fill(oldGreen, 0f)
-                java.util.Arrays.fill(oldBlue, 0f)
-                java.util.Arrays.fill(oldWeight, 0f)
-                var any = false
-                for (i in 0 until first) {
-                    val ripple = ripples[i]
-                    val alpha = waveAlpha(ripple)
-                    if (alpha <= 0.001f) continue
-                    accumulateSam(ripple, alpha, FIELD_OLD_WIDTH, FIELD_OLD_HEIGHT, oldRed, oldGreen, oldBlue, oldWeight)
-                    any = true
-                }
-                if (any) {
-                    sourceCount++
-                    mergeOlder()
-                }
-            }
-            for (i in first until ripples.size) {
-                val ripple = ripples[i]
-                val alpha = waveAlpha(ripple)
-                if (alpha <= 0.001f) continue
-                sourceCount++
-                accumulateSam(ripple, alpha, FIELD_WIDTH, FIELD_HEIGHT, red, green, blue, weight)
-            }
-            val path = samPath
-            val cellHeight = bounds.height() / FIELD_HEIGHT
-            for (y in 0 until FIELD_HEIGHT) {
-                val logicalY = bounds.top + (y + 0.5f) * cellHeight
-                val candidate = if (glowOnCandidates) {
-                    0.13f + 0.87f * smoothstep(0f, 32f * density, logicalY)
-                } else if (logicalY < 0f) 0f else 1f
-                for (x in 0 until FIELD_WIDTH) {
-                    val index = y * FIELD_WIDTH + x
-                    val w = weight[index]
-                    if (w <= 0.0000002f || candidate <= 0f) {
-                        pixels[index] = 0
-                        continue
-                    }
-                    val light = min(1f, Math.cbrt(w.toDouble()).toFloat())
-                    var r: Float
-                    var g: Float
-                    var b: Float
-                    if (path != null) {
-                        val position = (red[index] / w).coerceIn(0f, path.lastIndex.toFloat())
-                        val from = min(position.toInt(), path.lastIndex - 1)
-                        val mix = position - from
-                        val a = path[from]
-                        val c = path[from + 1]
-                        r = (Color.red(a) + (Color.red(c) - Color.red(a)) * mix) / 255f
-                        g = (Color.green(a) + (Color.green(c) - Color.green(a)) * mix) / 255f
-                        b = (Color.blue(a) + (Color.blue(c) - Color.blue(a)) * mix) / 255f
-                    } else {
-                        r = red[index] / w
-                        g = green[index] / w
-                        b = blue[index] / w
-                    }
-                    // Strong light is paler, as on the reference: its bright places are
-                    // closer to white than to a saturated colour.
-                    val pale = SAM_PALE * light * light
-                    r += (1f - r) * pale
-                    g += (1f - g) * pale
-                    b += (1f - b) * pale
-                    pixels[index] = ((light * candidate * 255f).toInt() shl 24) or
-                        ((r * 255f).toInt().coerceIn(0, 255) shl 16) or
-                        ((g * 255f).toInt().coerceIn(0, 255) shl 8) or
-                        (b * 255f).toInt().coerceIn(0, 255)
-                }
-            }
-            bitmap.setPixels(pixels, 0, FIELD_WIDTH, 0, 0, FIELD_WIDTH, FIELD_HEIGHT)
-        }
-
-        private fun accumulateSam(ripple: PressEffectTrail.Ripple, alpha: Float, gridWidth: Int, gridHeight: Int,
-            rBuffer: FloatArray, gBuffer: FloatArray, bBuffer: FloatArray, wBuffer: FloatArray) {
-            val cellWidth = logicalWidth.toFloat() / gridWidth
-            val cellHeight = bounds.height() / gridHeight
-            // The measured touch cell of the pressed key, so a nine-key layout scales too.
-            val pitch = if (ripple.pitch > 0f) ripple.pitch else logicalWidth / 10f
-            // A coarse keypad must not grow the pool beyond the keyboard itself.
-            val radius = min(pitch * SAM_REACH_KEYS * sqrt(sizeScale * glowReach).coerceIn(0.6f, 1.4f) * ripple.size,
-                min(logicalWidth.toFloat(), bounds.height()) * 0.9f).coerceAtLeast(pitch)
-            // The pool starts around its own key, so the gaps next to it light at once.
-            val start = min(pitch, radius * 0.4f)
-            val elapsed = (frameTime - ripple.start).coerceAtLeast(0L).toFloat()
-            val pace = expansionDuration.coerceAtLeast(1L) * SAM_GROWTH_PACE
-            val full = 1f - exp(-SAM_GROWTH_TIME / SAM_GROWTH_PACE)
-            val grown = ((1f - exp(-elapsed / pace)) / full).coerceAtMost(1f)
-            val front = start + (radius - start) * grown
-            val soft = min(pitch * SAM_EDGE_KEYS, front)
-            val colourTime = expansionDuration * SAM_COLOUR_TIME
-            for (k in 0..SAM_PROFILE + 1) {
-                val q = min(1f, k.toFloat() / SAM_PROFILE)
-                val distance = sqrt(q) * radius
-                val edge = 1f - smoothstep(front - soft, front + soft * 0.2f, distance)
-                val fall = (1f - q) * sqrt(1f - q) * (0.30f + 0.70f / (1f + 6f * q))
-                samLight[k] = alpha * edge * fall * SAM_PEAK
-                // When the edge of the pool passed this distance, which is the age of its light.
-                val reached = ((distance - start) / (radius - start)).coerceIn(0f, 1f)
-                val arrival = -pace * ln(1f - reached * full)
-                samAge[k] = ((elapsed - arrival) / colourTime).coerceIn(0f, 1f)
-            }
-            val path = samPath
-            var from = 0f
-            var span = 0f
-            var redSpan = 0f
-            var greenSpan = 0f
-            var blueSpan = 0f
-            if (path != null) {
-                // Pools do not all begin and end on exactly the same colour.
-                val last = path.lastIndex.toFloat()
-                from = last * 0.06f * (ripple.shape % 3)
-                span = last * (1f - 0.1f * (ripple.echoShape % 2)) - from
-            } else {
-                val own = colors[ripple.colorIndex]
-                val next = colors[(ripple.colorIndex + 1) % colors.size]
-                from = Color.red(own) / 255f
-                redSpan = (Color.red(next) - Color.red(own)) / 255f * SAM_OWN_COLOUR_DRIFT
-                greenSpan = (Color.green(next) - Color.green(own)) / 255f * SAM_OWN_COLOUR_DRIFT
-                blueSpan = (Color.blue(next) - Color.blue(own)) / 255f * SAM_OWN_COLOUR_DRIFT
-            }
-            val ownGreen = if (path == null) Color.green(colors[ripple.colorIndex]) / 255f else 0f
-            val ownBlue = if (path == null) Color.blue(colors[ripple.colorIndex]) / 255f else 0f
-            val inverse = 1f / (radius * radius)
-            val firstX = ((ripple.x - radius) / cellWidth).toInt().coerceIn(0, gridWidth - 1)
-            val lastX = ((ripple.x + radius) / cellWidth).toInt().coerceIn(0, gridWidth - 1)
-            val firstY = ((ripple.y - radius - bounds.top) / cellHeight).toInt().coerceIn(0, gridHeight - 1)
-            val lastY = ((ripple.y + radius - bounds.top) / cellHeight).toInt().coerceIn(0, gridHeight - 1)
-            for (y in firstY..lastY) {
-                val dy = bounds.top + (y + 0.5f) * cellHeight - ripple.y
-                val row = y * gridWidth
-                for (x in firstX..lastX) {
-                    visitedSamples++
-                    val dx = (x + 0.5f) * cellWidth - ripple.x
-                    val q = (dx * dx + dy * dy) * inverse
-                    if (q >= 1f) continue
-                    val at = q * SAM_PROFILE
-                    val k = at.toInt()
-                    val mix = at - k
-                    val light = samLight[k] + (samLight[k + 1] - samLight[k]) * mix
-                    if (light <= 0.004f) continue
-                    val age = samAge[k] + (samAge[k + 1] - samAge[k]) * mix
-                    val w = light * light * light
-                    val index = row + x
-                    wBuffer[index] += w
-                    if (path != null) rBuffer[index] += w * (from + span * age)
-                    else {
-                        rBuffer[index] += w * (from + redSpan * age)
-                        gBuffer[index] += w * (ownGreen + greenSpan * age)
-                        bBuffer[index] += w * (ownBlue + blueSpan * age)
-                    }
-                }
-            }
-        }
-
         private fun prepareOlder(end: Int): Boolean {
             val scratch = nodes[FIELD_DIRECT_SOURCES]
             java.util.Arrays.fill(oldRed, 0f)
@@ -1291,11 +1172,6 @@ internal class PressEffect(
             }
             if (!any) return false
             sourceCount++ // the old grid is one bounded composite, not a tenth direct source
-            mergeOlder()
-            return true
-        }
-
-        private fun mergeOlder() {
             for (y in 0 until FIELD_HEIGHT) for (x in 0 until FIELD_WIDTH) {
                 mergedSamples++
                 val a = oldY[y] * FIELD_OLD_WIDTH + oldX[x]
@@ -1310,6 +1186,7 @@ internal class PressEffect(
                 green[index] = bilinear(oldGreen, a, b, c, d, fx, fy)
                 blue[index] = bilinear(oldBlue, a, b, c, d, fx, fy)
             }
+            return true
         }
 
         private fun bilinear(values: FloatArray, a: Int, b: Int, c: Int, d: Int, fx: Float, fy: Float): Float {
@@ -1632,31 +1509,12 @@ internal class PressEffect(
         private const val FIELD_WIDTH = 120
         private const val FIELD_HEIGHT = 96
         private const val FIELD_PIXELS = FIELD_WIDTH * FIELD_HEIGHT
+        private const val SAM_FIELD_WIDTH = 160
+        private const val SAM_FIELD_HEIGHT = 128
         private const val FIELD_DIRECT_SOURCES = 8
         private const val FIELD_OLD_WIDTH = 40
         private const val FIELD_OLD_HEIGHT = 32
         private const val FIELD_OLD_PIXELS = FIELD_OLD_WIDTH * FIELD_OLD_HEIGHT
-        /** How many letter keys away the light of one press reaches. */
-        private const val SAM_REACH_KEYS = 4.6f
-        /** The soft edge of a growing pool, in letter keys. */
-        private const val SAM_EDGE_KEYS = 0.9f
-        /** Of the expansion setting: the pool has covered about two thirds of its reach by then. */
-        private const val SAM_GROWTH_PACE = 0.8f
-        /** Of the expansion setting: when the pool stops growing. */
-        private const val SAM_GROWTH_TIME = 2.25f
-        /** Of the expansion setting: how long a lit place takes to pass through the colours. */
-        private const val SAM_COLOUR_TIME = 2f
-        private const val SAM_PEAK = 0.95f
-        private const val SAM_PALE = 0.30f
-        /** A pool of an unrelated palette moves this far towards the next colour as it ages. */
-        private const val SAM_OWN_COLOUR_DRIFT = 0.35f
-        private const val SAM_PROFILE = 128
-        /** Green, teal, sky, blue, violet, pink: the order in which light ages on the reference. */
-        private val SAM_AURORA = intArrayOf(0xFF35F28A.toInt(), 0xFF22E6C3.toInt(), 0xFF3FB6FF.toInt(),
-            0xFF6A86FF.toInt(), 0xFFA57BFF.toInt(), 0xFFE48CFF.toInt())
-        /** The colours a pressed cap takes with the default palette. */
-        private val SAM_ACCENTS = intArrayOf(0xFFF64FE0.toInt(), 0xFF3DF58C.toInt(), 0xFF45B8FF.toInt(),
-            0xFF9D6BFF.toInt(), 0xFF20E3D0.toInt(), 0xFFFF5FA2.toInt())
         private const val FRESH_LIGHT_BUDGET = 1.50f
         private const val OLD_LIGHT_BUDGET = 0.30f
         private const val BRIDGE_LIGHT_BUDGET = 0.40f

@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.PressColorPalette
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.data.theme.ThemePreset
 import org.junit.Assert.*
 import org.junit.Before
@@ -177,7 +178,8 @@ class PressEffectRenderingTest {
         // Measure actual defaults rather than that class's custom timing fixture.
         prefs.pressEffect.sharedPreferences.edit().clear().commit()
         return Harness(press = true, production = true, idle = false, palette = palette, randomSeed = 1401,
-            ignition = prefs.pressIgnitionTime.getValue(), expansion = prefs.pressExpansionTime.getValue(),
+            ignition = prefs.pressIgnitionTime.getValue(),
+            expansion = prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.SoftMist),
             waveHold = prefs.pressWaveHoldTime.getValue(), fade = prefs.pressFadeOutTime.getValue(),
             hold = prefs.pressKeyHoldTime.getValue(), retreat = prefs.pressKeyRetreatTime.getValue())
     }
@@ -1302,7 +1304,8 @@ class PressEffectRenderingTest {
         assertEquals(50, prefs.pressKeyHoldTime.getValue())
         assertEquals(100, prefs.pressKeyRetreatTime.getValue())
         val h = Harness(press = true, production = true, idle = false, randomSeed = 1401,
-            ignition = prefs.pressIgnitionTime.getValue(), expansion = prefs.pressExpansionTime.getValue(),
+            ignition = prefs.pressIgnitionTime.getValue(),
+            expansion = prefs.pressExpansionTimeFor(ThemePrefs.RippleShape.SoftMist),
             waveHold = prefs.pressWaveHoldTime.getValue(), fade = prefs.pressFadeOutTime.getValue(),
             hold = prefs.pressKeyHoldTime.getValue(), retreat = prefs.pressKeyRetreatTime.getValue())
         fun facePeak(keyId: Int, time: Long): Int = h.surface(keyId, time).first.let { image ->
